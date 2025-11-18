@@ -20,10 +20,16 @@ Example:
     'gpt-4'
 """
 
+import json
+import os
 from pathlib import Path
 from typing import Any
 
+import yaml
 from pydantic import BaseModel, Field
+from pydantic import ValidationError as PydanticValidationError
+
+from nimbus.exceptions import ConfigurationError
 
 
 class RateLimitConfig(BaseModel):
@@ -220,3 +226,174 @@ class NimbusConfig(BaseModel):
     default_routing_strategy: str = "round_robin"
     enable_fallbacks: bool = True
     enable_rate_limiting: bool = True
+
+
+class ConfigLoader:
+    """Loads Nimbus configuration from multiple sources.
+
+    ConfigLoader supports loading configuration from three sources with the
+    following precedence (highest to lowest):
+    1. Code overrides (passed as dict to load())
+    2. Environment variables (NIMBUS_ prefix)
+    3. Configuration files (YAML or JSON)
+
+    The loader merges configuration from all sources, with higher precedence
+    sources overriding lower precedence ones.
+
+    Example:
+        >>> # Load from file only
+        >>> config = ConfigLoader.load(config_path=Path("nimbus.yaml"))
+        >>>
+        >>> # Load with environment variables
+        >>> os.environ["NIMBUS_LOG_LEVEL"] = "DEBUG"
+        >>> config = ConfigLoader.load()
+        >>>
+        >>> # Load with code overrides
+        >>> config = ConfigLoader.load(overrides={"log_level": "ERROR"})
+        >>>
+        >>> # Load from all sources
+        >>> config = ConfigLoader.load(
+        ...     config_path=Path("nimbus.yaml"),
+        ...     overrides={"enable_telemetry": False}
+        ... )
+    """
+
+    @staticmethod
+    def load(
+        config_path: Path | None = None, overrides: dict[str, Any] | None = None
+    ) -> NimbusConfig:
+        """Load configuration from multiple sources with precedence.
+
+        Loads configuration from file, environment variables, and code overrides,
+        applying them in order of precedence: code > environment > file.
+
+        Args:
+            config_path: Optional path to YAML or JSON configuration file.
+            overrides: Optional dictionary of configuration values to override.
+
+        Returns:
+            NimbusConfig: Validated configuration object.
+
+        Raises:
+            ConfigurationError: If configuration file cannot be read, parsed,
+                or if configuration values fail validation.
+
+        Example:
+            >>> config = ConfigLoader.load(
+            ...     config_path=Path("config.yaml"),
+            ...     overrides={"log_level": "DEBUG"}
+            ... )
+            >>> config.log_level
+            'DEBUG'
+        """
+        config_data: dict[str, Any] = {}
+
+        # 1. Load from file (lowest precedence)
+        if config_path:
+            try:
+                config_data = ConfigLoader._load_from_file(config_path)
+            except Exception as e:
+                raise ConfigurationError(
+                    f"Failed to load configuration from file: {config_path}",
+                    details={"path": str(config_path), "error": str(e)},
+                ) from e
+
+        # 2. Override with environment variables (medium precedence)
+        env_config = ConfigLoader._load_from_env()
+        config_data.update(env_config)
+
+        # 3. Apply code overrides (highest precedence)
+        if overrides:
+            config_data.update(overrides)
+
+        # Validate and create NimbusConfig
+        try:
+            return NimbusConfig(**config_data)
+        except PydanticValidationError as e:
+            raise ConfigurationError(
+                "Configuration validation failed",
+                details={"validation_errors": e.errors()},
+            ) from e
+
+    @staticmethod
+    def _load_from_file(config_path: Path) -> dict[str, Any]:
+        """Load configuration from a YAML or JSON file.
+
+        Args:
+            config_path: Path to configuration file.
+
+        Returns:
+            Dictionary containing configuration data.
+
+        Raises:
+            ConfigurationError: If file doesn't exist, can't be read, or has invalid format.
+        """
+        if not config_path.exists():
+            raise ConfigurationError(
+                f"Configuration file not found: {config_path}",
+                details={"path": str(config_path)},
+            )
+
+        try:
+            with open(config_path) as f:
+                if config_path.suffix in [".yaml", ".yml"]:
+                    data = yaml.safe_load(f)
+                elif config_path.suffix == ".json":
+                    data = json.load(f)
+                else:
+                    raise ConfigurationError(
+                        f"Unsupported configuration file format: {config_path.suffix}",
+                        details={"path": str(config_path), "suffix": config_path.suffix},
+                    )
+
+            # Handle empty files
+            if data is None:
+                return {}
+
+            if not isinstance(data, dict):
+                raise ConfigurationError(
+                    "Configuration file must contain a dictionary/object at root level",
+                    details={"path": str(config_path), "type": type(data).__name__},
+                )
+
+            return data
+
+        except (yaml.YAMLError, json.JSONDecodeError) as e:
+            raise ConfigurationError(
+                f"Failed to parse configuration file: {config_path}",
+                details={"path": str(config_path), "error": str(e)},
+            ) from e
+
+    @staticmethod
+    def _load_from_env() -> dict[str, Any]:
+        """Load configuration from environment variables.
+
+        Reads all environment variables with NIMBUS_ prefix and converts them
+        to configuration keys. The prefix is removed and the key is lowercased.
+
+        For example:
+            NIMBUS_LOG_LEVEL=DEBUG -> log_level: "DEBUG"
+            NIMBUS_ENABLE_TELEMETRY=false -> enable_telemetry: False
+
+        Returns:
+            Dictionary containing configuration data from environment variables.
+        """
+        config_data: dict[str, Any] = {}
+
+        for key, value in os.environ.items():
+            if key.startswith("NIMBUS_"):
+                # Remove NIMBUS_ prefix and convert to lowercase
+                config_key = key[7:].lower()
+
+                # Try to parse boolean values
+                if value.lower() in ["true", "false"]:
+                    config_data[config_key] = value.lower() == "true"
+                # Try to parse numeric values
+                elif value.isdigit():
+                    config_data[config_key] = int(value)
+                elif value.replace(".", "", 1).isdigit():
+                    config_data[config_key] = float(value)
+                else:
+                    config_data[config_key] = value
+
+        return config_data

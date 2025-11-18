@@ -11,53 +11,73 @@ Installation:
     pip install nimbus[all]               # Everything
 
 Example:
-    >>> from nimbus.completion import CompletionRequest
+    >>> import nimbus
     >>> from nimbus.messages import UserMessage
-    >>> from nimbus.providers.bedrock import BedrockModel
     >>>
-    >>> model = BedrockModel(model_id="anthropic.claude-3-sonnet")
-    >>> response = model.complete(
-    ...     CompletionRequest(
-    ...         messages=[UserMessage(content="Hello")],
-    ...         model="claude-3-sonnet"
-    ...     )
+    >>> client = nimbus.provider("bedrock", region="us-east-1")
+    >>> response = client.complete(
+    ...     messages=[UserMessage("Hello")],
+    ...     model="anthropic.claude-3-sonnet-20240229-v1:0"
     ... )
+    >>> print(response.text)
 """
 
 __version__ = "0.1.0"
 
 # Core exports
-from nimbus.exceptions import (
-    NimbusError,
-    ProviderError,
-    ConfigurationError,
-    ValidationError,
-    CapabilityExecutionError,
-)
-from nimbus.messages import (
-    NimbusMessage,
-    UserMessage,
-    AssistantMessage,
-    SystemMessage,
-    CapabilityMessage,
-    ContentChunk,
-)
 from nimbus.completion import (
-    TokenUsage,
     CompletionRequest,
     CompletionResponse,
     StreamChunk,
+    TokenUsage,
 )
 from nimbus.config import (
-    RateLimitConfig,
-    RetryConfig,
+    ConfigLoader,
     CooldownConfig,
     ModelConfig,
     NimbusConfig,
+    RateLimitConfig,
+    RetryConfig,
 )
+from nimbus.exceptions import (
+    CapabilityExecutionError,
+    ConfigurationError,
+    NimbusError,
+    ProviderError,
+    ValidationError,
+)
+from nimbus.interfaces import (
+    CapabilityInterface,
+    CapabilitySchema,
+    ContentReaderInterface,
+    EventHandlerInterface,
+    EventType,
+    MemoryInterface,
+    ModelInterface,
+    ModelRouterInterface,
+    ObserverInterface,
+    PluginInterface,
+    PromptBuilderInterface,
+    RoutingStrategy,
+    SafetyFilterInterface,
+    SafetyResult,
+    StorageAdapterInterface,
+    VectorEncoderInterface,
+)
+from nimbus.messages import (
+    AssistantMessage,
+    CapabilityMessage,
+    ContentChunk,
+    NimbusMessage,
+    SystemMessage,
+    UserMessage,
+)
+from nimbus.simple_client import provider
 
 __all__ = [
     "__version__",
+    # Simple API
+    "provider",
     # Exceptions
     "NimbusError",
     "ProviderError",
@@ -82,4 +102,22 @@ __all__ = [
     "CooldownConfig",
     "ModelConfig",
     "NimbusConfig",
+    "ConfigLoader",
+    # Interfaces
+    "ModelInterface",
+    "PromptBuilderInterface",
+    "CapabilityInterface",
+    "CapabilitySchema",
+    "MemoryInterface",
+    "SafetyFilterInterface",
+    "SafetyResult",
+    "ObserverInterface",
+    "EventType",
+    "StorageAdapterInterface",
+    "PluginInterface",
+    "EventHandlerInterface",
+    "VectorEncoderInterface",
+    "ContentReaderInterface",
+    "ModelRouterInterface",
+    "RoutingStrategy",
 ]

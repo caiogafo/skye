@@ -16,8 +16,8 @@ Example:
     0.7
 """
 
-from datetime import datetime
-from typing import Any, Type
+from datetime import datetime, timezone
+from typing import Any
 from uuid import uuid4
 
 from pydantic import BaseModel, Field
@@ -57,8 +57,17 @@ class CompletionRequest(BaseModel):
     Represents a request to an LLM provider with all necessary parameters
     including messages, model configuration, and optional structured output schema.
 
+    **Polymorphic Input Support:**
+    - **Base Nimbus**: Use `messages` parameter with list of NimbusMessage objects
+    - **With nimbus[prompts]**: Use `prompt` parameter with template name and variables
+
+    The interface accepts either messages OR prompt, making it work seamlessly
+    with or without the optional prompts package installed.
+
     Attributes:
-        messages: List of messages in the conversation.
+        messages: List of messages in the conversation (base Nimbus).
+        prompt: Prompt template name (requires nimbus[prompts]).
+        prompt_variables: Variables for prompt template rendering.
         model: Model identifier (e.g., 'gpt-4', 'claude-3-sonnet').
         temperature: Sampling temperature (0.0-2.0). Higher values make output more random.
         max_tokens: Maximum number of tokens to generate.
@@ -66,24 +75,38 @@ class CompletionRequest(BaseModel):
         stop: List of sequences that will stop generation.
         stream: Whether to stream the response.
         capabilities: List of capabilities/tools available to the model.
-        capability_choice: How the model should choose capabilities ('auto', 'none', or specific name).
+        capability_choice: How the model should choose capabilities
+            ('auto', 'none', or specific name).
         response_format: Format specification for structured outputs.
         response_schema: Pydantic model class for structured output validation.
         metadata: Additional metadata for the request.
 
-    Example:
+    Example (Base Nimbus):
         >>> from nimbus.messages import UserMessage
         >>> request = CompletionRequest(
         ...     messages=[UserMessage(content="What is 2+2?")],
         ...     model="gpt-4",
-        ...     temperature=0.7,
-        ...     max_tokens=100
+        ...     temperature=0.7
         ... )
         >>> request.model
         'gpt-4'
+
+    Example (With nimbus[prompts]):
+        >>> # Using prompt templates (requires nimbus[prompts])
+        >>> request = CompletionRequest(
+        ...     prompt="math_solver",
+        ...     prompt_variables={"problem": "What is 2+2?"},
+        ...     model="gpt-4"
+        ... )
+        >>> request.prompt
+        'math_solver'
     """
 
-    messages: list[NimbusMessage]
+    # Polymorphic input: either messages OR prompt
+    messages: list[NimbusMessage] | None = None
+    prompt: str | None = None  # Template name (requires nimbus[prompts])
+    prompt_variables: dict[str, Any] = Field(default_factory=dict)
+
     model: str
     temperature: float = Field(default=0.7, ge=0.0, le=2.0)
     max_tokens: int | None = Field(default=None, gt=0)
@@ -93,8 +116,15 @@ class CompletionRequest(BaseModel):
     capabilities: list[dict[str, Any]] | None = None
     capability_choice: str | None = None
     response_format: dict[str, Any] | None = None
-    response_schema: Type[BaseModel] | None = None
+    response_schema: type[BaseModel] | None = None
     metadata: dict[str, Any] = Field(default_factory=dict)
+
+    def model_post_init(self, __context: Any) -> None:
+        """Validate that either messages or prompt is provided, but not both."""
+        if self.messages is None and self.prompt is None:
+            raise ValueError("Either 'messages' or 'prompt' must be provided")
+        if self.messages is not None and self.prompt is not None:
+            raise ValueError("Cannot provide both 'messages' and 'prompt' - use one or the other")
 
 
 class CompletionResponse(BaseModel):
@@ -116,6 +146,7 @@ class CompletionResponse(BaseModel):
         metadata: Additional metadata about the response.
 
     Example:
+        >>> from datetime import datetime, timezone
         >>> response = CompletionResponse(
         ...     id="resp_123",
         ...     model="gpt-4",
@@ -124,7 +155,7 @@ class CompletionResponse(BaseModel):
         ...     role="assistant",
         ...     finish_reason="stop",
         ...     usage=TokenUsage(prompt_tokens=10, completion_tokens=5, total_tokens=15),
-        ...     created_at=datetime.utcnow()
+        ...     created_at=datetime.now(timezone.utc)
         ... )
         >>> response.get_output()
         'The answer is 4.'
@@ -138,7 +169,7 @@ class CompletionResponse(BaseModel):
     role: str = "assistant"
     finish_reason: str
     usage: TokenUsage
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     metadata: dict[str, Any] = Field(default_factory=dict)
 
     def get_output(self) -> str | BaseModel:

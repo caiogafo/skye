@@ -1,7 +1,12 @@
-"""Utility functions and helpers.
+"""Utility functions for Nimbus.
 
 This module provides utility functions for validation, schema generation,
 and other common operations.
 """
 
-__all__ = []
+from nimbus.utils.validation import generate_schema, validate_interface_compliance
+
+__all__ = [
+    "validate_interface_compliance",
+    "generate_schema",
+]

@@ -14,7 +14,7 @@ Example:
     {'role': 'user', 'content': 'Hello, how are you?', ...}
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Literal
 from uuid import uuid4
 
@@ -44,7 +44,7 @@ class NimbusMessage(BaseModel):
     role: Literal["user", "assistant", "system", "capability"]
     metadata: dict[str, Any] = Field(default_factory=dict)
     id: str = Field(default_factory=lambda: str(uuid4()))
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
     @property
     def message_type(self) -> str:
@@ -71,7 +71,7 @@ class NimbusMessage(BaseModel):
             "content": self.content,
             "metadata": self.metadata,
             "id": self.id,
-            "timestamp": self.timestamp.isoformat()
+            "timestamp": self.timestamp.isoformat(),
         }
 
     @classmethod
@@ -241,10 +241,7 @@ class CapabilityMessage(NimbusMessage):
             >>> formatted["role"]
             'tool'
         """
-        base = {
-            "role": "tool" if provider == "openai" else "user",
-            "content": self.content
-        }
+        base = {"role": "tool" if provider == "openai" else "user", "content": self.content}
         if provider == "openai":
             base["tool_call_id"] = self.capability_id
             base["name"] = self.capability_name

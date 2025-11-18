@@ -58,7 +58,7 @@ This implementation plan breaks down the development of nimbus (base package) in
     - Implement __str__ method
     - _Requirements: 1.1_
 
-- [ ] 4. Implement completion request/response models
+- [x] 4. Implement completion request/response models
   - [x] 4.1 Create TokenUsage model
     - Define Pydantic model with prompt_tokens, completion_tokens, total_tokens
     - _Requirements: 4.2, 7.1_
@@ -81,11 +81,14 @@ This implementation plan breaks down the development of nimbus (base package) in
     - Define Pydantic model for streaming response chunks
     - _Requirements: 2.4, 4.4_
 
-- [ ] 5. Implement configuration models
+- [x] 5. Implement configuration models
   - [x] 5.1 Create rate limiting configuration
     - Implement RateLimitConfig Pydantic model
     - Add requests_per_minute, tokens_per_minute fields
     - Add requests_per_day, tokens_per_day fields
+    - Write unit test in tests/unit/test_config_models.py
+    - Test field validation and default values
+    - Run with `uv run pytest tests/unit/test_config_models.py::test_rate_limit_config -v`
     - _Requirements: 3.1, 8.5_
   
   - [x] 5.2 Create retry configuration
@@ -93,12 +96,18 @@ This implementation plan breaks down the development of nimbus (base package) in
     - Add max_retries, retry_after_seconds fields
     - Add exponential_backoff flag
     - Add retry_on_errors list
+    - Write unit test in tests/unit/test_config_models.py
+    - Test default values and validation
+    - Run with `uv run pytest tests/unit/test_config_models.py::test_retry_config -v`
     - _Requirements: 3.3_
   
   - [x] 5.3 Create cooldown configuration
     - Implement CooldownConfig Pydantic model
     - Add enabled flag, allowed_fails_per_minute
     - Add cooldown_duration_seconds
+    - Write unit test in tests/unit/test_config_models.py
+    - Test cooldown logic and validation
+    - Run with `uv run pytest tests/unit/test_config_models.py::test_cooldown_config -v`
     - _Requirements: 3.3_
   
   - [x] 5.4 Create ModelConfig
@@ -108,6 +117,9 @@ This implementation plan breaks down the development of nimbus (base package) in
     - Add fallback_models list
     - Add weight, priority, tags for routing
     - Add cost tracking fields
+    - Write unit test in tests/unit/test_config_models.py
+    - Test all fields, nested configs, and validation
+    - Run with `uv run pytest tests/unit/test_config_models.py::test_model_config -v`
     - _Requirements: 3.1, 3.2, 3.4, 3.5, 7.4_
   
   - [x] 5.5 Create NimbusConfig
@@ -115,26 +127,37 @@ This implementation plan breaks down the development of nimbus (base package) in
     - Add log_level, enable_telemetry fields
     - Add models dict, plugins dict
     - Add router configuration fields
+    - Write unit test in tests/unit/test_config_models.py
+    - Test global config with nested model configs
+    - Run with `uv run pytest tests/unit/test_config_models.py::test_nimbus_config -v`
     - _Requirements: 8.1, 8.2, 8.3, 8.5_
 
-- [ ] 6. Implement configuration loading system
-  - [ ] 6.1 Create ConfigLoader class
+- [x] 6. Implement configuration loading system
+  - [x] 6.1 Create ConfigLoader class
     - Implement load() method with multi-source support
     - Load from YAML/JSON files
     - Load from environment variables (NIMBUS_ prefix)
     - Apply code overrides
     - Implement precedence: code > environment > file
-    - Use `uv run python -c "from nimbus.config import ConfigLoader; print(ConfigLoader.load())"` to test
+    - Write unit test in tests/unit/test_config_loader.py
+    - Test loading from each source (file, env, code)
+    - Test precedence order with multiple sources
+    - Create test fixtures in tests/fixtures/ (sample_config.yaml, sample_config.json)
+    - Run with `uv run pytest tests/unit/test_config_loader.py::test_config_loader -v`
+    - Verify with `uv run python -c "from nimbus.config import ConfigLoader; print(ConfigLoader.load())"`
     - _Requirements: 8.1, 8.2, 8.3, 8.4_
   
-  - [ ] 6.2 Add configuration validation
+  - [x] 6.2 Add configuration validation
     - Validate all config values using Pydantic
     - Raise ConfigurationError for invalid values
-    - Test with `uv run python -m pytest tests/unit/test_config.py -v`
+    - Write unit test in tests/unit/test_config_loader.py
+    - Test validation errors for invalid configs
+    - Test that ConfigurationError is raised with proper context
+    - Run with `uv run pytest tests/unit/test_config_loader.py::test_config_validation -v`
     - _Requirements: 8.5_
 
-- [ ] 7. Implement core interfaces
-  - [ ] 7.1 Create ModelInterface
+- [x] 7. Implement core interfaces
+  - [x] 7.1 Create ModelInterface
     - Define abstract base class with ABC
     - Add complete() method signature
     - Add stream() method signature
@@ -142,49 +165,69 @@ This implementation plan breaks down the development of nimbus (base package) in
     - Add astream() async method signature
     - Add get_model_info() method signature
     - Reference MCP server patterns for interface design (see ~/.kiro/settings/mcp.json)
+    - Write unit test in tests/unit/test_interfaces.py
+    - Create mock implementation to test interface compliance
+    - Test that all abstract methods are defined
+    - Test that incomplete implementations raise TypeError
+    - Run with `uv run pytest tests/unit/test_interfaces.py::test_model_interface -v`
     - Verify with `uv run python -c "from nimbus.interfaces.model import ModelInterface; print(ModelInterface.__abstractmethods__)"`
     - _Requirements: 1.1, 2.1, 2.3, 2.4_
   
-  - [ ] 7.2 Create PromptBuilderInterface
+  - [x] 7.2 Create PromptBuilderInterface
     - Define abstract base class
     - Add render() method signature
     - Add register_template() method signature
     - Add get_template() method signature
     - Check Promptify MCP for prompt template patterns
     - Reference Promptify's Pipeline and Prompter design
+    - Write unit test in tests/unit/test_interfaces.py
+    - Create mock implementation to test interface
+    - Run with `uv run pytest tests/unit/test_interfaces.py::test_prompt_builder_interface -v`
     - Verify with `uv run python -c "from nimbus.interfaces.prompt import PromptBuilderInterface; print(PromptBuilderInterface.__abstractmethods__)"`
     - _Requirements: 1.2_
   
-  - [ ] 7.3 Create CapabilityInterface
+  - [x] 7.3 Create CapabilityInterface
     - Define abstract base class
     - Create CapabilitySchema Pydantic model
     - Add get_schema() method signature
     - Add execute() method signature
     - Add aexecute() async method signature
     - Reference LangChain's tool/function calling patterns
+    - Write unit test in tests/unit/test_interfaces.py
+    - Test CapabilitySchema model validation
+    - Create mock capability implementation
+    - Run with `uv run pytest tests/unit/test_interfaces.py::test_capability_interface -v`
     - Verify with `uv run python -c "from nimbus.interfaces.capability import CapabilityInterface; print(CapabilityInterface.__abstractmethods__)"`
     - _Requirements: 1.3_
   
-  - [ ] 7.4 Create MemoryInterface
+  - [x] 7.4 Create MemoryInterface
     - Define abstract base class
     - Create MemoryEntry Pydantic model
     - Add store() method signature
     - Add retrieve() method signature
     - Add get_by_id() method signature
     - Add delete() method signature
+    - Write unit test in tests/unit/test_interfaces.py
+    - Test MemoryEntry model validation
+    - Create mock memory implementation
+    - Run with `uv run pytest tests/unit/test_interfaces.py::test_memory_interface -v`
     - Verify with `uv run python -c "from nimbus.interfaces.memory import MemoryInterface; print(MemoryInterface.__abstractmethods__)"`
     - _Requirements: 1.4_
   
-  - [ ] 7.5 Create SafetyFilterInterface
+  - [x] 7.5 Create SafetyFilterInterface
     - Define abstract base class
     - Create SafetyResult Pydantic model
     - Add validate_input() method signature
     - Add validate_output() method signature
     - Add get_policies() method signature
+    - Write unit test in tests/unit/test_interfaces.py
+    - Test SafetyResult model validation
+    - Create mock safety filter implementation
+    - Run with `uv run pytest tests/unit/test_interfaces.py::test_safety_filter_interface -v`
     - Verify with `uv run python -c "from nimbus.interfaces.safety import SafetyFilterInterface; print(SafetyFilterInterface.__abstractmethods__)"`
     - _Requirements: 1.5_
   
-  - [ ] 7.6 Create ObserverInterface
+  - [x] 7.6 Create ObserverInterface
     - Define abstract base class
     - Create EventType enum
     - Add log_event() method signature
@@ -192,28 +235,39 @@ This implementation plan breaks down the development of nimbus (base package) in
     - Add start_trace() method signature
     - Add end_trace() method signature
     - Reference OpenTelemetry patterns for tracing
+    - Write unit test in tests/unit/test_interfaces.py
+    - Test EventType enum values
+    - Create mock observer implementation
+    - Run with `uv run pytest tests/unit/test_interfaces.py::test_observer_interface -v`
     - Verify with `uv run python -c "from nimbus.interfaces.observer import ObserverInterface; print(ObserverInterface.__abstractmethods__)"`
     - _Requirements: 5.2, 9.1, 9.2, 9.3_
   
-  - [ ] 7.7 Create StorageAdapterInterface
+  - [x] 7.7 Create StorageAdapterInterface
     - Define abstract base class
     - Add save() method signature
     - Add query() method signature
     - Add vector_search() method signature
     - Add delete() method signature
+    - Write unit test in tests/unit/test_interfaces.py
+    - Create mock storage adapter implementation
+    - Run with `uv run pytest tests/unit/test_interfaces.py::test_storage_adapter_interface -v`
     - Verify with `uv run python -c "from nimbus.interfaces.storage import StorageAdapterInterface; print(StorageAdapterInterface.__abstractmethods__)"`
     - _Requirements: 5.3_
   
-  - [ ] 7.8 Create PluginInterface
+  - [x] 7.8 Create PluginInterface
     - Define abstract base class
     - Add initialize() method signature
     - Add shutdown() method signature
     - Add get_metadata() method signature
     - Reference MCP server lifecycle patterns (initialize/shutdown)
+    - Write unit test in tests/unit/test_interfaces.py
+    - Create mock plugin implementation
+    - Test plugin lifecycle (initialize/shutdown)
+    - Run with `uv run pytest tests/unit/test_interfaces.py::test_plugin_interface -v`
     - Verify with `uv run python -c "from nimbus.interfaces.plugin import PluginInterface; print(PluginInterface.__abstractmethods__)"`
     - _Requirements: 5.1, 5.4_
   
-  - [ ] 7.9 Create EventHandlerInterface
+  - [x] 7.9 Create EventHandlerInterface
     - Define abstract base class
     - Add on_model_invoke_start() method signature
     - Add on_model_invoke_end() method signature
@@ -224,30 +278,42 @@ This implementation plan breaks down the development of nimbus (base package) in
     - Add on_execution_step() method signature
     - Add on_execution_complete() method signature
     - Reference LangChain's callback handler patterns
+    - Write unit test in tests/unit/test_interfaces.py
+    - Create mock event handler implementation
+    - Test all event handler hooks
+    - Run with `uv run pytest tests/unit/test_interfaces.py::test_event_handler_interface -v`
     - Verify with `uv run python -c "from nimbus.interfaces.event_handler import EventHandlerInterface; print(EventHandlerInterface.__abstractmethods__)"`
     - _Requirements: 9.2, 9.5_
   
-  - [ ] 7.10 Create VectorEncoderInterface
+  - [x] 7.10 Create VectorEncoderInterface
     - Define abstract base class
     - Add encode() method signature
     - Add encode_batch() method signature
     - Add aencode() async method signature
     - Add aencode_batch() async method signature
     - Add get_vector_dimension() method signature
+    - Write unit test in tests/unit/test_interfaces.py
+    - Create mock vector encoder implementation
+    - Test sync and async methods
+    - Run with `uv run pytest tests/unit/test_interfaces.py::test_vector_encoder_interface -v`
     - Verify with `uv run python -c "from nimbus.interfaces.vector_encoder import VectorEncoderInterface; print(VectorEncoderInterface.__abstractmethods__)"`
     - _Requirements: 1.1_
   
-  - [ ] 7.11 Create ContentReaderInterface
+  - [x] 7.11 Create ContentReaderInterface
     - Define abstract base class
     - Add read() method signature
     - Add read_stream() method signature
     - Add aread() async method signature
     - Add get_reader_metadata() method signature
     - Reference LangChain's document loader patterns (but use Nimbus naming)
+    - Write unit test in tests/unit/test_interfaces.py
+    - Create mock content reader implementation
+    - Test sync, async, and streaming methods
+    - Run with `uv run pytest tests/unit/test_interfaces.py::test_content_reader_interface -v`
     - Verify with `uv run python -c "from nimbus.interfaces.content_reader import ContentReaderInterface; print(ContentReaderInterface.__abstractmethods__)"`
     - _Requirements: 1.1_
   
-  - [ ] 7.12 Create ModelRouterInterface
+  - [x] 7.12 Create ModelRouterInterface
     - Define abstract base class
     - Create RoutingStrategy enum
     - Add register_model() method signature
@@ -258,45 +324,65 @@ This implementation plan breaks down the development of nimbus (base package) in
     - Add get_model_health() method signature
     - Add set_routing_strategy() method signature
     - Reference LiteLLM's router patterns for load balancing
+    - Write unit test in tests/unit/test_interfaces.py
+    - Test RoutingStrategy enum values
+    - Create mock router implementation
+    - Test routing and fallback logic
+    - Run with `uv run pytest tests/unit/test_interfaces.py::test_model_router_interface -v`
     - Verify with `uv run python -c "from nimbus.interfaces.router import ModelRouterInterface; print(ModelRouterInterface.__abstractmethods__)"`
     - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.5_
 
-- [ ] 8. Implement validation utilities
-  - [ ] 8.1 Create interface validation utilities
+- [x] 8. Implement validation utilities
+  - [x] 8.1 Create interface validation utilities
     - Implement function to validate interface compliance at runtime
     - Check that all abstract methods are implemented
     - Raise ValidationError for non-compliant implementations
-    - Test with `uv run python -m pytest tests/unit/test_validation.py::test_interface_compliance -v`
+    - Write unit test in tests/unit/test_validation.py
+    - Test with compliant and non-compliant implementations
+    - Test that ValidationError includes helpful context
+    - Run with `uv run pytest tests/unit/test_validation.py::test_interface_compliance -v`
     - _Requirements: 5.4, 10.4_
   
-  - [ ] 8.2 Create schema generation utilities
+  - [x] 8.2 Create schema generation utilities
     - Implement function to convert Pydantic models to JSON Schema
     - Support for structured output schema generation
     - Use Pydantic's model_json_schema() method
-    - Test with `uv run python -c "from nimbus.utils.validation import generate_schema; from nimbus.messages import UserMessage; print(generate_schema(UserMessage))"`
+    - Write unit test in tests/unit/test_validation.py
+    - Test schema generation for various message types
+    - Test nested model schema generation
+    - Run with `uv run pytest tests/unit/test_validation.py::test_schema_generation -v`
+    - Verify with `uv run python -c "from nimbus.utils.validation import generate_schema; from nimbus.messages import UserMessage; print(generate_schema(UserMessage))"`
     - _Requirements: 10.2_
 
-- [ ] 9. Create package exports and documentation
-  - [ ] 9.1 Configure __init__.py exports
+- [x] 9. Create package exports and documentation
+  - [x] 9.1 Configure __init__.py exports
     - Export all interfaces from nimbus.interfaces
     - Export all models from nimbus.messages, nimbus.completion, nimbus.config
     - Export all exceptions from nimbus.exceptions
     - Export ConfigLoader from nimbus.config
-    - Test imports with `uv run python -c "from nimbus import ModelInterface, UserMessage, NimbusError, ConfigLoader; print('All imports successful')"`
+    - Write unit test in tests/unit/test_exports.py
+    - Test that all expected symbols are importable from nimbus
+    - Test that __all__ is properly defined
+    - Run with `uv run pytest tests/unit/test_exports.py -v`
+    - Verify with `uv run python -c "from nimbus import ModelInterface, UserMessage, NimbusError, ConfigLoader; print('All imports successful')"`
     - _Requirements: 10.1_
   
-  - [ ] 9.2 Write README.md
+  - [x] 9.2 Write README.md
     - Add project overview
     - Add installation instructions with uv: `uv pip install nimbus`, `uv pip install nimbus[bedrock]`
     - Add basic usage examples
     - Add link to full documentation
     - Reference MCP server structure for documentation patterns
+    - No unit test required (documentation)
     - _Requirements: All_
   
-  - [ ] 9.3 Add type hints verification
+  - [x] 9.3 Add type hints verification
     - Run mypy on all source files with `uv run mypy src/nimbus --strict`
     - Fix any type hint issues
     - Add mypy to Makefile check target: `uv run mypy src/nimbus`
+    - Write test script in tests/test_type_hints.sh
+    - Script should run mypy and fail if errors found
+    - Run with `uv run mypy src/nimbus --strict`
     - _Requirements: 10.1_
 
 - [ ]* 10. Write comprehensive tests
@@ -409,3 +495,84 @@ The ModelRouterInterface is defined in core but will be implemented in a separat
 - Run `uv run mypy src/nimbus --strict` before committing
 - Use `uv run black src/ tests/` to format code
 - Use `uv run ruff check src/ tests/` to lint code
+
+### Quick Validation Commands
+
+After implementing each task, use these UV commands to validate:
+
+```bash
+# Import validation
+uv run python -c "from nimbus import ModelInterface, UserMessage; print('OK')"
+
+# Type checking
+uv run mypy src/nimbus --strict
+
+# Run tests
+uv run pytest tests/unit/ -v
+
+# Code formatting
+uv run black src/ tests/ --check
+
+# Linting
+uv run ruff check src/ tests/
+
+# Full validation (add to Makefile)
+uv run pytest && uv run mypy src/nimbus --strict && uv run ruff check src/ tests/
+```
+
+### MCP Integration References
+
+The following MCP servers are available for reference patterns:
+- **Promptify**: Template and prompt management patterns
+- **LangChain**: General LLM patterns, callbacks, document loaders
+- **LiteLLM**: Provider abstraction and routing patterns
+- **SDK-Python**: Python SDK structure and interface design
+
+Access MCP documentation via:
+- Promptify: Check MCP for prompt template patterns
+- LangChain: Check MCP for callback and tool patterns
+- LiteLLM: Check MCP for router and provider patterns
+
+### Testing Requirements Summary
+
+**IMPORTANT**: For each implementation task, you MUST:
+
+1. **Write the unit test FIRST** in the appropriate test file (tests/unit/)
+2. **Implement the code** to make the test pass
+3. **Run the test** using the specified `uv run pytest` command
+4. **Verify** the implementation works as expected
+
+**Test File Organization**:
+- `tests/unit/test_exceptions.py` - Exception hierarchy tests
+- `tests/unit/test_messages.py` - Message model tests
+- `tests/unit/test_completion.py` - Completion request/response tests
+- `tests/unit/test_config_models.py` - Configuration model tests
+- `tests/unit/test_config_loader.py` - ConfigLoader tests
+- `tests/unit/test_interfaces.py` - All interface tests (one file for all interfaces)
+- `tests/unit/test_validation.py` - Validation utility tests
+- `tests/unit/test_exports.py` - Package export tests
+- `tests/fixtures/` - Test fixtures (sample configs, mock data)
+
+**Test Execution Pattern**:
+```bash
+# Run specific test
+uv run pytest tests/unit/test_file.py::test_function_name -v
+
+# Run all tests in a file
+uv run pytest tests/unit/test_file.py -v
+
+# Run all unit tests
+uv run pytest tests/unit/ -v
+
+# Run with coverage
+uv run pytest tests/unit/ --cov=src/nimbus --cov-report=term-missing
+```
+
+**Test Quality Standards**:
+- Each test should be focused on a single behavior
+- Use descriptive test names (test_user_message_creation, test_invalid_temperature_raises_error)
+- Use pytest.mark.parametrize for testing multiple cases
+- Use pytest.mark.asyncio for async tests
+- Mock external dependencies
+- Test both success and failure cases
+- Aim for 80%+ code coverage on core functionality

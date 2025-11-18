@@ -1,0 +1,38 @@
+log_level: INFO
+enable_telemetry: true
+correlation_id_header: X-Correlation-ID
+default_routing_strategy: round_robin
+enable_fallbacks: true
+enable_rate_limiting: true
+
+models:
+  gpt-4:
+    model_id: gpt-4
+    provider: openai
+    temperature: 0.7
+    max_tokens: 2000
+    rate_limits:
+      requests_per_minute: 60
+      tokens_per_minute: 90000
+    fallback_models:
+      - gpt-3.5-turbo
+    cost_per_1k_prompt_tokens: 0.03
+    cost_per_1k_completion_tokens: 0.06
+
+  claude-3:
+    model_id: claude-3-sonnet
+    provider: anthropic
+    temperature: 0.5
+    max_tokens: 4000
+    rate_limits:
+      requests_per_minute: 50
+      tokens_per_minute: 100000
+
+plugins:
+  memory:
+    type: redis
+    host: localhost
+    port: 6379
+  observe:
+    type: opentelemetry
+    endpoint: http://localhost:4318

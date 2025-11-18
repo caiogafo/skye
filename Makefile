@@ -1,4 +1,4 @@
-.PHONY: help install install-dev clean format lint type-check test test-unit test-integration test-cov check all
+.PHONY: help install install-dev clean format lint type-check type-check-providers test test-unit test-integration test-cov test-providers check all
 
 # Default target
 help:
@@ -14,12 +14,14 @@ help:
 	@echo "  make format           Format code with black"
 	@echo "  make lint             Lint code with ruff"
 	@echo "  make type-check       Type check with mypy"
+	@echo "  make type-check-providers  Type check providers only"
 	@echo "  make check            Run all checks (format, lint, type-check)"
 	@echo ""
 	@echo "Testing:"
 	@echo "  make test             Run all tests"
 	@echo "  make test-unit        Run unit tests only"
 	@echo "  make test-integration Run integration tests only"
+	@echo "  make test-providers   Run provider unit tests only"
 	@echo "  make test-cov         Run tests with coverage report"
 	@echo ""
 	@echo "Utilities:"
@@ -52,8 +54,14 @@ lint:
 # Type checking
 type-check:
 	@echo "Type checking with mypy..."
-	uv run mypy src/
+	uv run mypy src/nimbus --strict
 	@echo "✓ Type checking complete"
+
+# Type checking for providers specifically
+type-check-providers:
+	@echo "Type checking providers with mypy..."
+	uv run mypy src/nimbus/providers --strict
+	@echo "✓ Provider type checking complete"
 
 # Run all checks (for task completion validation)
 check: format lint type-check
@@ -74,6 +82,10 @@ test-unit:
 test-integration:
 	@echo "Running integration tests..."
 	uv run pytest tests/integration/ -v
+
+test-providers:
+	@echo "Running provider unit tests..."
+	uv run pytest tests/unit/providers/ -v
 
 test-cov:
 	@echo "Running tests with coverage..."
