@@ -1,25 +1,23 @@
-"""OpenAI Provider Example.
+"""OpenAI Provider Example (Boto3-style Nimbus API).
 
-This example demonstrates how to use the OpenAI provider with Nimbus.
-
-Features shown:
-- Basic completion
+This version demonstrates:
+- Basic completion with messages
 - Streaming responses
 - Async operations
-- Token usage tracking
+- Multi-turn conversations
+- Simple client creation: nimbus.provider("openai")
 """
 
 import asyncio
 import os
-from nimbus.completion import CompletionRequest
+import nimbus
 from nimbus.messages import UserMessage, SystemMessage
-from nimbus.providers import ProviderRegistry
 
 
 def basic_completion():
-    """Basic completion example."""
+    """Basic completion with OpenAI."""
     print("=" * 60)
-    print("OpenAI Basic Completion")
+    print("OpenAI - Basic Completion")
     print("=" * 60)
     
     api_key = os.getenv("OPENAI_API_KEY")
@@ -28,36 +26,28 @@ def basic_completion():
         print("   Set it with: export OPENAI_API_KEY='sk-...'")
         return
     
-    provider = ProviderRegistry.get_model_provider("openai", api_key=api_key)
+    client = nimbus.provider("openai", api_key=api_key)
     
-    request = CompletionRequest(
-        messages=[
-            SystemMessage(content="You are a helpful assistant."),
-            UserMessage(content="What is the capital of France?")
-        ],
-        model="gpt-4",
-        temperature=0.7,
-        max_tokens=100
+    messages = [
+        SystemMessage("You are a helpful assistant."),
+        UserMessage("What is the capital of France?"),
+    ]
+    
+    response = client.complete(
+        messages=messages, model="gpt-4", temperature=0.7, max_tokens=100
     )
     
-    print("\nRequest:")
-    print(f"  Model: {request.model}")
-    print(f"  Temperature: {request.temperature}")
-    print(f"  Messages: {len(request.messages)}")
-    
-    response = provider.complete(request)
-    
     print("\nResponse:")
-    print(f"  Content: {response.content}")
-    print(f"  Provider: {response.provider}")
-    print(f"  Tokens used: {response.usage.total_tokens}")
-    print(f"  Finish reason: {response.finish_reason}")
+    print("  Text:", response.content)
+    print("  Model:", response.model)
+    print("  Tokens:", response.usage.total_tokens)
+    print("  Finish reason:", response.finish_reason)
 
 
 def streaming_example():
-    """Streaming completion example."""
+    """Streaming completion with OpenAI."""
     print("\n" + "=" * 60)
-    print("OpenAI Streaming")
+    print("OpenAI - Streaming")
     print("=" * 60)
     
     api_key = os.getenv("OPENAI_API_KEY")
@@ -65,29 +55,23 @@ def streaming_example():
         print("⚠️  OPENAI_API_KEY environment variable not set")
         return
     
-    provider = ProviderRegistry.get_model_provider("openai", api_key=api_key)
+    client = nimbus.provider("openai", api_key=api_key)
     
-    request = CompletionRequest(
-        messages=[
-            UserMessage(content="Write a short poem about Python programming")
-        ],
-        model="gpt-4",
-        stream=True
-    )
+    messages = [UserMessage("Write a short poem about Python programming")]
     
     print("\nStreaming response:")
     print("-" * 40)
     
-    for chunk in provider.stream(request):
+    for chunk in client.stream(messages=messages, model="gpt-4"):
         print(chunk.delta, end="", flush=True)
     
     print("\n" + "-" * 40)
 
 
 async def async_completion():
-    """Async completion example."""
+    """Async completion with OpenAI."""
     print("\n" + "=" * 60)
-    print("OpenAI Async Completion")
+    print("OpenAI - Async Completion")
     print("=" * 60)
     
     api_key = os.getenv("OPENAI_API_KEY")
@@ -95,27 +79,21 @@ async def async_completion():
         print("⚠️  OPENAI_API_KEY environment variable not set")
         return
     
-    provider = ProviderRegistry.get_model_provider("openai", api_key=api_key)
+    client = nimbus.provider("openai", api_key=api_key)
     
-    request = CompletionRequest(
-        messages=[
-            UserMessage(content="Explain async/await in Python")
-        ],
-        model="gpt-4",
-        max_tokens=200
-    )
+    messages = [UserMessage("Explain async/await in Python")]
     
     print("\nMaking async request...")
-    response = await provider.acomplete(request)
+    response = await client.acomplete(messages=messages, model="gpt-4", max_tokens=200)
     
-    print(f"Response: {response.content[:100]}...")
-    print(f"Tokens: {response.usage.total_tokens}")
+    print("  Response:", response.content[:100], "...")
+    print("  Tokens:", response.usage.total_tokens)
 
 
 def multi_turn_conversation():
     """Multi-turn conversation example."""
     print("\n" + "=" * 60)
-    print("OpenAI Multi-Turn Conversation")
+    print("OpenAI - Multi-Turn Conversation")
     print("=" * 60)
     
     api_key = os.getenv("OPENAI_API_KEY")
@@ -123,35 +101,81 @@ def multi_turn_conversation():
         print("⚠️  OPENAI_API_KEY environment variable not set")
         return
     
-    provider = ProviderRegistry.get_model_provider("openai", api_key=api_key)
+    client = nimbus.provider("openai", api_key=api_key)
     
     # First turn
     print("\nTurn 1: User asks a question")
-    request = CompletionRequest(
-        messages=[
-            UserMessage(content="What is machine learning?")
-        ],
-        model="gpt-4",
-        max_tokens=150
-    )
+    messages = [UserMessage("What is machine learning?")]
     
-    response1 = provider.complete(request)
+    response1 = client.complete(messages=messages, model="gpt-4", max_tokens=150)
     print(f"Assistant: {response1.content[:100]}...")
     
     # Second turn - continue conversation
     print("\nTurn 2: User asks follow-up question")
-    request = CompletionRequest(
-        messages=[
-            UserMessage(content="What is machine learning?"),
-            response1.to_message(),
-            UserMessage(content="Can you give me a practical example?")
-        ],
-        model="gpt-4",
-        max_tokens=150
-    )
+    messages.append(response1.to_message())
+    messages.append(UserMessage("Can you give me a practical example?"))
     
-    response2 = provider.complete(request)
+    response2 = client.complete(messages=messages, model="gpt-4", max_tokens=150)
     print(f"Assistant: {response2.content[:100]}...")
+
+
+def router_example():
+    """Example using router for load balancing."""
+    print("\n" + "=" * 60)
+    print("OpenAI - Router for Load Balancing")
+    print("=" * 60)
+    
+    print("""
+Use RouterRegistry for load balancing across deployments:
+
+```python
+import nimbus
+from nimbus import routes as rt
+from nimbus.messages import UserMessage
+
+# Define load balancing setup
+registry = rt.RouterRegistry([
+    rt.RouteConfig(
+        alias="gpt-4",
+        targets=[
+            rt.ModelTarget(
+                model="gpt-4",
+                provider="openai",
+                api_key=os.getenv("OPENAI_API_KEY_1")
+            ),
+            rt.ModelTarget(
+                model="gpt-4",
+                provider="openai",
+                api_key=os.getenv("OPENAI_API_KEY_2")
+            ),
+        ],
+        strategy="least-busy"
+    ),
+    rt.RouteConfig(
+        alias="fast",
+        targets=[
+            rt.ModelTarget(model="gpt-3.5-turbo", provider="openai", api_key="..."),
+            rt.ModelTarget(model="gpt-3.5-turbo-16k", provider="openai", api_key="..."),
+        ],
+        strategy="round-robin"
+    )
+])
+
+# Create client with router
+client = nimbus.provider("openai", router=registry)
+
+# Use alias - router handles selection
+response = client.complete(
+    messages=[UserMessage("Hello")],
+    model="fast"  # Routes to gpt-3.5-turbo or gpt-3.5-turbo-16k
+)
+```
+
+Benefits:
+- Load balance across multiple API keys
+- Automatic failover on rate limits
+- Custom aliases for model groups
+""")
 
 
 def main():
@@ -164,6 +188,7 @@ def main():
         basic_completion()
         streaming_example()
         multi_turn_conversation()
+        router_example()
         
         # Run async example
         print("\n" + "=" * 60)

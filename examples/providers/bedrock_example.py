@@ -14,170 +14,117 @@ from nimbus.messages import UserMessage, SystemMessage
 
 
 def basic_completion():
-    """Basic completion with Bedrock."""
+    """Basic completion using Bedrock."""
     print("=" * 60)
-    print("AWS Bedrock Basic Completion")
+    print("AWS Bedrock - Basic Completion")
     print("=" * 60)
     
     try:
-        provider = ProviderRegistry.get_model_provider(
+        client = nimbus.provider(
             "bedrock",
-            region_name="us-east-1"
+            region="us-east-1",
+            model="anthropic.claude-3-sonnet-20240229-v1:0"
         )
     except ImportError as e:
         print(f"⚠️  Error: {e}")
         print("\nTo use Bedrock, install with: pip install nimbus[bedrock]")
         return
     
-    request = CompletionRequest(
-        messages=[
-            SystemMessage(content="You are a helpful assistant."),
-            UserMessage(content="What is the capital of France?")
-        ],
-        model="anthropic.claude-3-sonnet-20240229-v1:0",
-        temperature=0.7,
-        max_tokens=100
-    )
+    messages = [
+        SystemMessage("You are a helpful assistant."),
+        UserMessage("What is the capital of France?"),
+    ]
     
-    print("\nRequest:")
-    print(f"  Model: {request.model}")
-    print(f"  Region: us-east-1")
-    print(f"  Messages: {len(request.messages)}")
+    response = client.complete(messages=messages, temperature=0.7, max_tokens=100)
     
-    try:
-        response = provider.complete(request)
-        
-        print("\nResponse:")
-        print(f"  Content: {response.content}")
-        print(f"  Provider: {response.provider}")
-        print(f"  Tokens used: {response.usage.total_tokens}")
-        print(f"  Finish reason: {response.finish_reason}")
-    except Exception as e:
-        print(f"\n❌ Error: {e}")
-        print("\nMake sure you have:")
-        print("  1. AWS credentials configured (AWS_PROFILE or AWS_ACCESS_KEY_ID)")
-        print("  2. Access to Bedrock in your AWS account")
-        print("  3. Model access enabled in Bedrock console")
+    print("\nResponse:")
+    print("  Text:", response.content)
+    print("  Model:", response.model)
+    print("  Tokens:", response.usage.total_tokens)
+    print("  Finish reason:", response.finish_reason)
 
 
 def multiple_models():
-    """Example with different Bedrock models."""
+    """Run the same prompt on different models."""
     print("\n" + "=" * 60)
     print("AWS Bedrock - Multiple Models")
     print("=" * 60)
     
-    try:
-        provider = ProviderRegistry.get_model_provider(
-            "bedrock",
-            region_name="us-west-2"
-        )
-    except ImportError:
-        print("⚠️  Bedrock provider not available")
-        return
+    client = nimbus.provider("bedrock", region="us-west-2")
     
     models = [
-        ("anthropic.claude-3-sonnet-20240229-v1:0", "Claude 3 Sonnet"),
-        ("anthropic.claude-3-haiku-20240307-v1:0", "Claude 3 Haiku"),
-        ("amazon.titan-text-express-v1", "Amazon Titan"),
+        "anthropic.claude-3-sonnet-20240229-v1:0",
+        "anthropic.claude-3-haiku-20240307-v1:0",
+        "amazon.titan-text-express-v1",
     ]
     
     prompt = "What is artificial intelligence?"
+    messages = [UserMessage(prompt)]
     
     print(f"\nPrompt: {prompt}")
     print("-" * 40)
     
-    for model_id, model_name in models:
-        print(f"\n{model_name}:")
-        
-        request = CompletionRequest(
-            messages=[UserMessage(content=prompt)],
-            model=model_id,
-            max_tokens=100
-        )
-        
-        try:
-            response = provider.complete(request)
-            print(f"  Response: {response.content[:80]}...")
-            print(f"  Tokens: {response.usage.total_tokens}")
-        except Exception as e:
-            print(f"  ⚠️  Error: {str(e)[:60]}...")
+    for model in models:
+        print(f"\nModel: {model}")
+        response = client.complete(messages=messages, model=model, max_tokens=80)
+        print("  Response:", response.content[:80], "...")
+        print("  Tokens:", response.usage.total_tokens)
 
 
 def streaming_example():
-    """Streaming completion with Bedrock."""
+    """Streaming completion using Bedrock."""
     print("\n" + "=" * 60)
-    print("AWS Bedrock Streaming")
+    print("AWS Bedrock - Streaming")
     print("=" * 60)
     
-    try:
-        provider = ProviderRegistry.get_model_provider(
-            "bedrock",
-            region_name="us-east-1"
-        )
-    except ImportError:
-        print("⚠️  Bedrock provider not available")
-        return
+    client = nimbus.provider("bedrock", region="us-east-1")
     
-    request = CompletionRequest(
-        messages=[
-            UserMessage(content="Write a short story about a robot learning to paint")
-        ],
-        model="anthropic.claude-3-sonnet-20240229-v1:0",
-        stream=True
-    )
+    messages = [UserMessage("Write a short story about a robot learning to paint.")]
     
     print("\nStreaming response:")
     print("-" * 40)
     
-    try:
-        for chunk in provider.stream(request):
-            print(chunk.delta, end="", flush=True)
-        print("\n" + "-" * 40)
-    except Exception as e:
-        print(f"\n❌ Error: {e}")
+    for chunk in client.stream(
+        messages=messages, model="anthropic.claude-3-sonnet-20240229-v1:0"
+    ):
+        print(chunk.delta, end="", flush=True)
+    
+    print("\n" + "-" * 40)
 
 
 def lambda_deployment_example():
-    """Example showing Lambda-friendly usage."""
+    """Lambda-friendly example."""
     print("\n" + "=" * 60)
     print("AWS Lambda Deployment Example")
     print("=" * 60)
     
     print("""
-In AWS Lambda, boto3 is pre-installed in the runtime.
-You don't need to include it in your deployment package.
-
-Example Lambda handler:
+Example AWS Lambda handler using Nimbus:
 
 ```python
-from nimbus.completion import CompletionRequest
+import nimbus
 from nimbus.messages import UserMessage
-from nimbus.providers import ProviderRegistry
+
+client = nimbus.provider("bedrock", region="us-east-1")
 
 def lambda_handler(event, context):
-    # Bedrock provider works without boto3 in dependencies
-    provider = ProviderRegistry.get_model_provider(
-        "bedrock",
-        region_name="us-east-1"
-    )
+    messages = [UserMessage(event["prompt"])]
     
-    request = CompletionRequest(
-        messages=[UserMessage(content=event['prompt'])],
+    response = client.complete(
+        messages=messages,
         model="anthropic.claude-3-sonnet-20240229-v1:0"
     )
     
-    response = provider.complete(request)
-    
     return {
-        'statusCode': 200,
-        'body': response.content
+        "statusCode": 200,
+        "body": response.content
     }
 ```
 
 Deployment:
-1. Create deployment package with nimbus (without boto3)
+1. Create deployment package with nimbus (boto3 is pre-installed in Lambda)
 2. Upload to Lambda
-3. Set environment variables if needed
+3. Set IAM permissions for Bedrock access
 4. Lambda runtime provides boto3 automatically
 """)
 
@@ -192,12 +139,12 @@ def aws_profile_example():
 You can specify an AWS profile for Bedrock:
 
 ```python
-from nimbus.providers import ProviderRegistry
+import nimbus
 
 # Use specific AWS profile
-provider = ProviderRegistry.get_model_provider(
+client = nimbus.provider(
     "bedrock",
-    region_name="us-east-1",
+    region="us-east-1",
     profile_name="my-profile"
 )
 ```
@@ -212,11 +159,59 @@ export AWS_REGION=us-east-1
 Then:
 
 ```python
-provider = ProviderRegistry.get_model_provider(
-    "bedrock",
-    region_name="us-east-1"
+client = nimbus.provider("bedrock", region="us-east-1")
+```
+""")
+
+
+def router_example():
+    """Example using router for multi-region load balancing."""
+    print("\n" + "=" * 60)
+    print("AWS Bedrock - Router for Multi-Region")
+    print("=" * 60)
+    
+    print("""
+Use RouterRegistry for load balancing across regions:
+
+```python
+import nimbus
+from nimbus import routes as rt
+from nimbus.messages import UserMessage
+
+# Define multi-region setup
+registry = rt.RouterRegistry([
+    rt.RouteConfig(
+        alias="claude",
+        targets=[
+            rt.ModelTarget(
+                model="anthropic.claude-3-sonnet-20240229-v1:0",
+                provider="bedrock",
+                region="us-east-1"
+            ),
+            rt.ModelTarget(
+                model="anthropic.claude-3-sonnet-20240229-v1:0",
+                provider="bedrock",
+                region="us-west-2"
+            ),
+        ],
+        strategy="round-robin"
+    )
+])
+
+# Create client with router
+client = nimbus.provider("bedrock", router=registry)
+
+# Use alias - router handles region selection
+response = client.complete(
+    messages=[UserMessage("Hello")],
+    model="claude"  # Routes to us-east-1 or us-west-2
 )
 ```
+
+Benefits:
+- Automatic failover between regions
+- Load balancing for better performance
+- Single alias for multiple deployments
 """)
 
 
@@ -232,6 +227,7 @@ def main():
         streaming_example()
         lambda_deployment_example()
         aws_profile_example()
+        router_example()
         
         print("\n" + "=" * 60)
         print("✅ Examples completed!")

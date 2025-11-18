@@ -189,3 +189,49 @@ class ProviderRegistry:
             ['openai', 'bedrock', 'cohere', 'vertex']
         """
         return list(cls._embedding_providers.keys())
+
+
+def provider(name: str, **config: Any) -> ModelInterface:
+    """Create a provider client (boto3-style API).
+
+    This is the main entry point for the simplified boto3-style API.
+    Returns a provider instance that supports direct method calls.
+
+    Args:
+        name: Provider name (e.g., "openai", "bedrock", "anthropic").
+        **config: Provider-specific configuration.
+
+    Returns:
+        ModelInterface instance that supports boto3-style calls.
+
+    Example:
+        >>> import nimbus
+        >>> from nimbus.messages import UserMessage
+        >>>
+        >>> # OpenAI
+        >>> client = nimbus.provider("openai", api_key="sk-...")
+        >>> response = client.complete(
+        ...     messages=[UserMessage("Hello")],
+        ...     model="gpt-4"
+        ... )
+        >>>
+        >>> # Bedrock
+        >>> client = nimbus.provider("bedrock", region="us-east-1")
+        >>> response = client.complete(
+        ...     messages=[UserMessage("Hello")],
+        ...     model="anthropic.claude-3-sonnet-20240229-v1:0"
+        ... )
+        >>>
+        >>> # Anthropic
+        >>> client = nimbus.provider("anthropic", api_key="sk-ant-...")
+        >>> response = client.complete(
+        ...     messages=[UserMessage("Hello")],
+        ...     model="claude-3-sonnet-20240229"
+        ... )
+    """
+    # Normalize parameter names for convenience
+    # Allow "region" as alias for "region_name" (boto3-style)
+    if "region" in config and "region_name" not in config:
+        config["region_name"] = config.pop("region")
+
+    return ProviderRegistry.get_model_provider(name, **config)

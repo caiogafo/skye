@@ -46,12 +46,21 @@ class BaseModelProvider(ModelInterface, ABC):
         ...     # ... implement other abstract methods
     """
     
-    def __init__(self, **config: Any) -> None:
+    def __init__(self, model: str | None = None, router: Any | None = None, **config: Any) -> None:
         """Initialize base provider with configuration.
         
         Args:
+            model: Model identifier (required if router not provided)
+            router: Model router for load balancing (required if model not provided)
             **config: Provider-specific configuration parameters
         """
+        if model is None and router is None:
+            raise ValueError("Either 'model' or 'router' must be provided")
+        if model is not None and router is not None:
+            raise ValueError("Cannot provide both 'model' and 'router'")
+        
+        self.model = model
+        self.router = router
         self.config = config
         self._client = None
         self.health_metrics = HealthMetrics()
@@ -183,27 +192,87 @@ class BaseModelProvider(ModelInterface, ABC):
         """
         pass
     
-    def complete(self, request: CompletionRequest) -> CompletionResponse:
+    def complete(
+        self,
+        messages: list[Any] | str | CompletionRequest | None = None,
+        model: str | None = None,
+        router: Any | None = None,
+        temperature: float | None = None,
+        max_tokens: int | None = None,
+        **kwargs: Any,
+    ) -> CompletionResponse:
         """Execute synchronous completion.
         
-        This method handles the complete flow:
-        1. Transform request to provider format
-        2. Call provider API (with retry logic)
-        3. Transform response to nimbus format
-        4. Wrap any errors in ProviderError
+        Supports both boto3-style direct calls and CompletionRequest objects.
         
-        Includes automatic retry logic with exponential backoff for transient failures.
-        Health metrics are tracked for all requests (only final result, not retries).
+        Boto3-style usage:
+            >>> # With specific model
+            >>> response = client.complete(
+            ...     messages=[UserMessage("Hello")],
+            ...     model="gpt-4"
+            ... )
+            >>>
+            >>> # With router for load balancing
+            >>> response = client.complete(
+            ...     messages=[UserMessage("Hello")],
+            ...     router=my_router
+            ... )
+        
+        CompletionRequest usage (internal):
+            >>> request = CompletionRequest(messages=[...], model="gpt-4")
+            >>> response = provider.complete(request)
         
         Args:
-            request: The completion request
+            messages: List of NimbusMessage objects, string, or CompletionRequest
+            model: Model identifier (mutually exclusive with router)
+            router: Router instance for load balancing (mutually exclusive with model)
+            temperature: Sampling temperature
+            max_tokens: Maximum tokens to generate
+            **kwargs: Additional provider-specific parameters
             
         Returns:
             CompletionResponse with the model's output
             
         Raises:
             ProviderError: If the provider API call fails
+            ValueError: If required parameters are missing or both model and router provided
         """
+        # Handle polymorphic input
+        if isinstance(messages, CompletionRequest):
+            request = messages
+        else:
+            # Convert to CompletionRequest
+            if messages is None:
+                raise ValueError("messages parameter is required")
+            
+            # Validate model/router parameters
+            if model is not None and router is not None:
+                raise ValueError("Cannot specify both 'model' and 'router' parameters")
+            
+            # Use provided model, router, or fall back to default
+            effective_model = model or self.default_model
+            
+            if router is not None:
+                # Router will select the model
+                effective_model = router.select_model(messages)
+            elif effective_model is None:
+                raise ValueError(
+                    "Either 'model' or 'router' parameter is required"
+                )
+            
+            # Convert string to UserMessage if needed
+            if isinstance(messages, str):
+                from nimbus.messages import UserMessage
+                messages = [UserMessage(content=messages)]
+            
+            request = CompletionRequest(
+                messages=messages,
+                model=effective_model,
+                temperature=temperature,
+                max_tokens=max_tokens,
+                **kwargs,
+            )
+        
         start_time = time.time()
         try:
             response = self._complete_with_retry(request)
@@ -244,27 +313,91 @@ class BaseModelProvider(ModelInterface, ABC):
                 error_type=type(e).__name__
             ) from e
     
-    def stream(self, request: CompletionRequest) -> Iterator[StreamChunk]:
+    def stream(
+        self,
+        messages: list[Any] | str | CompletionRequest | None = None,
+        model: str | None = None,
+        router: Any | None = None,
+        temperature: float | None = None,
+        max_tokens: int | None = None,
+        **kwargs: Any,
+    ) -> Iterator[StreamChunk]:
         """Execute streaming completion.
         
-        This method handles the streaming flow:
-        1. Transform request to provider format
-        2. Call provider streaming API (with retry logic)
-        3. Transform each chunk to nimbus format
-        4. Wrap any errors in ProviderError
+        Supports both boto3-style direct calls and CompletionRequest objects.
         
-        Includes automatic retry logic with exponential backoff for transient failures.
-        Health metrics are tracked for all requests (only final result, not retries).
+        Boto3-style usage:
+            >>> # With specific model
+            >>> for chunk in client.stream(
+            ...     messages=[UserMessage("Hello")],
+            ...     model="gpt-4"
+            ... ):
+            ...     print(chunk.delta, end="")
+            >>>
+            >>> # With router for load balancing
+            >>> for chunk in client.stream(
+            ...     messages=[UserMessage("Hello")],
+            ...     router=my_router
+            ... ):
+            ...     print(chunk.delta, end="")
+        
+        CompletionRequest usage (internal):
+            >>> request = CompletionRequest(messages=[...], model="gpt-4", stream=True)
+            >>> for chunk in provider.stream(request):
+            ...     print(chunk.delta, end="")
         
         Args:
-            request: The completion request
+            messages: List of NimbusMessage objects, string, or CompletionRequest
+            model: Model identifier (mutually exclusive with router)
+            router: Router instance for load balancing (mutually exclusive with model)
+            temperature: Sampling temperature
+            max_tokens: Maximum tokens to generate
+            **kwargs: Additional provider-specific parameters
             
         Yields:
             StreamChunk objects with incremental content
             
         Raises:
             ProviderError: If the provider API call fails
+            ValueError: If required parameters are missing or both model and router provided
         """
+        # Handle polymorphic input
+        if isinstance(messages, CompletionRequest):
+            request = messages
+        else:
+            # Convert to CompletionRequest
+            if messages is None:
+                raise ValueError("messages parameter is required")
+            
+            # Validate model/router parameters
+            if model is not None and router is not None:
+                raise ValueError("Cannot specify both 'model' and 'router' parameters")
+            
+            # Use provided model, router, or fall back to default
+            effective_model = model or self.default_model
+            
+            if router is not None:
+                # Router will select the model
+                effective_model = router.select_model(messages)
+            elif effective_model is None:
+                raise ValueError(
+                    "Either 'model' or 'router' parameter is required"
+                )
+            
+            # Convert string to UserMessage if needed
+            if isinstance(messages, str):
+                from nimbus.messages import UserMessage
+                messages = [UserMessage(content=messages)]
+            
+            request = CompletionRequest(
+                messages=messages,
+                model=effective_model,
+                temperature=temperature,
+                max_tokens=max_tokens,
+                stream=True,
+                **kwargs,
+            )
+        
         start_time = time.time()
         try:
             yield from self._stream_with_retry(request)
@@ -305,7 +438,15 @@ class BaseModelProvider(ModelInterface, ABC):
                 error_type=type(e).__name__
             ) from e
     
-    async def acomplete(self, request: CompletionRequest) -> CompletionResponse:
+    async def acomplete(
+        self,
+        messages: list[Any] | str | CompletionRequest | None = None,
+        model: str | None = None,
+        router: Any | None = None,
+        temperature: float | None = None,
+        max_tokens: int | None = None,
+        **kwargs: Any,
+    ) -> CompletionResponse:
         """Execute asynchronous completion.
         
         Default implementation uses synchronous version. Override this method
@@ -313,7 +454,12 @@ class BaseModelProvider(ModelInterface, ABC):
         async client.
         
         Args:
-            request: The completion request
+            messages: List of NimbusMessage objects, string, or CompletionRequest
+            model: Model identifier (mutually exclusive with router)
+            router: Router instance for load balancing (mutually exclusive with model)
+            temperature: Sampling temperature
+            max_tokens: Maximum tokens to generate
+            **kwargs: Additional provider-specific parameters
             
         Returns:
             CompletionResponse with the model's output
@@ -321,7 +467,7 @@ class BaseModelProvider(ModelInterface, ABC):
         Raises:
             ProviderError: If the provider API call fails
         """
-        return self.complete(request)
+        return self.complete(messages, model, router, temperature, max_tokens, **kwargs)
     
     async def astream(self, request: CompletionRequest) -> Iterator[StreamChunk]:  # type: ignore[misc,override]
         """Execute asynchronous streaming completion.

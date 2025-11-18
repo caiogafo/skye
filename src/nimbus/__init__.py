@@ -72,12 +72,14 @@ from nimbus.messages import (
     SystemMessage,
     UserMessage,
 )
-from nimbus.simple_client import provider
+from nimbus.providers.registry import provider
+from nimbus import routes
 
 __all__ = [
     "__version__",
     # Simple API
     "provider",
+    "routes",
     # Exceptions
     "NimbusError",
     "ProviderError",

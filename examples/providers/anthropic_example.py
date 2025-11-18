@@ -1,24 +1,22 @@
-"""Anthropic Provider Example.
+"""Anthropic Provider Example (Boto3-style Nimbus API).
 
-This example demonstrates how to use the Anthropic provider with Nimbus.
-
-Features shown:
-- Basic completion with Claude
+This version demonstrates:
+- Basic completion with Claude models
 - Streaming responses
 - System messages (Anthropic-specific)
-- Token usage tracking
+- Multi-turn conversations
+- Simple client creation: nimbus.provider("anthropic")
 """
 
 import os
-from nimbus.completion import CompletionRequest
+import nimbus
 from nimbus.messages import UserMessage, SystemMessage
-from nimbus.providers import ProviderRegistry
 
 
 def basic_completion():
     """Basic completion with Anthropic."""
     print("=" * 60)
-    print("Anthropic Basic Completion")
+    print("Anthropic - Basic Completion")
     print("=" * 60)
     
     api_key = os.getenv("ANTHROPIC_API_KEY")
@@ -28,46 +26,35 @@ def basic_completion():
         return
     
     try:
-        provider = ProviderRegistry.get_model_provider(
-            "anthropic",
-            api_key=api_key
-        )
+        client = nimbus.provider("anthropic", api_key=api_key)
     except ImportError as e:
         print(f"⚠️  Error: {e}")
         print("\nTo use Anthropic, install with: pip install nimbus[anthropic]")
         return
     
-    request = CompletionRequest(
-        messages=[
-            SystemMessage(content="You are a helpful assistant specialized in science."),
-            UserMessage(content="Explain photosynthesis in simple terms")
-        ],
+    messages = [
+        SystemMessage("You are a helpful assistant specialized in science."),
+        UserMessage("Explain photosynthesis in simple terms"),
+    ]
+    
+    response = client.complete(
+        messages=messages,
         model="claude-3-sonnet-20240229",
         temperature=0.7,
-        max_tokens=200
+        max_tokens=200,
     )
     
-    print("\nRequest:")
-    print(f"  Model: {request.model}")
-    print(f"  Temperature: {request.temperature}")
-    print(f"  Messages: {len(request.messages)}")
-    
-    try:
-        response = provider.complete(request)
-        
-        print("\nResponse:")
-        print(f"  Content: {response.content}")
-        print(f"  Provider: {response.provider}")
-        print(f"  Tokens used: {response.usage.total_tokens}")
-        print(f"  Finish reason: {response.finish_reason}")
-    except Exception as e:
-        print(f"\n❌ Error: {e}")
+    print("\nResponse:")
+    print("  Text:", response.content)
+    print("  Model:", response.model)
+    print("  Tokens:", response.usage.total_tokens)
+    print("  Finish reason:", response.finish_reason)
 
 
 def streaming_example():
     """Streaming completion with Anthropic."""
     print("\n" + "=" * 60)
-    print("Anthropic Streaming")
+    print("Anthropic - Streaming")
     print("=" * 60)
     
     api_key = os.getenv("ANTHROPIC_API_KEY")
@@ -76,31 +63,20 @@ def streaming_example():
         return
     
     try:
-        provider = ProviderRegistry.get_model_provider(
-            "anthropic",
-            api_key=api_key
-        )
+        client = nimbus.provider("anthropic", api_key=api_key)
     except ImportError:
         print("⚠️  Anthropic provider not available")
         return
     
-    request = CompletionRequest(
-        messages=[
-            UserMessage(content="Write a haiku about artificial intelligence")
-        ],
-        model="claude-3-sonnet-20240229",
-        stream=True
-    )
+    messages = [UserMessage("Write a haiku about artificial intelligence")]
     
     print("\nStreaming response:")
     print("-" * 40)
     
-    try:
-        for chunk in provider.stream(request):
-            print(chunk.delta, end="", flush=True)
-        print("\n" + "-" * 40)
-    except Exception as e:
-        print(f"\n❌ Error: {e}")
+    for chunk in client.stream(messages=messages, model="claude-3-sonnet-20240229"):
+        print(chunk.delta, end="", flush=True)
+    
+    print("\n" + "-" * 40)
 
 
 def claude_models():
@@ -115,10 +91,7 @@ def claude_models():
         return
     
     try:
-        provider = ProviderRegistry.get_model_provider(
-            "anthropic",
-            api_key=api_key
-        )
+        client = nimbus.provider("anthropic", api_key=api_key)
     except ImportError:
         print("⚠️  Anthropic provider not available")
         return
@@ -130,6 +103,7 @@ def claude_models():
     ]
     
     prompt = "What is the meaning of life?"
+    messages = [UserMessage(prompt)]
     
     print(f"\nPrompt: {prompt}")
     print("-" * 40)
@@ -137,18 +111,9 @@ def claude_models():
     for model_id, model_name in models:
         print(f"\n{model_name}:")
         
-        request = CompletionRequest(
-            messages=[UserMessage(content=prompt)],
-            model=model_id,
-            max_tokens=100
-        )
-        
-        try:
-            response = provider.complete(request)
-            print(f"  Response: {response.content[:80]}...")
-            print(f"  Tokens: {response.usage.total_tokens}")
-        except Exception as e:
-            print(f"  ⚠️  Error: {str(e)[:60]}...")
+        response = client.complete(messages=messages, model=model_id, max_tokens=100)
+        print("  Response:", response.content[:80], "...")
+        print("  Tokens:", response.usage.total_tokens)
 
 
 def system_message_example():
@@ -157,20 +122,6 @@ def system_message_example():
     print("Anthropic - System Messages")
     print("=" * 60)
     
-    api_key = os.getenv("ANTHROPIC_API_KEY")
-    if not api_key:
-        print("⚠️  ANTHROPIC_API_KEY environment variable not set")
-        return
-    
-    try:
-        provider = ProviderRegistry.get_model_provider(
-            "anthropic",
-            api_key=api_key
-        )
-    except ImportError:
-        print("⚠️  Anthropic provider not available")
-        return
-    
     print("""
 Anthropic handles system messages differently than other providers.
 The system message is sent separately from the conversation messages.
@@ -178,15 +129,17 @@ The system message is sent separately from the conversation messages.
 Example:
 
 ```python
-request = CompletionRequest(
-    messages=[
-        SystemMessage(content="You are a Python expert."),
-        UserMessage(content="How do I use decorators?")
-    ],
-    model="claude-3-sonnet-20240229"
-)
+import nimbus
+from nimbus.messages import SystemMessage, UserMessage
 
-response = provider.complete(request)
+client = nimbus.provider("anthropic", api_key="sk-ant-...")
+
+messages = [
+    SystemMessage("You are a Python expert."),
+    UserMessage("How do I use decorators?")
+]
+
+response = client.complete(messages=messages, model="claude-3-sonnet-20240229")
 ```
 
 Nimbus automatically handles this difference for you!
@@ -196,7 +149,7 @@ Nimbus automatically handles this difference for you!
 def multi_turn_conversation():
     """Multi-turn conversation example."""
     print("\n" + "=" * 60)
-    print("Anthropic Multi-Turn Conversation")
+    print("Anthropic - Multi-Turn Conversation")
     print("=" * 60)
     
     api_key = os.getenv("ANTHROPIC_API_KEY")
@@ -205,44 +158,29 @@ def multi_turn_conversation():
         return
     
     try:
-        provider = ProviderRegistry.get_model_provider(
-            "anthropic",
-            api_key=api_key
-        )
+        client = nimbus.provider("anthropic", api_key=api_key)
     except ImportError:
         print("⚠️  Anthropic provider not available")
         return
     
     # First turn
     print("\nTurn 1: User asks about Python")
-    request = CompletionRequest(
-        messages=[
-            UserMessage(content="What is a Python list?")
-        ],
-        model="claude-3-sonnet-20240229",
-        max_tokens=150
-    )
+    messages = [UserMessage("What is a Python list?")]
     
-    try:
-        response1 = provider.complete(request)
-        print(f"Assistant: {response1.content[:100]}...")
-        
-        # Second turn - continue conversation
-        print("\nTurn 2: User asks follow-up question")
-        request = CompletionRequest(
-            messages=[
-                UserMessage(content="What is a Python list?"),
-                response1.to_message(),
-                UserMessage(content="How do I add items to a list?")
-            ],
-            model="claude-3-sonnet-20240229",
-            max_tokens=150
-        )
-        
-        response2 = provider.complete(request)
-        print(f"Assistant: {response2.content[:100]}...")
-    except Exception as e:
-        print(f"\n❌ Error: {e}")
+    response1 = client.complete(
+        messages=messages, model="claude-3-sonnet-20240229", max_tokens=150
+    )
+    print(f"Assistant: {response1.content[:100]}...")
+    
+    # Second turn - continue conversation
+    print("\nTurn 2: User asks follow-up question")
+    messages.append(response1.to_message())
+    messages.append(UserMessage("How do I add items to a list?"))
+    
+    response2 = client.complete(
+        messages=messages, model="claude-3-sonnet-20240229", max_tokens=150
+    )
+    print(f"Assistant: {response2.content[:100]}...")
 
 
 def main():
