@@ -1,0 +1,84 @@
+[project]
+name = "nimbus"
+version = "0.1.0"
+description = "Modular GenAI library with optional extras for building AI agents and intelligent applications"
+readme = "README.md"
+license = {text = "MIT"}
+authors = [{name = "Nimbus Team"}]
+requires-python = ">=3.10"
+dependencies = [
+    "pydantic>=2.0",
+    "pyyaml>=6.0",
+]
+
+[project.optional-dependencies]
+# Individual providers
+bedrock = ["boto3>=1.28"]
+openai = ["openai>=1.0"]
+anthropic = ["anthropic>=0.25"]
+azure = ["azure-ai-inference>=1.0.0b1"]
+
+# Individual components
+agents = []
+prompts = []
+tools = []
+memory = ["redis>=5.0", "psycopg2-binary>=2.9"]
+guard = []
+observe = ["opentelemetry-api>=1.20", "prometheus-client>=0.19"]
+
+# Convenience bundles
+providers = ["boto3>=1.28", "openai>=1.0", "anthropic>=0.25", "azure-ai-inference>=1.0.0b1"]
+all = ["boto3>=1.28", "openai>=1.0", "anthropic>=0.25", "azure-ai-inference>=1.0.0b1", "redis>=5.0", "psycopg2-binary>=2.9", "opentelemetry-api>=1.20", "prometheus-client>=0.19"]
+
+[dependency-groups]
+dev = [
+    "pytest>=7.0",
+    "pytest-asyncio>=0.21",
+    "pytest-cov>=4.0",
+    "black>=23.0",
+    "ruff>=0.1",
+    "mypy>=1.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.black]
+line-length = 100
+target-version = ['py310']
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "W", "UP"]
+
+[tool.mypy]
+python_version = "3.10"
+strict = true
+warn_return_any = true
+warn_unused_configs = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+asyncio_mode = "auto"
+
+[tool.coverage.run]
+source = ["src"]
+omit = ["*/tests/*"]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+    "if TYPE_CHECKING:",
+    "@abstractmethod",
+]
