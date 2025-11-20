@@ -49,19 +49,26 @@ from nimbus.exceptions import (
 from nimbus.interfaces import (
     CapabilityInterface,
     CapabilitySchema,
+    ConfigLoaderInterface,
     ContentReaderInterface,
+    CostCalculatorInterface,
+    ErrorHandlerInterface,
     EventHandlerInterface,
     EventType,
     MemoryInterface,
+    MessageTransformerInterface,
     ModelInterface,
     ModelRouterInterface,
+    MultimodalHandlerInterface,
     ObserverInterface,
     PluginInterface,
     PromptBuilderInterface,
+    RouteRegistryInterface,
     RoutingStrategy,
     SafetyFilterInterface,
     SafetyResult,
     StorageAdapterInterface,
+    TokenCounterInterface,
     VectorEncoderInterface,
 )
 from nimbus.messages import (
@@ -74,12 +81,35 @@ from nimbus.messages import (
 )
 from nimbus.providers.registry import provider
 from nimbus import routes
+from nimbus.routes import (
+    AllowedFailsPolicyConfig,
+    CooldownInfo,
+    FallbackConfig,
+    ModelHealthMetrics,
+    ModelRouter,
+    ModelTarget,
+    RetryPolicyConfig,
+    RouteConfig,
+    UsageStats,
+)
 
 __all__ = [
     "__version__",
     # Simple API
     "provider",
     "routes",
+    # Routing - Core
+    "ModelRouter",
+    # Routing - Configuration
+    "ModelTarget",
+    "RouteConfig",
+    "FallbackConfig",
+    "RetryPolicyConfig",
+    "AllowedFailsPolicyConfig",
+    # Routing - Metrics
+    "ModelHealthMetrics",
+    "UsageStats",
+    "CooldownInfo",
     # Exceptions
     "NimbusError",
     "ProviderError",
@@ -105,21 +135,36 @@ __all__ = [
     "ModelConfig",
     "NimbusConfig",
     "ConfigLoader",
-    # Interfaces
+    # Interfaces - Core
     "ModelInterface",
+    "VectorEncoderInterface",
+    "ModelRouterInterface",
+    "RouteRegistryInterface",
+    "RoutingStrategy",
+    # Interfaces - Prompt and Message
     "PromptBuilderInterface",
+    "MessageTransformerInterface",
+    # Interfaces - Capability
     "CapabilityInterface",
     "CapabilitySchema",
+    # Interfaces - Memory and Storage
     "MemoryInterface",
+    "StorageAdapterInterface",
+    # Interfaces - Safety
     "SafetyFilterInterface",
     "SafetyResult",
+    # Interfaces - Observability
     "ObserverInterface",
     "EventType",
-    "StorageAdapterInterface",
-    "PluginInterface",
     "EventHandlerInterface",
-    "VectorEncoderInterface",
+    # Interfaces - Plugin
+    "PluginInterface",
+    # Interfaces - Content
     "ContentReaderInterface",
-    "ModelRouterInterface",
-    "RoutingStrategy",
+    "MultimodalHandlerInterface",
+    # Interfaces - Utilities
+    "CostCalculatorInterface",
+    "TokenCounterInterface",
+    "ErrorHandlerInterface",
+    "ConfigLoaderInterface",
 ]

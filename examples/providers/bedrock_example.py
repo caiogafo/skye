@@ -98,35 +98,51 @@ def lambda_deployment_example():
     print("AWS Lambda Deployment Example")
     print("=" * 60)
     
+    print("\nExample AWS Lambda handler using Nimbus:")
+    print("-" * 40)
     print("""
-Example AWS Lambda handler using Nimbus:
-
-```python
 import nimbus
 from nimbus.messages import UserMessage
 
+# Initialize client once (reused across invocations)
 client = nimbus.provider("bedrock", region="us-east-1")
 
 def lambda_handler(event, context):
-    messages = [UserMessage(event["prompt"])]
-    
-    response = client.complete(
-        messages=messages,
-        model="anthropic.claude-3-sonnet-20240229-v1:0"
-    )
-    
-    return {
-        "statusCode": 200,
-        "body": response.content
-    }
-```
-
-Deployment:
-1. Create deployment package with nimbus (boto3 is pre-installed in Lambda)
-2. Upload to Lambda
-3. Set IAM permissions for Bedrock access
-4. Lambda runtime provides boto3 automatically
+    '''Handle Lambda invocation.'''
+    try:
+        prompt = event.get("prompt", "Hello")
+        messages = [UserMessage(prompt)]
+        
+        response = client.complete(
+            messages=messages,
+            model="anthropic.claude-3-sonnet-20240229-v1:0",
+            max_tokens=500
+        )
+        
+        return {
+            "statusCode": 200,
+            "body": {
+                "response": response.content,
+                "model": response.model,
+                "tokens": response.usage.total_tokens
+            }
+        }
+    except Exception as e:
+        return {
+            "statusCode": 500,
+            "body": {"error": str(e)}
+        }
 """)
+    
+    print("\nDeployment Steps:")
+    print("  1. Create deployment package with nimbus")
+    print("  2. Upload to Lambda (boto3 is pre-installed)")
+    print("  3. Set IAM permissions for Bedrock access")
+    print("  4. Configure environment variables if needed")
+    print("  5. Test with sample event")
+    
+    print("\nSample Lambda Event:")
+    print('  {"prompt": "What is AWS Bedrock?"}')
 
 
 def aws_profile_example():
@@ -135,10 +151,9 @@ def aws_profile_example():
     print("AWS Bedrock - Using AWS Profiles")
     print("=" * 60)
     
+    print("\nMethod 1: Using AWS Profile in Code")
+    print("-" * 40)
     print("""
-You can specify an AWS profile for Bedrock:
-
-```python
 import nimbus
 
 # Use specific AWS profile
@@ -147,72 +162,122 @@ client = nimbus.provider(
     region="us-east-1",
     profile_name="my-profile"
 )
-```
 
-Or use environment variables:
-
-```bash
+response = client.complete(
+    messages=[UserMessage("Hello")],
+    model="anthropic.claude-3-sonnet-20240229-v1:0"
+)
+""")
+    
+    print("\nMethod 2: Using Environment Variables")
+    print("-" * 40)
+    print("""
+# Set environment variables
 export AWS_PROFILE=my-profile
 export AWS_REGION=us-east-1
-```
 
-Then:
+# Then in Python
+import nimbus
 
-```python
 client = nimbus.provider("bedrock", region="us-east-1")
-```
+""")
+    
+    print("\nMethod 3: Using AWS Credentials")
+    print("-" * 40)
+    print("""
+# Set environment variables
+export AWS_ACCESS_KEY_ID=your-access-key
+export AWS_SECRET_ACCESS_KEY=your-secret-key
+export AWS_REGION=us-east-1
+
+# Then in Python
+import nimbus
+
+client = nimbus.provider("bedrock", region="us-east-1")
+""")
+    
+    print("\nProfile Configuration (~/.aws/config):")
+    print("-" * 40)
+    print("""
+[profile my-profile]
+region = us-east-1
+output = json
+
+[profile my-profile-west]
+region = us-west-2
+output = json
 """)
 
 
 def router_example():
     """Example using router for multi-region load balancing."""
     print("\n" + "=" * 60)
-    print("AWS Bedrock - Router for Multi-Region")
+    print("AWS Bedrock - Router for Multi-Region Load Balancing")
     print("=" * 60)
     
-    print("""
-Use RouterRegistry for load balancing across regions:
-
-```python
-import nimbus
-from nimbus import routes as rt
-from nimbus.messages import UserMessage
-
-# Define multi-region setup
-registry = rt.RouterRegistry([
-    rt.RouteConfig(
-        alias="claude",
-        targets=[
-            rt.ModelTarget(
-                model="anthropic.claude-3-sonnet-20240229-v1:0",
-                provider="bedrock",
-                region="us-east-1"
-            ),
-            rt.ModelTarget(
-                model="anthropic.claude-3-sonnet-20240229-v1:0",
-                provider="bedrock",
-                region="us-west-2"
-            ),
-        ],
-        strategy="round-robin"
-    )
-])
-
-# Create client with router
-client = nimbus.provider("bedrock", router=registry)
-
-# Use alias - router handles region selection
-response = client.complete(
-    messages=[UserMessage("Hello")],
-    model="claude"  # Routes to us-east-1 or us-west-2
-)
-```
-
-Benefits:
-- Automatic failover between regions
-- Load balancing for better performance
-- Single alias for multiple deployments
-""")
+    try:
+        from nimbus import ModelRouter, ModelTarget, RouteConfig
+        from nimbus.interfaces.router import RoutingStrategy
+        
+        # Define multi-region setup with ModelRouter
+        router = ModelRouter(
+            routes=[
+                RouteConfig(
+                    alias="claude",
+                    targets=[
+                        ModelTarget(
+                            model="anthropic.claude-3-sonnet-20240229-v1:0",
+                            provider="bedrock",
+                            region="us-east-1",
+                            tpm=100000,
+                            rpm=500,
+                            tags=["us-east-1"]
+                        ),
+                        ModelTarget(
+                            model="anthropic.claude-3-sonnet-20240229-v1:0",
+                            provider="bedrock",
+                            region="us-west-2",
+                            tpm=100000,
+                            rpm=500,
+                            tags=["us-west-2"]
+                        ),
+                    ],
+                    strategy=RoutingStrategy.ROUND_ROBIN
+                )
+            ],
+            strategy=RoutingStrategy.ROUND_ROBIN,
+            cooldown_seconds=60.0,
+        )
+        
+        print("\nRouter Configuration:")
+        print(f"  Aliases: {router.list_aliases()}")
+        print(f"  Strategy: {router.strategy.value}")
+        
+        # Show route details
+        route = router.get_route("claude")
+        if route:
+            print(f"  Targets for 'claude': {len(route.targets)}")
+            for i, target in enumerate(route.targets, 1):
+                print(f"    {i}. {target.model} in {target.region}")
+        
+        print("\nBenefits:")
+        print("  ✓ Automatic failover between regions")
+        print("  ✓ Load balancing for better performance")
+        print("  ✓ Single alias for multiple deployments")
+        print("  ✓ Health tracking per region")
+        print("  ✓ Rate limiting per region")
+        
+        print("\nUsage:")
+        print("  # Router automatically selects best region")
+        print("  response = client.complete(")
+        print("      messages=[UserMessage('Hello')],")
+        print("      model='claude'  # Routes to us-east-1 or us-west-2")
+        print("  )")
+        
+    except ImportError as e:
+        print(f"⚠️  Error: {e}")
+        print("\nTo use ModelRouter, install with: pip install nimbus")
+        return
 
 
 def main():

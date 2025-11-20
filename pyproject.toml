@@ -24,7 +24,7 @@ cohere = ["cohere>=5.0"]
 # Individual components
 agents = []
 prompts = []
-tools = []
+tools = ["requests>=2.31", "httpx>=0.24"]
 memory = ["redis>=5.0", "psycopg2-binary>=2.9"]
 guard = []
 observe = ["opentelemetry-api>=1.20", "prometheus-client>=0.19"]
@@ -45,6 +45,10 @@ dev = [
     "ruff>=0.1",
     "mypy>=1.0",
     "types-PyYAML>=6.0",
+    "types-requests>=2.31",
+    "responses>=0.23",
+    "requests>=2.31",
+    "httpx>=0.24",
 ]
 
 [build-system]

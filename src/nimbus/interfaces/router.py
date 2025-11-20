@@ -107,14 +107,18 @@ class ModelRouterInterface(ABC):
         pass
 
     @abstractmethod
-    def get_model_health(self, model_id: str) -> dict[str, Any]:
+    def get_model_health(self, model_id: str) -> Any:
         """Get health status of a model.
 
         Args:
             model_id: The model to check.
 
         Returns:
-            Dictionary containing health metrics.
+            ModelHealthMetrics object containing health metrics.
+
+        Example:
+            >>> health = router.get_model_health("gpt-4")
+            >>> print(f"Success rate: {health.success_rate:.1%}")
         """
         pass
 
@@ -128,70 +132,63 @@ class ModelRouterInterface(ABC):
         pass
 
     @abstractmethod
-    def set_fallbacks(self, fallbacks: list[dict[str, Any]]) -> None:
+    def set_fallbacks(self, fallbacks: list[Any]) -> None:
         """Set fallback model chains.
 
         Inspired by LiteLLM's fallback system, this allows defining fallback
         chains that are tried when primary models fail.
 
         Args:
-            fallbacks: List of fallback configurations. Each dict should contain:
-                - "primary": Primary model ID
-                - "fallbacks": List of fallback model IDs to try in order
+            fallbacks: List of FallbackConfig objects defining fallback chains.
 
         Example:
+            >>> from nimbus.routes import FallbackConfig
             >>> router.set_fallbacks([
-            ...     {
-            ...         "primary": "gpt-4",
-            ...         "fallbacks": ["gpt-3.5-turbo", "claude-3-sonnet"]
-            ...     }
+            ...     FallbackConfig(
+            ...         primary="gpt-4",
+            ...         fallbacks=["gpt-3.5-turbo", "claude-3-sonnet"]
+            ...     )
             ... ])
         """
         pass
 
     @abstractmethod
-    def set_retry_policy(self, retry_policy: dict[str, int]) -> None:
+    def set_retry_policy(self, retry_policies: list[Any]) -> None:
         """Set retry policy per error type.
 
         Inspired by LiteLLM's RetryPolicy, this allows setting custom retry
         counts for different error types.
 
         Args:
-            retry_policy: Mapping of error type to retry count. Example:
-                {
-                    "RateLimitError": 3,
-                    "TimeoutError": 2,
-                    "AuthenticationError": 0,
-                    "BadRequestError": 1
-                }
+            retry_policies: List of RetryPolicyConfig objects.
 
         Example:
-            >>> router.set_retry_policy({
-            ...     "RateLimitError": 3,
-            ...     "TimeoutError": 2
-            ... })
+            >>> from nimbus.routes import RetryPolicyConfig
+            >>> router.set_retry_policy([
+            ...     RetryPolicyConfig(error_type="RateLimitError", max_retries=3),
+            ...     RetryPolicyConfig(error_type="TimeoutError", max_retries=2)
+            ... ])
         """
         pass
 
     @abstractmethod
-    def set_allowed_fails_policy(self, allowed_fails: dict[str, int]) -> None:
+    def set_allowed_fails_policy(self, allowed_fails_policies: list[Any]) -> None:
         """Set allowed fails before cooldown per error type.
 
         Inspired by LiteLLM's AllowedFailsPolicy, this sets how many failures
         of each type are allowed per minute before cooling down a deployment.
 
         Args:
-            allowed_fails: Mapping of error type to allowed fails/minute. Example:
-                {
-                    "RateLimitError": 100,
-                    "ContentPolicyViolationError": 1000
-                }
+            allowed_fails_policies: List of AllowedFailsPolicyConfig objects.
 
         Example:
-            >>> router.set_allowed_fails_policy({
-            ...     "RateLimitError": 100,
-            ...     "ContentPolicyViolationError": 1000
-            ... })
+            >>> from nimbus.routes import AllowedFailsPolicyConfig
+            >>> router.set_allowed_fails_policy([
+            ...     AllowedFailsPolicyConfig(
+            ...         error_type="RateLimitError",
+            ...         allowed_fails_per_minute=100
+            ...     )
+            ... ])
         """
         pass
 
@@ -242,7 +239,7 @@ class ModelRouterInterface(ABC):
         pass
 
     @abstractmethod
-    def get_usage_stats(self, model_id: str) -> dict[str, Any]:
+    def get_usage_stats(self, model_id: str) -> Any:
         """Get current usage statistics for a model.
 
         Returns TPM/RPM usage, active requests, and other metrics.
@@ -251,33 +248,25 @@ class ModelRouterInterface(ABC):
             model_id: The model deployment ID.
 
         Returns:
-            Dictionary with usage stats:
-                - "tpm_used": Tokens used this minute
-                - "rpm_used": Requests made this minute
-                - "active_requests": Currently active requests
-                - "total_requests": Total requests made
-                - "total_failures": Total failures
+            UsageStats object with usage statistics.
 
         Example:
             >>> stats = router.get_usage_stats("gpt-4-deployment-1")
-            >>> print(f"TPM used: {stats['tpm_used']}")
+            >>> print(f"TPM used: {stats.tpm_used}")
         """
         pass
 
     @abstractmethod
-    def get_cooldown_models(self) -> list[dict[str, Any]]:
+    def get_cooldown_models(self) -> list[Any]:
         """Get list of models currently in cooldown.
 
         Returns:
-            List of dicts with cooldown info:
-                - "model_id": Model identifier
-                - "cooldown_until": Timestamp when cooldown ends
-                - "reason": Reason for cooldown
+            List of CooldownInfo objects with cooldown information.
 
         Example:
             >>> cooled_down = router.get_cooldown_models()
-            >>> for model in cooled_down:
-            ...     print(f"{model['model_id']} cooled down until {model['cooldown_until']}")
+            >>> for info in cooled_down:
+            ...     print(f"{info.model_id} cooled down until {info.cooldown_until}")
         """
         pass
 

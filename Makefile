@@ -1,4 +1,4 @@
-.PHONY: help install install-dev clean format lint type-check type-check-providers test test-unit test-integration test-cov test-providers check all
+.PHONY: help install install-dev clean format lint type-check type-check-providers test test-unit test-integration test-cov test-providers test-capabilities check all
 
 # Default target
 help:
@@ -22,6 +22,7 @@ help:
 	@echo "  make test-unit        Run unit tests only"
 	@echo "  make test-integration Run integration tests only"
 	@echo "  make test-providers   Run provider unit tests only"
+	@echo "  make test-capabilities Run capability unit tests only"
 	@echo "  make test-cov         Run tests with coverage report"
 	@echo ""
 	@echo "Utilities:"
@@ -86,6 +87,10 @@ test-integration:
 test-providers:
 	@echo "Running provider unit tests..."
 	uv run pytest tests/unit/providers/ -v
+
+test-capabilities:
+	@echo "Running capability unit tests..."
+	uv run pytest tests/unit/capabilities/ -v
 
 test-cov:
 	@echo "Running tests with coverage..."
