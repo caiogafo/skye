@@ -52,6 +52,21 @@ class CapabilityValidationError(CapabilityError):
         super().__init__(message, details)
 
 
+class CapabilityExecutionError(CapabilityError):
+    """Raised when capability execution fails.
+
+    Args:
+        message: Human-readable error message
+        capability_name: Name of the capability that failed execution
+        **kwargs: Additional context to include in details
+    """
+
+    def __init__(self, message: str, capability_name: str, **kwargs: Any) -> None:
+        """Initialize CapabilityExecutionError with capability name."""
+        details = {"capability_name": capability_name, **kwargs}
+        super().__init__(message, details)
+
+
 class ToolCallParsingError(CapabilityError):
     """Raised when tool call parsing fails.
 

@@ -102,8 +102,8 @@ This implementation plan breaks down the development of Capability Support into 
     - Run with `uv run pytest tests/unit/capabilities/test_tool_transformer.py -v`
     - _Requirements: 5.1, 5.2, 5.3, 5.4, 5.5_
 
-- [ ] 7. Implement ToolCall and ToolResult models
-  - [ ] 7.1 Create ToolCall and ToolResult Pydantic models
+- [x] 7. Implement ToolCall and ToolResult models
+  - [x] 7.1 Create ToolCall and ToolResult Pydantic models
     - Define ToolCall with id, name, arguments fields
     - Define ToolResult with tool_call_id, name, result, error fields
     - Add validation for required fields
@@ -113,8 +113,8 @@ This implementation plan breaks down the development of Capability Support into 
     - Run with `uv run pytest tests/unit/capabilities/test_tool_models.py -v`
     - _Requirements: 6.1, 6.2_
 
-- [ ] 8. Implement ToolCallHandler
-  - [ ] 8.1 Create ToolCallHandler class
+- [x] 8. Implement ToolCallHandler
+  - [x] 8.1 Create ToolCallHandler class
     - Implement parse_tool_calls() for each provider format
     - Implement execute_tool_calls() for executing capabilities
     - Implement format_tool_results() for provider-specific formatting
@@ -130,8 +130,8 @@ This implementation plan breaks down the development of Capability Support into 
     - Run with `uv run pytest tests/unit/capabilities/test_tool_call_handler.py -v`
     - _Requirements: 6.1, 6.2, 6.3, 6.4, 6.5_
 
-- [ ] 9. Implement custom exceptions
-  - [ ] 9.1 Create capability-specific exceptions
+- [x] 9. Implement custom exceptions
+  - [x] 9.1 Create capability-specific exceptions
     - Create CapabilityError base class
     - Create CapabilityNotFoundError
     - Create CapabilityExecutionError
@@ -144,8 +144,8 @@ This implementation plan breaks down the development of Capability Support into 
     - Run with `uv run pytest tests/unit/capabilities/test_exceptions.py -v`
     - _Requirements: 7.1, 7.2, 7.3, 7.4, 7.5_
 
-- [ ] 10. Extend CompletionRequest with capabilities
-  - [ ] 10.1 Update CompletionRequest model
+- [x] 10. Extend CompletionRequest with capabilities
+  - [x] 10.1 Update CompletionRequest model
     - Add capabilities field (optional list of CapabilityInterface)
     - Add tool_choice field (optional string: "auto", "required", or tool name)
     - Update docstring with examples
@@ -155,8 +155,8 @@ This implementation plan breaks down the development of Capability Support into 
     - Run with `uv run pytest tests/unit/test_completion_models.py::test_completion_request_capabilities -v`
     - _Requirements: 8.1, 8.2, 8.3, 8.4, 8.5_
 
-- [ ] 11. Extend CompletionResponse with tool calls
-  - [ ] 11.1 Update CompletionResponse model
+- [x] 11. Extend CompletionResponse with tool calls
+  - [x] 11.1 Update CompletionResponse model
     - Add tool_calls field (optional list of ToolCall)
     - Add has_tool_calls() method
     - Add execute_tool_calls() async method
@@ -168,8 +168,8 @@ This implementation plan breaks down the development of Capability Support into 
     - Run with `uv run pytest tests/unit/test_completion_models.py::test_completion_response_tool_calls -v`
     - _Requirements: 9.1, 9.2, 9.3, 9.4, 9.5_
 
-- [ ] 12. Integrate capabilities with OpenAI provider
-  - [ ] 12.1 Update OpenAIProvider for tool support
+- [x] 12. Integrate capabilities with OpenAI provider
+  - [x] 12.1 Update OpenAIProvider for tool support
     - Convert capabilities to OpenAI format in _transform_request()
     - Handle tool_choice parameter
     - Parse tool calls from response in _transform_response()
@@ -181,8 +181,8 @@ This implementation plan breaks down the development of Capability Support into 
     - Run with `uv run pytest tests/unit/providers/test_openai_provider.py::test_tool_calling -v`
     - _Requirements: 8.1, 8.2, 8.3, 8.4, 8.5_
 
-- [ ] 13. Integrate capabilities with Anthropic provider
-  - [ ] 13.1 Update AnthropicProvider for tool support
+- [x] 13. Integrate capabilities with Anthropic provider
+  - [x] 13.1 Update AnthropicProvider for tool support
     - Convert capabilities to Anthropic format in _transform_request()
     - Handle tool_choice parameter
     - Parse tool use from response in _transform_response()
@@ -193,8 +193,8 @@ This implementation plan breaks down the development of Capability Support into 
     - Run with `uv run pytest tests/unit/providers/test_anthropic_provider.py::test_tool_calling -v`
     - _Requirements: 8.1, 8.2, 8.3, 8.4, 8.5_
 
-- [ ] 14. Integrate capabilities with Bedrock provider
-  - [ ] 14.1 Update BedrockProvider for tool support
+- [x] 14. Integrate capabilities with Bedrock provider
+  - [x] 14.1 Update BedrockProvider for tool support
     - Convert capabilities to Bedrock format in _transform_request()
     - Handle tool_choice parameter
     - Parse tool calls from response in _transform_response()
@@ -205,8 +205,8 @@ This implementation plan breaks down the development of Capability Support into 
     - Run with `uv run pytest tests/unit/providers/test_bedrock_provider.py::test_tool_calling -v`
     - _Requirements: 8.1, 8.2, 8.3, 8.4, 8.5_
 
-- [ ] 15. Integrate capabilities with Azure provider
-  - [ ] 15.1 Update AzureOpenAIProvider for tool support
+- [x] 15. Integrate capabilities with Azure provider
+  - [x] 15.1 Update AzureOpenAIProvider for tool support
     - Convert capabilities to Azure format in _transform_request()
     - Handle tool_choice parameter
     - Parse tool calls from response in _transform_response()
@@ -217,8 +217,8 @@ This implementation plan breaks down the development of Capability Support into 
     - Run with `uv run pytest tests/unit/providers/test_azure_provider.py::test_tool_calling -v`
     - _Requirements: 8.1, 8.2, 8.3, 8.4, 8.5_
 
-- [ ] 16. Integrate capabilities with Vertex provider
-  - [ ] 16.1 Update VertexAIProvider for tool support
+- [x] 16. Integrate capabilities with Vertex provider
+  - [x] 16.1 Update VertexAIProvider for tool support
     - Convert capabilities to Vertex format in _transform_request()
     - Handle tool_choice parameter
     - Parse tool calls from response in _transform_response()
@@ -229,8 +229,8 @@ This implementation plan breaks down the development of Capability Support into 
     - Run with `uv run pytest tests/unit/providers/test_vertex_provider.py::test_tool_calling -v`
     - _Requirements: 8.1, 8.2, 8.3, 8.4, 8.5_
 
-- [ ] 17. Implement MCP (Model Context Protocol) support
-  - [ ] 17.1 Create MCPCapability class (optional - requires FastMCP)
+- [x] 17. Implement MCP (Model Context Protocol) support
+  - [x] 17.1 Create MCPCapability class (optional - requires FastMCP)
     - Implement __init__ with MCP tool definition
     - Implement get_schema() with MCP to CapabilitySchema conversion
     - Implement execute() for sync MCP tool calls
@@ -247,7 +247,7 @@ This implementation plan breaks down the development of Capability Support into 
     - Run with `uv run pytest tests/unit/capabilities/test_mcp_capability.py -v`
     - _Requirements: 12.1, 12.2, 12.3, 12.4, 12.5, 12.6, 12.7, 12.8_
   
-  - [ ] 17.2 Create MCPServerClient class
+  - [x] 17.2 Create MCPServerClient class
     - Implement __init__ with server configuration
     - Implement load_tools() to fetch tools from MCP server
     - Implement get_tool() to retrieve specific tool
@@ -264,7 +264,7 @@ This implementation plan breaks down the development of Capability Support into 
     - Run with `uv run pytest tests/unit/capabilities/test_mcp_server_client.py -v`
     - _Requirements: 12.1, 12.2, 12.3, 12.4, 12.5_
   
-  - [ ] 17.3 Add MCP configuration support
+  - [x] 17.3 Add MCP configuration support
     - Support MCP server configuration in CompletionRequest
     - Add mcp_servers field to CompletionRequest (optional)
     - Implement MCP server discovery and loading
@@ -275,8 +275,8 @@ This implementation plan breaks down the development of Capability Support into 
     - Run with `uv run pytest tests/unit/test_completion_models.py::test_mcp_configuration -v`
     - _Requirements: 12.1, 12.2, 12.3, 12.4, 12.5_
 
-- [ ] 18. Implement observability and logging
-  - [ ] 17.1 Add logging to capability operations
+- [ ]* 18. Implement observability and logging
+  - [ ]* 17.1 Add logging to capability operations
     - Log capability registration
     - Log tool calls with arguments
     - Log tool execution results and latency
@@ -290,8 +290,8 @@ This implementation plan breaks down the development of Capability Support into 
     - Run with `uv run pytest tests/unit/capabilities/test_observability.py -v`
     - _Requirements: 11.1, 11.2, 11.3, 11.4, 11.5_
 
-- [ ] 18. Create capability package exports
-  - [ ] 18.1 Configure package exports
+- [x] 18. Create capability package exports
+  - [x] 18.1 Configure package exports
     - Export CapabilityInterface from nimbus.capabilities
     - Export CapabilitySchema from nimbus.capabilities
     - Export CapabilityRegistry from nimbus.capabilities

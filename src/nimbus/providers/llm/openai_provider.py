@@ -134,11 +134,29 @@ class OpenAIProvider(BaseModelProvider):
         elif request.response_format:
             openai_request["response_format"] = request.response_format
         
-        # Handle function calling
+        # Handle capabilities/tool calling
         if request.capabilities:
-            openai_request["tools"] = request.capabilities
-            if request.capability_choice:
-                openai_request["tool_choice"] = request.capability_choice
+            # Import ToolTransformer here to avoid circular dependency
+            try:
+                from nimbus.capabilities.tool_transformer import ToolTransformer
+                
+                # Convert capabilities to OpenAI format
+                openai_request["tools"] = ToolTransformer.to_openai_format(request.capabilities)
+                
+                # Handle tool_choice parameter
+                if request.tool_choice:
+                    if request.tool_choice in ["auto", "required"]:
+                        # Standard values
+                        openai_request["tool_choice"] = request.tool_choice
+                    else:
+                        # Specific tool name - OpenAI expects {"type": "function", "function": {"name": "tool_name"}}
+                        openai_request["tool_choice"] = {
+                            "type": "function",
+                            "function": {"name": request.tool_choice}
+                        }
+            except ImportError:
+                # If capabilities package not installed, skip tool conversion
+                pass
         
         # Provider-specific metadata
         if request.metadata:
@@ -165,10 +183,13 @@ class OpenAIProvider(BaseModelProvider):
         if hasattr(message, "parsed") and message.parsed:
             structured_output = message.parsed
         
-        # Extract tool calls if present
-        tool_calls = None
+        # Extract tool calls if present and convert to ToolCall objects
+        tool_calls_list = None
+        tool_calls_metadata = None
+        
         if hasattr(message, "tool_calls") and message.tool_calls:
-            tool_calls = [
+            # Store raw tool calls in metadata for ToolCallHandler
+            tool_calls_metadata = [
                 {
                     "id": tc.id,
                     "type": tc.type,
@@ -179,6 +200,31 @@ class OpenAIProvider(BaseModelProvider):
                 }
                 for tc in message.tool_calls
             ]
+            
+            # Try to convert to ToolCall objects if capabilities package is available
+            try:
+                from nimbus.capabilities.tool_models import ToolCall
+                import json
+                
+                tool_calls_list = []
+                for tc in message.tool_calls:
+                    # Parse arguments JSON string
+                    try:
+                        arguments = json.loads(tc.function.arguments)
+                    except json.JSONDecodeError:
+                        # If parsing fails, use empty dict
+                        arguments = {}
+                    
+                    tool_calls_list.append(
+                        ToolCall(
+                            id=tc.id,
+                            name=tc.function.name,
+                            arguments=arguments
+                        )
+                    )
+            except ImportError:
+                # If capabilities package not installed, tool_calls_list stays None
+                pass
         
         return CompletionResponse(
             id=response.id,
@@ -193,10 +239,11 @@ class OpenAIProvider(BaseModelProvider):
                 completion_tokens=response.usage.completion_tokens,
                 total_tokens=response.usage.total_tokens
             ),
+            tool_calls=tool_calls_list,
             created_at=datetime.fromtimestamp(response.created, tz=timezone.utc),
             metadata={
                 "system_fingerprint": getattr(response, "system_fingerprint", None),
-                "tool_calls": tool_calls
+                "tool_calls": tool_calls_metadata
             }
         )
     

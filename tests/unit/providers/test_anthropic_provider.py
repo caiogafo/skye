@@ -26,7 +26,7 @@ class TestAnthropicProviderInitialization:
     
     def test_init_with_api_key(self) -> None:
         """Test initialization with API key."""
-        provider = AnthropicProvider(api_key="sk-ant-test")
+        provider = AnthropicProvider(model="claude-3-opus-20240229", api_key="sk-ant-test")
         assert provider.api_key == "sk-ant-test"
     
     @patch("nimbus.providers.llm.anthropic_provider.LazyImporter.import_module")
@@ -35,7 +35,7 @@ class TestAnthropicProviderInitialization:
         mock_anthropic = MagicMock()
         mock_import.return_value = mock_anthropic
         
-        provider = AnthropicProvider(api_key="sk-ant-test")
+        provider = AnthropicProvider(model="claude-3-opus-20240229", api_key="sk-ant-test")
         
         # Client should not be initialized yet
         mock_import.assert_not_called()
@@ -53,7 +53,7 @@ class TestAnthropicRequestTransformation:
     
     def test_transform_basic_request(self) -> None:
         """Test transformation of basic completion request."""
-        provider = AnthropicProvider(api_key="sk-ant-test")
+        provider = AnthropicProvider(model="claude-3-opus-20240229", api_key="sk-ant-test")
         request = CompletionRequest(
             messages=[UserMessage(content="Hello")],
             model="claude-3-opus-20240229",
@@ -73,7 +73,7 @@ class TestAnthropicRequestTransformation:
     
     def test_transform_with_system_message_separation(self) -> None:
         """Test transformation with system message separated."""
-        provider = AnthropicProvider(api_key="sk-ant-test")
+        provider = AnthropicProvider(model="claude-3-opus-20240229", api_key="sk-ant-test")
         request = CompletionRequest(
             messages=[
                 SystemMessage(content="You are a helpful assistant"),
@@ -93,7 +93,7 @@ class TestAnthropicRequestTransformation:
     
     def test_transform_with_max_tokens(self) -> None:
         """Test transformation with max_tokens parameter."""
-        provider = AnthropicProvider(api_key="sk-ant-test")
+        provider = AnthropicProvider(model="claude-3-opus-20240229", api_key="sk-ant-test")
         request = CompletionRequest(
             messages=[UserMessage(content="Hello")],
             model="claude-3-opus-20240229",
@@ -106,7 +106,7 @@ class TestAnthropicRequestTransformation:
     
     def test_transform_with_stop_sequences(self) -> None:
         """Test transformation with stop sequences."""
-        provider = AnthropicProvider(api_key="sk-ant-test")
+        provider = AnthropicProvider(model="claude-3-opus-20240229", api_key="sk-ant-test")
         request = CompletionRequest(
             messages=[UserMessage(content="Hello")],
             model="claude-3-opus-20240229",
@@ -119,7 +119,7 @@ class TestAnthropicRequestTransformation:
     
     def test_transform_with_tool_use(self) -> None:
         """Test transformation with tool use (Anthropic's function calling)."""
-        provider = AnthropicProvider(api_key="sk-ant-test")
+        provider = AnthropicProvider(model="claude-3-opus-20240229", api_key="sk-ant-test")
         capabilities = [
             {
                 "type": "function",
@@ -139,7 +139,7 @@ class TestAnthropicRequestTransformation:
             messages=[UserMessage(content="What's the weather?")],
             model="claude-3-opus-20240229",
             capabilities=capabilities,
-            capability_choice="auto"
+            tool_choice="auto"
         )
         
         result = provider._transform_request(request)
@@ -153,7 +153,7 @@ class TestAnthropicRequestTransformation:
     
     def test_transform_with_tool_choice_required(self) -> None:
         """Test transformation with required tool choice."""
-        provider = AnthropicProvider(api_key="sk-ant-test")
+        provider = AnthropicProvider(model="claude-3-opus-20240229", api_key="sk-ant-test")
         capabilities = [
             {
                 "type": "function",
@@ -168,7 +168,7 @@ class TestAnthropicRequestTransformation:
             messages=[UserMessage(content="What's the weather?")],
             model="claude-3-opus-20240229",
             capabilities=capabilities,
-            capability_choice="required"
+            tool_choice="required"
         )
         
         result = provider._transform_request(request)
@@ -177,7 +177,7 @@ class TestAnthropicRequestTransformation:
     
     def test_transform_with_provider_metadata(self) -> None:
         """Test transformation with provider-specific metadata."""
-        provider = AnthropicProvider(api_key="sk-ant-test")
+        provider = AnthropicProvider(model="claude-3-opus-20240229", api_key="sk-ant-test")
         request = CompletionRequest(
             messages=[UserMessage(content="Hello")],
             model="claude-3-opus-20240229",
@@ -198,7 +198,7 @@ class TestAnthropicResponseTransformation:
     
     def test_transform_basic_response(self) -> None:
         """Test transformation of basic Anthropic response."""
-        provider = AnthropicProvider(api_key="sk-ant-test")
+        provider = AnthropicProvider(model="claude-3-opus-20240229", api_key="sk-ant-test")
         
         # Mock Anthropic response
         mock_response = Mock()
@@ -236,7 +236,7 @@ class TestAnthropicResponseTransformation:
     
     def test_transform_response_with_tool_use(self) -> None:
         """Test transformation of response with tool use."""
-        provider = AnthropicProvider(api_key="sk-ant-test")
+        provider = AnthropicProvider(model="claude-3-opus-20240229", api_key="sk-ant-test")
         
         # Mock Anthropic response with tool use
         mock_response = Mock()
@@ -272,7 +272,7 @@ class TestAnthropicResponseTransformation:
     
     def test_transform_response_with_mixed_content(self) -> None:
         """Test transformation of response with text and tool use."""
-        provider = AnthropicProvider(api_key="sk-ant-test")
+        provider = AnthropicProvider(model="claude-3-opus-20240229", api_key="sk-ant-test")
         
         # Mock Anthropic response with mixed content
         mock_response = Mock()
@@ -313,7 +313,7 @@ class TestAnthropicStreamTransformation:
     
     def test_transform_content_block_delta(self) -> None:
         """Test transformation of content block delta event."""
-        provider = AnthropicProvider(api_key="sk-ant-test")
+        provider = AnthropicProvider(model="claude-3-opus-20240229", api_key="sk-ant-test")
         
         # Mock Anthropic stream event
         mock_chunk = Mock()
@@ -333,7 +333,7 @@ class TestAnthropicStreamTransformation:
     
     def test_transform_message_delta_with_stop(self) -> None:
         """Test transformation of message delta with stop reason."""
-        provider = AnthropicProvider(api_key="sk-ant-test")
+        provider = AnthropicProvider(model="claude-3-opus-20240229", api_key="sk-ant-test")
         
         # Mock final stream event
         mock_chunk = Mock()
@@ -350,7 +350,7 @@ class TestAnthropicStreamTransformation:
     
     def test_transform_other_event_types(self) -> None:
         """Test transformation of other event types."""
-        provider = AnthropicProvider(api_key="sk-ant-test")
+        provider = AnthropicProvider(model="claude-3-opus-20240229", api_key="sk-ant-test")
         
         # Mock other event type (e.g., message_start)
         mock_chunk = Mock()
@@ -397,7 +397,7 @@ class TestAnthropicProviderCalls:
         mock_client.messages.create.return_value = mock_response
         
         # Execute
-        provider = AnthropicProvider(api_key="sk-ant-test")
+        provider = AnthropicProvider(model="claude-3-opus-20240229", api_key="sk-ant-test")
         request = CompletionRequest(
             messages=[UserMessage(content="Hello")],
             model="claude-3-opus-20240229"
@@ -425,7 +425,7 @@ class TestAnthropicProviderCalls:
         mock_client.messages.create.side_effect = Exception("API Error")
         
         # Execute and verify error
-        provider = AnthropicProvider(api_key="sk-ant-test")
+        provider = AnthropicProvider(model="claude-3-opus-20240229", api_key="sk-ant-test")
         request = CompletionRequest(
             messages=[UserMessage(content="Hello")],
             model="claude-3-opus-20240229"
@@ -474,7 +474,7 @@ class TestAnthropicProviderCalls:
         mock_client.messages.stream.return_value = mock_stream
         
         # Execute
-        provider = AnthropicProvider(api_key="sk-ant-test")
+        provider = AnthropicProvider(model="claude-3-opus-20240229", api_key="sk-ant-test")
         request = CompletionRequest(
             messages=[UserMessage(content="Hello")],
             model="claude-3-opus-20240229",
@@ -530,7 +530,7 @@ class TestAnthropicAsyncSupport:
         mock_async_client.messages.create = async_create
         
         # Execute
-        provider = AnthropicProvider(api_key="sk-ant-test")
+        provider = AnthropicProvider(model="claude-3-opus-20240229", api_key="sk-ant-test")
         request = CompletionRequest(
             messages=[UserMessage(content="Hello")],
             model="claude-3-opus-20240229"
@@ -549,7 +549,7 @@ class TestAnthropicModelInfo:
     
     def test_get_model_info(self) -> None:
         """Test getting model information."""
-        provider = AnthropicProvider(api_key="sk-ant-test")
+        provider = AnthropicProvider(model="claude-3-opus-20240229", api_key="sk-ant-test")
         
         info = provider.get_model_info()
         
@@ -559,3 +559,313 @@ class TestAnthropicModelInfo:
         assert info["supports_structured_output"] is False
         assert info["supports_multimodal"] is True
         assert info["supports_thinking"] is True
+
+
+class TestAnthropicToolCalling:
+    """Test tool calling integration with capabilities."""
+    
+    def test_transform_request_with_capabilities(self) -> None:
+        """Test transformation of request with capabilities to Anthropic format."""
+        # Mock capability
+        mock_capability = Mock()
+        mock_schema = Mock()
+        mock_schema.name = "get_weather"
+        mock_schema.description = "Get weather for a location"
+        mock_schema.parameters = {
+            "type": "object",
+            "properties": {
+                "location": {"type": "string"}
+            },
+            "required": ["location"]
+        }
+        mock_capability.get_schema.return_value = mock_schema
+        
+        provider = AnthropicProvider(model="claude-3-opus-20240229", api_key="sk-ant-test")
+        request = CompletionRequest(
+            messages=[UserMessage(content="What's the weather in NYC?")],
+            model="claude-3-opus-20240229",
+            capabilities=[mock_capability],
+            tool_choice="auto"
+        )
+        
+        result = provider._transform_request(request)
+        
+        # Verify tools are converted to Anthropic format
+        assert "tools" in result
+        assert len(result["tools"]) == 1
+        assert result["tools"][0]["name"] == "get_weather"
+        assert result["tools"][0]["description"] == "Get weather for a location"
+        assert result["tools"][0]["input_schema"]["type"] == "object"
+        assert result["tools"][0]["input_schema"]["properties"]["location"]["type"] == "string"
+        assert result["tool_choice"] == {"type": "auto"}
+    
+    def test_transform_request_with_specific_tool_choice(self) -> None:
+        """Test transformation with specific tool name in tool_choice."""
+        # Mock capability
+        mock_capability = Mock()
+        mock_schema = Mock()
+        mock_schema.name = "get_weather"
+        mock_schema.description = "Get weather"
+        mock_schema.parameters = {"type": "object", "properties": {}}
+        mock_capability.get_schema.return_value = mock_schema
+        
+        provider = AnthropicProvider(model="claude-3-opus-20240229", api_key="sk-ant-test")
+        request = CompletionRequest(
+            messages=[UserMessage(content="What's the weather?")],
+            model="claude-3-opus-20240229",
+            capabilities=[mock_capability],
+            tool_choice="get_weather"
+        )
+        
+        result = provider._transform_request(request)
+        
+        # Verify tool_choice is formatted correctly for specific tool
+        assert "tool_choice" in result
+        assert result["tool_choice"]["type"] == "tool"
+        assert result["tool_choice"]["name"] == "get_weather"
+    
+    def test_transform_request_with_required_tool_choice(self) -> None:
+        """Test transformation with 'required' tool_choice."""
+        # Mock capability
+        mock_capability = Mock()
+        mock_schema = Mock()
+        mock_schema.name = "calculator"
+        mock_schema.description = "Calculate"
+        mock_schema.parameters = {"type": "object", "properties": {}}
+        mock_capability.get_schema.return_value = mock_schema
+        
+        provider = AnthropicProvider(model="claude-3-opus-20240229", api_key="sk-ant-test")
+        request = CompletionRequest(
+            messages=[UserMessage(content="Calculate 2+2")],
+            model="claude-3-opus-20240229",
+            capabilities=[mock_capability],
+            tool_choice="required"
+        )
+        
+        result = provider._transform_request(request)
+        
+        # Verify tool_choice is converted to Anthropic's "any" type
+        assert result["tool_choice"] == {"type": "any"}
+    
+    def test_transform_response_with_tool_calls_creates_tool_call_objects(self) -> None:
+        """Test that tool calls in response are converted to ToolCall objects."""
+        provider = AnthropicProvider(model="claude-3-opus-20240229", api_key="sk-ant-test")
+        
+        # Mock Anthropic response with tool use
+        mock_response = Mock()
+        mock_response.id = "msg_123"
+        mock_response.model = "claude-3-opus-20240229"
+        mock_response.stop_reason = "tool_use"
+        mock_response.stop_sequence = None
+        
+        mock_tool_use = Mock()
+        mock_tool_use.type = "tool_use"
+        mock_tool_use.id = "toolu_abc123"
+        mock_tool_use.name = "get_weather"
+        mock_tool_use.input = {"location": "San Francisco", "unit": "celsius"}
+        
+        mock_response.content = [mock_tool_use]
+        
+        mock_usage = Mock()
+        mock_usage.input_tokens = 50
+        mock_usage.output_tokens = 20
+        mock_response.usage = mock_usage
+        
+        result = provider._transform_response(mock_response)
+        
+        # Verify tool_calls are present in response
+        assert result.tool_calls is not None
+        assert len(result.tool_calls) == 1
+        
+        # Verify ToolCall object structure
+        tool_call = result.tool_calls[0]
+        assert tool_call.id == "toolu_abc123"
+        assert tool_call.name == "get_weather"
+        assert tool_call.arguments == {"location": "San Francisco", "unit": "celsius"}
+        
+        # Verify metadata also contains tool calls
+        assert result.metadata["tool_calls"] is not None
+        assert len(result.metadata["tool_calls"]) == 1
+        assert result.metadata["tool_calls"][0]["id"] == "toolu_abc123"
+    
+    def test_transform_response_with_parallel_tool_calls(self) -> None:
+        """Test handling of parallel tool calls in response."""
+        provider = AnthropicProvider(model="claude-3-opus-20240229", api_key="sk-ant-test")
+        
+        # Mock Anthropic response with multiple tool uses
+        mock_response = Mock()
+        mock_response.id = "msg_123"
+        mock_response.model = "claude-3-opus-20240229"
+        mock_response.stop_reason = "tool_use"
+        mock_response.stop_sequence = None
+        
+        mock_tool_use_1 = Mock()
+        mock_tool_use_1.type = "tool_use"
+        mock_tool_use_1.id = "toolu_1"
+        mock_tool_use_1.name = "get_weather"
+        mock_tool_use_1.input = {"location": "NYC"}
+        
+        mock_tool_use_2 = Mock()
+        mock_tool_use_2.type = "tool_use"
+        mock_tool_use_2.id = "toolu_2"
+        mock_tool_use_2.name = "get_time"
+        mock_tool_use_2.input = {"timezone": "EST"}
+        
+        mock_response.content = [mock_tool_use_1, mock_tool_use_2]
+        
+        mock_usage = Mock()
+        mock_usage.input_tokens = 60
+        mock_usage.output_tokens = 30
+        mock_response.usage = mock_usage
+        
+        result = provider._transform_response(mock_response)
+        
+        # Verify both tool calls are present
+        assert result.tool_calls is not None
+        assert len(result.tool_calls) == 2
+        
+        # Verify first tool call
+        assert result.tool_calls[0].id == "toolu_1"
+        assert result.tool_calls[0].name == "get_weather"
+        assert result.tool_calls[0].arguments == {"location": "NYC"}
+        
+        # Verify second tool call
+        assert result.tool_calls[1].id == "toolu_2"
+        assert result.tool_calls[1].name == "get_time"
+        assert result.tool_calls[1].arguments == {"timezone": "EST"}
+    
+    def test_transform_response_with_text_and_tool_use(self) -> None:
+        """Test handling of response with both text and tool use."""
+        provider = AnthropicProvider(model="claude-3-opus-20240229", api_key="sk-ant-test")
+        
+        # Mock Anthropic response with text and tool use
+        mock_response = Mock()
+        mock_response.id = "msg_123"
+        mock_response.model = "claude-3-opus-20240229"
+        mock_response.stop_reason = "tool_use"
+        mock_response.stop_sequence = None
+        
+        mock_text = Mock()
+        mock_text.type = "text"
+        mock_text.text = "Let me check the weather for you."
+        
+        mock_tool_use = Mock()
+        mock_tool_use.type = "tool_use"
+        mock_tool_use.id = "toolu_123"
+        mock_tool_use.name = "get_weather"
+        mock_tool_use.input = {"location": "Boston"}
+        
+        mock_response.content = [mock_text, mock_tool_use]
+        
+        mock_usage = Mock()
+        mock_usage.input_tokens = 40
+        mock_usage.output_tokens = 25
+        mock_response.usage = mock_usage
+        
+        result = provider._transform_response(mock_response)
+        
+        # Verify both text content and tool calls are present
+        assert result.content == "Let me check the weather for you."
+        assert result.tool_calls is not None
+        assert len(result.tool_calls) == 1
+        assert result.tool_calls[0].name == "get_weather"
+    
+    def test_transform_request_with_multiple_capabilities(self) -> None:
+        """Test transformation with multiple capabilities."""
+        provider = AnthropicProvider(model="claude-3-opus-20240229", api_key="sk-ant-test")
+        
+        # Mock multiple capabilities
+        mock_capability_1 = Mock()
+        mock_schema_1 = Mock()
+        mock_schema_1.name = "get_weather"
+        mock_schema_1.description = "Get weather"
+        mock_schema_1.parameters = {"type": "object", "properties": {"location": {"type": "string"}}}
+        mock_capability_1.get_schema.return_value = mock_schema_1
+        
+        mock_capability_2 = Mock()
+        mock_schema_2 = Mock()
+        mock_schema_2.name = "get_time"
+        mock_schema_2.description = "Get time"
+        mock_schema_2.parameters = {"type": "object", "properties": {"timezone": {"type": "string"}}}
+        mock_capability_2.get_schema.return_value = mock_schema_2
+        
+        # Create request with multiple capabilities
+        request = CompletionRequest(
+            messages=[UserMessage(content="Hello")],
+            model="claude-3-opus-20240229",
+            capabilities=[mock_capability_1, mock_capability_2]
+        )
+        
+        result = provider._transform_request(request)
+        
+        # Verify both tools are present
+        assert "tools" in result
+        assert len(result["tools"]) == 2
+        assert result["tools"][0]["name"] == "get_weather"
+        assert result["tools"][1]["name"] == "get_time"
+    
+    @patch("nimbus.providers.llm.anthropic_provider.LazyImporter.import_module")
+    def test_complete_with_tool_calls(self, mock_import: Mock) -> None:
+        """Test end-to-end completion with tool calls."""
+        # Setup mocks
+        mock_anthropic = MagicMock()
+        mock_import.return_value = mock_anthropic
+        
+        mock_client = Mock()
+        mock_anthropic.Anthropic.return_value = mock_client
+        
+        # Mock capability
+        mock_capability = Mock()
+        mock_schema = Mock()
+        mock_schema.name = "get_weather"
+        mock_schema.description = "Get weather"
+        mock_schema.parameters = {
+            "type": "object",
+            "properties": {"location": {"type": "string"}},
+            "required": ["location"]
+        }
+        mock_capability.get_schema.return_value = mock_schema
+        
+        # Mock response with tool use
+        mock_response = Mock()
+        mock_response.id = "msg_123"
+        mock_response.model = "claude-3-opus-20240229"
+        mock_response.stop_reason = "tool_use"
+        mock_response.stop_sequence = None
+        
+        mock_tool_use = Mock()
+        mock_tool_use.type = "tool_use"
+        mock_tool_use.id = "toolu_123"
+        mock_tool_use.name = "get_weather"
+        mock_tool_use.input = {"location": "Boston"}
+        
+        mock_response.content = [mock_tool_use]
+        
+        mock_usage = Mock()
+        mock_usage.input_tokens = 40
+        mock_usage.output_tokens = 15
+        mock_response.usage = mock_usage
+        
+        mock_client.messages.create.return_value = mock_response
+        
+        # Execute
+        provider = AnthropicProvider(model="claude-3-opus-20240229", api_key="sk-ant-test")
+        request = CompletionRequest(
+            messages=[UserMessage(content="What's the weather in Boston?")],
+            model="claude-3-opus-20240229",
+            capabilities=[mock_capability],
+            tool_choice="auto"
+        )
+        
+        result = provider.complete(request)
+        
+        # Verify
+        assert result.finish_reason == "tool_use"
+        assert result.has_tool_calls()
+        assert len(result.tool_calls) == 1
+        assert result.tool_calls[0].name == "get_weather"
+        
+        # Verify the API was called with tools
+        call_args = mock_client.messages.create.call_args
+        assert "tools" in call_args[1]
+        assert call_args[1]["tool_choice"] == {"type": "auto"}

@@ -195,28 +195,34 @@ class TestVertexAIRequestTransformation:
         assert result["grounding"] == grounding_config
 
     def test_transform_with_function_calling(self) -> None:
-        """Test transformation with function calling."""
+        """Test transformation with function calling (legacy test - now handled by TestVertexAIToolCalling)."""
+        # This test is now superseded by the more comprehensive TestVertexAIToolCalling tests
+        # Keeping it for backwards compatibility but updating to use proper CapabilityInterface
+        from nimbus.capabilities import LocalFunctionCapability
+
+        def get_weather(location: str) -> str:
+            """Get weather for a location."""
+            return f"Weather for {location}"
+
+        capability = LocalFunctionCapability(get_weather)
+
         provider = VertexAIProvider(
             project_id="my-project",
             location="us-central1"
         )
-        capabilities = [
-            {
-                "name": "get_weather",
-                "description": "Get weather",
-                "parameters": {"type": "object", "properties": {}}
-            }
-        ]
         request = CompletionRequest(
             messages=[UserMessage(content="What's the weather?")],
             model="gemini-1.5-pro",
-            capabilities=capabilities
+            capabilities=[capability]
         )
 
         result = provider._transform_request(request)
 
         assert "tools" in result
-        assert result["tools"][0]["function_declarations"] == capabilities
+        assert len(result["tools"]) == 1
+        assert "function_declarations" in result["tools"][0]
+        assert len(result["tools"][0]["function_declarations"]) == 1
+        assert result["tools"][0]["function_declarations"][0]["name"] == "get_weather"
 
     def test_transform_with_provider_metadata(self) -> None:
         """Test transformation with provider-specific metadata."""
@@ -288,7 +294,9 @@ class TestVertexAIResponseTransformation:
         assert result.usage.total_tokens == 30
 
     def test_transform_response_with_function_call(self) -> None:
-        """Test transformation of response with function call."""
+        """Test transformation of response with function call (legacy test - now handled by TestVertexAIToolCalling)."""
+        # This test is now superseded by the more comprehensive TestVertexAIToolCalling tests
+        # Updating to match new metadata format
         provider = VertexAIProvider(
             project_id="my-project",
             location="us-central1"
@@ -325,10 +333,14 @@ class TestVertexAIResponseTransformation:
         result = provider._transform_response(mock_response)
 
         assert result.content == ""
-        assert result.metadata["tool_calls"] is not None
-        assert len(result.metadata["tool_calls"]) == 1
-        assert result.metadata["tool_calls"][0]["function"]["name"] == "get_weather"
-        assert result.metadata["tool_calls"][0]["function"]["arguments"] == {"location": "NYC"}
+        # New format stores tool calls in metadata["candidates"]
+        assert "candidates" in result.metadata
+        assert len(result.metadata["candidates"]) == 1
+        # Also check that tool_calls list is populated
+        assert result.tool_calls is not None
+        assert len(result.tool_calls) == 1
+        assert result.tool_calls[0].name == "get_weather"
+        assert result.tool_calls[0].arguments == {"location": "NYC"}
 
     def test_transform_response_without_usage(self) -> None:
         """Test transformation of response without usage metadata."""
@@ -644,3 +656,367 @@ class TestVertexAIModelInfo:
         assert info["supports_function_calling"] is True
         assert info["supports_structured_output"] is False
         assert info["supports_multimodal"] is True
+
+
+class TestVertexAIToolCalling:
+    """Test tool calling integration with capabilities."""
+
+    def test_transform_request_with_capabilities(self) -> None:
+        """Test transformation of request with capabilities."""
+        from nimbus.capabilities import LocalFunctionCapability
+
+        def get_weather(location: str) -> str:
+            """Get weather for a location."""
+            return f"Weather for {location}"
+
+        capability = LocalFunctionCapability(get_weather)
+
+        provider = VertexAIProvider(
+            project_id="my-project",
+            location="us-central1"
+        )
+        request = CompletionRequest(
+            messages=[UserMessage(content="What's the weather in NYC?")],
+            model="gemini-1.5-pro",
+            capabilities=[capability]
+        )
+
+        result = provider._transform_request(request)
+
+        # Verify tools are present
+        assert "tools" in result
+        assert len(result["tools"]) == 1
+        assert "function_declarations" in result["tools"][0]
+
+        # Verify function declaration format
+        func_decl = result["tools"][0]["function_declarations"][0]
+        assert func_decl["name"] == "get_weather"
+        assert func_decl["description"] == "Get weather for a location."
+        assert "parameters" in func_decl
+
+    def test_transform_request_with_tool_choice_auto(self) -> None:
+        """Test transformation with tool_choice='auto'."""
+        from nimbus.capabilities import LocalFunctionCapability
+
+        def get_weather(location: str) -> str:
+            """Get weather for a location."""
+            return f"Weather for {location}"
+
+        capability = LocalFunctionCapability(get_weather)
+
+        provider = VertexAIProvider(
+            project_id="my-project",
+            location="us-central1"
+        )
+        request = CompletionRequest(
+            messages=[UserMessage(content="What's the weather?")],
+            model="gemini-1.5-pro",
+            capabilities=[capability],
+            tool_choice="auto"
+        )
+
+        result = provider._transform_request(request)
+
+        # Verify tool_config is present
+        assert "tool_config" in result
+        assert result["tool_config"]["function_calling_config"]["mode"] == "AUTO"
+
+    def test_transform_request_with_tool_choice_required(self) -> None:
+        """Test transformation with tool_choice='required'."""
+        from nimbus.capabilities import LocalFunctionCapability
+
+        def get_weather(location: str) -> str:
+            """Get weather for a location."""
+            return f"Weather for {location}"
+
+        capability = LocalFunctionCapability(get_weather)
+
+        provider = VertexAIProvider(
+            project_id="my-project",
+            location="us-central1"
+        )
+        request = CompletionRequest(
+            messages=[UserMessage(content="What's the weather?")],
+            model="gemini-1.5-pro",
+            capabilities=[capability],
+            tool_choice="required"
+        )
+
+        result = provider._transform_request(request)
+
+        # Verify tool_config is present
+        assert "tool_config" in result
+        assert result["tool_config"]["function_calling_config"]["mode"] == "ANY"
+
+    def test_transform_request_with_specific_tool_choice(self) -> None:
+        """Test transformation with specific tool name in tool_choice."""
+        from nimbus.capabilities import LocalFunctionCapability
+
+        def get_weather(location: str) -> str:
+            """Get weather for a location."""
+            return f"Weather for {location}"
+
+        def get_time(timezone: str) -> str:
+            """Get current time."""
+            return f"Time in {timezone}"
+
+        capability1 = LocalFunctionCapability(get_weather)
+        capability2 = LocalFunctionCapability(get_time)
+
+        provider = VertexAIProvider(
+            project_id="my-project",
+            location="us-central1"
+        )
+        request = CompletionRequest(
+            messages=[UserMessage(content="What's the weather?")],
+            model="gemini-1.5-pro",
+            capabilities=[capability1, capability2],
+            tool_choice="get_weather"
+        )
+
+        result = provider._transform_request(request)
+
+        # Verify tool_config with specific function
+        assert "tool_config" in result
+        assert result["tool_config"]["function_calling_config"]["mode"] == "ANY"
+        assert result["tool_config"]["function_calling_config"]["allowed_function_names"] == ["get_weather"]
+
+    def test_transform_response_with_tool_calls(self) -> None:
+        """Test transformation of response with tool calls."""
+        provider = VertexAIProvider(
+            project_id="my-project",
+            location="us-central1"
+        )
+
+        # Mock Vertex AI response with function call
+        mock_response = Mock()
+        mock_response.name = "response-123"
+        mock_response.model = "gemini-1.5-pro"
+
+        mock_func_call = Mock()
+        mock_func_call.name = "get_weather"
+        mock_func_call.args = {"location": "NYC"}
+
+        mock_part = Mock()
+        mock_part.function_call = mock_func_call
+        mock_part.text = None
+
+        mock_content = Mock()
+        mock_content.parts = [mock_part]
+
+        mock_candidate = Mock()
+        mock_candidate.content = mock_content
+        mock_candidate.finish_reason = "STOP"
+
+        mock_response.candidates = [mock_candidate]
+
+        mock_usage = Mock()
+        mock_usage.prompt_token_count = 10
+        mock_usage.candidates_token_count = 5
+        mock_usage.total_token_count = 15
+        mock_response.usage_metadata = mock_usage
+
+        result = provider._transform_response(mock_response)
+
+        # Verify tool_calls are present
+        assert result.tool_calls is not None
+        assert len(result.tool_calls) == 1
+        assert result.tool_calls[0].name == "get_weather"
+        assert result.tool_calls[0].arguments == {"location": "NYC"}
+        assert result.tool_calls[0].id.startswith("vertex_call_")
+
+        # Verify metadata contains raw tool calls
+        assert "candidates" in result.metadata
+        assert len(result.metadata["candidates"]) == 1
+
+    def test_transform_response_with_multiple_tool_calls(self) -> None:
+        """Test transformation of response with multiple tool calls."""
+        provider = VertexAIProvider(
+            project_id="my-project",
+            location="us-central1"
+        )
+
+        # Mock Vertex AI response with multiple function calls
+        mock_response = Mock()
+        mock_response.name = "response-123"
+        mock_response.model = "gemini-1.5-pro"
+
+        mock_func_call1 = Mock()
+        mock_func_call1.name = "get_weather"
+        mock_func_call1.args = {"location": "NYC"}
+
+        mock_func_call2 = Mock()
+        mock_func_call2.name = "get_time"
+        mock_func_call2.args = {"timezone": "EST"}
+
+        mock_part1 = Mock()
+        mock_part1.function_call = mock_func_call1
+        mock_part1.text = None
+
+        mock_part2 = Mock()
+        mock_part2.function_call = mock_func_call2
+        mock_part2.text = None
+
+        mock_content = Mock()
+        mock_content.parts = [mock_part1, mock_part2]
+
+        mock_candidate = Mock()
+        mock_candidate.content = mock_content
+        mock_candidate.finish_reason = "STOP"
+
+        mock_response.candidates = [mock_candidate]
+
+        mock_usage = Mock()
+        mock_usage.prompt_token_count = 10
+        mock_usage.candidates_token_count = 5
+        mock_usage.total_token_count = 15
+        mock_response.usage_metadata = mock_usage
+
+        result = provider._transform_response(mock_response)
+
+        # Verify multiple tool_calls are present
+        assert result.tool_calls is not None
+        assert len(result.tool_calls) == 2
+        assert result.tool_calls[0].name == "get_weather"
+        assert result.tool_calls[0].arguments == {"location": "NYC"}
+        assert result.tool_calls[1].name == "get_time"
+        assert result.tool_calls[1].arguments == {"timezone": "EST"}
+
+    @patch("nimbus.providers.llm.vertex_provider.LazyImporter.import_module")
+    def test_complete_with_tool_calling(self, mock_import: Mock) -> None:
+        """Test complete with tool calling end-to-end."""
+        from nimbus.capabilities import LocalFunctionCapability
+
+        def get_weather(location: str) -> str:
+            """Get weather for a location."""
+            return f"Weather for {location}"
+
+        capability = LocalFunctionCapability(get_weather)
+
+        # Setup mocks
+        mock_vertexai = MagicMock()
+        mock_import.return_value = mock_vertexai
+
+        mock_generative_models = Mock()
+        mock_vertexai.generative_models = mock_generative_models
+
+        mock_model = Mock()
+        mock_generative_models.GenerativeModel.return_value = mock_model
+
+        # Mock response with function call
+        mock_response = Mock()
+        mock_response.name = "response-123"
+        mock_response.model = "gemini-1.5-pro"
+
+        mock_func_call = Mock()
+        mock_func_call.name = "get_weather"
+        mock_func_call.args = {"location": "San Francisco"}
+
+        mock_part = Mock()
+        mock_part.function_call = mock_func_call
+        mock_part.text = None
+
+        mock_content = Mock()
+        mock_content.parts = [mock_part]
+
+        mock_candidate = Mock()
+        mock_candidate.content = mock_content
+        mock_candidate.finish_reason = "STOP"
+
+        mock_response.candidates = [mock_candidate]
+
+        mock_usage = Mock()
+        mock_usage.prompt_token_count = 15
+        mock_usage.candidates_token_count = 5
+        mock_usage.total_token_count = 20
+        mock_response.usage_metadata = mock_usage
+
+        mock_model.generate_content.return_value = mock_response
+
+        # Execute
+        provider = VertexAIProvider(
+            project_id="my-project",
+            location="us-central1"
+        )
+        request = CompletionRequest(
+            messages=[UserMessage(content="What's the weather in San Francisco?")],
+            model="gemini-1.5-pro",
+            capabilities=[capability]
+        )
+
+        result = provider.complete(request)
+
+        # Verify
+        assert isinstance(result, CompletionResponse)
+        assert result.tool_calls is not None
+        assert len(result.tool_calls) == 1
+        assert result.tool_calls[0].name == "get_weather"
+        assert result.tool_calls[0].arguments == {"location": "San Francisco"}
+
+        # Verify the call was made with tools
+        call_kwargs = mock_model.generate_content.call_args[1]
+        assert "tools" in call_kwargs
+        assert len(call_kwargs["tools"]) == 1
+        assert "function_declarations" in call_kwargs["tools"][0]
+
+    def test_tool_call_parsing_with_handler(self) -> None:
+        """Test that tool calls can be parsed by ToolCallHandler."""
+        from nimbus.capabilities import CapabilityRegistry, LocalFunctionCapability
+        from nimbus.capabilities.tool_call_handler import ToolCallHandler
+
+        def get_weather(location: str) -> str:
+            """Get weather for a location."""
+            return f"Weather for {location}"
+
+        # Register capability
+        capability = LocalFunctionCapability(get_weather)
+        registry = CapabilityRegistry.get_instance()
+        registry.register(capability)
+
+        provider = VertexAIProvider(
+            project_id="my-project",
+            location="us-central1"
+        )
+
+        # Mock Vertex AI response with function call
+        mock_response = Mock()
+        mock_response.name = "response-123"
+        mock_response.model = "gemini-1.5-pro"
+
+        mock_func_call = Mock()
+        mock_func_call.name = "get_weather"
+        mock_func_call.args = {"location": "NYC"}
+
+        mock_part = Mock()
+        mock_part.function_call = mock_func_call
+        mock_part.text = None
+
+        mock_content = Mock()
+        mock_content.parts = [mock_part]
+
+        mock_candidate = Mock()
+        mock_candidate.content = mock_content
+        mock_candidate.finish_reason = "STOP"
+
+        mock_response.candidates = [mock_candidate]
+
+        mock_usage = Mock()
+        mock_usage.prompt_token_count = 10
+        mock_usage.candidates_token_count = 5
+        mock_usage.total_token_count = 15
+        mock_response.usage_metadata = mock_usage
+
+        # Transform response
+        result = provider._transform_response(mock_response)
+
+        # Parse tool calls using handler
+        handler = ToolCallHandler(registry)
+        tool_calls = handler.parse_tool_calls(result, "vertex")
+
+        # Verify parsing
+        assert len(tool_calls) == 1
+        assert tool_calls[0].name == "get_weather"
+        assert tool_calls[0].arguments == {"location": "NYC"}
+
+        # Clean up
+        registry.unregister("get_weather")

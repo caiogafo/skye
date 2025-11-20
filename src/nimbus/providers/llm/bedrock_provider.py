@@ -134,9 +134,38 @@ class BedrockProvider(BaseModelProvider):
         
         # Handle function/tool calling
         if request.capabilities:
-            bedrock_request["toolConfig"] = {
-                "tools": [{"toolSpec": cap} for cap in request.capabilities]
-            }
+            # Check if capabilities are CapabilityInterface objects or dicts
+            if request.capabilities and isinstance(request.capabilities[0], dict):
+                # Legacy support: capabilities are already in dict format
+                bedrock_request["toolConfig"] = {
+                    "tools": [{"toolSpec": cap} for cap in request.capabilities]
+                }
+            else:
+                # Use ToolTransformer to convert capabilities to Bedrock format
+                try:
+                    from nimbus.capabilities.tool_transformer import ToolTransformer
+                    
+                    bedrock_request["toolConfig"] = {
+                        "tools": ToolTransformer.to_bedrock_format(request.capabilities)
+                    }
+                    
+                    # Handle tool_choice parameter
+                    if request.tool_choice:
+                        if request.tool_choice == "auto":
+                            bedrock_request["toolConfig"]["toolChoice"] = {"auto": {}}
+                        elif request.tool_choice == "required":
+                            bedrock_request["toolConfig"]["toolChoice"] = {"any": {}}
+                        elif isinstance(request.tool_choice, str):
+                            # Specific tool name
+                            bedrock_request["toolConfig"]["toolChoice"] = {
+                                "tool": {"name": request.tool_choice}
+                            }
+                        elif isinstance(request.tool_choice, dict):
+                            # Already formatted tool choice
+                            bedrock_request["toolConfig"]["toolChoice"] = request.tool_choice
+                except ImportError:
+                    # If capabilities package not installed, skip tool conversion
+                    pass
         
         # Provider-specific metadata
         if request.metadata:
@@ -165,17 +194,33 @@ class BedrockProvider(BaseModelProvider):
         
         # Extract content from message
         content = ""
-        tool_calls = None
+        tool_calls_list = []
+        tool_calls_metadata = []
         
         for content_block in message.get("content", []):
             if "text" in content_block:
                 content += content_block["text"]
             elif "toolUse" in content_block:
                 # Handle tool use
-                if tool_calls is None:
-                    tool_calls = []
                 tool_use = content_block["toolUse"]
-                tool_calls.append({
+                
+                # Create ToolCall object if capabilities are available
+                try:
+                    from nimbus.capabilities.tool_models import ToolCall
+                    
+                    tool_calls_list.append(
+                        ToolCall(
+                            id=tool_use["toolUseId"],
+                            name=tool_use["name"],
+                            arguments=tool_use["input"]
+                        )
+                    )
+                except ImportError:
+                    # If capabilities package not installed, skip ToolCall creation
+                    pass
+                
+                # Also store in metadata for compatibility
+                tool_calls_metadata.append({
                     "id": tool_use["toolUseId"],
                     "type": "function",
                     "function": {
@@ -212,10 +257,11 @@ class BedrockProvider(BaseModelProvider):
             role="assistant",
             finish_reason=finish_reason,
             usage=usage,
+            tool_calls=tool_calls_list if tool_calls_list else None,
             created_at=datetime.now(tz=timezone.utc),
             metadata={
                 "stop_reason": stop_reason,
-                "tool_calls": tool_calls,
+                "tool_calls": tool_calls_metadata if tool_calls_metadata else None,
                 "metrics": response.get("metrics", {})
             }
         )

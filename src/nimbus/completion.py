@@ -17,12 +17,16 @@ Example:
 """
 
 from datetime import datetime, timezone
-from typing import Any
+from typing import TYPE_CHECKING, Any
 from uuid import uuid4
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from nimbus.messages import NimbusMessage
+
+if TYPE_CHECKING:
+    from nimbus.capabilities.registry import CapabilityRegistry
+    from nimbus.capabilities.tool_models import ToolResult
 
 
 class TokenUsage(BaseModel):
@@ -74,9 +78,11 @@ class CompletionRequest(BaseModel):
         top_p: Nucleus sampling parameter (0.0-1.0).
         stop: List of sequences that will stop generation.
         stream: Whether to stream the response.
-        capabilities: List of capabilities/tools available to the model.
-        capability_choice: How the model should choose capabilities
-            ('auto', 'none', or specific name).
+        capabilities: List of capabilities/tools available to the model
+            (requires nimbus[capabilities]).
+        tool_choice: How the model should choose tools ('auto', 'required', or specific tool name).
+        mcp_servers: List of MCP server configurations to load tools from
+            (requires nimbus[mcp]). Each config should contain server connection details.
         response_format: Format specification for structured outputs.
         response_schema: Pydantic model class for structured output validation.
         metadata: Additional metadata for the request.
@@ -100,6 +106,44 @@ class CompletionRequest(BaseModel):
         ... )
         >>> request.prompt
         'math_solver'
+
+    Example (With nimbus[capabilities]):
+        >>> # Using capabilities/tools (requires nimbus[capabilities])
+        >>> from nimbus.capabilities import LocalFunctionCapability
+        >>>
+        >>> def get_weather(location: str) -> str:
+        ...     return f"Weather for {location}"
+        >>>
+        >>> capability = LocalFunctionCapability(
+        ...     func=get_weather,
+        ...     name="get_weather",
+        ...     description="Get weather for a location"
+        ... )
+        >>>
+        >>> request = CompletionRequest(
+        ...     messages=[UserMessage(content="What's the weather in NYC?")],
+        ...     model="gpt-4",
+        ...     capabilities=[capability],
+        ...     tool_choice="auto"
+        ... )
+        >>> len(request.capabilities)
+        1
+
+    Example (With nimbus[mcp]):
+        >>> # Using MCP servers (requires nimbus[mcp])
+        >>> request = CompletionRequest(
+        ...     messages=[UserMessage(content="What's the weather in NYC?")],
+        ...     model="gpt-4",
+        ...     mcp_servers=[
+        ...         {
+        ...             "name": "weather_server",
+        ...             "command": "mcp-server-weather",
+        ...             "args": ["--port", "8080"]
+        ...         }
+        ...     ]
+        ... )
+        >>> len(request.mcp_servers)
+        1
     """
 
     # Polymorphic input: either messages OR prompt
@@ -113,11 +157,27 @@ class CompletionRequest(BaseModel):
     top_p: float = Field(default=1.0, ge=0.0, le=1.0)
     stop: list[str] | None = None
     stream: bool = False
-    capabilities: list[dict[str, Any]] | None = None
-    capability_choice: str | None = None
+    # List of CapabilityInterface (requires nimbus[capabilities])
+    capabilities: list[Any] | None = None
+    tool_choice: str | None = None  # "auto", "required", or specific tool name
+    # MCP server configurations (requires nimbus[mcp])
+    mcp_servers: list[dict[str, Any]] | None = None
     response_format: dict[str, Any] | None = None
     response_schema: type[BaseModel] | None = None
     metadata: dict[str, Any] = Field(default_factory=dict)
+
+    @field_validator("tool_choice")
+    @classmethod
+    def validate_tool_choice(cls, v: str | None) -> str | None:
+        """Validate tool_choice is 'auto', 'required', or a tool name."""
+        if v is not None and v not in ["auto", "required"]:
+            # If not a standard value, assume it's a specific tool name
+            # Tool names should be non-empty strings
+            if not isinstance(v, str) or not v.strip():
+                raise ValueError(
+                    "tool_choice must be 'auto', 'required', or a non-empty tool name"
+                )
+        return v
 
     def model_post_init(self, __context: Any) -> None:
         """Validate that either messages or prompt is provided, but not both."""
@@ -131,7 +191,7 @@ class CompletionResponse(BaseModel):
     """Response from model completion.
 
     Represents the response from an LLM provider, including the generated content,
-    token usage, and optional structured output.
+    token usage, optional structured output, and tool calls.
 
     Attributes:
         id: Unique identifier for the response.
@@ -142,10 +202,11 @@ class CompletionResponse(BaseModel):
         role: Role of the responder (typically 'assistant').
         finish_reason: Reason the generation stopped ('stop', 'length', 'tool_calls', etc.).
         usage: Token usage statistics.
+        tool_calls: List of tool calls requested by the model (requires nimbus[capabilities]).
         created_at: Timestamp when the response was created.
         metadata: Additional metadata about the response.
 
-    Example:
+    Example (Basic Response):
         >>> from datetime import datetime, timezone
         >>> response = CompletionResponse(
         ...     id="resp_123",
@@ -159,6 +220,30 @@ class CompletionResponse(BaseModel):
         ... )
         >>> response.get_output()
         'The answer is 4.'
+
+    Example (With Tool Calls):
+        >>> from nimbus.capabilities.tool_models import ToolCall
+        >>> response = CompletionResponse(
+        ...     model="gpt-4",
+        ...     provider="openai",
+        ...     content="",
+        ...     role="assistant",
+        ...     finish_reason="tool_calls",
+        ...     usage=TokenUsage(prompt_tokens=50, completion_tokens=20, total_tokens=70),
+        ...     tool_calls=[
+        ...         ToolCall(
+        ...             id="call_123",
+        ...             name="weather.get_current",
+        ...             arguments={"location": "San Francisco"}
+        ...         )
+        ...     ]
+        ... )
+        >>> response.has_tool_calls()
+        True
+        >>> # Execute tool calls (requires nimbus[capabilities])
+        >>> from nimbus.capabilities.registry import CapabilityRegistry
+        >>> registry = CapabilityRegistry.get_instance()
+        >>> results = await response.execute_tool_calls(registry)
     """
 
     id: str = Field(default_factory=lambda: str(uuid4()))
@@ -169,6 +254,7 @@ class CompletionResponse(BaseModel):
     role: str = "assistant"
     finish_reason: str
     usage: TokenUsage
+    tool_calls: list[Any] | None = None  # List of ToolCall (requires nimbus[capabilities])
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     metadata: dict[str, Any] = Field(default_factory=dict)
 
@@ -200,6 +286,132 @@ class CompletionResponse(BaseModel):
             'Alice'
         """
         return self.structured_output if self.structured_output else self.content
+
+    def has_tool_calls(self) -> bool:
+        """Check if the response contains tool calls.
+
+        Returns:
+            True if the response contains one or more tool calls, False otherwise.
+
+        Example:
+            >>> from nimbus.capabilities.tool_models import ToolCall
+            >>> response = CompletionResponse(
+            ...     model="gpt-4",
+            ...     provider="openai",
+            ...     content="",
+            ...     finish_reason="tool_calls",
+            ...     usage=TokenUsage(prompt_tokens=10, completion_tokens=5, total_tokens=15),
+            ...     tool_calls=[
+            ...         ToolCall(id="call_1", name="get_weather", arguments={"city": "NYC"})
+            ...     ]
+            ... )
+            >>> response.has_tool_calls()
+            True
+            >>>
+            >>> response_no_tools = CompletionResponse(
+            ...     model="gpt-4",
+            ...     provider="openai",
+            ...     content="Hello",
+            ...     finish_reason="stop",
+            ...     usage=TokenUsage(prompt_tokens=5, completion_tokens=2, total_tokens=7)
+            ... )
+            >>> response_no_tools.has_tool_calls()
+            False
+        """
+        return self.tool_calls is not None and len(self.tool_calls) > 0
+
+    async def execute_tool_calls(
+        self,
+        registry: "CapabilityRegistry",
+    ) -> list["ToolResult"]:
+        """Execute all tool calls using the provided capability registry.
+
+        Executes all tool calls in the response using the provided registry
+        and returns a list of ToolResult objects. This method is async to
+        support asynchronous capability execution.
+
+        Args:
+            registry: CapabilityRegistry instance to use for executing capabilities
+
+        Returns:
+            List of ToolResult objects containing execution results
+
+        Raises:
+            ImportError: If nimbus[capabilities] is not installed
+            ValueError: If the response has no tool calls
+
+        Example:
+            >>> from nimbus.capabilities.registry import CapabilityRegistry
+            >>> from nimbus.capabilities.tool_models import ToolCall
+            >>>
+            >>> # Create response with tool calls
+            >>> response = CompletionResponse(
+            ...     model="gpt-4",
+            ...     provider="openai",
+            ...     content="",
+            ...     finish_reason="tool_calls",
+            ...     usage=TokenUsage(prompt_tokens=50, completion_tokens=20, total_tokens=70),
+            ...     tool_calls=[
+            ...         ToolCall(
+            ...             id="call_123",
+            ...             name="weather.get_current",
+            ...             arguments={"location": "San Francisco"}
+            ...         )
+            ...     ]
+            ... )
+            >>>
+            >>> # Execute tool calls
+            >>> registry = CapabilityRegistry.get_instance()
+            >>> results = await response.execute_tool_calls(registry)
+            >>> for result in results:
+            ...     print(f"{result.name}: {result.result}")
+        """
+        # Import here to avoid circular dependency and allow optional capabilities
+        try:
+            from nimbus.capabilities.tool_models import ToolResult
+        except ImportError as e:
+            raise ImportError(
+                "Tool call execution requires nimbus[capabilities]. "
+                "Install with: pip install nimbus[capabilities]"
+            ) from e
+
+        if not self.has_tool_calls():
+            raise ValueError("Response has no tool calls to execute")
+
+        results: list[ToolResult] = []
+
+        for tool_call in self.tool_calls:  # type: ignore
+            try:
+                # Execute the capability asynchronously
+                result = await registry.aexecute(
+                    capability_name=tool_call.name,
+                    arguments=tool_call.arguments,
+                    tool_call_id=tool_call.id,
+                    return_raw=True,
+                )
+
+                # Create successful result
+                results.append(
+                    ToolResult(
+                        tool_call_id=tool_call.id,
+                        name=tool_call.name,
+                        result=result,
+                        error=None,
+                    )
+                )
+
+            except Exception as e:
+                # Create error result
+                results.append(
+                    ToolResult(
+                        tool_call_id=tool_call.id,
+                        name=tool_call.name,
+                        result=None,
+                        error=str(e),
+                    )
+                )
+
+        return results
 
 
 class StreamChunk(BaseModel):

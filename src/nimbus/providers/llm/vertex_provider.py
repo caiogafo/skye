@@ -66,6 +66,8 @@ class VertexAIProvider(BaseModelProvider):
         project_id: str,
         location: str = "us-central1",
         credentials: Any = None,
+        model: str | None = None,
+        router: Any | None = None,
         **kwargs: Any
     ) -> None:
         """Initialize Vertex AI provider.
@@ -74,9 +76,18 @@ class VertexAIProvider(BaseModelProvider):
             project_id: Google Cloud project ID
             location: Google Cloud region (default: us-central1)
             credentials: Optional credentials object
+            model: Optional default model identifier (can be overridden in request)
+            router: Optional model router for load balancing
             **kwargs: Additional configuration parameters
         """
+        # For Vertex, model is typically specified in the request, not at init
+        # If neither model nor router is provided, use a placeholder
+        if model is None and router is None:
+            model = "gemini-1.5-pro"  # Default model as placeholder
+        
         super().__init__(
+            model=model,
+            router=router,
             project_id=project_id,
             location=location,
             credentials=credentials,
@@ -145,13 +156,49 @@ class VertexAIProvider(BaseModelProvider):
         if request.metadata and "grounding" in request.metadata:
             vertex_request["grounding"] = request.metadata["grounding"]
 
-        # Handle function calling
+        # Handle capabilities/tool calling
         if request.capabilities:
-            vertex_request["tools"] = [
-                {
-                    "function_declarations": request.capabilities
-                }
-            ]
+            # Import ToolTransformer here to avoid circular dependency
+            try:
+                from nimbus.capabilities.tool_transformer import ToolTransformer
+                
+                # Convert capabilities to Vertex format
+                function_declarations = ToolTransformer.to_vertex_format(request.capabilities)
+                vertex_request["tools"] = [
+                    {
+                        "function_declarations": function_declarations
+                    }
+                ]
+                
+                # Handle tool_choice parameter
+                # Note: Vertex AI doesn't have direct tool_choice support like OpenAI
+                # We can use function_calling_config for similar behavior
+                if request.tool_choice:
+                    if request.tool_choice == "required":
+                        # Force function calling
+                        vertex_request["tool_config"] = {
+                            "function_calling_config": {
+                                "mode": "ANY"
+                            }
+                        }
+                    elif request.tool_choice == "auto":
+                        # Let model decide
+                        vertex_request["tool_config"] = {
+                            "function_calling_config": {
+                                "mode": "AUTO"
+                            }
+                        }
+                    elif request.tool_choice != "none":
+                        # Specific tool name - use allowed_function_names
+                        vertex_request["tool_config"] = {
+                            "function_calling_config": {
+                                "mode": "ANY",
+                                "allowed_function_names": [request.tool_choice]
+                            }
+                        }
+            except ImportError:
+                # If capabilities package not installed, skip tool conversion
+                pass
 
         # Provider-specific metadata
         if request.metadata:
@@ -173,7 +220,8 @@ class VertexAIProvider(BaseModelProvider):
         # Extract content from the response
         content = ""
         finish_reason = "stop"
-        tool_calls = None
+        tool_calls_list = None
+        tool_calls_metadata = None
 
         if hasattr(response, "candidates") and response.candidates:
             candidate = response.candidates[0]
@@ -187,22 +235,60 @@ class VertexAIProvider(BaseModelProvider):
 
             # Extract content from parts
             if hasattr(candidate, "content") and hasattr(candidate.content, "parts"):
-                for part in candidate.content.parts:
+                # Store function calls for metadata
+                function_calls_raw = []
+                
+                for idx, part in enumerate(candidate.content.parts):
                     if hasattr(part, "text") and part.text is not None:
                         content = part.text
                     elif hasattr(part, "function_call"):
                         # Handle function calls
                         func_call = part.function_call
-                        tool_calls = [
+                        function_calls_raw.append({
+                            "idx": idx,
+                            "name": getattr(func_call, "name", ""),
+                            "args": dict(getattr(func_call, "args", {}))
+                        })
+                
+                # Store raw function calls in metadata for ToolCallHandler
+                if function_calls_raw:
+                    tool_calls_metadata = {
+                        "candidates": [
                             {
-                                "id": getattr(func_call, "name", ""),
-                                "type": "function",
-                                "function": {
-                                    "name": getattr(func_call, "name", ""),
-                                    "arguments": getattr(func_call, "args", {})
+                                "content": {
+                                    "parts": [
+                                        {
+                                            "functionCall": {
+                                                "name": fc["name"],
+                                                "args": fc["args"]
+                                            }
+                                        }
+                                        for fc in function_calls_raw
+                                    ]
                                 }
                             }
                         ]
+                    }
+                    
+                    # Try to convert to ToolCall objects if capabilities package is available
+                    try:
+                        from nimbus.capabilities.tool_models import ToolCall
+                        
+                        tool_calls_list = []
+                        for fc in function_calls_raw:
+                            # Generate ID since Vertex doesn't provide one
+                            call_id = f"vertex_call_{fc['idx']}"
+                            
+                            tool_calls_list.append(
+                                ToolCall(
+                                    id=call_id,
+                                    name=fc["name"],
+                                    arguments=fc["args"]
+                                )
+                            )
+                    except ImportError:
+                        # If capabilities package not installed, tool_calls_list stays None
+                        pass
 
         # Extract usage information
         prompt_tokens = 0
@@ -228,10 +314,9 @@ class VertexAIProvider(BaseModelProvider):
                 completion_tokens=completion_tokens,
                 total_tokens=total_tokens
             ),
+            tool_calls=tool_calls_list,
             created_at=datetime.now(tz=timezone.utc),
-            metadata={
-                "tool_calls": tool_calls
-            }
+            metadata=tool_calls_metadata or {}
         )
 
     def _transform_stream_chunk(self, chunk: Any) -> StreamChunk:
@@ -289,6 +374,7 @@ class VertexAIProvider(BaseModelProvider):
         safety_settings = request.pop("safety_settings", None)
         grounding = request.pop("grounding", None)
         tools = request.pop("tools", None)
+        tool_config = request.pop("tool_config", None)
         messages = request.pop("messages", [])
 
         # Build the generate_content call
@@ -305,6 +391,9 @@ class VertexAIProvider(BaseModelProvider):
 
         if tools:
             call_kwargs["tools"] = tools
+
+        if tool_config:
+            call_kwargs["tool_config"] = tool_config
 
         return model.generate_content(**call_kwargs)
 
@@ -328,6 +417,7 @@ class VertexAIProvider(BaseModelProvider):
         safety_settings = request.pop("safety_settings", None)
         grounding = request.pop("grounding", None)
         tools = request.pop("tools", None)
+        tool_config = request.pop("tool_config", None)
         messages = request.pop("messages", [])
 
         # Build the generate_content call with streaming
@@ -345,6 +435,9 @@ class VertexAIProvider(BaseModelProvider):
 
         if tools:
             call_kwargs["tools"] = tools
+
+        if tool_config:
+            call_kwargs["tool_config"] = tool_config
 
         return model.generate_content(**call_kwargs)  # type: ignore[no-any-return]
 

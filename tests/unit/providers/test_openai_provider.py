@@ -546,6 +546,343 @@ class TestOpenAIAsyncSupport:
         assert result.provider == "openai"
 
 
+class TestOpenAIToolCalling:
+    """Test tool calling integration with capabilities."""
+    
+    def test_transform_request_with_capabilities(self) -> None:
+        """Test transformation of request with capabilities to OpenAI format."""
+        # Mock capability
+        mock_capability = Mock()
+        mock_schema = Mock()
+        mock_schema.name = "get_weather"
+        mock_schema.description = "Get weather for a location"
+        mock_schema.parameters = {
+            "type": "object",
+            "properties": {
+                "location": {"type": "string"}
+            },
+            "required": ["location"]
+        }
+        mock_capability.get_schema.return_value = mock_schema
+        
+        provider = OpenAIProvider(model="gpt-4", api_key="sk-test")
+        request = CompletionRequest(
+            messages=[UserMessage(content="What's the weather in NYC?")],
+            model="gpt-4",
+            capabilities=[mock_capability],
+            tool_choice="auto"
+        )
+        
+        result = provider._transform_request(request)
+        
+        # Verify tools are converted to OpenAI format
+        assert "tools" in result
+        assert len(result["tools"]) == 1
+        assert result["tools"][0]["type"] == "function"
+        assert result["tools"][0]["function"]["name"] == "get_weather"
+        assert result["tools"][0]["function"]["description"] == "Get weather for a location"
+        assert result["tool_choice"] == "auto"
+    
+    def test_transform_request_with_specific_tool_choice(self) -> None:
+        """Test transformation with specific tool name in tool_choice."""
+        # Mock capability
+        mock_capability = Mock()
+        mock_schema = Mock()
+        mock_schema.name = "get_weather"
+        mock_schema.description = "Get weather"
+        mock_schema.parameters = {"type": "object", "properties": {}}
+        mock_capability.get_schema.return_value = mock_schema
+        
+        provider = OpenAIProvider(model="gpt-4", api_key="sk-test")
+        request = CompletionRequest(
+            messages=[UserMessage(content="What's the weather?")],
+            model="gpt-4",
+            capabilities=[mock_capability],
+            tool_choice="get_weather"
+        )
+        
+        result = provider._transform_request(request)
+        
+        # Verify tool_choice is formatted correctly for specific tool
+        assert "tool_choice" in result
+        assert result["tool_choice"]["type"] == "function"
+        assert result["tool_choice"]["function"]["name"] == "get_weather"
+    
+    def test_transform_request_with_required_tool_choice(self) -> None:
+        """Test transformation with 'required' tool_choice."""
+        # Mock capability
+        mock_capability = Mock()
+        mock_schema = Mock()
+        mock_schema.name = "calculator"
+        mock_schema.description = "Calculate"
+        mock_schema.parameters = {"type": "object", "properties": {}}
+        mock_capability.get_schema.return_value = mock_schema
+        
+        provider = OpenAIProvider(model="gpt-4", api_key="sk-test")
+        request = CompletionRequest(
+            messages=[UserMessage(content="Calculate 2+2")],
+            model="gpt-4",
+            capabilities=[mock_capability],
+            tool_choice="required"
+        )
+        
+        result = provider._transform_request(request)
+        
+        # Verify tool_choice is passed through as-is for 'required'
+        assert result["tool_choice"] == "required"
+    
+    def test_transform_response_with_tool_calls_creates_tool_call_objects(self) -> None:
+        """Test that tool calls in response are converted to ToolCall objects."""
+        provider = OpenAIProvider(model="gpt-4", api_key="sk-test")
+        
+        # Mock OpenAI response with tool calls
+        mock_response = Mock()
+        mock_response.id = "chatcmpl-123"
+        mock_response.model = "gpt-4"
+        mock_response.created = 1234567890
+        mock_response.system_fingerprint = None
+        
+        mock_tool_call = Mock()
+        mock_tool_call.id = "call_abc123"
+        mock_tool_call.type = "function"
+        mock_tool_call.function = Mock()
+        mock_tool_call.function.name = "get_weather"
+        mock_tool_call.function.arguments = '{"location": "San Francisco", "unit": "celsius"}'
+        
+        mock_choice = Mock()
+        mock_choice.finish_reason = "tool_calls"
+        mock_choice.message = Mock()
+        mock_choice.message.content = None
+        mock_choice.message.tool_calls = [mock_tool_call]
+        mock_choice.message.parsed = None
+        mock_response.choices = [mock_choice]
+        
+        mock_usage = Mock()
+        mock_usage.prompt_tokens = 50
+        mock_usage.completion_tokens = 20
+        mock_usage.total_tokens = 70
+        mock_response.usage = mock_usage
+        
+        result = provider._transform_response(mock_response)
+        
+        # Verify tool_calls are present in response
+        assert result.tool_calls is not None
+        assert len(result.tool_calls) == 1
+        
+        # Verify ToolCall object structure
+        tool_call = result.tool_calls[0]
+        assert tool_call.id == "call_abc123"
+        assert tool_call.name == "get_weather"
+        assert tool_call.arguments == {"location": "San Francisco", "unit": "celsius"}
+        
+        # Verify metadata also contains raw tool calls
+        assert result.metadata["tool_calls"] is not None
+        assert len(result.metadata["tool_calls"]) == 1
+        assert result.metadata["tool_calls"][0]["id"] == "call_abc123"
+    
+    def test_transform_response_with_parallel_tool_calls(self) -> None:
+        """Test handling of parallel tool calls in response."""
+        provider = OpenAIProvider(model="gpt-4", api_key="sk-test")
+        
+        # Mock OpenAI response with multiple parallel tool calls
+        mock_response = Mock()
+        mock_response.id = "chatcmpl-123"
+        mock_response.model = "gpt-4"
+        mock_response.created = 1234567890
+        mock_response.system_fingerprint = None
+        
+        mock_tool_call_1 = Mock()
+        mock_tool_call_1.id = "call_1"
+        mock_tool_call_1.type = "function"
+        mock_tool_call_1.function = Mock()
+        mock_tool_call_1.function.name = "get_weather"
+        mock_tool_call_1.function.arguments = '{"location": "NYC"}'
+        
+        mock_tool_call_2 = Mock()
+        mock_tool_call_2.id = "call_2"
+        mock_tool_call_2.type = "function"
+        mock_tool_call_2.function = Mock()
+        mock_tool_call_2.function.name = "get_time"
+        mock_tool_call_2.function.arguments = '{"timezone": "EST"}'
+        
+        mock_choice = Mock()
+        mock_choice.finish_reason = "tool_calls"
+        mock_choice.message = Mock()
+        mock_choice.message.content = None
+        mock_choice.message.tool_calls = [mock_tool_call_1, mock_tool_call_2]
+        mock_choice.message.parsed = None
+        mock_response.choices = [mock_choice]
+        
+        mock_usage = Mock()
+        mock_usage.prompt_tokens = 60
+        mock_usage.completion_tokens = 30
+        mock_usage.total_tokens = 90
+        mock_response.usage = mock_usage
+        
+        result = provider._transform_response(mock_response)
+        
+        # Verify both tool calls are present
+        assert result.tool_calls is not None
+        assert len(result.tool_calls) == 2
+        
+        # Verify first tool call
+        assert result.tool_calls[0].id == "call_1"
+        assert result.tool_calls[0].name == "get_weather"
+        assert result.tool_calls[0].arguments == {"location": "NYC"}
+        
+        # Verify second tool call
+        assert result.tool_calls[1].id == "call_2"
+        assert result.tool_calls[1].name == "get_time"
+        assert result.tool_calls[1].arguments == {"timezone": "EST"}
+    
+    def test_transform_response_with_invalid_json_arguments(self) -> None:
+        """Test handling of tool calls with invalid JSON arguments."""
+        provider = OpenAIProvider(model="gpt-4", api_key="sk-test")
+        
+        # Mock OpenAI response with invalid JSON in arguments
+        mock_response = Mock()
+        mock_response.id = "chatcmpl-123"
+        mock_response.model = "gpt-4"
+        mock_response.created = 1234567890
+        mock_response.system_fingerprint = None
+        
+        mock_tool_call = Mock()
+        mock_tool_call.id = "call_123"
+        mock_tool_call.type = "function"
+        mock_tool_call.function = Mock()
+        mock_tool_call.function.name = "get_weather"
+        mock_tool_call.function.arguments = 'invalid json {'
+        
+        mock_choice = Mock()
+        mock_choice.finish_reason = "tool_calls"
+        mock_choice.message = Mock()
+        mock_choice.message.content = None
+        mock_choice.message.tool_calls = [mock_tool_call]
+        mock_choice.message.parsed = None
+        mock_response.choices = [mock_choice]
+        
+        mock_usage = Mock()
+        mock_usage.prompt_tokens = 10
+        mock_usage.completion_tokens = 5
+        mock_usage.total_tokens = 15
+        mock_response.usage = mock_usage
+        
+        result = provider._transform_response(mock_response)
+        
+        # Verify tool call is still created with empty arguments
+        assert result.tool_calls is not None
+        assert len(result.tool_calls) == 1
+        assert result.tool_calls[0].arguments == {}
+    
+    def test_transform_request_with_multiple_capabilities(self) -> None:
+        """Test transformation with multiple capabilities."""
+        provider = OpenAIProvider(model="gpt-4", api_key="sk-test")
+        
+        # Mock multiple capabilities
+        mock_capability_1 = Mock()
+        mock_schema_1 = Mock()
+        mock_schema_1.name = "get_weather"
+        mock_schema_1.description = "Get weather"
+        mock_schema_1.parameters = {"type": "object", "properties": {"location": {"type": "string"}}}
+        mock_capability_1.get_schema.return_value = mock_schema_1
+        
+        mock_capability_2 = Mock()
+        mock_schema_2 = Mock()
+        mock_schema_2.name = "get_time"
+        mock_schema_2.description = "Get time"
+        mock_schema_2.parameters = {"type": "object", "properties": {"timezone": {"type": "string"}}}
+        mock_capability_2.get_schema.return_value = mock_schema_2
+        
+        # Create request with multiple capabilities
+        request = CompletionRequest(
+            messages=[UserMessage(content="Hello")],
+            model="gpt-4",
+            capabilities=[mock_capability_1, mock_capability_2]
+        )
+        
+        result = provider._transform_request(request)
+        
+        # Verify both tools are present
+        assert "tools" in result
+        assert len(result["tools"]) == 2
+        assert result["tools"][0]["function"]["name"] == "get_weather"
+        assert result["tools"][1]["function"]["name"] == "get_time"
+    
+    @patch("nimbus.providers.llm.openai_provider.LazyImporter.import_module")
+    def test_complete_with_tool_calls(self, mock_import: Mock) -> None:
+        """Test end-to-end completion with tool calls."""
+        # Setup mocks
+        mock_openai = MagicMock()
+        mock_import.return_value = mock_openai
+        
+        mock_client = Mock()
+        mock_openai.OpenAI.return_value = mock_client
+        
+        # Mock capability
+        mock_capability = Mock()
+        mock_schema = Mock()
+        mock_schema.name = "get_weather"
+        mock_schema.description = "Get weather"
+        mock_schema.parameters = {
+            "type": "object",
+            "properties": {"location": {"type": "string"}},
+            "required": ["location"]
+        }
+        mock_capability.get_schema.return_value = mock_schema
+        
+        # Mock response with tool call
+        mock_response = Mock()
+        mock_response.id = "chatcmpl-123"
+        mock_response.model = "gpt-4"
+        mock_response.created = 1234567890
+        mock_response.system_fingerprint = None
+        
+        mock_tool_call = Mock()
+        mock_tool_call.id = "call_123"
+        mock_tool_call.type = "function"
+        mock_tool_call.function = Mock()
+        mock_tool_call.function.name = "get_weather"
+        mock_tool_call.function.arguments = '{"location": "Boston"}'
+        
+        mock_choice = Mock()
+        mock_choice.finish_reason = "tool_calls"
+        mock_choice.message = Mock()
+        mock_choice.message.content = None
+        mock_choice.message.tool_calls = [mock_tool_call]
+        mock_choice.message.parsed = None
+        mock_response.choices = [mock_choice]
+        
+        mock_usage = Mock()
+        mock_usage.prompt_tokens = 40
+        mock_usage.completion_tokens = 15
+        mock_usage.total_tokens = 55
+        mock_response.usage = mock_usage
+        
+        mock_client.chat.completions.create.return_value = mock_response
+        
+        # Execute
+        provider = OpenAIProvider(model="gpt-4", api_key="sk-test")
+        request = CompletionRequest(
+            messages=[UserMessage(content="What's the weather in Boston?")],
+            model="gpt-4",
+            capabilities=[mock_capability],
+            tool_choice="auto"
+        )
+        
+        result = provider.complete(request)
+        
+        # Verify
+        assert result.finish_reason == "tool_calls"
+        assert result.has_tool_calls()
+        assert len(result.tool_calls) == 1
+        assert result.tool_calls[0].name == "get_weather"
+        
+        # Verify the API was called with tools
+        call_args = mock_client.chat.completions.create.call_args
+        assert "tools" in call_args[1]
+        assert call_args[1]["tool_choice"] == "auto"
+
+
 class TestOpenAIModelInfo:
     """Test model info retrieval."""
     

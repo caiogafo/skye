@@ -499,6 +499,363 @@ class TestBedrockModelInfo:
         assert info["supports_multimodal"] is True
 
 
+class TestBedrockToolCalling:
+    """Test tool calling integration with capabilities."""
+    
+    def test_transform_request_with_capabilities(self):
+        """Test transformation of request with capabilities to Bedrock format."""
+        # Mock capability
+        mock_capability = Mock()
+        mock_schema = Mock()
+        mock_schema.name = "get_weather"
+        mock_schema.description = "Get weather for a location"
+        mock_schema.parameters = {
+            "type": "object",
+            "properties": {
+                "location": {"type": "string"}
+            },
+            "required": ["location"]
+        }
+        mock_capability.get_schema.return_value = mock_schema
+        
+        provider = BedrockProvider(model="anthropic.claude-3-sonnet-20240229-v1:0")
+        request = CompletionRequest(
+            messages=[UserMessage(content="What's the weather in NYC?")],
+            model="anthropic.claude-3-sonnet-20240229-v1:0",
+            capabilities=[mock_capability],
+            tool_choice="auto"
+        )
+        
+        result = provider._transform_request(request)
+        
+        # Verify tools are converted to Bedrock format
+        assert "toolConfig" in result
+        assert "tools" in result["toolConfig"]
+        assert len(result["toolConfig"]["tools"]) == 1
+        
+        # Verify Bedrock toolSpec format
+        tool = result["toolConfig"]["tools"][0]
+        assert "toolSpec" in tool
+        assert tool["toolSpec"]["name"] == "get_weather"
+        assert tool["toolSpec"]["description"] == "Get weather for a location"
+        assert "inputSchema" in tool["toolSpec"]
+        assert "json" in tool["toolSpec"]["inputSchema"]
+        
+        # Verify tool_choice is formatted correctly
+        assert "toolChoice" in result["toolConfig"]
+        assert "auto" in result["toolConfig"]["toolChoice"]
+    
+    def test_transform_request_with_specific_tool_choice(self):
+        """Test transformation with specific tool name in tool_choice."""
+        # Mock capability
+        mock_capability = Mock()
+        mock_schema = Mock()
+        mock_schema.name = "get_weather"
+        mock_schema.description = "Get weather"
+        mock_schema.parameters = {"type": "object", "properties": {}}
+        mock_capability.get_schema.return_value = mock_schema
+        
+        provider = BedrockProvider(model="anthropic.claude-3-sonnet-20240229-v1:0")
+        request = CompletionRequest(
+            messages=[UserMessage(content="What's the weather?")],
+            model="anthropic.claude-3-sonnet-20240229-v1:0",
+            capabilities=[mock_capability],
+            tool_choice="get_weather"
+        )
+        
+        result = provider._transform_request(request)
+        
+        # Verify tool_choice is formatted correctly for specific tool
+        assert "toolChoice" in result["toolConfig"]
+        assert "tool" in result["toolConfig"]["toolChoice"]
+        assert result["toolConfig"]["toolChoice"]["tool"]["name"] == "get_weather"
+    
+    def test_transform_request_with_required_tool_choice(self):
+        """Test transformation with 'required' tool_choice."""
+        # Mock capability
+        mock_capability = Mock()
+        mock_schema = Mock()
+        mock_schema.name = "calculator"
+        mock_schema.description = "Calculate"
+        mock_schema.parameters = {"type": "object", "properties": {}}
+        mock_capability.get_schema.return_value = mock_schema
+        
+        provider = BedrockProvider(model="anthropic.claude-3-sonnet-20240229-v1:0")
+        request = CompletionRequest(
+            messages=[UserMessage(content="Calculate 2+2")],
+            model="anthropic.claude-3-sonnet-20240229-v1:0",
+            capabilities=[mock_capability],
+            tool_choice="required"
+        )
+        
+        result = provider._transform_request(request)
+        
+        # Verify tool_choice is formatted correctly for 'required' (maps to 'any' in Bedrock)
+        assert "toolChoice" in result["toolConfig"]
+        assert "any" in result["toolConfig"]["toolChoice"]
+    
+    def test_transform_response_with_tool_calls_creates_tool_call_objects(self):
+        """Test that tool calls in response are converted to ToolCall objects."""
+        provider = BedrockProvider(model="anthropic.claude-3-sonnet-20240229-v1:0")
+        
+        # Mock Bedrock response with tool use
+        bedrock_response = {
+            "output": {
+                "message": {
+                    "role": "assistant",
+                    "content": [
+                        {
+                            "toolUse": {
+                                "toolUseId": "tooluse_abc123",
+                                "name": "get_weather",
+                                "input": {"location": "San Francisco", "unit": "celsius"}
+                            }
+                        }
+                    ]
+                }
+            },
+            "stopReason": "tool_use",
+            "usage": {
+                "inputTokens": 50,
+                "outputTokens": 20,
+                "totalTokens": 70
+            },
+            "ResponseMetadata": {
+                "RequestId": "test-request-id",
+                "HTTPHeaders": {}
+            }
+        }
+        
+        result = provider._transform_response(bedrock_response)
+        
+        # Verify tool_calls are present in response
+        assert result.tool_calls is not None
+        assert len(result.tool_calls) == 1
+        
+        # Verify ToolCall object structure
+        tool_call = result.tool_calls[0]
+        assert tool_call.id == "tooluse_abc123"
+        assert tool_call.name == "get_weather"
+        assert tool_call.arguments == {"location": "San Francisco", "unit": "celsius"}
+        
+        # Verify metadata also contains raw tool calls
+        assert result.metadata["tool_calls"] is not None
+        assert len(result.metadata["tool_calls"]) == 1
+        assert result.metadata["tool_calls"][0]["id"] == "tooluse_abc123"
+        assert result.finish_reason == "tool_calls"
+    
+    def test_transform_response_with_parallel_tool_calls(self):
+        """Test handling of parallel tool calls in response."""
+        provider = BedrockProvider(model="anthropic.claude-3-sonnet-20240229-v1:0")
+        
+        # Mock Bedrock response with multiple parallel tool calls
+        bedrock_response = {
+            "output": {
+                "message": {
+                    "role": "assistant",
+                    "content": [
+                        {
+                            "toolUse": {
+                                "toolUseId": "tooluse_1",
+                                "name": "get_weather",
+                                "input": {"location": "NYC"}
+                            }
+                        },
+                        {
+                            "toolUse": {
+                                "toolUseId": "tooluse_2",
+                                "name": "get_time",
+                                "input": {"timezone": "EST"}
+                            }
+                        }
+                    ]
+                }
+            },
+            "stopReason": "tool_use",
+            "usage": {
+                "inputTokens": 60,
+                "outputTokens": 30,
+                "totalTokens": 90
+            },
+            "ResponseMetadata": {
+                "RequestId": "test-request-id",
+                "HTTPHeaders": {}
+            }
+        }
+        
+        result = provider._transform_response(bedrock_response)
+        
+        # Verify both tool calls are present
+        assert result.tool_calls is not None
+        assert len(result.tool_calls) == 2
+        
+        # Verify first tool call
+        assert result.tool_calls[0].id == "tooluse_1"
+        assert result.tool_calls[0].name == "get_weather"
+        assert result.tool_calls[0].arguments == {"location": "NYC"}
+        
+        # Verify second tool call
+        assert result.tool_calls[1].id == "tooluse_2"
+        assert result.tool_calls[1].name == "get_time"
+        assert result.tool_calls[1].arguments == {"timezone": "EST"}
+    
+    def test_transform_response_with_text_and_tool_use(self):
+        """Test handling of response with both text and tool use."""
+        provider = BedrockProvider(model="anthropic.claude-3-sonnet-20240229-v1:0")
+        
+        # Mock Bedrock response with text and tool use
+        bedrock_response = {
+            "output": {
+                "message": {
+                    "role": "assistant",
+                    "content": [
+                        {"text": "Let me check the weather for you. "},
+                        {
+                            "toolUse": {
+                                "toolUseId": "tooluse_123",
+                                "name": "get_weather",
+                                "input": {"location": "Boston"}
+                            }
+                        }
+                    ]
+                }
+            },
+            "stopReason": "tool_use",
+            "usage": {
+                "inputTokens": 40,
+                "outputTokens": 25,
+                "totalTokens": 65
+            },
+            "ResponseMetadata": {
+                "RequestId": "test-request-id",
+                "HTTPHeaders": {}
+            }
+        }
+        
+        result = provider._transform_response(bedrock_response)
+        
+        # Verify both text content and tool calls are present
+        assert result.content == "Let me check the weather for you. "
+        assert result.tool_calls is not None
+        assert len(result.tool_calls) == 1
+        assert result.tool_calls[0].name == "get_weather"
+    
+    def test_transform_request_with_multiple_capabilities(self):
+        """Test transformation with multiple capabilities."""
+        provider = BedrockProvider(model="anthropic.claude-3-sonnet-20240229-v1:0")
+        
+        # Mock multiple capabilities
+        mock_capability_1 = Mock()
+        mock_schema_1 = Mock()
+        mock_schema_1.name = "get_weather"
+        mock_schema_1.description = "Get weather"
+        mock_schema_1.parameters = {"type": "object", "properties": {"location": {"type": "string"}}}
+        mock_capability_1.get_schema.return_value = mock_schema_1
+        
+        mock_capability_2 = Mock()
+        mock_schema_2 = Mock()
+        mock_schema_2.name = "get_time"
+        mock_schema_2.description = "Get time"
+        mock_schema_2.parameters = {"type": "object", "properties": {"timezone": {"type": "string"}}}
+        mock_capability_2.get_schema.return_value = mock_schema_2
+        
+        # Create request with multiple capabilities
+        request = CompletionRequest(
+            messages=[UserMessage(content="Hello")],
+            model="anthropic.claude-3-sonnet-20240229-v1:0",
+            capabilities=[mock_capability_1, mock_capability_2]
+        )
+        
+        result = provider._transform_request(request)
+        
+        # Verify both tools are present
+        assert "toolConfig" in result
+        assert len(result["toolConfig"]["tools"]) == 2
+        assert result["toolConfig"]["tools"][0]["toolSpec"]["name"] == "get_weather"
+        assert result["toolConfig"]["tools"][1]["toolSpec"]["name"] == "get_time"
+    
+    @patch("nimbus.providers.llm.bedrock_provider.LazyImporter.import_module")
+    def test_complete_with_tool_calls(self, mock_import):
+        """Test end-to-end completion with tool calls."""
+        # Setup mocks
+        mock_boto3 = MagicMock()
+        mock_session = MagicMock()
+        mock_client = MagicMock()
+        
+        mock_boto3.Session.return_value = mock_session
+        mock_session.client.return_value = mock_client
+        mock_import.return_value = mock_boto3
+        
+        # Ensure boto3 is not in sys.modules
+        if "boto3" in sys.modules:
+            del sys.modules["boto3"]
+        
+        # Mock capability
+        mock_capability = Mock()
+        mock_schema = Mock()
+        mock_schema.name = "get_weather"
+        mock_schema.description = "Get weather"
+        mock_schema.parameters = {
+            "type": "object",
+            "properties": {"location": {"type": "string"}},
+            "required": ["location"]
+        }
+        mock_capability.get_schema.return_value = mock_schema
+        
+        # Mock response with tool call
+        mock_response = {
+            "output": {
+                "message": {
+                    "role": "assistant",
+                    "content": [
+                        {
+                            "toolUse": {
+                                "toolUseId": "tooluse_123",
+                                "name": "get_weather",
+                                "input": {"location": "Boston"}
+                            }
+                        }
+                    ]
+                }
+            },
+            "stopReason": "tool_use",
+            "usage": {
+                "inputTokens": 40,
+                "outputTokens": 15,
+                "totalTokens": 55
+            },
+            "ResponseMetadata": {
+                "RequestId": "test-request-id",
+                "HTTPHeaders": {}
+            }
+        }
+        
+        mock_client.converse.return_value = mock_response
+        
+        # Execute
+        provider = BedrockProvider(model="anthropic.claude-3-sonnet-20240229-v1:0")
+        request = CompletionRequest(
+            messages=[UserMessage(content="What's the weather in Boston?")],
+            model="anthropic.claude-3-sonnet-20240229-v1:0",
+            capabilities=[mock_capability],
+            tool_choice="auto"
+        )
+        
+        result = provider.complete(request)
+        
+        # Verify
+        assert result.finish_reason == "tool_calls"
+        assert result.has_tool_calls()
+        assert len(result.tool_calls) == 1
+        assert result.tool_calls[0].name == "get_weather"
+        
+        # Verify the API was called with tools
+        call_args = mock_client.converse.call_args[1]
+        assert "toolConfig" in call_args
+        assert "tools" in call_args["toolConfig"]
+        assert "toolChoice" in call_args["toolConfig"]
+
+
 class TestBedrockIntegration:
     """Integration tests for complete request/response flow."""
     

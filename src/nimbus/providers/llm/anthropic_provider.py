@@ -35,6 +35,14 @@ from nimbus.providers.base import BaseModelProvider
 from nimbus.providers.lazy_import import LazyImporter
 from nimbus.providers.transformers import MessageTransformer
 
+# Import ToolTransformer for capability conversion
+try:
+    from nimbus.capabilities.tool_transformer import ToolTransformer
+    from nimbus.capabilities.tool_models import ToolCall
+    CAPABILITIES_AVAILABLE = True
+except ImportError:
+    CAPABILITIES_AVAILABLE = False
+
 
 class AnthropicProvider(BaseModelProvider):
     """Anthropic provider implementation.
@@ -121,27 +129,41 @@ class AnthropicProvider(BaseModelProvider):
         
         # Handle tool use (Anthropic's function calling)
         if request.capabilities:
-            # Convert OpenAI-style tools to Anthropic format
-            anthropic_tools = []
-            for cap in request.capabilities:
-                if cap.get("type") == "function":
-                    func = cap["function"]
-                    anthropic_tools.append({
-                        "name": func["name"],
-                        "description": func.get("description", ""),
-                        "input_schema": func.get("parameters", {})
-                    })
-            anthropic_request["tools"] = anthropic_tools
+            # Check if capabilities are CapabilityInterface objects or dicts
+            if request.capabilities and isinstance(request.capabilities[0], dict):
+                # Legacy support: capabilities are already in dict format
+                anthropic_tools = []
+                for cap in request.capabilities:
+                    if cap.get("type") == "function":
+                        func = cap["function"]
+                        anthropic_tools.append({
+                            "name": func["name"],
+                            "description": func.get("description", ""),
+                            "input_schema": func.get("parameters", {})
+                        })
+                anthropic_request["tools"] = anthropic_tools
+            elif CAPABILITIES_AVAILABLE:
+                # Use ToolTransformer to convert capabilities to Anthropic format
+                anthropic_request["tools"] = ToolTransformer.to_anthropic_format(request.capabilities)
+            else:
+                # Capabilities module not available
+                raise ValueError("Capabilities module not installed. Install with: pip install nimbus[capabilities]")
             
             # Handle tool choice
-            if request.capability_choice:
-                if request.capability_choice == "auto":
+            if request.tool_choice:
+                if request.tool_choice == "auto":
                     anthropic_request["tool_choice"] = {"type": "auto"}
-                elif request.capability_choice == "required":
+                elif request.tool_choice == "required":
                     anthropic_request["tool_choice"] = {"type": "any"}
-                elif isinstance(request.capability_choice, dict):
-                    # Specific tool choice
-                    anthropic_request["tool_choice"] = request.capability_choice
+                elif isinstance(request.tool_choice, str):
+                    # Specific tool name
+                    anthropic_request["tool_choice"] = {
+                        "type": "tool",
+                        "name": request.tool_choice
+                    }
+                elif isinstance(request.tool_choice, dict):
+                    # Already formatted tool choice
+                    anthropic_request["tool_choice"] = request.tool_choice
         
         # Provider-specific metadata
         if request.metadata:
@@ -162,16 +184,25 @@ class AnthropicProvider(BaseModelProvider):
         """
         # Extract content
         content_text = ""
-        tool_calls = None
+        tool_calls_list = []
+        tool_calls_metadata = []
         
         for content_block in response.content:
             if content_block.type == "text":
                 content_text += content_block.text
             elif content_block.type == "tool_use":
-                # Convert tool use to OpenAI-style tool calls format
-                if tool_calls is None:
-                    tool_calls = []
-                tool_calls.append({
+                # Create ToolCall object if capabilities are available
+                if CAPABILITIES_AVAILABLE:
+                    tool_calls_list.append(
+                        ToolCall(
+                            id=content_block.id,
+                            name=content_block.name,
+                            arguments=content_block.input
+                        )
+                    )
+                
+                # Also store in metadata for compatibility
+                tool_calls_metadata.append({
                     "id": content_block.id,
                     "type": "function",
                     "function": {
@@ -197,9 +228,20 @@ class AnthropicProvider(BaseModelProvider):
                 total_tokens=response.usage.input_tokens + response.usage.output_tokens
             ),
             created_at=created_at,
+            tool_calls=tool_calls_list if tool_calls_list else None,
             metadata={
                 "stop_sequence": response.stop_sequence,
-                "tool_calls": tool_calls
+                "tool_calls": tool_calls_metadata if tool_calls_metadata else None,
+                "content": [
+                    {
+                        "type": block.type,
+                        "id": getattr(block, "id", None),
+                        "name": getattr(block, "name", None),
+                        "input": getattr(block, "input", None),
+                    }
+                    for block in response.content
+                    if block.type == "tool_use"
+                ]
             }
         )
     
