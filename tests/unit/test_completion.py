@@ -114,10 +114,10 @@ class TestCompletionRequest:
             messages=[UserMessage(content="What's the weather?")],
             model="gpt-4",
             capabilities=capabilities,
-            tool_choice="auto",
+            capability_choice="auto",
         )
         assert request.capabilities == capabilities
-        assert request.tool_choice == "auto"
+        assert request.capability_choice == "auto"
 
     def test_structured_output_fields(self):
         """Test response_format and response_schema fields."""
@@ -150,7 +150,7 @@ class TestCompletionRequest:
         # Test with None (default)
         request = CompletionRequest(messages=[UserMessage(content="Hello")], model="gpt-4")
         assert request.capabilities is None
-        assert request.tool_choice is None
+        assert request.capability_choice is None
 
         # Test with empty list
         request = CompletionRequest(
@@ -171,40 +171,40 @@ class TestCompletionRequest:
         assert len(request.capabilities) == 2
         assert request.capabilities[0]["name"] == "get_weather"
 
-    def test_completion_request_tool_choice_validation(self):
-        """Test tool_choice field validation."""
+    def test_completion_request_capability_choice_validation(self):
+        """Test capability_choice field validation."""
         # Valid: None (default)
         request = CompletionRequest(messages=[UserMessage(content="Hello")], model="gpt-4")
-        assert request.tool_choice is None
+        assert request.capability_choice is None
 
         # Valid: "auto"
         request = CompletionRequest(
-            messages=[UserMessage(content="Hello")], model="gpt-4", tool_choice="auto"
+            messages=[UserMessage(content="Hello")], model="gpt-4", capability_choice="auto"
         )
-        assert request.tool_choice == "auto"
+        assert request.capability_choice == "auto"
 
         # Valid: "required"
         request = CompletionRequest(
-            messages=[UserMessage(content="Hello")], model="gpt-4", tool_choice="required"
+            messages=[UserMessage(content="Hello")], model="gpt-4", capability_choice="required"
         )
-        assert request.tool_choice == "required"
+        assert request.capability_choice == "required"
 
-        # Valid: specific tool name
+        # Valid: specific capability name
         request = CompletionRequest(
-            messages=[UserMessage(content="Hello")], model="gpt-4", tool_choice="get_weather"
+            messages=[UserMessage(content="Hello")], model="gpt-4", capability_choice="get_weather"
         )
-        assert request.tool_choice == "get_weather"
+        assert request.capability_choice == "get_weather"
 
         # Invalid: empty string
         with pytest.raises(ValidationError):
             CompletionRequest(
-                messages=[UserMessage(content="Hello")], model="gpt-4", tool_choice=""
+                messages=[UserMessage(content="Hello")], model="gpt-4", capability_choice=""
             )
 
         # Invalid: whitespace only
         with pytest.raises(ValidationError):
             CompletionRequest(
-                messages=[UserMessage(content="Hello")], model="gpt-4", tool_choice="   "
+                messages=[UserMessage(content="Hello")], model="gpt-4", capability_choice="   "
             )
 
 

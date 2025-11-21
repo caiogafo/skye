@@ -191,7 +191,7 @@ class ProviderRegistry:
         return list(cls._embedding_providers.keys())
 
 
-def provider(name: str, **config: Any) -> ModelInterface:
+def provider(name: str, **config: Any) -> ModelInterface | VectorEncoderInterface:
     """Create a provider client (boto3-style API).
 
     This is the main entry point for the simplified boto3-style API.
@@ -199,39 +199,71 @@ def provider(name: str, **config: Any) -> ModelInterface:
 
     Args:
         name: Provider name (e.g., "openai", "bedrock", "anthropic").
-        **config: Provider-specific configuration.
+        **config: Provider-specific configuration. Use provider_type="embedding"
+            to get an embedding provider instead of a model provider.
 
     Returns:
-        ModelInterface instance that supports boto3-style calls.
+        ModelInterface or VectorEncoderInterface instance that supports boto3-style calls.
 
     Example:
         >>> import nimbus
         >>> from nimbus.messages import UserMessage
         >>>
-        >>> # OpenAI
+        >>> # OpenAI LLM
         >>> client = nimbus.provider("openai", api_key="sk-...")
         >>> response = client.complete(
         ...     messages=[UserMessage("Hello")],
         ...     model="gpt-4"
         ... )
         >>>
-        >>> # Bedrock
+        >>> # OpenAI Embeddings
+        >>> embedder = nimbus.provider(
+        ...     "openai",
+        ...     api_key="sk-...",
+        ...     model="text-embedding-3-small",
+        ...     provider_type="embedding"
+        ... )
+        >>> vectors = embedder.encode_batch(["text1", "text2"])
+        >>>
+        >>> # Bedrock LLM
         >>> client = nimbus.provider("bedrock", region="us-east-1")
         >>> response = client.complete(
         ...     messages=[UserMessage("Hello")],
         ...     model="anthropic.claude-3-sonnet-20240229-v1:0"
         ... )
         >>>
-        >>> # Anthropic
-        >>> client = nimbus.provider("anthropic", api_key="sk-ant-...")
-        >>> response = client.complete(
-        ...     messages=[UserMessage("Hello")],
-        ...     model="claude-3-sonnet-20240229"
+        >>> # Bedrock Embeddings
+        >>> embedder = nimbus.provider(
+        ...     "bedrock",
+        ...     region="us-east-1",
+        ...     model="amazon.titan-embed-text-v1",
+        ...     provider_type="embedding"
         ... )
+        >>> vectors = embedder.encode_batch(["text1", "text2"])
+        >>>
+        >>> # Vertex AI Embeddings
+        >>> embedder = nimbus.provider(
+        ...     "vertex",
+        ...     project_id="my-project",
+        ...     location="us-central1",
+        ...     model="textembedding-gecko@003",
+        ...     provider_type="embedding"
+        ... )
+        >>> vectors = embedder.encode_batch(["text1", "text2"])
     """
     # Normalize parameter names for convenience
     # Allow "region" as alias for "region_name" (boto3-style)
     if "region" in config and "region_name" not in config:
         config["region_name"] = config.pop("region")
+    
+    # Allow "location" as alias for "region_name" (GCP-style)
+    if "location" in config and "region_name" not in config:
+        config["region_name"] = config.pop("location")
 
-    return ProviderRegistry.get_model_provider(name, **config)
+    # Check if this is an embedding provider request
+    provider_type = config.pop("provider_type", "model")
+    
+    if provider_type == "embedding":
+        return ProviderRegistry.get_embedding_provider(name, **config)
+    else:
+        return ProviderRegistry.get_model_provider(name, **config)

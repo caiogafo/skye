@@ -3,22 +3,34 @@
 This example demonstrates how to use embedding providers with Nimbus.
 
 Features shown:
-- OpenAI embeddings
-- Bedrock embeddings
-- Cohere embeddings
+- OpenAI embeddings (text-embedding-3-small)
+- AWS Bedrock embeddings (Titan)
+- Google Vertex AI embeddings (textembedding-gecko)
+- Single text encoding
 - Batch encoding
 - Async encoding
+- Similarity calculations
+
+Usage:
+    python embeddings_example.py
+
+Requirements:
+    - Set OPENAI_API_KEY for OpenAI examples
+    - Configure AWS credentials for Bedrock examples
+    - Set GOOGLE_CLOUD_PROJECT for Vertex AI examples
 """
 
-import os
 import asyncio
-from nimbus.providers import ProviderRegistry
+import math
+import os
+
+import nimbus
 
 
 def openai_embeddings():
-    """OpenAI embeddings example."""
+    """OpenAI embeddings example using text-embedding-3-small."""
     print("=" * 60)
-    print("OpenAI Embeddings")
+    print("OpenAI Embeddings (text-embedding-3-small)")
     print("=" * 60)
     
     api_key = os.getenv("OPENAI_API_KEY")
@@ -27,10 +39,12 @@ def openai_embeddings():
         return
     
     try:
-        provider = ProviderRegistry.get_embedding_provider(
+        # Use the modern nimbus.provider() interface
+        embedder = nimbus.provider(
             "openai",
             model="text-embedding-3-small",
-            api_key=api_key
+            api_key=api_key,
+            provider_type="embedding"
         )
     except ImportError as e:
         print(f"⚠️  Error: {e}")
@@ -47,21 +61,13 @@ def openai_embeddings():
     print("-" * 40)
     
     try:
-        embeddings = provider.encode_batch(texts)
+        embeddings = embedder.encode_batch(texts)
         
         print(f"✓ Generated {len(embeddings)} embeddings")
-        print(f"✓ Vector dimension: {provider.get_vector_dimension()}")
+        print(f"✓ Vector dimension: {embedder.get_vector_dimension()}")
         print(f"✓ First embedding (first 5 values): {embeddings[0][:5]}")
         
         # Calculate similarity between first two texts
-        import math
-        
-        def cosine_similarity(a, b):
-            dot_product = sum(x * y for x, y in zip(a, b))
-            magnitude_a = math.sqrt(sum(x ** 2 for x in a))
-            magnitude_b = math.sqrt(sum(x ** 2 for x in b))
-            return dot_product / (magnitude_a * magnitude_b)
-        
         similarity = cosine_similarity(embeddings[0], embeddings[1])
         print(f"✓ Similarity between text 1 and 2: {similarity:.4f}")
         
@@ -70,16 +76,17 @@ def openai_embeddings():
 
 
 def bedrock_embeddings():
-    """Bedrock embeddings example."""
+    """Bedrock embeddings example using Titan Embeddings."""
     print("\n" + "=" * 60)
-    print("AWS Bedrock Embeddings")
+    print("AWS Bedrock Embeddings (Titan)")
     print("=" * 60)
     
     try:
-        provider = ProviderRegistry.get_embedding_provider(
+        embedder = nimbus.provider(
             "bedrock",
             model="amazon.titan-embed-text-v1",
-            region_name="us-east-1"
+            region_name="us-east-1",
+            provider_type="embedding"
         )
     except ImportError as e:
         print(f"⚠️  Error: {e}")
@@ -95,10 +102,10 @@ def bedrock_embeddings():
     print("-" * 40)
     
     try:
-        embeddings = provider.encode_batch(texts)
+        embeddings = embedder.encode_batch(texts)
         
         print(f"✓ Generated {len(embeddings)} embeddings")
-        print(f"✓ Vector dimension: {provider.get_vector_dimension()}")
+        print(f"✓ Vector dimension: {embedder.get_vector_dimension()}")
         print(f"✓ First embedding (first 5 values): {embeddings[0][:5]}")
         
     except Exception as e:
@@ -108,26 +115,28 @@ def bedrock_embeddings():
         print("  2. Access to Bedrock embeddings")
 
 
-def cohere_embeddings():
-    """Cohere embeddings example."""
+def vertex_embeddings():
+    """Vertex AI embeddings example."""
     print("\n" + "=" * 60)
-    print("Cohere Embeddings")
+    print("Google Vertex AI Embeddings")
     print("=" * 60)
     
-    api_key = os.getenv("COHERE_API_KEY")
-    if not api_key:
-        print("⚠️  COHERE_API_KEY environment variable not set")
+    project_id = os.getenv("GOOGLE_CLOUD_PROJECT")
+    if not project_id:
+        print("⚠️  GOOGLE_CLOUD_PROJECT environment variable not set")
         return
     
     try:
-        provider = ProviderRegistry.get_embedding_provider(
-            "cohere",
-            model="embed-english-v3.0",
-            api_key=api_key
+        embedder = nimbus.provider(
+            "vertex",
+            model="textembedding-gecko@003",
+            project_id=project_id,
+            location="us-central1",
+            provider_type="embedding"
         )
     except ImportError as e:
         print(f"⚠️  Error: {e}")
-        print("\nTo use Cohere embeddings, install with: pip install nimbus[cohere]")
+        print("\nTo use Vertex AI embeddings, install with: pip install nimbus[vertex]")
         return
     
     texts = [
@@ -135,18 +144,29 @@ def cohere_embeddings():
         "Deep learning powers modern AI systems"
     ]
     
-    print(f"\nEncoding {len(texts)} texts with Cohere...")
+    print(f"\nEncoding {len(texts)} texts with Vertex AI...")
     print("-" * 40)
     
     try:
-        embeddings = provider.encode_batch(texts)
+        embeddings = embedder.encode_batch(texts)
         
         print(f"✓ Generated {len(embeddings)} embeddings")
-        print(f"✓ Vector dimension: {provider.get_vector_dimension()}")
+        print(f"✓ Vector dimension: {embedder.get_vector_dimension()}")
         print(f"✓ First embedding (first 5 values): {embeddings[0][:5]}")
         
     except Exception as e:
         print(f"\n❌ Error: {e}")
+        print("\nMake sure you have:")
+        print("  1. Google Cloud credentials configured")
+        print("  2. Vertex AI API enabled")
+
+
+def cosine_similarity(a: list[float], b: list[float]) -> float:
+    """Calculate cosine similarity between two vectors."""
+    dot_product = sum(x * y for x, y in zip(a, b))
+    magnitude_a = math.sqrt(sum(x ** 2 for x in a))
+    magnitude_b = math.sqrt(sum(x ** 2 for x in b))
+    return dot_product / (magnitude_a * magnitude_b)
 
 
 def single_text_encoding():
@@ -161,10 +181,11 @@ def single_text_encoding():
         return
     
     try:
-        provider = ProviderRegistry.get_embedding_provider(
+        embedder = nimbus.provider(
             "openai",
             model="text-embedding-3-small",
-            api_key=api_key
+            api_key=api_key,
+            provider_type="embedding"
         )
     except ImportError:
         print("⚠️  OpenAI provider not available")
@@ -176,7 +197,7 @@ def single_text_encoding():
     print("-" * 40)
     
     try:
-        embedding = provider.encode(text)
+        embedding = embedder.encode(text)
         
         print(f"✓ Generated embedding")
         print(f"✓ Vector dimension: {len(embedding)}")
@@ -198,10 +219,11 @@ async def async_encoding():
         return
     
     try:
-        provider = ProviderRegistry.get_embedding_provider(
+        embedder = nimbus.provider(
             "openai",
             model="text-embedding-3-small",
-            api_key=api_key
+            api_key=api_key,
+            provider_type="embedding"
         )
     except ImportError:
         print("⚠️  OpenAI provider not available")
@@ -216,7 +238,7 @@ async def async_encoding():
     print("-" * 40)
     
     try:
-        embeddings = await provider.aencode_batch(texts)
+        embeddings = await embedder.aencode_batch(texts)
         
         print(f"✓ Generated {len(embeddings)} embeddings asynchronously")
         print(f"✓ First embedding (first 5 values): {embeddings[0][:5]}")
@@ -237,10 +259,11 @@ def batch_processing():
         return
     
     try:
-        provider = ProviderRegistry.get_embedding_provider(
+        embedder = nimbus.provider(
             "openai",
             model="text-embedding-3-small",
-            api_key=api_key
+            api_key=api_key,
+            provider_type="embedding"
         )
     except ImportError:
         print("⚠️  OpenAI provider not available")
@@ -267,11 +290,11 @@ def batch_processing():
             batch = documents[i:i + batch_size]
             print(f"Processing batch {i // batch_size + 1}...")
             
-            embeddings = provider.encode_batch(batch)
+            embeddings = embedder.encode_batch(batch)
             all_embeddings.extend(embeddings)
         
         print(f"\n✓ Processed {len(all_embeddings)} documents")
-        print(f"✓ Vector dimension: {provider.get_vector_dimension()}")
+        print(f"✓ Vector dimension: {embedder.get_vector_dimension()}")
         
     except Exception as e:
         print(f"\n❌ Error: {e}")
@@ -282,11 +305,16 @@ def main():
     print("\n" + "📊 " * 20)
     print("NIMBUS - Embedding Providers Examples")
     print("📊 " * 20)
+    print("\nThis example demonstrates various embedding providers and operations.")
+    print("Set the appropriate API keys/credentials as environment variables:")
+    print("  - OPENAI_API_KEY for OpenAI")
+    print("  - AWS credentials for Bedrock")
+    print("  - GOOGLE_CLOUD_PROJECT for Vertex AI")
     
     try:
         openai_embeddings()
         bedrock_embeddings()
-        cohere_embeddings()
+        vertex_embeddings()
         single_text_encoding()
         batch_processing()
         

@@ -344,14 +344,14 @@
   - Ensure YAML configuration loading works correctly
   - _Requirements: 2.1, 2.2, 2.3_
 
-- [ ] 30. Fix failing completion request tests
+- [x] 30. Fix failing completion request tests
   - Update tests/unit/test_completion.py
   - Fix capabilities field tests
   - Fix tool_choice validation tests
   - Ensure CompletionRequest model validation works
   - _Requirements: 1.2, 1.3_
 
-- [ ] 31. Fix failing exports test
+- [x] 31. Fix failing exports test
   - Update tests/unit/test_exports.py
   - Ensure __all__ list matches actual exports
   - Verify all public APIs are properly exported

@@ -166,19 +166,26 @@ def test_all_list_matches_exports():
     """Test that __all__ contains all expected exports."""
     from nimbus import __all__
 
-    # Count expected exports
+    # Count expected exports by category (matching __init__.py structure)
     expected_count = (
         1  # __version__
         + 2  # Simple API (provider, routes)
-        + 3  # Routing - Core (ModelRouter)
-        + 5  # Routing - Configuration
-        + 3  # Routing - Metrics
-        + 5  # Exceptions
-        + 6  # Messages
-        + 4  # Completion
-        + 6  # Configuration
-        + 15  # Interfaces (removed MessageTransformerInterface)
-        + 5  # Interfaces - Utilities
+        + 1  # Routing - Core (ModelRouter)
+        + 5  # Routing - Configuration (ModelTarget, RouteConfig, FallbackConfig, RetryPolicyConfig, AllowedFailsPolicyConfig)
+        + 3  # Routing - Metrics (ModelHealthMetrics, UsageStats, CooldownInfo)
+        + 5  # Exceptions (NimbusError, ProviderError, ConfigurationError, ValidationError, CapabilityExecutionError)
+        + 6  # Messages (NimbusMessage, UserMessage, AssistantMessage, SystemMessage, CapabilityMessage, ContentChunk)
+        + 4  # Completion (TokenUsage, CompletionRequest, CompletionResponse, StreamChunk)
+        + 6  # Configuration (RateLimitConfig, RetryConfig, CooldownConfig, ModelConfig, NimbusConfig, ConfigLoader)
+        + 5  # Interfaces - Core (ModelInterface, VectorEncoderInterface, ModelRouterInterface, RouteRegistryInterface, RoutingStrategy)
+        + 1  # Interfaces - Prompt and Message (PromptBuilderInterface)
+        + 2  # Interfaces - Capability (CapabilityInterface, CapabilitySchema)
+        + 2  # Interfaces - Memory and Storage (MemoryInterface, StorageAdapterInterface)
+        + 2  # Interfaces - Safety (SafetyFilterInterface, SafetyResult)
+        + 3  # Interfaces - Observability (ObserverInterface, EventType, EventHandlerInterface)
+        + 1  # Interfaces - Plugin (PluginInterface)
+        + 2  # Interfaces - Content (ContentReaderInterface, MultimodalHandlerInterface)
+        + 4  # Interfaces - Utilities (CostCalculatorInterface, TokenCounterInterface, ErrorHandlerInterface, ConfigLoaderInterface)
     )
 
     assert len(__all__) == expected_count, f"Expected {expected_count} exports, got {len(__all__)}"
@@ -190,7 +197,7 @@ def test_no_unexpected_exports():
 
     import nimbus
 
-    # Get all public attributes that are not modules
+    # Get all public attributes that are not modules (except 'routes' which is intentionally exported)
     public_attrs = [
         attr
         for attr in dir(nimbus)
@@ -200,3 +207,112 @@ def test_no_unexpected_exports():
     # All public non-module attributes should be in __all__
     for attr in public_attrs:
         assert attr in nimbus.__all__, f"Unexpected public export: {attr}"
+
+
+def test_all_exports_exist():
+    """Test that all items in __all__ actually exist and are importable."""
+    import nimbus
+
+    for export_name in nimbus.__all__:
+        assert hasattr(nimbus, export_name), f"{export_name} in __all__ but not found in module"
+        # Verify it's actually importable
+        obj = getattr(nimbus, export_name)
+        assert obj is not None, f"{export_name} exists but is None"
+
+
+def test_all_list_structure():
+    """Test that __all__ list matches the documented structure in __init__.py."""
+    from nimbus import __all__
+
+    # Define expected exports by category (matching __init__.py comments)
+    expected_exports = {
+        # Version
+        "__version__",
+        # Simple API
+        "provider",
+        "routes",
+        # Routing - Core
+        "ModelRouter",
+        # Routing - Configuration
+        "ModelTarget",
+        "RouteConfig",
+        "FallbackConfig",
+        "RetryPolicyConfig",
+        "AllowedFailsPolicyConfig",
+        # Routing - Metrics
+        "ModelHealthMetrics",
+        "UsageStats",
+        "CooldownInfo",
+        # Exceptions
+        "NimbusError",
+        "ProviderError",
+        "ConfigurationError",
+        "ValidationError",
+        "CapabilityExecutionError",
+        # Messages
+        "NimbusMessage",
+        "UserMessage",
+        "AssistantMessage",
+        "SystemMessage",
+        "CapabilityMessage",
+        "ContentChunk",
+        # Completion
+        "TokenUsage",
+        "CompletionRequest",
+        "CompletionResponse",
+        "StreamChunk",
+        # Configuration
+        "RateLimitConfig",
+        "RetryConfig",
+        "CooldownConfig",
+        "ModelConfig",
+        "NimbusConfig",
+        "ConfigLoader",
+        # Interfaces - Core
+        "ModelInterface",
+        "VectorEncoderInterface",
+        "ModelRouterInterface",
+        "RouteRegistryInterface",
+        "RoutingStrategy",
+        # Interfaces - Prompt and Message
+        "PromptBuilderInterface",
+        # Interfaces - Capability
+        "CapabilityInterface",
+        "CapabilitySchema",
+        # Interfaces - Memory and Storage
+        "MemoryInterface",
+        "StorageAdapterInterface",
+        # Interfaces - Safety
+        "SafetyFilterInterface",
+        "SafetyResult",
+        # Interfaces - Observability
+        "ObserverInterface",
+        "EventType",
+        "EventHandlerInterface",
+        # Interfaces - Plugin
+        "PluginInterface",
+        # Interfaces - Content
+        "ContentReaderInterface",
+        "MultimodalHandlerInterface",
+        # Interfaces - Utilities
+        "CostCalculatorInterface",
+        "TokenCounterInterface",
+        "ErrorHandlerInterface",
+        "ConfigLoaderInterface",
+    }
+
+    # Convert __all__ to set for comparison
+    actual_exports = set(__all__)
+
+    # Check for missing exports
+    missing = expected_exports - actual_exports
+    if missing:
+        raise AssertionError(f"Missing exports in __all__: {sorted(missing)}")
+
+    # Check for unexpected exports
+    unexpected = actual_exports - expected_exports
+    if unexpected:
+        raise AssertionError(f"Unexpected exports in __all__: {sorted(unexpected)}")
+
+    # Verify exact match
+    assert actual_exports == expected_exports, "Export lists do not match"

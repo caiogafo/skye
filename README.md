@@ -69,21 +69,19 @@ uv pip install nimbus[all]
 ### Basic Usage
 
 ```python
-from nimbus import CompletionRequest, UserMessage
-from nimbus.providers.bedrock import BedrockModel
+import nimbus
+from nimbus.messages import UserMessage
 
-# Initialize model
-model = BedrockModel(model_id="anthropic.claude-3-sonnet")
+# Create provider client (boto3-style)
+client = nimbus.provider("bedrock", region="us-east-1")
 
-# Create request
-request = CompletionRequest(
+# Make completion request
+response = client.complete(
     messages=[UserMessage(content="Hello, world!")],
-    model="claude-3-sonnet",
+    model="anthropic.claude-3-sonnet-20240229-v1:0",
     temperature=0.7
 )
 
-# Get response
-response = model.complete(request)
 print(response.content)
 ```
 
@@ -91,18 +89,17 @@ print(response.content)
 
 ```python
 import asyncio
-from nimbus import CompletionRequest, UserMessage
-from nimbus.providers.openai import OpenAIModel
+import nimbus
+from nimbus.messages import UserMessage
 
 async def main():
-    model = OpenAIModel(api_key="your-api-key")
+    client = nimbus.provider("openai", api_key="sk-...")
     
-    request = CompletionRequest(
+    response = await client.acomplete(
         messages=[UserMessage(content="Explain async/await")],
         model="gpt-4"
     )
     
-    response = await model.acomplete(request)
     print(response.content)
 
 asyncio.run(main())
@@ -111,18 +108,15 @@ asyncio.run(main())
 ### Streaming
 
 ```python
-from nimbus import CompletionRequest, UserMessage
-from nimbus.providers.openai import OpenAIModel
+import nimbus
+from nimbus.messages import UserMessage
 
-model = OpenAIModel(api_key="your-api-key")
+client = nimbus.provider("openai", api_key="sk-...")
 
-request = CompletionRequest(
+for chunk in client.stream(
     messages=[UserMessage(content="Write a story")],
-    model="gpt-4",
-    stream=True
-)
-
-for chunk in model.stream(request):
+    model="gpt-4"
+):
     print(chunk.delta, end="", flush=True)
 ```
 
@@ -130,23 +124,22 @@ for chunk in model.stream(request):
 
 ```python
 from pydantic import BaseModel
-from nimbus import CompletionRequest, UserMessage
-from nimbus.providers.openai import OpenAIModel
+import nimbus
+from nimbus.messages import UserMessage
 
 class Person(BaseModel):
     name: str
     age: int
     occupation: str
 
-model = OpenAIModel(api_key="your-api-key")
+client = nimbus.provider("openai", api_key="sk-...")
 
-request = CompletionRequest(
+response = client.complete(
     messages=[UserMessage(content="Extract: John is 30 and works as an engineer")],
     model="gpt-4",
     response_schema=Person
 )
 
-response = model.complete(request)
 person = response.structured_output  # Returns Person instance
 print(f"{person.name} is {person.age} years old")
 ```
@@ -270,13 +263,14 @@ response = client.complete(
 ### Embedding Providers
 
 ```python
-from nimbus.providers import ProviderRegistry
+import nimbus
 
 # OpenAI embeddings
-embedder = ProviderRegistry.get_embedding_provider(
+embedder = nimbus.provider(
     "openai",
     model="text-embedding-3-small",
-    api_key="sk-..."
+    api_key="sk-...",
+    provider_type="embedding"
 )
 
 embeddings = embedder.encode_batch([
@@ -284,26 +278,36 @@ embeddings = embedder.encode_batch([
     "Goodbye world"
 ])
 
+# Get vector dimension
+print(f"Dimension: {embedder.get_vector_dimension()}")
+
 # Bedrock embeddings
-embedder = ProviderRegistry.get_embedding_provider(
+embedder = nimbus.provider(
     "bedrock",
     model="amazon.titan-embed-text-v1",
-    region_name="us-east-1"
+    region="us-east-1",
+    provider_type="embedding"
 )
 
 embeddings = embedder.encode_batch(["Hello world"])
 
-# Cohere embeddings
-embedder = ProviderRegistry.get_embedding_provider(
-    "cohere",
-    model="embed-english-v3.0",
-    api_key="..."
+# Vertex AI embeddings
+embedder = nimbus.provider(
+    "vertex",
+    model="textembedding-gecko@003",
+    project_id="my-project",
+    location="us-central1",
+    provider_type="embedding"
 )
 
 embeddings = embedder.encode_batch(["Hello world"])
+
+# Single text encoding
+embedding = embedder.encode("Single text")
+
+# Async encoding
+embeddings = await embedder.aencode_batch(["text1", "text2"])
 ```
-
-Note: Embedding providers still use ProviderRegistry as there's no simplified `nimbus.embedder()` interface yet.
 
 ### Multimodal Inputs
 
@@ -335,14 +339,12 @@ response = client.complete(
     model="gpt-4-vision"
 )
 
-response = provider.complete(request)
-
 # Image from base64
 import base64
 with open("image.jpg", "rb") as f:
     image_data = base64.b64encode(f.read()).decode()
 
-request = CompletionRequest(
+response = client.complete(
     messages=[
         UserMessage(
             content="What's in this image?",
@@ -351,25 +353,23 @@ request = CompletionRequest(
     ],
     model="gpt-4-vision"
 )
-
-response = provider.complete(request)
 ```
 
 ### Structured Outputs
 
 ```python
 from pydantic import BaseModel
-from nimbus import CompletionRequest, UserMessage
-from nimbus.providers import ProviderRegistry
+import nimbus
+from nimbus.messages import UserMessage
 
 class Person(BaseModel):
     name: str
     age: int
     occupation: str
 
-provider = ProviderRegistry.get_model_provider("openai", api_key="sk-...")
+client = nimbus.provider("openai", api_key="sk-...")
 
-request = CompletionRequest(
+response = client.complete(
     messages=[
         UserMessage(content="Extract: John is 30 and works as an engineer")
     ],
@@ -377,90 +377,76 @@ request = CompletionRequest(
     response_schema=Person
 )
 
-response = provider.complete(request)
 person = response.structured_output
 print(f"{person.name} is {person.age} years old")
 ```
 
-### Function Calling
+### Function Calling (Capabilities)
 
 ```python
-from nimbus import CompletionRequest, UserMessage, CapabilityMessage
-from nimbus.providers import ProviderRegistry
+import nimbus
+from nimbus.messages import UserMessage, CapabilityMessage
+from nimbus.capabilities import capability
 
-provider = ProviderRegistry.get_model_provider("openai", api_key="sk-...")
+# Define capability using decorator
+@capability
+def get_weather(location: str) -> str:
+    """Get weather for a location.
+    
+    Args:
+        location: The city or location to get weather for
+    """
+    # Your implementation here
+    return f"Weather in {location}: Sunny, 72°F"
 
-# Define capabilities
-capabilities = [
-    {
-        "type": "function",
-        "function": {
-            "name": "get_weather",
-            "description": "Get weather for a location",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "location": {"type": "string"}
-                },
-                "required": ["location"]
-            }
-        }
-    }
-]
+client = nimbus.provider("openai", api_key="sk-...")
 
-request = CompletionRequest(
+response = client.complete(
     messages=[
         UserMessage(content="What's the weather in San Francisco?")
     ],
     model="gpt-4",
-    capabilities=capabilities
+    capabilities=[get_weather]
 )
-
-response = provider.complete(request)
 
 # Check if model called a function
 if response.capability_calls:
     for call in response.capability_calls:
-        print(f"Called: {call['function']['name']}")
-        print(f"Args: {call['function']['arguments']}")
+        print(f"Called: {call.name}")
+        print(f"Args: {call.arguments}")
         
-        # Execute the function and send result back
-        if call['function']['name'] == 'get_weather':
-            result = get_weather(call['function']['arguments']['location'])
-            
-            # Continue conversation with result
-            request = CompletionRequest(
-                messages=[
-                    UserMessage(content="What's the weather in San Francisco?"),
-                    response.to_message(),  # Assistant's response with function call
-                    CapabilityMessage(
-                        content=result,
-                        capability_id=call['id'],
-                        capability_name=call['function']['name']
-                    )
-                ],
-                model="gpt-4"
-            )
-            
-            final_response = provider.complete(request)
-            print(final_response.content)
+        # Execute the capability
+        result = get_weather.execute(**call.arguments)
+        
+        # Continue conversation with result
+        final_response = client.complete(
+            messages=[
+                UserMessage(content="What's the weather in San Francisco?"),
+                response.to_message(),  # Assistant's response with function call
+                CapabilityMessage(
+                    content=result,
+                    capability_id=call.id,
+                    capability_name=call.name
+                )
+            ],
+            model="gpt-4"
+        )
+        
+        print(final_response.content)
 ```
 
 ### Streaming
 
 ```python
-from nimbus import CompletionRequest, UserMessage
-from nimbus.providers import ProviderRegistry
+import nimbus
+from nimbus.messages import UserMessage
 
-provider = ProviderRegistry.get_model_provider("openai", api_key="sk-...")
+client = nimbus.provider("openai", api_key="sk-...")
 
-request = CompletionRequest(
+for chunk in client.stream(
     messages=[UserMessage(content="Write a story")],
-    model="gpt-4",
-    stream=True
-)
-
-for chunk in provider.stream(request):
+    model="gpt-4"
+):
     print(chunk.delta, end="", flush=True)
 ```
 
@@ -468,18 +454,17 @@ for chunk in provider.stream(request):
 
 ```python
 import asyncio
-from nimbus import CompletionRequest, UserMessage
-from nimbus.providers import ProviderRegistry
+import nimbus
+from nimbus.messages import UserMessage
 
 async def main():
-    provider = ProviderRegistry.get_model_provider("openai", api_key="sk-...")
+    client = nimbus.provider("openai", api_key="sk-...")
     
-    request = CompletionRequest(
+    response = await client.acomplete(
         messages=[UserMessage(content="Hello!")],
         model="gpt-4"
     )
     
-    response = await provider.acomplete(request)
     print(response.content)
 
 asyncio.run(main())
@@ -494,20 +479,16 @@ Nimbus uses lazy loading to defer importing provider SDKs until they're actually
 3. **Lambda-friendly**: Bedrock works in AWS Lambda without boto3 as a dependency (it's pre-installed)
 
 ```python
+import nimbus
+
 # This doesn't import OpenAI SDK until you actually use it
-provider = ProviderRegistry.get_model_provider("openai", api_key="sk-...")
+client = nimbus.provider("openai", api_key="sk-...")
 
 # SDK is imported here when complete() is called
-response = provider.complete(request)
-```
-
-Check which providers are available:
-
-```python
-from nimbus.providers import ProviderRegistry
-
-print("Available LLM providers:", ProviderRegistry.list_model_providers())
-print("Available embedding providers:", ProviderRegistry.list_embedding_providers())
+response = client.complete(
+    messages=[...],
+    model="gpt-4"
+)
 ```
 
 ### AWS Lambda Deployment
@@ -517,22 +498,18 @@ Nimbus is Lambda-friendly:
 ```python
 # In AWS Lambda, boto3 is pre-installed
 # No need to include it in your deployment package
-from nimbus.providers import ProviderRegistry
+import nimbus
+from nimbus.messages import UserMessage
 
 def lambda_handler(event, context):
     # Bedrock provider works without boto3 in dependencies
-    provider = ProviderRegistry.get_model_provider(
-        "bedrock",
-        region_name="us-east-1"
-    )
+    client = nimbus.provider("bedrock", region="us-east-1")
     
-    from nimbus import CompletionRequest, UserMessage
-    request = CompletionRequest(
+    response = client.complete(
         messages=[UserMessage(content=event['prompt'])],
-        model="anthropic.claude-3-sonnet"
+        model="anthropic.claude-3-sonnet-20240229-v1:0"
     )
     
-    response = provider.complete(request)
     return {"response": response.content}
 ```
 
@@ -621,21 +598,38 @@ Unified interface for all LLM providers:
 
 ```python
 from abc import ABC, abstractmethod
-from nimbus import CompletionRequest, CompletionResponse
+from typing import Iterator
+from nimbus import CompletionResponse, StreamChunk
+from nimbus.messages import NimbusMessage
 
 class ModelInterface(ABC):
     @abstractmethod
-    def complete(self, request: CompletionRequest) -> CompletionResponse:
+    def complete(
+        self,
+        messages: list[NimbusMessage],
+        model: str,
+        **kwargs
+    ) -> CompletionResponse:
         """Execute a synchronous completion request."""
         pass
     
     @abstractmethod
-    async def acomplete(self, request: CompletionRequest) -> CompletionResponse:
+    async def acomplete(
+        self,
+        messages: list[NimbusMessage],
+        model: str,
+        **kwargs
+    ) -> CompletionResponse:
         """Execute an asynchronous completion request."""
         pass
     
     @abstractmethod
-    def stream(self, request: CompletionRequest) -> Iterator[StreamChunk]:
+    def stream(
+        self,
+        messages: list[NimbusMessage],
+        model: str,
+        **kwargs
+    ) -> Iterator[StreamChunk]:
         """Execute a streaming completion request."""
         pass
 ```
@@ -688,30 +682,46 @@ class MyMemory(MemoryInterface):
 ### Load Balancing and Routing
 
 ```python
-from nimbus import ModelRouterInterface, RoutingStrategy, ModelConfig
+import nimbus
+from nimbus.messages import UserMessage
+from nimbus.routes import ModelRouter, ModelTarget, RouteConfig
+from nimbus.interfaces.router import RoutingStrategy
 
-router = ModelRouter()
+# Create router with multiple targets for an alias
+router = ModelRouter(routes=[
+    RouteConfig(
+        alias="gpt-4",  # Use this alias as the model name
+        targets=[
+            ModelTarget(
+                model="gpt-4",
+                provider="openai",
+                api_key="${OPENAI_API_KEY}",
+                tpm=100000,
+                rpm=1000,
+                weight=2.0
+            ),
+            ModelTarget(
+                model="azure/gpt-4",
+                provider="azure",
+                api_key="${AZURE_API_KEY}",
+                api_base="${AZURE_API_BASE}",
+                tpm=80000,
+                rpm=800,
+                weight=1.0
+            )
+        ],
+        strategy=RoutingStrategy.WEIGHTED
+    )
+])
 
-# Register multiple models
-router.register_model(ModelConfig(
-    model_id="gpt-4-primary",
-    provider="openai",
-    weight=2.0,
-    priority=1
-))
+# Create provider with router
+client = nimbus.provider("openai", router=router)
 
-router.register_model(ModelConfig(
-    model_id="gpt-4-fallback",
-    provider="openai",
-    weight=1.0,
-    priority=2
-))
-
-# Set routing strategy
-router.set_routing_strategy(RoutingStrategy.WEIGHTED)
-
-# Route requests automatically
-response = router.route_request(request)
+# Use the alias as the model name - router handles load balancing
+response = client.complete(
+    messages=[UserMessage(content="Hello!")],
+    model="gpt-4"  # This is the alias, router picks the best target
+)
 ```
 
 ### Rate Limiting
