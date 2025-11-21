@@ -16,8 +16,10 @@ Note: Set environment variables for API keys:
 
 import os
 import json
+import asyncio
 import nimbus
 from nimbus.messages import UserMessage, CapabilityMessage
+from nimbus.capabilities.registry import CapabilityRegistry
 
 
 def basic_function_calling():
@@ -92,7 +94,7 @@ def basic_function_calling():
         print(f"\n❌ Error: {e}")
 
 
-def function_execution_workflow():
+async def function_execution_workflow():
     """Example of executing functions and continuing conversation."""
     print("\n" + "=" * 60)
     print("Function Calling - Execution Workflow")
@@ -148,28 +150,16 @@ def function_execution_workflow():
         )
         print(f"  Assistant: {response.content[:80]}...")
         
-        if response.capability_calls:
+        if response.has_capability_calls():
             print(f"\nStep 2: Execute capabilities")
+            print(f"  Found {len(response.capability_calls)} capability call(s)")
             
-            # Execute each capability call
-            capability_results = []
-            for call in response.capability_calls:
-                func_name = call['function']['name']
-                func_args = json.loads(call['function']['arguments'])
-                
-                print(f"  Calling {func_name}({func_args})")
-                
-                if func_name == "get_weather":
-                    result = get_weather(func_args['location'])
-                    print(f"    Result: {result}")
-                    
-                    capability_results.append(
-                        CapabilityMessage(
-                            content=result,
-                            capability_id=call['id'],
-                            capability_name=func_name
-                        )
-                    )
+            # Execute all capability calls and get messages
+            registry = CapabilityRegistry.get_instance()
+            capability_messages = await response.execute_capability_calls(registry)
+            
+            for msg in capability_messages:
+                print(f"  {msg.capability_name}: {msg.content[:60]}...")
             
             print(f"\nStep 3: Continue conversation with results")
             
@@ -178,7 +168,7 @@ def function_execution_workflow():
                 messages=[
                     UserMessage(content="What's the weather in San Francisco and New York?"),
                     response.to_message(),
-                    *capability_results
+                    *capability_messages  # Spread capability messages
                 ],
                 model="gpt-4",
                 capabilities=capabilities
@@ -391,7 +381,7 @@ Same code works across OpenAI, Anthropic, and Bedrock!
 """)
 
 
-def main():
+async def main():
     """Run all examples."""
     print("\n" + "🔧 " * 20)
     print("NIMBUS - Function Calling Examples")
@@ -399,7 +389,7 @@ def main():
     
     try:
         basic_function_calling()
-        function_execution_workflow()
+        await function_execution_workflow()
         multiple_functions()
         anthropic_tool_use()
         bedrock_tool_use()
@@ -419,4 +409,5 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    import asyncio
+    asyncio.run(main())

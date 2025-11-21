@@ -194,10 +194,10 @@ class AnthropicProvider(BaseModelProvider):
         if not CAPABILITIES_AVAILABLE:
             return None
         
-        tool_calls = []
+        capability_calls = []
         for content_block in response.content:
             if content_block.type == "tool_use":
-                tool_calls.append(
+                capability_calls.append(
                     CapabilityCall(
                         id=content_block.id,
                         name=content_block.name,
@@ -205,7 +205,7 @@ class AnthropicProvider(BaseModelProvider):
                     )
                 )
         
-        return tool_calls if tool_calls else None
+        return capability_calls if capability_calls else None
     
     def _transform_request(self, request: CompletionRequest) -> dict[str, Any]:
         """Transform CompletionRequest to Anthropic format.
@@ -323,7 +323,7 @@ class AnthropicProvider(BaseModelProvider):
                 })
         
         # Extract capability calls using internal method
-        tool_calls_list = self._extract_capability_calls(response)
+        capability_calls_list = self._extract_capability_calls(response)
         
         # Create timestamp from current time (Anthropic doesn't provide created timestamp)
         created_at = datetime.now(timezone.utc)
@@ -342,7 +342,7 @@ class AnthropicProvider(BaseModelProvider):
                 total_tokens=response.usage.input_tokens + response.usage.output_tokens
             ),
             created_at=created_at,
-            tool_calls=tool_calls_list if tool_calls_list else None,
+            capability_calls=capability_calls_list if capability_calls_list else None,
             metadata={
                 "stop_sequence": response.stop_sequence,
                 "tool_calls": tool_calls_metadata if tool_calls_metadata else None,

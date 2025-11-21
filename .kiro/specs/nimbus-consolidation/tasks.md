@@ -246,7 +246,7 @@
   - Verify providers handle all transformations internally via _transform_messages(), _transform_capabilities(), etc.
   - _Requirements: 9.1, 9.2, 9.3, 9.4, 9.5_
 
-- [ ] 17. Create YAML routing examples
+- [x] 17. Create YAML routing examples
   - Create `examples/routing/yaml_config.py`
   - Create sample YAML configuration file
   - Demonstrate environment variable usage

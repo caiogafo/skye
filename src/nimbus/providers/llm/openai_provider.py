@@ -283,7 +283,7 @@ class OpenAIProvider(BaseModelProvider):
             structured_output = message.parsed
         
         # Extract capability calls using internal method
-        tool_calls_list = self._extract_capability_calls(response)
+        capability_calls_list = self._extract_capability_calls(response)
         
         # Store raw tool calls in metadata for compatibility
         tool_calls_metadata = None
@@ -313,7 +313,7 @@ class OpenAIProvider(BaseModelProvider):
                 completion_tokens=response.usage.completion_tokens,
                 total_tokens=response.usage.total_tokens
             ),
-            tool_calls=tool_calls_list,
+            capability_calls=capability_calls_list,
             created_at=datetime.fromtimestamp(response.created, tz=timezone.utc),
             metadata={
                 "system_fingerprint": getattr(response, "system_fingerprint", None),

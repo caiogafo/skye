@@ -490,6 +490,10 @@ class BaseModelProvider(ModelInterface, ABC):
         try:
             response = self._complete_with_retry(request)
             
+            # Attach capabilities to response for direct execution
+            if request.capabilities:
+                response._capabilities = request.capabilities
+            
             # Record success with latency (only on final success)
             latency_ms = (time.time() - start_time) * 1000
             self.health_metrics.record_success(latency_ms)
