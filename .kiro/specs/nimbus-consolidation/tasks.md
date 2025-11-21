@@ -254,7 +254,7 @@
   - Add comprehensive comments
   - _Requirements: 4.3_
 
-- [ ] 18. Create capability examples
+- [x] 18. Create capability examples
   - Create `examples/capabilities/local_function.py`
   - Create `examples/capabilities/remote_api.py`
   - Create `examples/capabilities/mcp_server.py`

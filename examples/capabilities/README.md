@@ -23,43 +23,88 @@ Demonstrates how to define and use capabilities with different providers.
 - Multi-turn conversations with capability results
 - Provider-specific implementations (OpenAI, Anthropic, Bedrock)
 
+**Run:**
+```bash
+python examples/capabilities/function_calling_example.py
+```
+
 ### `local_function.py`
 Using local Python functions as capabilities.
 
 **Topics covered:**
-- Wrapping Python functions as capabilities
+- Wrapping Python functions as capabilities using the `@capability` decorator
+- Automatic schema generation from function signatures
 - Executing capabilities locally
 - Returning results to the model
+- Both synchronous and asynchronous functions
+- Multi-turn conversations with capability results
+
+**Run:**
+```bash
+python examples/capabilities/local_function.py
+```
+
+**Key Features:**
+- `@capability` decorator for easy function wrapping
+- Automatic type hint to JSON Schema conversion
+- Support for both sync and async functions
+- Automatic parameter validation
 
 ### `remote_api.py`
-Calling remote APIs through capabilities.
+Calling remote HTTP APIs through capabilities.
 
 **Topics covered:**
-- Defining capabilities for external APIs
-- Handling API responses
-- Error handling
+- Wrapping HTTP APIs as capabilities using `RemoteAPICapability`
+- Handling different HTTP methods (GET, POST, PUT, DELETE, PATCH)
+- Custom headers and authentication
+- Error handling and API responses
+- Both synchronous and asynchronous execution
+- Concurrent API calls
+
+**Run:**
+```bash
+python examples/capabilities/remote_api.py
+```
+
+**Key Features:**
+- Support for all HTTP methods
+- Basic authentication support
+- Custom headers configuration
+- Configurable timeouts
+- Automatic JSON parsing
 
 ### `mcp_server.py`
 Using Model Context Protocol (MCP) servers as capabilities.
 
 **Topics covered:**
-- Connecting to MCP servers
-- Discovering available capabilities
-- Executing MCP capabilities
+- Overview of MCP (Model Context Protocol)
+- Creating MCPCapability instances from MCP tool definitions
+- Automatic schema conversion from MCP to Nimbus format
+- Using MCP capabilities with language models
+- Error handling and best practices
+- Performance optimization with schema caching
 
-## Running the Examples
+**Run:**
+```bash
+python examples/capabilities/mcp_server.py
+```
+
+**Requirements:**
+- FastMCP library: `pip install nimbus[mcp]` or `pip install fastmcp>=0.1.0`
+
+**Key Features:**
+- Automatic MCP to Nimbus schema conversion
+- Schema caching for performance
+- Support for complex MCP tool definitions
+- OpenAPI-based tool support
+
+## Running All Examples
 
 ```bash
-# Run function calling example
+# Run all capability examples
 python examples/capabilities/function_calling_example.py
-
-# Run local function example
 python examples/capabilities/local_function.py
-
-# Run remote API example
 python examples/capabilities/remote_api.py
-
-# Run MCP server example
 python examples/capabilities/mcp_server.py
 ```
 
