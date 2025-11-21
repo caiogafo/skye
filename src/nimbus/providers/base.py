@@ -3,6 +3,37 @@
 This module provides abstract base classes that all provider implementations
 must inherit from. These classes handle common functionality like lazy client
 initialization, error handling, request/response transformation, and retry logic.
+
+## Provider Transformation Architecture
+
+All provider-specific transformation logic MUST be encapsulated within provider
+client classes. This ensures the core library remains completely provider-agnostic
+and makes it easy to add new providers without modifying core code.
+
+### Transformation Responsibilities
+
+Each provider client handles ALL transformations for that provider:
+- Message format conversion (Nimbus messages → provider format)
+- Capability/tool format conversion (Nimbus capabilities → provider tools)
+- Tool call extraction (provider response → Nimbus CapabilityCall objects)
+- Parameter mapping and provider-specific options
+
+### Core Library Provider Agnosticism
+
+Core library modules MUST NOT contain provider-specific code:
+- src/nimbus/routes/ - Router and routing logic
+- src/nimbus/capabilities/ - Capability system
+- src/nimbus/completion.py - Completion models
+- src/nimbus/messages.py - Message models
+
+### Adding a New Provider
+
+To add a new provider, you only need to:
+1. Create a new provider class inheriting from BaseModelProvider
+2. Implement all required transformation methods
+3. No changes to core library code required
+
+See docs/provider-transformation-architecture.md for detailed documentation.
 """
 
 import time
@@ -25,11 +56,26 @@ class BaseModelProvider(ModelInterface, ABC):
     including lazy client initialization, error handling, and a template method
     pattern for request/response transformation.
     
+    **Provider-Specific Transformation Encapsulation:**
+    
+    All provider-specific transformation logic MUST be contained within the
+    provider client class. This ensures the core library remains provider-agnostic
+    and makes it easy to add new providers without modifying core code.
+    
+    Each provider client handles ALL transformations for that provider:
+    - Message format conversion (Nimbus messages → provider format)
+    - Capability/tool format conversion (Nimbus capabilities → provider tools)
+    - Tool call extraction (provider response → Nimbus CapabilityCall objects)
+    - Parameter mapping and provider-specific options
+    
     Subclasses must implement:
     - _initialize_client(): Create the provider-specific client
     - _transform_request(): Convert CompletionRequest to provider format
     - _transform_response(): Convert provider response to CompletionResponse
     - _transform_stream_chunk(): Convert provider stream chunk to StreamChunk
+    - _transform_messages(): Convert Nimbus messages to provider format
+    - _transform_capabilities(): Convert Nimbus capabilities to provider format
+    - _extract_capability_calls(): Extract capability calls from provider response
     - _call_provider(): Make the actual provider API call
     - _call_provider_stream(): Make streaming provider API call
     - get_model_info(): Return model metadata
@@ -41,7 +87,24 @@ class BaseModelProvider(ModelInterface, ABC):
         ...         return openai.OpenAI(api_key=self.config["api_key"])
         ...
         ...     def _transform_request(self, request):
-        ...         return {"model": request.model, "messages": [...]}
+        ...         # Use internal transformation methods
+        ...         return {
+        ...             "model": request.model,
+        ...             "messages": self._transform_messages(request.messages),
+        ...             "tools": self._transform_capabilities(request.capabilities)
+        ...         }
+        ...
+        ...     def _transform_messages(self, messages):
+        ...         # OpenAI-specific message transformation
+        ...         return [{"role": m.role, "content": m.content} for m in messages]
+        ...
+        ...     def _transform_capabilities(self, capabilities):
+        ...         # OpenAI-specific capability transformation
+        ...         return [{"type": "function", "function": {...}} for c in capabilities]
+        ...
+        ...     def _extract_capability_calls(self, response):
+        ...         # Extract capability calls from OpenAI response
+        ...         return [CapabilityCall(...) for tc in response.tool_calls]
         ...
         ...     # ... implement other abstract methods
     """
@@ -50,12 +113,10 @@ class BaseModelProvider(ModelInterface, ABC):
         """Initialize base provider with configuration.
         
         Args:
-            model: Model identifier (required if router not provided)
-            router: Model router for load balancing (required if model not provided)
+            model: Model identifier (optional, can be provided in request)
+            router: Model router for load balancing (optional)
             **config: Provider-specific configuration parameters
         """
-        if model is None and router is None:
-            raise ValueError("Either 'model' or 'router' must be provided")
         if model is not None and router is not None:
             raise ValueError("Cannot provide both 'model' and 'router'")
         
@@ -64,6 +125,15 @@ class BaseModelProvider(ModelInterface, ABC):
         self.config = config
         self._client = None
         self.health_metrics = HealthMetrics()
+    
+    @property
+    def default_model(self) -> str | None:
+        """Get the default model for this provider.
+        
+        Returns:
+            The default model identifier, or None if not set
+        """
+        return self.model
     
     @property
     def client(self) -> Any:
@@ -189,6 +259,149 @@ class BaseModelProvider(ModelInterface, ABC):
         Example:
             >>> def _call_provider_stream(self, request):
             ...     return self.client.chat.completions.create(**request)
+        """
+        pass
+    
+    @abstractmethod
+    def _transform_messages(self, messages: list[Any]) -> list[dict[str, Any]]:
+        """Transform Nimbus messages to provider-specific format.
+        
+        This method encapsulates all provider-specific message transformation logic.
+        Each provider has different requirements for message format, and this method
+        handles those differences.
+        
+        **Provider-Specific Responsibilities:**
+        - Convert Nimbus message objects to provider's message format
+        - Handle system messages (some providers require separate handling)
+        - Handle capability/tool messages and results
+        - Handle multimodal content (images, etc.)
+        - Map message roles to provider-specific roles
+        
+        Args:
+            messages: List of Nimbus message objects (UserMessage, AssistantMessage, etc.)
+            
+        Returns:
+            List of dictionaries in provider-specific message format
+            
+        Example (OpenAI):
+            >>> def _transform_messages(self, messages):
+            ...     return [
+            ...         {"role": msg.role, "content": msg.content}
+            ...         for msg in messages
+            ...     ]
+        
+        Example (Bedrock):
+            >>> def _transform_messages(self, messages):
+            ...     return [
+            ...         {"role": msg.role, "content": [{"text": msg.content}]}
+            ...         for msg in messages
+            ...     ]
+        """
+        pass
+    
+    @abstractmethod
+    def _transform_capabilities(self, capabilities: list[Any]) -> list[dict[str, Any]]:
+        """Transform Nimbus capabilities to provider-specific tool format.
+        
+        This method encapsulates all provider-specific capability/tool transformation
+        logic. Each provider has different requirements for tool definitions, and this
+        method handles those differences.
+        
+        **Provider-Specific Responsibilities:**
+        - Convert CapabilityInterface objects to provider's tool format
+        - Generate proper JSON Schema for tool parameters
+        - Handle provider-specific tool metadata
+        - Map capability names and descriptions appropriately
+        
+        Args:
+            capabilities: List of CapabilityInterface objects
+            
+        Returns:
+            List of dictionaries in provider-specific tool format
+            
+        Example (OpenAI):
+            >>> def _transform_capabilities(self, capabilities):
+            ...     return [
+            ...         {
+            ...             "type": "function",
+            ...             "function": {
+            ...                 "name": cap.get_schema().name,
+            ...                 "description": cap.get_schema().description,
+            ...                 "parameters": cap.get_schema().parameters
+            ...             }
+            ...         }
+            ...         for cap in capabilities
+            ...     ]
+        
+        Example (Bedrock):
+            >>> def _transform_capabilities(self, capabilities):
+            ...     return [
+            ...         {
+            ...             "toolSpec": {
+            ...                 "name": cap.get_schema().name,
+            ...                 "description": cap.get_schema().description,
+            ...                 "inputSchema": {"json": cap.get_schema().parameters}
+            ...             }
+            ...         }
+            ...         for cap in capabilities
+            ...     ]
+        """
+        pass
+    
+    @abstractmethod
+    def _extract_capability_calls(self, response: Any) -> list[Any] | None:
+        """Extract capability calls from provider response.
+        
+        This method encapsulates provider-specific logic for extracting tool/function
+        calls from the provider's response and converting them to Nimbus CapabilityCall
+        objects.
+        
+        **Provider-Specific Responsibilities:**
+        - Parse capability calls from provider response format
+        - Extract capability call ID, name, and arguments
+        - Convert to CapabilityCall objects
+        - Handle JSON parsing of arguments if needed
+        - Return None if no capability calls present
+        
+        Args:
+            response: Provider-specific response object
+            
+        Returns:
+            List of CapabilityCall objects, or None if no capability calls
+            
+        Example (OpenAI):
+            >>> def _extract_capability_calls(self, response):
+            ...     if not hasattr(response.choices[0].message, "tool_calls"):
+            ...         return None
+            ...     
+            ...     from nimbus.capabilities.capability_models import CapabilityCall
+            ...     import json
+            ...     
+            ...     capability_calls = []
+            ...     for tc in response.choices[0].message.tool_calls:
+            ...         capability_calls.append(
+            ...             CapabilityCall(
+            ...                 id=tc.id,
+            ...                 name=tc.function.name,
+            ...                 arguments=json.loads(tc.function.arguments)
+            ...             )
+            ...         )
+            ...     return capability_calls
+        
+        Example (Bedrock):
+            >>> def _extract_capability_calls(self, response):
+            ...     capability_calls = []
+            ...     for block in response["output"]["message"].get("content", []):
+            ...         if "toolUse" in block:
+            ...             tool_use = block["toolUse"]
+            ...             capability_calls.append(
+            ...                 CapabilityCall(
+            ...                     id=tool_use["toolUseId"],
+            ...                     name=tool_use["name"],
+            ...                     arguments=tool_use["input"]
+            ...                 )
+            ...             )
+            ...     return capability_calls if capability_calls else None
         """
         pass
     

@@ -39,7 +39,6 @@ from nimbus.completion import CompletionRequest, CompletionResponse, StreamChunk
 from nimbus.messages import AssistantMessage
 from nimbus.providers.base import BaseModelProvider
 from nimbus.providers.lazy_import import LazyImporter
-from nimbus.providers.transformers import MessageTransformer
 
 
 class AzureOpenAIProvider(BaseModelProvider):
@@ -107,6 +106,113 @@ class AzureOpenAIProvider(BaseModelProvider):
             azure_endpoint=self.azure_endpoint
         )
     
+    def _transform_messages(self, messages: list[Any]) -> list[dict[str, Any]]:
+        """Transform Nimbus messages to Azure OpenAI format.
+        
+        Azure OpenAI uses the same format as OpenAI: a simple role-content format
+        with tool calls as a separate field. System messages are included in the
+        messages array.
+        
+        Args:
+            messages: List of Nimbus message objects
+            
+        Returns:
+            List of dictionaries in Azure OpenAI format
+        """
+        from nimbus.messages import AssistantMessage, CapabilityMessage
+        
+        result = []
+        for msg in messages:
+            if isinstance(msg, CapabilityMessage):
+                result.append(
+                    {
+                        "role": "tool",
+                        "tool_call_id": msg.capability_id,
+                        "name": msg.capability_name,
+                        "content": msg.content,
+                    }
+                )
+            else:
+                azure_msg: dict[str, Any] = {"role": msg.role, "content": msg.content}
+                if isinstance(msg, AssistantMessage) and msg.capability_calls:
+                    azure_msg["tool_calls"] = msg.capability_calls
+                result.append(azure_msg)
+        return result
+    
+    def _transform_capabilities(self, capabilities: list[Any]) -> list[dict[str, Any]]:
+        """Transform Nimbus capabilities to Azure OpenAI function calling format.
+        
+        Azure OpenAI uses the same format as OpenAI: a nested structure with
+        "type": "function" and a "function" object containing the tool definition.
+        
+        Args:
+            capabilities: List of CapabilityInterface objects or dicts
+            
+        Returns:
+            List of tool definitions in Azure OpenAI format
+        """
+        tools = []
+        for capability in capabilities:
+            # Handle both CapabilityInterface objects and dict format
+            if isinstance(capability, dict):
+                # Already in dict format, pass through
+                tools.append(capability)
+            else:
+                # CapabilityInterface object, convert to Azure OpenAI format
+                schema = capability.get_schema()
+                tool = {
+                    "type": "function",
+                    "function": {
+                        "name": schema.name,
+                        "description": schema.description,
+                        "parameters": schema.parameters or {
+                            "type": "object",
+                            "properties": {},
+                        },
+                    },
+                }
+                tools.append(tool)
+        return tools
+    
+    def _extract_capability_calls(self, response: Any) -> list[Any] | None:
+        """Extract capability calls from Azure OpenAI response.
+        
+        Azure OpenAI uses the same format as OpenAI for tool calls.
+        
+        Args:
+            response: Azure OpenAI response object
+            
+        Returns:
+            List of CapabilityCall objects, or None if no capability calls
+        """
+        choice = response.choices[0]
+        message = choice.message
+        
+        if not hasattr(message, "tool_calls") or not message.tool_calls:
+            return None
+        
+        from nimbus.capabilities.capability_models import CapabilityCall
+        import json
+        
+        capability_calls = []
+        for tc in message.tool_calls:
+            # Parse arguments JSON string
+            try:
+                arguments = json.loads(tc.function.arguments)
+            except json.JSONDecodeError:
+                # If parsing fails, use empty dict
+                arguments = {}
+            
+            capability_calls.append(
+                CapabilityCall(
+                    id=tc.id,
+                    name=tc.function.name,
+                    arguments=arguments
+                )
+            )
+        
+        return capability_calls
+    
     def _transform_request(self, request: CompletionRequest) -> dict[str, Any]:
         """Transform CompletionRequest to Azure OpenAI format.
         
@@ -122,7 +228,7 @@ class AzureOpenAIProvider(BaseModelProvider):
         
         azure_request: dict[str, Any] = {
             "model": self.deployment_name,
-            "messages": MessageTransformer.to_openai_format(request.messages),
+            "messages": self._transform_messages(request.messages),
             "temperature": request.temperature,
             "stream": request.stream
         }
@@ -152,27 +258,20 @@ class AzureOpenAIProvider(BaseModelProvider):
         
         # Handle capabilities/tool calling (Azure uses OpenAI-compatible format)
         if request.capabilities:
-            # Import ToolTransformer here to avoid circular dependency
-            try:
-                from nimbus.capabilities.tool_transformer import ToolTransformer
-                
-                # Convert capabilities to Azure/OpenAI format
-                azure_request["tools"] = ToolTransformer.to_azure_format(request.capabilities)
-                
-                # Handle tool_choice parameter
-                if request.tool_choice:
-                    if request.tool_choice in ["auto", "required"]:
-                        # Standard values
-                        azure_request["tool_choice"] = request.tool_choice
-                    else:
-                        # Specific tool name - Azure expects {"type": "function", "function": {"name": "tool_name"}}
-                        azure_request["tool_choice"] = {
-                            "type": "function",
-                            "function": {"name": request.tool_choice}
-                        }
-            except ImportError:
-                # If capabilities package not installed, skip tool conversion
-                pass
+            # Convert capabilities to Azure/OpenAI format using internal method
+            azure_request["tools"] = self._transform_capabilities(request.capabilities)
+            
+            # Handle capability_choice parameter
+            if request.capability_choice:
+                if request.capability_choice in ["auto", "required"]:
+                    # Standard values
+                    azure_request["tool_choice"] = request.capability_choice
+                else:
+                    # Specific capability name - Azure expects {"type": "function", "function": {"name": "capability_name"}}
+                    azure_request["tool_choice"] = {
+                        "type": "function",
+                        "function": {"name": request.capability_choice}
+                    }
         
         # Provider-specific metadata
         if request.metadata:
@@ -199,12 +298,12 @@ class AzureOpenAIProvider(BaseModelProvider):
         if hasattr(message, "parsed") and message.parsed:
             structured_output = message.parsed
         
-        # Extract tool calls if present and convert to ToolCall objects
-        tool_calls_list = None
-        tool_calls_metadata = None
+        # Extract capability calls using internal method
+        tool_calls_list = self._extract_capability_calls(response)
         
+        # Store raw tool calls in metadata for compatibility
+        tool_calls_metadata = None
         if hasattr(message, "tool_calls") and message.tool_calls:
-            # Store raw tool calls in metadata for ToolCallHandler
             tool_calls_metadata = [
                 {
                     "id": tc.id,
@@ -216,31 +315,6 @@ class AzureOpenAIProvider(BaseModelProvider):
                 }
                 for tc in message.tool_calls
             ]
-            
-            # Try to convert to ToolCall objects if capabilities package is available
-            try:
-                from nimbus.capabilities.tool_models import ToolCall
-                import json
-                
-                tool_calls_list = []
-                for tc in message.tool_calls:
-                    # Parse arguments JSON string
-                    try:
-                        arguments = json.loads(tc.function.arguments)
-                    except json.JSONDecodeError:
-                        # If parsing fails, use empty dict
-                        arguments = {}
-                    
-                    tool_calls_list.append(
-                        ToolCall(
-                            id=tc.id,
-                            name=tc.function.name,
-                            arguments=arguments
-                        )
-                    )
-            except ImportError:
-                # If capabilities package not installed, tool_calls_list stays None
-                pass
         
         return CompletionResponse(
             id=response.id,

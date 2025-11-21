@@ -185,104 +185,86 @@ pip install nimbus[all-providers]
 #### OpenAI
 
 ```python
-from nimbus import CompletionRequest, UserMessage
-from nimbus.providers import ProviderRegistry
+import nimbus
+from nimbus.messages import UserMessage
 
-# Get provider from registry
-provider = ProviderRegistry.get_model_provider(
-    "openai",
-    api_key="sk-..."
-)
+# Create provider client
+client = nimbus.provider("openai", api_key="sk-...")
 
-request = CompletionRequest(
+# Make completion request
+response = client.complete(
     messages=[UserMessage(content="Hello!")],
     model="gpt-4"
 )
 
-response = provider.complete(request)
 print(response.content)
 ```
 
 #### Anthropic
 
 ```python
-from nimbus import CompletionRequest, UserMessage
-from nimbus.providers import ProviderRegistry
+import nimbus
+from nimbus.messages import UserMessage
 
-provider = ProviderRegistry.get_model_provider(
-    "anthropic",
-    api_key="sk-ant-..."
-)
+client = nimbus.provider("anthropic", api_key="sk-ant-...")
 
-request = CompletionRequest(
+response = client.complete(
     messages=[UserMessage(content="Hello!")],
-    model="claude-3-sonnet"
+    model="claude-3-sonnet-20240229"
 )
-
-response = provider.complete(request)
 ```
 
 #### AWS Bedrock
 
 ```python
-from nimbus import CompletionRequest, UserMessage
-from nimbus.providers import ProviderRegistry
+import nimbus
+from nimbus.messages import UserMessage
 
 # Works with or without boto3 installed
 # In AWS Lambda, boto3 is pre-installed
-provider = ProviderRegistry.get_model_provider(
-    "bedrock",
-    region_name="us-east-1"
-)
+client = nimbus.provider("bedrock", region="us-east-1")
 
-request = CompletionRequest(
+response = client.complete(
     messages=[UserMessage(content="Hello!")],
-    model="anthropic.claude-3-sonnet"
+    model="anthropic.claude-3-sonnet-20240229-v1:0"
 )
-
-response = provider.complete(request)
 ```
 
 #### Azure OpenAI
 
 ```python
-from nimbus import CompletionRequest, UserMessage
-from nimbus.providers import ProviderRegistry
+import nimbus
+from nimbus.messages import UserMessage
 
-provider = ProviderRegistry.get_model_provider(
+client = nimbus.provider(
     "azure",
     azure_endpoint="https://your-resource.openai.azure.com/",
     api_key="your-api-key",
-    api_version="2024-02-15-preview",
-    deployment_name="gpt-4"
+    api_version="2024-02-15-preview"
 )
 
-request = CompletionRequest(
+response = client.complete(
     messages=[UserMessage(content="Hello!")],
-    model="gpt-4"
+    model="gpt-4"  # Your deployment name
 )
-
-response = provider.complete(request)
 ```
 
 #### Google Vertex AI
 
 ```python
-from nimbus import CompletionRequest, UserMessage
-from nimbus.providers import ProviderRegistry
+import nimbus
+from nimbus.messages import UserMessage
 
-provider = ProviderRegistry.get_model_provider(
+client = nimbus.provider(
     "vertex",
     project_id="your-project",
     location="us-central1"
 )
 
-request = CompletionRequest(
+response = client.complete(
     messages=[UserMessage(content="Hello!")],
-    model="gemini-pro"
+    model="gemini-1.5-pro"
 )
-
-response = provider.complete(request)
 ```
 
 ### Embedding Providers
@@ -291,59 +273,59 @@ response = provider.complete(request)
 from nimbus.providers import ProviderRegistry
 
 # OpenAI embeddings
-embedding_provider = ProviderRegistry.get_embedding_provider(
+embedder = ProviderRegistry.get_embedding_provider(
     "openai",
     model="text-embedding-3-small",
     api_key="sk-..."
 )
 
-embeddings = embedding_provider.encode_batch([
+embeddings = embedder.encode_batch([
     "Hello world",
     "Goodbye world"
 ])
 
 # Bedrock embeddings
-embedding_provider = ProviderRegistry.get_embedding_provider(
+embedder = ProviderRegistry.get_embedding_provider(
     "bedrock",
     model="amazon.titan-embed-text-v1",
     region_name="us-east-1"
 )
 
-embeddings = embedding_provider.encode_batch(["Hello world"])
+embeddings = embedder.encode_batch(["Hello world"])
 
 # Cohere embeddings
-embedding_provider = ProviderRegistry.get_embedding_provider(
+embedder = ProviderRegistry.get_embedding_provider(
     "cohere",
     model="embed-english-v3.0",
     api_key="..."
 )
 
-embeddings = embedding_provider.encode_batch(["Hello world"])
+embeddings = embedder.encode_batch(["Hello world"])
 ```
+
+Note: Embedding providers still use ProviderRegistry as there's no simplified `nimbus.embedder()` interface yet.
 
 ### Multimodal Inputs
 
 ```python
-from nimbus import CompletionRequest, UserMessage
-from nimbus.providers import ProviderRegistry
+import nimbus
+from nimbus.messages import UserMessage
 
-provider = ProviderRegistry.get_model_provider("openai", api_key="sk-...")
+client = nimbus.provider("openai", api_key="sk-...")
 
 # Image from URL
-request = CompletionRequest(
+response = client.complete(
     messages=[
         UserMessage(
             content="What's in this image?",
             images=["https://example.com/image.jpg"]
         )
     ],
-    model="gpt-4-vision"
+    model="gpt-4-vision-preview"
 )
 
-response = provider.complete(request)
-
 # Image from file path
-request = CompletionRequest(
+response = client.complete(
     messages=[
         UserMessage(
             content="Describe this image",

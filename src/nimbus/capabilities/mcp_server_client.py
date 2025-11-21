@@ -1,7 +1,11 @@
 """MCP Server Client for managing connections to MCP servers.
 
 This module provides the MCPServerClient class for connecting to MCP servers,
-loading tools, and managing tool caching and auto-registration.
+loading capabilities, and managing capability caching and auto-registration.
+
+Note: MCP uses the term "tool" in its specification, so you'll see references to
+"MCP tools" throughout this module when referring to the MCP protocol itself.
+These are wrapped as Nimbus capabilities for use in the framework.
 """
 
 import asyncio
@@ -18,18 +22,21 @@ logger = logging.getLogger(__name__)
 class MCPServerClient:
     """Client for managing connections to MCP (Model Context Protocol) servers.
 
-    Provides functionality to connect to MCP servers, load tools, cache tool
-    definitions, and optionally auto-register tools to a CapabilityRegistry.
-    Supports both local (stdio) and remote (SSE) MCP servers.
+    Provides functionality to connect to MCP servers, load capabilities from MCP tools,
+    cache capability definitions, and optionally auto-register capabilities to a
+    CapabilityRegistry. Supports both local (stdio) and remote (SSE) MCP servers.
 
     The FastMCP library is required to use this class. If FastMCP is not installed,
     a helpful error message will be displayed directing users to install it with:
     `pip install nimbus[mcp]` or `pip install fastmcp>=0.1.0`
 
+    Note: MCP uses the term "tool" in its specification. This client wraps MCP tools
+    as Nimbus capabilities for seamless integration with the Nimbus framework.
+
     Attributes:
         server_name: Name identifier for this MCP server
         server_config: Configuration dictionary for the MCP server
-        auto_register: Whether to automatically register loaded tools to registry
+        auto_register: Whether to automatically register loaded capabilities to registry
 
     Example:
         >>> # Using as async context manager
@@ -38,12 +45,12 @@ class MCPServerClient:
         ...     server_config={"command": "mcp-server-weather"},
         ...     auto_register=True
         ... ) as client:
-        ...     tools = await client.load_tools()
-        ...     weather_tool = await client.get_tool("get_weather")
+        ...     capabilities = await client.load_tools()
+        ...     weather_cap = await client.get_tool("get_weather")
         ...
         >>> # Manual lifecycle management
         >>> client = MCPServerClient("weather_server", config)
-        >>> tools = await client.load_tools()
+        >>> capabilities = await client.load_tools()
         >>> await client.close()
     """
 

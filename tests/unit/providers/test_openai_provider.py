@@ -549,6 +549,56 @@ class TestOpenAIAsyncSupport:
 class TestOpenAIToolCalling:
     """Test tool calling integration with capabilities."""
     
+    def test_transform_capabilities_with_capability_interface(self) -> None:
+        """Test _transform_capabilities() with CapabilityInterface objects."""
+        # Mock capability
+        mock_capability = Mock()
+        mock_schema = Mock()
+        mock_schema.name = "get_weather"
+        mock_schema.description = "Get weather for a location"
+        mock_schema.parameters = {
+            "type": "object",
+            "properties": {
+                "location": {"type": "string"}
+            },
+            "required": ["location"]
+        }
+        mock_capability.get_schema.return_value = mock_schema
+        
+        provider = OpenAIProvider(model="gpt-4", api_key="sk-test")
+        
+        # Test internal transformation method
+        result = provider._transform_capabilities([mock_capability])
+        
+        # Verify OpenAI format
+        assert len(result) == 1
+        assert result[0]["type"] == "function"
+        assert result[0]["function"]["name"] == "get_weather"
+        assert result[0]["function"]["description"] == "Get weather for a location"
+        assert result[0]["function"]["parameters"]["type"] == "object"
+        assert "location" in result[0]["function"]["parameters"]["properties"]
+    
+    def test_transform_capabilities_with_dict_format(self) -> None:
+        """Test _transform_capabilities() with dict format (pass-through)."""
+        provider = OpenAIProvider(model="gpt-4", api_key="sk-test")
+        
+        # Already in OpenAI format
+        capabilities = [
+            {
+                "type": "function",
+                "function": {
+                    "name": "get_weather",
+                    "description": "Get weather",
+                    "parameters": {"type": "object", "properties": {}}
+                }
+            }
+        ]
+        
+        result = provider._transform_capabilities(capabilities)
+        
+        # Should pass through unchanged
+        assert result == capabilities
+    
     def test_transform_request_with_capabilities(self) -> None:
         """Test transformation of request with capabilities to OpenAI format."""
         # Mock capability
@@ -570,12 +620,12 @@ class TestOpenAIToolCalling:
             messages=[UserMessage(content="What's the weather in NYC?")],
             model="gpt-4",
             capabilities=[mock_capability],
-            tool_choice="auto"
+            capability_choice="auto"
         )
         
         result = provider._transform_request(request)
         
-        # Verify tools are converted to OpenAI format
+        # Verify tools are converted to OpenAI format via internal method
         assert "tools" in result
         assert len(result["tools"]) == 1
         assert result["tools"][0]["type"] == "function"
@@ -584,7 +634,7 @@ class TestOpenAIToolCalling:
         assert result["tool_choice"] == "auto"
     
     def test_transform_request_with_specific_tool_choice(self) -> None:
-        """Test transformation with specific tool name in tool_choice."""
+        """Test transformation with specific tool name in capability_choice."""
         # Mock capability
         mock_capability = Mock()
         mock_schema = Mock()
@@ -598,7 +648,7 @@ class TestOpenAIToolCalling:
             messages=[UserMessage(content="What's the weather?")],
             model="gpt-4",
             capabilities=[mock_capability],
-            tool_choice="get_weather"
+            capability_choice="get_weather"
         )
         
         result = provider._transform_request(request)
@@ -609,7 +659,7 @@ class TestOpenAIToolCalling:
         assert result["tool_choice"]["function"]["name"] == "get_weather"
     
     def test_transform_request_with_required_tool_choice(self) -> None:
-        """Test transformation with 'required' tool_choice."""
+        """Test transformation with 'required' capability_choice."""
         # Mock capability
         mock_capability = Mock()
         mock_schema = Mock()
@@ -623,7 +673,7 @@ class TestOpenAIToolCalling:
             messages=[UserMessage(content="Calculate 2+2")],
             model="gpt-4",
             capabilities=[mock_capability],
-            tool_choice="required"
+            capability_choice="required"
         )
         
         result = provider._transform_request(request)
@@ -632,7 +682,7 @@ class TestOpenAIToolCalling:
         assert result["tool_choice"] == "required"
     
     def test_transform_response_with_tool_calls_creates_tool_call_objects(self) -> None:
-        """Test that tool calls in response are converted to ToolCall objects."""
+        """Test that tool calls in response are converted to CapabilityCall objects."""
         provider = OpenAIProvider(model="gpt-4", api_key="sk-test")
         
         # Mock OpenAI response with tool calls
@@ -669,7 +719,7 @@ class TestOpenAIToolCalling:
         assert result.tool_calls is not None
         assert len(result.tool_calls) == 1
         
-        # Verify ToolCall object structure
+        # Verify CapabilityCall object structure
         tool_call = result.tool_calls[0]
         assert tool_call.id == "call_abc123"
         assert tool_call.name == "get_weather"
@@ -774,6 +824,35 @@ class TestOpenAIToolCalling:
         assert len(result.tool_calls) == 1
         assert result.tool_calls[0].arguments == {}
     
+    def test_transform_capabilities_with_multiple_capabilities(self) -> None:
+        """Test _transform_capabilities() with multiple capabilities."""
+        provider = OpenAIProvider(model="gpt-4", api_key="sk-test")
+        
+        # Mock multiple capabilities
+        mock_capability_1 = Mock()
+        mock_schema_1 = Mock()
+        mock_schema_1.name = "get_weather"
+        mock_schema_1.description = "Get weather"
+        mock_schema_1.parameters = {"type": "object", "properties": {"location": {"type": "string"}}}
+        mock_capability_1.get_schema.return_value = mock_schema_1
+        
+        mock_capability_2 = Mock()
+        mock_schema_2 = Mock()
+        mock_schema_2.name = "get_time"
+        mock_schema_2.description = "Get time"
+        mock_schema_2.parameters = {"type": "object", "properties": {"timezone": {"type": "string"}}}
+        mock_capability_2.get_schema.return_value = mock_schema_2
+        
+        # Test internal transformation method
+        result = provider._transform_capabilities([mock_capability_1, mock_capability_2])
+        
+        # Verify both tools are present in OpenAI format
+        assert len(result) == 2
+        assert result[0]["type"] == "function"
+        assert result[0]["function"]["name"] == "get_weather"
+        assert result[1]["type"] == "function"
+        assert result[1]["function"]["name"] == "get_time"
+    
     def test_transform_request_with_multiple_capabilities(self) -> None:
         """Test transformation with multiple capabilities."""
         provider = OpenAIProvider(model="gpt-4", api_key="sk-test")
@@ -866,7 +945,7 @@ class TestOpenAIToolCalling:
             messages=[UserMessage(content="What's the weather in Boston?")],
             model="gpt-4",
             capabilities=[mock_capability],
-            tool_choice="auto"
+            capability_choice="auto"
         )
         
         result = provider.complete(request)

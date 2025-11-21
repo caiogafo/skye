@@ -1,8 +1,8 @@
 """Capability support for Nimbus.
 
 This module provides a unified interface for registering, managing, and invoking
-tools/functions across different LLM providers. Capabilities can be local Python
-functions, remote HTTP APIs, or MCP (Model Context Protocol) server tools.
+capabilities across different LLM providers. Capabilities can be local Python
+functions, remote HTTP APIs, or MCP (Model Context Protocol) server capabilities.
 
 Example:
     >>> from nimbus.capabilities import capability, CapabilityInterface, CapabilitySchema
@@ -31,9 +31,8 @@ from nimbus.capabilities.mcp_server_client import MCPServerClient
 from nimbus.capabilities.registry import CapabilityRegistry
 from nimbus.capabilities.remote_api import RemoteAPICapability
 from nimbus.capabilities.schema import CapabilitySchema
-from nimbus.capabilities.tool_call_handler import ToolCallHandler
-from nimbus.capabilities.tool_models import ToolCall, ToolResult
-from nimbus.capabilities.tool_transformer import ToolTransformer
+from nimbus.capabilities.capability_call_handler import CapabilityCallHandler
+from nimbus.capabilities.capability_models import CapabilityCall, CapabilityResult
 
 __all__ = [
     "CapabilityInterface",
@@ -44,10 +43,9 @@ __all__ = [
     "MCPServerClient",
     "capability",
     "CapabilityRegistry",
-    "ToolTransformer",
-    "ToolCallHandler",
-    "ToolCall",
-    "ToolResult",
+    "CapabilityCallHandler",
+    "CapabilityCall",
+    "CapabilityResult",
     "CapabilityError",
     "CapabilityExecutionError",
     "CapabilityNotFoundError",

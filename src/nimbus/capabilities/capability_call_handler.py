@@ -1,7 +1,45 @@
-"""Tool call handler for parsing and executing tool calls from provider responses.
+"""Capability call handler for parsing and executing capability calls from provider responses.
 
-This module provides the ToolCallHandler class for processing tool calls from
+This module provides the CapabilityCallHandler class for processing capability calls from
 different LLM providers, executing capabilities, and formatting results.
+
+**ARCHITECTURAL DEBT:**
+This module contains provider-specific parsing and formatting methods that violate
+the provider encapsulation principle. All provider-specific logic should be in
+provider client classes, not in core library modules.
+
+Current provider-specific methods:
+- _parse_openai_capability_calls() / _format_openai_results()
+- _parse_anthropic_capability_calls() / _format_anthropic_results()
+- _parse_bedrock_capability_calls() / _format_bedrock_results()
+- _parse_vertex_capability_calls() / _format_vertex_results()
+
+**Future Refactor:**
+Move this logic to provider classes as:
+- provider._parse_capability_calls(response) - Parse from provider response
+- provider._format_capability_results(results) - Format for provider
+
+This would make CapabilityCallHandler a thin delegation layer like MessageTransformer
+and CapabilityTransformer, fully aligning with the provider encapsulation architecture.
+
+See docs/provider-transformation-architecture.md for complete architecture documentation
+- _parse_bedrock_capability_calls()
+- _parse_vertex_capability_calls()
+- _format_openai_results()
+- _format_anthropic_results()
+- _format_bedrock_results()
+- _format_vertex_results()
+
+In a future refactor, this logic should be moved to provider classes as:
+- provider._parse_capability_calls(response) -> list[CapabilityCall]
+- provider._format_capability_results(results) -> list[dict]
+
+This would make CapabilityCallHandler a thin delegation layer like MessageTransformer
+and CapabilityTransformer, completing the provider encapsulation architecture.
+
+For now, providers already implement _extract_capability_calls() which is used during
+response transformation, so this handler provides an alternative interface for
+capability execution workflows.
 """
 
 import json
@@ -14,21 +52,21 @@ from nimbus.capabilities.exceptions import (
     ToolCallParsingError,
 )
 from nimbus.capabilities.registry import CapabilityRegistry
-from nimbus.capabilities.tool_models import ToolCall, ToolResult
+from nimbus.capabilities.capability_models import CapabilityCall, CapabilityResult
 from nimbus.completion import CompletionResponse
 
 logger = logging.getLogger(__name__)
 
 
-class ToolCallHandler:
-    """Handler for parsing and executing tool calls from provider responses.
+class CapabilityCallHandler:
+    """Handler for parsing and executing capability calls from provider responses.
 
-    Processes tool calls from different LLM providers (OpenAI, Anthropic, Bedrock,
+    Processes capability calls from different LLM providers (OpenAI, Anthropic, Bedrock,
     Azure, Vertex), executes the corresponding capabilities, and formats results
     for sending back to the provider.
 
     The handler supports provider-specific parsing and formatting while providing
-    a unified interface for tool execution. It validates arguments against capability
+    a unified interface for capability execution. It validates arguments against capability
     schemas and handles errors gracefully.
 
     Attributes:
@@ -36,39 +74,39 @@ class ToolCallHandler:
 
     Example:
         >>> registry = CapabilityRegistry.get_instance()
-        >>> handler = ToolCallHandler(registry)
+        >>> handler = CapabilityCallHandler(registry)
         >>>
-        >>> # Parse tool calls from provider response
-        >>> tool_calls = handler.parse_tool_calls(response, "openai")
+        >>> # Parse capability calls from provider response
+        >>> capability_calls = handler.parse_capability_calls(response, "openai")
         >>>
-        >>> # Execute tool calls
-        >>> results = await handler.execute_tool_calls(tool_calls)
+        >>> # Execute capability calls
+        >>> results = await handler.execute_capability_calls(capability_calls)
         >>>
         >>> # Format results for provider
-        >>> formatted = handler.format_tool_results(results, "openai")
+        >>> formatted = handler.format_capability_results(results, "openai")
     """
 
     def __init__(self, registry: CapabilityRegistry) -> None:
-        """Initialize ToolCallHandler with a capability registry.
+        """Initialize CapabilityCallHandler with a capability registry.
 
         Args:
             registry: CapabilityRegistry instance for looking up capabilities
 
         Example:
             >>> registry = CapabilityRegistry.get_instance()
-            >>> handler = ToolCallHandler(registry)
+            >>> handler = CapabilityCallHandler(registry)
         """
         self.registry = registry
 
-    def parse_tool_calls(
+    def parse_capability_calls(
         self,
         response: CompletionResponse,
         provider: str,
-    ) -> list[ToolCall]:
-        """Parse tool calls from a provider response.
+    ) -> list[CapabilityCall]:
+        """Parse capability calls from a provider response.
 
-        Extracts tool calls from the provider-specific response format and
-        converts them to a unified ToolCall format. Supports OpenAI, Anthropic,
+        Extracts capability calls from the provider-specific response format and
+        converts them to a unified CapabilityCall format. Supports OpenAI, Anthropic,
         Bedrock, Azure, and Vertex AI response formats.
 
         Args:
@@ -76,28 +114,28 @@ class ToolCallHandler:
             provider: Provider name ('openai', 'anthropic', 'bedrock', 'azure', 'vertex')
 
         Returns:
-            List of ToolCall objects parsed from the response
+            List of CapabilityCall objects parsed from the response
 
         Raises:
             ToolCallParsingError: If parsing fails or format is invalid
 
         Example:
-            >>> handler = ToolCallHandler(registry)
-            >>> tool_calls = handler.parse_tool_calls(response, "openai")
-            >>> for call in tool_calls:
+            >>> handler = CapabilityCallHandler(registry)
+            >>> capability_calls = handler.parse_capability_calls(response, "openai")
+            >>> for call in capability_calls:
             ...     print(f"{call.name}: {call.arguments}")
         """
         provider_lower = provider.lower()
 
         try:
             if provider_lower in ("openai", "azure"):
-                return self._parse_openai_tool_calls(response)
+                return self._parse_openai_capability_calls(response)
             elif provider_lower == "anthropic":
-                return self._parse_anthropic_tool_calls(response)
+                return self._parse_anthropic_capability_calls(response)
             elif provider_lower == "bedrock":
-                return self._parse_bedrock_tool_calls(response)
+                return self._parse_bedrock_capability_calls(response)
             elif provider_lower == "vertex":
-                return self._parse_vertex_tool_calls(response)
+                return self._parse_vertex_capability_calls(response)
             else:
                 raise ToolCallParsingError(
                     f"Unsupported provider: {provider}",
@@ -107,16 +145,16 @@ class ToolCallHandler:
             raise
         except Exception as e:
             raise ToolCallParsingError(
-                f"Failed to parse tool calls from {provider}: {e}",
+                f"Failed to parse capability calls from {provider}: {e}",
                 provider=provider,
                 original_error=str(e),
             ) from e
 
-    def _parse_openai_tool_calls(
+    def _parse_openai_capability_calls(
         self,
         response: CompletionResponse,
-    ) -> list[ToolCall]:
-        """Parse tool calls from OpenAI/Azure response format.
+    ) -> list[CapabilityCall]:
+        """Parse capability calls from OpenAI/Azure response format.
 
         OpenAI format:
         {
@@ -136,7 +174,7 @@ class ToolCallHandler:
             response: CompletionResponse from OpenAI/Azure
 
         Returns:
-            List of ToolCall objects
+            List of CapabilityCall objects
 
         Raises:
             ToolCallParsingError: If parsing fails
@@ -145,7 +183,7 @@ class ToolCallHandler:
         if not tool_calls_data:
             return []
 
-        tool_calls = []
+        capability_calls = []
         for call_data in tool_calls_data:
             try:
                 call_id = call_data.get("id")
@@ -164,8 +202,8 @@ class ToolCallHandler:
                 except json.JSONDecodeError as e:
                     raise ValueError(f"Invalid JSON in arguments: {e}") from e
 
-                tool_calls.append(
-                    ToolCall(
+                capability_calls.append(
+                    CapabilityCall(
                         id=call_id,
                         name=name,
                         arguments=arguments,
@@ -173,22 +211,22 @@ class ToolCallHandler:
                 )
             except Exception as e:
                 logger.warning(
-                    "Failed to parse OpenAI tool call",
+                    "Failed to parse OpenAI capability call",
                     extra={"error": str(e), "call_data": call_data},
                 )
                 raise ToolCallParsingError(
-                    f"Failed to parse OpenAI tool call: {e}",
+                    f"Failed to parse OpenAI capability call: {e}",
                     provider="openai",
                     call_data=call_data,
                 ) from e
 
-        return tool_calls
+        return capability_calls
 
-    def _parse_anthropic_tool_calls(
+    def _parse_anthropic_capability_calls(
         self,
         response: CompletionResponse,
-    ) -> list[ToolCall]:
-        """Parse tool calls from Anthropic response format.
+    ) -> list[CapabilityCall]:
+        """Parse capability calls from Anthropic response format.
 
         Anthropic format:
         {
@@ -206,7 +244,7 @@ class ToolCallHandler:
             response: CompletionResponse from Anthropic
 
         Returns:
-            List of ToolCall objects
+            List of CapabilityCall objects
 
         Raises:
             ToolCallParsingError: If parsing fails
@@ -215,7 +253,7 @@ class ToolCallHandler:
         if not content_blocks:
             return []
 
-        tool_calls = []
+        capability_calls = []
         for block in content_blocks:
             try:
                 if block.get("type") != "tool_use":
@@ -232,8 +270,8 @@ class ToolCallHandler:
                 # Anthropic uses "input" instead of "arguments"
                 arguments = block.get("input", {})
 
-                tool_calls.append(
-                    ToolCall(
+                capability_calls.append(
+                    CapabilityCall(
                         id=call_id,
                         name=name,
                         arguments=arguments,
@@ -241,22 +279,22 @@ class ToolCallHandler:
                 )
             except Exception as e:
                 logger.warning(
-                    "Failed to parse Anthropic tool call",
+                    "Failed to parse Anthropic capability call",
                     extra={"error": str(e), "block": block},
                 )
                 raise ToolCallParsingError(
-                    f"Failed to parse Anthropic tool call: {e}",
+                    f"Failed to parse Anthropic capability call: {e}",
                     provider="anthropic",
                     block=block,
                 ) from e
 
-        return tool_calls
+        return capability_calls
 
-    def _parse_bedrock_tool_calls(
+    def _parse_bedrock_capability_calls(
         self,
         response: CompletionResponse,
-    ) -> list[ToolCall]:
-        """Parse tool calls from Bedrock response format.
+    ) -> list[CapabilityCall]:
+        """Parse capability calls from Bedrock response format.
 
         Bedrock format (Converse API):
         {
@@ -279,12 +317,12 @@ class ToolCallHandler:
             response: CompletionResponse from Bedrock
 
         Returns:
-            List of ToolCall objects
+            List of CapabilityCall objects
 
         Raises:
             ToolCallParsingError: If parsing fails
         """
-        # Bedrock stores tool calls in nested structure
+        # Bedrock stores capability calls in nested structure
         output = response.metadata.get("output", {})
         message = output.get("message", {})
         content_blocks = message.get("content", [])
@@ -292,7 +330,7 @@ class ToolCallHandler:
         if not content_blocks:
             return []
 
-        tool_calls = []
+        capability_calls = []
         for block in content_blocks:
             try:
                 tool_use = block.get("toolUse")
@@ -309,8 +347,8 @@ class ToolCallHandler:
 
                 arguments = tool_use.get("input", {})
 
-                tool_calls.append(
-                    ToolCall(
+                capability_calls.append(
+                    CapabilityCall(
                         id=call_id,
                         name=name,
                         arguments=arguments,
@@ -318,22 +356,22 @@ class ToolCallHandler:
                 )
             except Exception as e:
                 logger.warning(
-                    "Failed to parse Bedrock tool call",
+                    "Failed to parse Bedrock capability call",
                     extra={"error": str(e), "block": block},
                 )
                 raise ToolCallParsingError(
-                    f"Failed to parse Bedrock tool call: {e}",
+                    f"Failed to parse Bedrock capability call: {e}",
                     provider="bedrock",
                     block=block,
                 ) from e
 
-        return tool_calls
+        return capability_calls
 
-    def _parse_vertex_tool_calls(
+    def _parse_vertex_capability_calls(
         self,
         response: CompletionResponse,
-    ) -> list[ToolCall]:
-        """Parse tool calls from Vertex AI response format.
+    ) -> list[CapabilityCall]:
+        """Parse capability calls from Vertex AI response format.
 
         Vertex format (Gemini):
         {
@@ -357,7 +395,7 @@ class ToolCallHandler:
             response: CompletionResponse from Vertex AI
 
         Returns:
-            List of ToolCall objects
+            List of CapabilityCall objects
 
         Raises:
             ToolCallParsingError: If parsing fails
@@ -366,7 +404,7 @@ class ToolCallHandler:
         if not candidates:
             return []
 
-        tool_calls = []
+        capability_calls = []
         # Process first candidate
         candidate = candidates[0]
         content = candidate.get("content", {})
@@ -388,8 +426,8 @@ class ToolCallHandler:
                 # Generate ID since Vertex doesn't provide one
                 call_id = f"vertex_call_{idx}"
 
-                tool_calls.append(
-                    ToolCall(
+                capability_calls.append(
+                    CapabilityCall(
                         id=call_id,
                         name=name,
                         arguments=arguments,
@@ -397,39 +435,39 @@ class ToolCallHandler:
                 )
             except Exception as e:
                 logger.warning(
-                    "Failed to parse Vertex tool call",
+                    "Failed to parse Vertex capability call",
                     extra={"error": str(e), "part": part},
                 )
                 raise ToolCallParsingError(
-                    f"Failed to parse Vertex tool call: {e}",
+                    f"Failed to parse Vertex capability call: {e}",
                     provider="vertex",
                     part=part,
                 ) from e
 
-        return tool_calls
+        return capability_calls
 
-    async def execute_tool_calls(
+    async def execute_capability_calls(
         self,
-        tool_calls: list[ToolCall],
-    ) -> list[ToolResult]:
-        """Execute a list of tool calls and return results.
+        capability_calls: list[CapabilityCall],
+    ) -> list[CapabilityResult]:
+        """Execute a list of capability calls and return results.
 
-        Executes each tool call by looking up the capability in the registry,
+        Executes each capability call by looking up the capability in the registry,
         validating arguments, and executing the capability. Handles errors
-        gracefully by capturing them in the ToolResult.
+        gracefully by capturing them in the CapabilityResult.
 
         Args:
-            tool_calls: List of ToolCall objects to execute
+            capability_calls: List of CapabilityCall objects to execute
 
         Returns:
-            List of ToolResult objects with execution results or errors
+            List of CapabilityResult objects with execution results or errors
 
         Example:
-            >>> handler = ToolCallHandler(registry)
-            >>> tool_calls = [
-            ...     ToolCall(id="call_1", name="get_weather", arguments={"location": "NYC"})
+            >>> handler = CapabilityCallHandler(registry)
+            >>> capability_calls = [
+            ...     CapabilityCall(id="call_1", name="get_weather", arguments={"location": "NYC"})
             ... ]
-            >>> results = await handler.execute_tool_calls(tool_calls)
+            >>> results = await handler.execute_capability_calls(capability_calls)
             >>> for result in results:
             ...     if result.error:
             ...         print(f"Error: {result.error}")
@@ -438,64 +476,64 @@ class ToolCallHandler:
         """
         results = []
 
-        for tool_call in tool_calls:
+        for capability_call in capability_calls:
             try:
                 # Look up capability
-                capability = self.registry.get(tool_call.name)
+                capability = self.registry.get(capability_call.name)
                 if capability is None:
                     raise CapabilityNotFoundError(
-                        f"Capability '{tool_call.name}' not found in registry",
-                        capability_name=tool_call.name,
+                        f"Capability '{capability_call.name}' not found in registry",
+                        capability_name=capability_call.name,
                     )
 
                 # Validate arguments against schema
                 schema = capability.get_schema()
-                self._validate_arguments(tool_call.arguments, schema.parameters)
+                self._validate_arguments(capability_call.arguments, schema.parameters)
 
                 # Execute capability
                 logger.info(
-                    "Executing tool call",
+                    "Executing capability call",
                     extra={
-                        "tool_call_id": tool_call.id,
-                        "capability_name": tool_call.name,
-                        "arguments": tool_call.arguments,
+                        "capability_call_id": capability_call.id,
+                        "capability_name": capability_call.name,
+                        "arguments": capability_call.arguments,
                     },
                 )
 
-                result = await capability.aexecute(**tool_call.arguments)
+                result = await capability.aexecute(**capability_call.arguments)
 
                 # Create successful result
                 results.append(
-                    ToolResult(
-                        tool_call_id=tool_call.id,
-                        name=tool_call.name,
+                    CapabilityResult(
+                        capability_call_id=capability_call.id,
+                        name=capability_call.name,
                         result=result,
                         error=None,
                     )
                 )
 
                 logger.info(
-                    "Tool call executed successfully",
+                    "Capability call executed successfully",
                     extra={
-                        "tool_call_id": tool_call.id,
-                        "capability_name": tool_call.name,
+                        "capability_call_id": capability_call.id,
+                        "capability_name": capability_call.name,
                     },
                 )
 
             except (CapabilityNotFoundError, CapabilityValidationError) as e:
                 # Capability-specific errors
                 logger.error(
-                    "Tool call execution failed",
+                    "Capability call execution failed",
                     extra={
-                        "tool_call_id": tool_call.id,
-                        "capability_name": tool_call.name,
+                        "capability_call_id": capability_call.id,
+                        "capability_name": capability_call.name,
                         "error": str(e),
                     },
                 )
                 results.append(
-                    ToolResult(
-                        tool_call_id=tool_call.id,
-                        name=tool_call.name,
+                    CapabilityResult(
+                        capability_call_id=capability_call.id,
+                        name=capability_call.name,
                         result=None,
                         error=str(e),
                     )
@@ -504,18 +542,18 @@ class ToolCallHandler:
             except Exception as e:
                 # Unexpected errors
                 logger.error(
-                    "Tool call execution failed with unexpected error",
+                    "Capability call execution failed with unexpected error",
                     extra={
-                        "tool_call_id": tool_call.id,
-                        "capability_name": tool_call.name,
+                        "capability_call_id": capability_call.id,
+                        "capability_name": capability_call.name,
                         "error": str(e),
                     },
                     exc_info=True,
                 )
                 results.append(
-                    ToolResult(
-                        tool_call_id=tool_call.id,
-                        name=tool_call.name,
+                    CapabilityResult(
+                        capability_call_id=capability_call.id,
+                        name=capability_call.name,
                         result=None,
                         error=f"Execution failed: {e}",
                     )
@@ -596,18 +634,18 @@ class ToolCallHandler:
                     actual_type=type(value).__name__,
                 )
 
-    def format_tool_results(
+    def format_capability_results(
         self,
-        results: list[ToolResult],
+        results: list[CapabilityResult],
         provider: str,
     ) -> list[dict[str, Any]]:
-        """Format tool results for sending back to provider.
+        """Format capability results for sending back to provider.
 
-        Converts ToolResult objects to provider-specific format for sending
+        Converts CapabilityResult objects to provider-specific format for sending
         back to the LLM. Each provider expects results in a different format.
 
         Args:
-            results: List of ToolResult objects to format
+            results: List of CapabilityResult objects to format
             provider: Provider name ('openai', 'anthropic', 'bedrock', 'azure', 'vertex')
 
         Returns:
@@ -617,15 +655,15 @@ class ToolCallHandler:
             ToolCallParsingError: If formatting fails
 
         Example:
-            >>> handler = ToolCallHandler(registry)
+            >>> handler = CapabilityCallHandler(registry)
             >>> results = [
-            ...     ToolResult(
-            ...         tool_call_id="call_1",
+            ...     CapabilityResult(
+            ...         capability_call_id="call_1",
             ...         name="get_weather",
             ...         result={"temp": 72}
             ...     )
             ... ]
-            >>> formatted = handler.format_tool_results(results, "openai")
+            >>> formatted = handler.format_capability_results(results, "openai")
         """
         provider_lower = provider.lower()
 
@@ -647,14 +685,14 @@ class ToolCallHandler:
             raise
         except Exception as e:
             raise ToolCallParsingError(
-                f"Failed to format tool results for {provider}: {e}",
+                f"Failed to format capability results for {provider}: {e}",
                 provider=provider,
                 original_error=str(e),
             ) from e
 
     def _format_openai_results(
         self,
-        results: list[ToolResult],
+        results: list[CapabilityResult],
     ) -> list[dict[str, Any]]:
         """Format results for OpenAI/Azure.
 
@@ -666,7 +704,7 @@ class ToolCallHandler:
         }
 
         Args:
-            results: List of ToolResult objects
+            results: List of CapabilityResult objects
 
         Returns:
             List of formatted result dictionaries
@@ -683,7 +721,7 @@ class ToolCallHandler:
 
             formatted.append(
                 {
-                    "tool_call_id": result.tool_call_id,
+                    "tool_call_id": result.capability_call_id,
                     "role": "tool",
                     "content": content,
                 }
@@ -693,7 +731,7 @@ class ToolCallHandler:
 
     def _format_anthropic_results(
         self,
-        results: list[ToolResult],
+        results: list[CapabilityResult],
     ) -> list[dict[str, Any]]:
         """Format results for Anthropic.
 
@@ -705,7 +743,7 @@ class ToolCallHandler:
         }
 
         Args:
-            results: List of ToolResult objects
+            results: List of CapabilityResult objects
 
         Returns:
             List of formatted result dictionaries
@@ -723,7 +761,7 @@ class ToolCallHandler:
             formatted.append(
                 {
                     "type": "tool_result",
-                    "tool_use_id": result.tool_call_id,
+                    "tool_use_id": result.capability_call_id,
                     "content": content,
                 }
             )
@@ -732,7 +770,7 @@ class ToolCallHandler:
 
     def _format_bedrock_results(
         self,
-        results: list[ToolResult],
+        results: list[CapabilityResult],
     ) -> list[dict[str, Any]]:
         """Format results for Bedrock.
 
@@ -749,7 +787,7 @@ class ToolCallHandler:
         }
 
         Args:
-            results: List of ToolResult objects
+            results: List of CapabilityResult objects
 
         Returns:
             List of formatted result dictionaries
@@ -772,7 +810,7 @@ class ToolCallHandler:
             formatted.append(
                 {
                     "toolResult": {
-                        "toolUseId": result.tool_call_id,
+                        "toolUseId": result.capability_call_id,
                         "content": [{"json": result_data}],
                     }
                 }
@@ -782,7 +820,7 @@ class ToolCallHandler:
 
     def _format_vertex_results(
         self,
-        results: list[ToolResult],
+        results: list[CapabilityResult],
     ) -> list[dict[str, Any]]:
         """Format results for Vertex AI.
 
@@ -795,7 +833,7 @@ class ToolCallHandler:
         }
 
         Args:
-            results: List of ToolResult objects
+            results: List of CapabilityResult objects
 
         Returns:
             List of formatted result dictionaries

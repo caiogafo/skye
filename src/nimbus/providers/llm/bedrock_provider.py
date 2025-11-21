@@ -32,7 +32,6 @@ from typing import Any
 from nimbus.completion import CompletionRequest, CompletionResponse, StreamChunk, TokenUsage
 from nimbus.providers.base import BaseModelProvider
 from nimbus.providers.lazy_import import LazyImporter
-from nimbus.providers.transformers import MessageTransformer
 
 
 class BedrockProvider(BaseModelProvider):
@@ -102,6 +101,139 @@ class BedrockProvider(BaseModelProvider):
         )
         return session.client("bedrock-runtime")
     
+    def _transform_messages(self, messages: list[Any]) -> list[dict[str, Any]]:
+        """Transform Nimbus messages to Bedrock Converse API format.
+        
+        Bedrock uses a content array format where each message has a content
+        array containing text or tool use/result blocks.
+        
+        Args:
+            messages: List of Nimbus message objects
+            
+        Returns:
+            List of dictionaries in Bedrock Converse API format
+        """
+        from nimbus.messages import AssistantMessage, CapabilityMessage, SystemMessage
+        
+        result = []
+        for msg in messages:
+            if isinstance(msg, SystemMessage):
+                result.append({"role": "system", "content": [{"text": msg.content}]})
+            elif isinstance(msg, CapabilityMessage):
+                result.append(
+                    {
+                        "role": "user",
+                        "content": [
+                            {
+                                "toolResult": {
+                                    "toolUseId": msg.capability_id,
+                                    "content": [{"text": msg.content}],
+                                }
+                            }
+                        ],
+                    }
+                )
+            else:
+                content: list[dict[str, Any]] = [{"text": msg.content}]
+                if isinstance(msg, AssistantMessage) and msg.capability_calls:
+                    content = [
+                        {
+                            "toolUse": {
+                                "toolUseId": call["id"],
+                                "name": call["function"]["name"],
+                                "input": call["function"]["arguments"],
+                            }
+                        }
+                        for call in msg.capability_calls
+                    ]
+                result.append({"role": msg.role, "content": content})
+        return result
+    
+    def _transform_capabilities(self, capabilities: list[Any]) -> list[dict[str, Any]]:
+        """Transform Nimbus capabilities to Bedrock Converse API format.
+        
+        Bedrock uses a nested structure with "toolSpec" containing the tool
+        definition. The inputSchema is the JSON Schema for parameters.
+        
+        Args:
+            capabilities: List of CapabilityInterface objects or dicts
+            
+        Returns:
+            List of tool definitions in Bedrock format
+        """
+        tools = []
+        for capability in capabilities:
+            # Handle both CapabilityInterface objects and dict format
+            if isinstance(capability, dict):
+                # Check if already in Bedrock format
+                if "toolSpec" in capability:
+                    tools.append(capability)
+                else:
+                    # Convert from OpenAI format to Bedrock format
+                    func = capability.get("function", {})
+                    tool = {
+                        "toolSpec": {
+                            "name": func.get("name", ""),
+                            "description": func.get("description", ""),
+                            "inputSchema": {
+                                "json": func.get("parameters", {
+                                    "type": "object",
+                                    "properties": {},
+                                })
+                            },
+                        }
+                    }
+                    tools.append(tool)
+            else:
+                # CapabilityInterface object, convert to Bedrock format
+                schema = capability.get_schema()
+                tool = {
+                    "toolSpec": {
+                        "name": schema.name,
+                        "description": schema.description,
+                        "inputSchema": {
+                            "json": schema.parameters or {
+                                "type": "object",
+                                "properties": {},
+                            }
+                        },
+                    }
+                }
+                tools.append(tool)
+        return tools
+    
+    def _extract_capability_calls(self, response: Any) -> list[Any] | None:
+        """Extract capability calls from Bedrock response.
+        
+        Parses tool use blocks from the Bedrock response format and converts them
+        to Nimbus CapabilityCall objects.
+        
+        Args:
+            response: Bedrock response dictionary
+            
+        Returns:
+            List of CapabilityCall objects, or None if no capability calls
+        """
+        output = response.get("output", {})
+        message = output.get("message", {})
+        
+        capability_calls = []
+        for content_block in message.get("content", []):
+            if "toolUse" in content_block:
+                tool_use = content_block["toolUse"]
+                
+                from nimbus.capabilities.capability_models import CapabilityCall
+                
+                capability_calls.append(
+                    CapabilityCall(
+                        id=tool_use["toolUseId"],
+                        name=tool_use["name"],
+                        arguments=tool_use["input"]
+                    )
+                )
+        
+        return capability_calls if capability_calls else None
+    
     def _transform_request(self, request: CompletionRequest) -> dict[str, Any]:
         """Transform CompletionRequest to Bedrock Converse API format.
         
@@ -117,7 +249,7 @@ class BedrockProvider(BaseModelProvider):
         
         bedrock_request: dict[str, Any] = {
             "modelId": request.model,
-            "messages": MessageTransformer.to_bedrock_format(request.messages),
+            "messages": self._transform_messages(request.messages),
             "inferenceConfig": {
                 "temperature": request.temperature
             }
@@ -141,31 +273,25 @@ class BedrockProvider(BaseModelProvider):
                     "tools": [{"toolSpec": cap} for cap in request.capabilities]
                 }
             else:
-                # Use ToolTransformer to convert capabilities to Bedrock format
-                try:
-                    from nimbus.capabilities.tool_transformer import ToolTransformer
-                    
-                    bedrock_request["toolConfig"] = {
-                        "tools": ToolTransformer.to_bedrock_format(request.capabilities)
-                    }
-                    
-                    # Handle tool_choice parameter
-                    if request.tool_choice:
-                        if request.tool_choice == "auto":
-                            bedrock_request["toolConfig"]["toolChoice"] = {"auto": {}}
-                        elif request.tool_choice == "required":
-                            bedrock_request["toolConfig"]["toolChoice"] = {"any": {}}
-                        elif isinstance(request.tool_choice, str):
-                            # Specific tool name
-                            bedrock_request["toolConfig"]["toolChoice"] = {
-                                "tool": {"name": request.tool_choice}
-                            }
-                        elif isinstance(request.tool_choice, dict):
-                            # Already formatted tool choice
-                            bedrock_request["toolConfig"]["toolChoice"] = request.tool_choice
-                except ImportError:
-                    # If capabilities package not installed, skip tool conversion
-                    pass
+                # Use internal method to convert capabilities to Bedrock format
+                bedrock_request["toolConfig"] = {
+                    "tools": self._transform_capabilities(request.capabilities)
+                }
+                
+                # Handle capability_choice parameter
+                if request.capability_choice:
+                    if request.capability_choice == "auto":
+                        bedrock_request["toolConfig"]["toolChoice"] = {"auto": {}}
+                    elif request.capability_choice == "required":
+                        bedrock_request["toolConfig"]["toolChoice"] = {"any": {}}
+                    elif isinstance(request.capability_choice, str):
+                        # Specific capability name
+                        bedrock_request["toolConfig"]["toolChoice"] = {
+                            "tool": {"name": request.capability_choice}
+                        }
+                    elif isinstance(request.capability_choice, dict):
+                        # Already formatted capability choice
+                        bedrock_request["toolConfig"]["toolChoice"] = request.capability_choice
         
         # Provider-specific metadata
         if request.metadata:
@@ -194,32 +320,14 @@ class BedrockProvider(BaseModelProvider):
         
         # Extract content from message
         content = ""
-        tool_calls_list = []
         tool_calls_metadata = []
         
         for content_block in message.get("content", []):
             if "text" in content_block:
                 content += content_block["text"]
             elif "toolUse" in content_block:
-                # Handle tool use
+                # Store in metadata for compatibility
                 tool_use = content_block["toolUse"]
-                
-                # Create ToolCall object if capabilities are available
-                try:
-                    from nimbus.capabilities.tool_models import ToolCall
-                    
-                    tool_calls_list.append(
-                        ToolCall(
-                            id=tool_use["toolUseId"],
-                            name=tool_use["name"],
-                            arguments=tool_use["input"]
-                        )
-                    )
-                except ImportError:
-                    # If capabilities package not installed, skip ToolCall creation
-                    pass
-                
-                # Also store in metadata for compatibility
                 tool_calls_metadata.append({
                     "id": tool_use["toolUseId"],
                     "type": "function",
@@ -228,6 +336,9 @@ class BedrockProvider(BaseModelProvider):
                         "arguments": tool_use["input"]
                     }
                 })
+        
+        # Extract capability calls using internal method
+        tool_calls_list = self._extract_capability_calls(response)
         
         # Extract usage information
         usage_info = response.get("usage", {})

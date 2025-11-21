@@ -37,7 +37,6 @@ from nimbus.completion import CompletionRequest, CompletionResponse, StreamChunk
 from nimbus.messages import AssistantMessage
 from nimbus.providers.base import BaseModelProvider
 from nimbus.providers.lazy_import import LazyImporter
-from nimbus.providers.transformers import MessageTransformer
 
 
 class VertexAIProvider(BaseModelProvider):
@@ -118,6 +117,120 @@ class VertexAIProvider(BaseModelProvider):
 
         # Return the GenerativeModel class for creating model instances
         return vertexai.generative_models
+    
+    def _transform_messages(self, messages: list[Any]) -> list[dict[str, Any]]:
+        """Transform Nimbus messages to Vertex AI (Gemini) format.
+        
+        Vertex AI uses a parts-based format where content is broken into parts.
+        System instructions are typically handled separately in the API call.
+        
+        Args:
+            messages: List of Nimbus message objects
+            
+        Returns:
+            List of dictionaries in Vertex AI format
+        """
+        from nimbus.messages import AssistantMessage, CapabilityMessage, SystemMessage
+        
+        result = []
+        for msg in messages:
+            if isinstance(msg, SystemMessage):
+                # System messages are typically passed separately in Vertex AI
+                # but we include them here for completeness
+                result.append({"role": "system", "parts": [{"text": msg.content}]})
+            elif isinstance(msg, CapabilityMessage):
+                result.append(
+                    {
+                        "role": "user",
+                        "parts": [
+                            {
+                                "functionResponse": {
+                                    "name": msg.capability_name,
+                                    "response": {"content": msg.content},
+                                }
+                            }
+                        ],
+                    }
+                )
+            else:
+                # Map assistant to model for Vertex AI
+                role = "model" if msg.role == "assistant" else msg.role
+                parts: list[dict[str, Any]] = [{"text": msg.content}]
+
+                if isinstance(msg, AssistantMessage) and msg.capability_calls:
+                    parts = [
+                        {
+                            "functionCall": {
+                                "name": call["function"]["name"],
+                                "args": call["function"]["arguments"],
+                            }
+                        }
+                        for call in msg.capability_calls
+                    ]
+
+                result.append({"role": role, "parts": parts})
+        return result
+    
+    def _transform_capabilities(self, capabilities: list[Any]) -> list[dict[str, Any]]:
+        """Transform Nimbus capabilities to Vertex AI Gemini format.
+        
+        Vertex AI uses a format with "name", "description", and "parameters"
+        fields. The parameters field is the JSON Schema for parameters.
+        
+        Args:
+            capabilities: List of CapabilityInterface objects or dicts
+            
+        Returns:
+            List of tool definitions in Vertex AI format
+        """
+        tools = []
+        for capability in capabilities:
+            # Handle both CapabilityInterface objects and dict format
+            if isinstance(capability, dict):
+                # Check if already in Vertex format
+                if "parameters" in capability and "function" not in capability:
+                    tools.append(capability)
+                else:
+                    # Convert from OpenAI format to Vertex format
+                    func = capability.get("function", {})
+                    tool = {
+                        "name": func.get("name", ""),
+                        "description": func.get("description", ""),
+                        "parameters": func.get("parameters", {
+                            "type": "object",
+                            "properties": {},
+                        }),
+                    }
+                    tools.append(tool)
+            else:
+                # CapabilityInterface object, convert to Vertex format
+                schema = capability.get_schema()
+                tool = {
+                    "name": schema.name,
+                    "description": schema.description,
+                    "parameters": schema.parameters or {
+                        "type": "object",
+                        "properties": {},
+                    },
+                }
+                tools.append(tool)
+        return tools
+    
+    def _extract_capability_calls(self, response: Any) -> list[Any] | None:
+        """Extract capability calls from Vertex AI response.
+        
+        Parses function calls from the Vertex AI response format and converts them
+        to Nimbus CapabilityCall objects.
+        
+        Args:
+            response: Vertex AI response object
+            
+        Returns:
+            List of CapabilityCall objects, or None if no capability calls
+        """
+        # Vertex AI response structure varies, need to check for function calls
+        # This is a placeholder - actual implementation depends on Vertex AI SDK structure
+        return None
 
     def _transform_request(self, request: CompletionRequest) -> dict[str, Any]:
         """Transform CompletionRequest to Vertex AI format.
@@ -133,7 +246,7 @@ class VertexAIProvider(BaseModelProvider):
 
         vertex_request: dict[str, Any] = {
             "model": request.model,
-            "messages": MessageTransformer.to_vertex_format(request.messages),
+            "messages": self._transform_messages(request.messages),
             "generation_config": {
                 "temperature": request.temperature,
             }
@@ -158,47 +271,40 @@ class VertexAIProvider(BaseModelProvider):
 
         # Handle capabilities/tool calling
         if request.capabilities:
-            # Import ToolTransformer here to avoid circular dependency
-            try:
-                from nimbus.capabilities.tool_transformer import ToolTransformer
-                
-                # Convert capabilities to Vertex format
-                function_declarations = ToolTransformer.to_vertex_format(request.capabilities)
-                vertex_request["tools"] = [
-                    {
-                        "function_declarations": function_declarations
+            # Convert capabilities to Vertex format using internal method
+            function_declarations = self._transform_capabilities(request.capabilities)
+            vertex_request["tools"] = [
+                {
+                    "function_declarations": function_declarations
+                }
+            ]
+            
+            # Handle capability_choice parameter
+            # Note: Vertex AI doesn't have direct capability_choice support like OpenAI
+            # We can use function_calling_config for similar behavior
+            if request.capability_choice:
+                if request.capability_choice == "required":
+                    # Force function calling
+                    vertex_request["tool_config"] = {
+                        "function_calling_config": {
+                            "mode": "ANY"
+                        }
                     }
-                ]
-                
-                # Handle tool_choice parameter
-                # Note: Vertex AI doesn't have direct tool_choice support like OpenAI
-                # We can use function_calling_config for similar behavior
-                if request.tool_choice:
-                    if request.tool_choice == "required":
-                        # Force function calling
-                        vertex_request["tool_config"] = {
-                            "function_calling_config": {
-                                "mode": "ANY"
-                            }
+                elif request.capability_choice == "auto":
+                    # Let model decide
+                    vertex_request["tool_config"] = {
+                        "function_calling_config": {
+                            "mode": "AUTO"
                         }
-                    elif request.tool_choice == "auto":
-                        # Let model decide
-                        vertex_request["tool_config"] = {
-                            "function_calling_config": {
-                                "mode": "AUTO"
-                            }
+                    }
+                elif request.capability_choice != "none":
+                    # Specific capability name - use allowed_function_names
+                    vertex_request["tool_config"] = {
+                        "function_calling_config": {
+                            "mode": "ANY",
+                            "allowed_function_names": [request.capability_choice]
                         }
-                    elif request.tool_choice != "none":
-                        # Specific tool name - use allowed_function_names
-                        vertex_request["tool_config"] = {
-                            "function_calling_config": {
-                                "mode": "ANY",
-                                "allowed_function_names": [request.tool_choice]
-                            }
-                        }
-            except ImportError:
-                # If capabilities package not installed, skip tool conversion
-                pass
+                    }
 
         # Provider-specific metadata
         if request.metadata:
@@ -250,7 +356,7 @@ class VertexAIProvider(BaseModelProvider):
                             "args": dict(getattr(func_call, "args", {}))
                         })
                 
-                # Store raw function calls in metadata for ToolCallHandler
+                # Store raw function calls in metadata for CapabilityCallHandler
                 if function_calls_raw:
                     tool_calls_metadata = {
                         "candidates": [
@@ -270,9 +376,9 @@ class VertexAIProvider(BaseModelProvider):
                         ]
                     }
                     
-                    # Try to convert to ToolCall objects if capabilities package is available
+                    # Try to convert to CapabilityCall objects if capabilities package is available
                     try:
-                        from nimbus.capabilities.tool_models import ToolCall
+                        from nimbus.capabilities.capability_models import CapabilityCall
                         
                         tool_calls_list = []
                         for fc in function_calls_raw:
@@ -280,7 +386,7 @@ class VertexAIProvider(BaseModelProvider):
                             call_id = f"vertex_call_{fc['idx']}"
                             
                             tool_calls_list.append(
-                                ToolCall(
+                                CapabilityCall(
                                     id=call_id,
                                     name=fc["name"],
                                     arguments=fc["args"]

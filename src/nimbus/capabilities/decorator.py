@@ -36,12 +36,12 @@ def capability(
     Can be used with or without arguments:
 
     @capability
-    def my_tool(location: str) -> str:
+    def get_weather(location: str) -> str:
         '''Get weather for a location'''
         return f"Weather for {location}"
 
     @capability(name="custom_name", description="Custom description")
-    def my_tool(location: str) -> str:
+    def get_weather(location: str) -> str:
         return f"Weather for {location}"
 
     Args:

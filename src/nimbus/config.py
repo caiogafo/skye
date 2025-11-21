@@ -21,7 +21,9 @@ Example:
 """
 
 import json
+import logging
 import os
+import re
 from pathlib import Path
 from typing import Any
 
@@ -30,6 +32,74 @@ from pydantic import BaseModel, Field
 from pydantic import ValidationError as PydanticValidationError
 
 from nimbus.exceptions import ConfigurationError
+
+# Set up module logger
+logger = logging.getLogger(__name__)
+
+# Cache for environment variable substitutions to avoid repeated os.getenv() calls
+_env_var_cache: dict[str, str] = {}
+
+
+def substitute_env_vars(config: dict[str, Any] | list[Any] | str | Any) -> Any:
+    """Recursively substitute environment variables in configuration.
+
+    Substitutes ${VAR_NAME} patterns with environment variable values throughout
+    the configuration structure. Supports nested dictionaries, lists, and strings.
+    Uses caching to avoid repeated os.getenv() calls for the same variable.
+
+    Args:
+        config: Configuration data (dict, list, str, or other type).
+
+    Returns:
+        Configuration data with environment variables substituted.
+
+    Raises:
+        ConfigurationError: If a referenced environment variable is not found.
+
+    Example:
+        >>> os.environ["API_KEY"] = "secret-key-123"
+        >>> config = {"api_key": "${API_KEY}", "timeout": 30}
+        >>> result = substitute_env_vars(config)
+        >>> result["api_key"]
+        'secret-key-123'
+        >>> result["timeout"]
+        30
+    """
+    if isinstance(config, dict):
+        # Recursively substitute in dictionary values
+        return {key: substitute_env_vars(value) for key, value in config.items()}
+    elif isinstance(config, list):
+        # Recursively substitute in list items
+        return [substitute_env_vars(item) for item in config]
+    elif isinstance(config, str):
+        # Pattern to match ${VAR_NAME}
+        pattern = re.compile(r"\$\{([A-Za-z_][A-Za-z0-9_]*)\}")
+
+        def replace_var(match: re.Match[str]) -> str:
+            var_name = match.group(1)
+
+            # Check cache first
+            if var_name in _env_var_cache:
+                logger.debug(f"Using cached value for environment variable: {var_name}")
+                return _env_var_cache[var_name]
+
+            # Get from environment
+            value = os.getenv(var_name)
+            if value is None:
+                raise ConfigurationError(
+                    f"Environment variable '${{{var_name}}}' not found",
+                    details={"variable_name": var_name},
+                )
+
+            # Cache the value
+            _env_var_cache[var_name] = value
+            logger.debug(f"Substituted environment variable: {var_name}")
+            return value
+
+        return pattern.sub(replace_var, config)
+    else:
+        # Return non-string, non-dict, non-list values as-is
+        return config
 
 
 class RateLimitConfig(BaseModel):
@@ -228,6 +298,140 @@ class NimbusConfig(BaseModel):
     enable_rate_limiting: bool = True
 
 
+class RouterConfig(BaseModel):
+    """Complete router configuration from YAML.
+
+    This model represents a complete router configuration that can be loaded
+    from YAML files. It includes routes, fallbacks, retry policies, and other
+    router settings.
+
+    Attributes:
+        routes: List of route configurations with aliases and targets.
+        fallbacks: List of fallback configurations defining fallback chains.
+        retry_policies: List of retry policy configurations per error type.
+        allowed_fails_policies: List of allowed fails policies before cooldown.
+        strategy: Default routing strategy for the router.
+        cooldown_seconds: Default cooldown duration for failed models.
+        enable_pre_call_checks: Whether to enable pre-call rate limit checks.
+
+    Example:
+        >>> config = RouterConfig(
+        ...     routes=[
+        ...         {
+        ...             "alias": "gpt-3.5-turbo",
+        ...             "targets": [
+        ...                 {
+        ...                     "model": "gpt-3.5-turbo",
+        ...                     "provider": "openai",
+        ...                     "api_key": "${OPENAI_API_KEY}",
+        ...                     "tpm": 200000,
+        ...                     "rpm": 2000
+        ...                 }
+        ...             ],
+        ...             "strategy": "rate_limit_aware"
+        ...         }
+        ...     ],
+        ...     fallbacks=[
+        ...         {
+        ...             "primary": "gpt-4",
+        ...             "fallbacks": ["gpt-3.5-turbo"]
+        ...         }
+        ...     ]
+        ... )
+    """
+
+    routes: list[dict[str, Any]] = Field(default_factory=list, description="Route configurations")
+    fallbacks: list[dict[str, Any]] = Field(
+        default_factory=list, description="Fallback configurations"
+    )
+    retry_policies: list[dict[str, Any]] = Field(
+        default_factory=list, description="Retry policy configurations"
+    )
+    allowed_fails_policies: list[dict[str, Any]] = Field(
+        default_factory=list, description="Allowed fails policy configurations"
+    )
+    strategy: str = Field("round_robin", description="Default routing strategy")
+    cooldown_seconds: float = Field(60.0, ge=0.0, description="Cooldown duration in seconds")
+    enable_pre_call_checks: bool = Field(
+        True, description="Enable pre-call rate limit checks"
+    )
+
+
+def load_router_config(yaml_path: str | Path) -> dict[str, Any]:
+    """Load router configuration from YAML file with environment variable substitution.
+
+    This function loads a router configuration from a YAML file and applies
+    environment variable substitution to all string values. The configuration
+    is validated against the RouterConfig model.
+
+    Args:
+        yaml_path: Path to the YAML configuration file.
+
+    Returns:
+        Dictionary containing the router configuration with environment variables substituted.
+
+    Raises:
+        ConfigurationError: If the file doesn't exist, can't be parsed, or fails validation.
+
+    Example:
+        >>> # Load router config from YAML
+        >>> config = load_router_config("router_config.yaml")
+        >>> print(config["routes"])
+        [{'alias': 'gpt-3.5-turbo', 'targets': [...]}]
+    """
+    yaml_path = Path(yaml_path) if isinstance(yaml_path, str) else yaml_path
+
+    if not yaml_path.exists():
+        raise ConfigurationError(
+            f"Router configuration file not found: {yaml_path}",
+            details={"path": str(yaml_path)},
+        )
+
+    try:
+        with open(yaml_path) as f:
+            data = yaml.safe_load(f)
+    except yaml.YAMLError as e:
+        raise ConfigurationError(
+            f"Failed to parse YAML configuration file: {yaml_path}",
+            details={"path": str(yaml_path), "error": str(e)},
+        ) from e
+    except Exception as e:
+        raise ConfigurationError(
+            f"Failed to read configuration file: {yaml_path}",
+            details={"path": str(yaml_path), "error": str(e)},
+        ) from e
+
+    # Handle empty files
+    if data is None:
+        raise ConfigurationError(
+            "Router configuration file is empty",
+            details={"path": str(yaml_path)},
+        )
+
+    if not isinstance(data, dict):
+        raise ConfigurationError(
+            "Router configuration file must contain a dictionary/object at root level",
+            details={"path": str(yaml_path), "type": type(data).__name__},
+        )
+
+    # Apply environment variable substitution
+    substituted_data = substitute_env_vars(data)
+
+    # Validate against RouterConfig model
+    try:
+        router_config = RouterConfig(**substituted_data)
+        # Return as dict for compatibility with router initialization
+        return router_config.model_dump()
+    except PydanticValidationError as e:
+        raise ConfigurationError(
+            "Router configuration validation failed",
+            details={
+                "path": str(yaml_path),
+                "validation_errors": e.errors(),
+            },
+        ) from e
+
+
 class ConfigLoader:
     """Loads Nimbus configuration from multiple sources.
 
@@ -304,7 +508,9 @@ class ConfigLoader:
 
         # 3. Apply code overrides (highest precedence)
         if overrides:
-            config_data.update(overrides)
+            # Apply environment variable substitution to overrides
+            substituted_overrides = substitute_env_vars(overrides)
+            config_data.update(substituted_overrides)
 
         # Validate and create NimbusConfig
         try:
@@ -323,7 +529,7 @@ class ConfigLoader:
             config_path: Path to configuration file.
 
         Returns:
-            Dictionary containing configuration data.
+            Dictionary containing configuration data with environment variables substituted.
 
         Raises:
             ConfigurationError: If file doesn't exist, can't be read, or has invalid format.
@@ -356,7 +562,8 @@ class ConfigLoader:
                     details={"path": str(config_path), "type": type(data).__name__},
                 )
 
-            return data
+            # Apply environment variable substitution
+            return substitute_env_vars(data)
 
         except (yaml.YAMLError, json.JSONDecodeError) as e:
             raise ConfigurationError(

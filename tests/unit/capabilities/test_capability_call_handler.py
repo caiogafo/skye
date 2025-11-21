@@ -1,4 +1,4 @@
-"""Unit tests for ToolCallHandler."""
+"""Unit tests for CapabilityCallHandler."""
 
 import json
 
@@ -8,8 +8,8 @@ from nimbus.capabilities.exceptions import ToolCallParsingError
 from nimbus.capabilities.interface import CapabilityInterface
 from nimbus.capabilities.registry import CapabilityRegistry
 from nimbus.capabilities.schema import CapabilitySchema
-from nimbus.capabilities.tool_call_handler import ToolCallHandler
-from nimbus.capabilities.tool_models import ToolCall, ToolResult
+from nimbus.capabilities.capability_call_handler import CapabilityCallHandler
+from nimbus.capabilities.capability_models import CapabilityCall, CapabilityResult
 from nimbus.completion import CompletionResponse, TokenUsage
 
 
@@ -52,8 +52,8 @@ def registry():
 
 @pytest.fixture
 def handler(registry):
-    """Create a ToolCallHandler with a registry."""
-    return ToolCallHandler(registry)
+    """Create a CapabilityCallHandler with a registry."""
+    return CapabilityCallHandler(registry)
 
 
 @pytest.fixture
@@ -62,16 +62,16 @@ def mock_capability():
     return MockCapability("get_weather", {"temperature": 72, "condition": "sunny"})
 
 
-class TestToolCallHandlerInit:
-    """Tests for ToolCallHandler initialization."""
+class TestCapabilityCallHandlerInit:
+    """Tests for CapabilityCallHandler initialization."""
 
     def test_init_with_registry(self, registry):
         """Test initialization with a registry."""
-        handler = ToolCallHandler(registry)
+        handler = CapabilityCallHandler(registry)
         assert handler.registry is registry
 
 
-class TestParseOpenAIToolCalls:
+class TestParseOpenAICapabilityCalls:
     """Tests for parsing OpenAI tool calls."""
 
     def test_parse_openai_tool_calls_success(self, handler):
@@ -96,7 +96,7 @@ class TestParseOpenAIToolCalls:
             },
         )
 
-        tool_calls = handler.parse_tool_calls(response, "openai")
+        tool_calls = handler.parse_capability_calls(response, "openai")
 
         assert len(tool_calls) == 1
         assert tool_calls[0].id == "call_123"
@@ -136,7 +136,7 @@ class TestParseOpenAIToolCalls:
             },
         )
 
-        tool_calls = handler.parse_tool_calls(response, "openai")
+        tool_calls = handler.parse_capability_calls(response, "openai")
 
         assert len(tool_calls) == 2
         assert tool_calls[0].name == "get_weather"
@@ -153,7 +153,7 @@ class TestParseOpenAIToolCalls:
             metadata={},
         )
 
-        tool_calls = handler.parse_tool_calls(response, "openai")
+        tool_calls = handler.parse_capability_calls(response, "openai")
 
         assert len(tool_calls) == 0
 
@@ -180,7 +180,7 @@ class TestParseOpenAIToolCalls:
         )
 
         with pytest.raises(ToolCallParsingError) as exc_info:
-            handler.parse_tool_calls(response, "openai")
+            handler.parse_capability_calls(response, "openai")
 
         assert "Invalid JSON" in str(exc_info.value)
 
@@ -206,10 +206,10 @@ class TestParseOpenAIToolCalls:
         )
 
         with pytest.raises(ToolCallParsingError):
-            handler.parse_tool_calls(response, "openai")
+            handler.parse_capability_calls(response, "openai")
 
 
-class TestParseAnthropicToolCalls:
+class TestParseAnthropicCapabilityCalls:
     """Tests for parsing Anthropic tool calls."""
 
     def test_parse_anthropic_tool_calls_success(self, handler):
@@ -232,7 +232,7 @@ class TestParseAnthropicToolCalls:
             },
         )
 
-        tool_calls = handler.parse_tool_calls(response, "anthropic")
+        tool_calls = handler.parse_capability_calls(response, "anthropic")
 
         assert len(tool_calls) == 1
         assert tool_calls[0].id == "toolu_123"
@@ -263,7 +263,7 @@ class TestParseAnthropicToolCalls:
             },
         )
 
-        tool_calls = handler.parse_tool_calls(response, "anthropic")
+        tool_calls = handler.parse_capability_calls(response, "anthropic")
 
         assert len(tool_calls) == 1
         assert tool_calls[0].name == "get_weather"
@@ -279,12 +279,12 @@ class TestParseAnthropicToolCalls:
             metadata={},
         )
 
-        tool_calls = handler.parse_tool_calls(response, "anthropic")
+        tool_calls = handler.parse_capability_calls(response, "anthropic")
 
         assert len(tool_calls) == 0
 
 
-class TestParseBedrockToolCalls:
+class TestParseBedrockCapabilityCalls:
     """Tests for parsing Bedrock tool calls."""
 
     def test_parse_bedrock_tool_calls_success(self, handler):
@@ -315,7 +315,7 @@ class TestParseBedrockToolCalls:
             },
         )
 
-        tool_calls = handler.parse_tool_calls(response, "bedrock")
+        tool_calls = handler.parse_capability_calls(response, "bedrock")
 
         assert len(tool_calls) == 1
         assert tool_calls[0].id == "tooluse_123"
@@ -336,12 +336,12 @@ class TestParseBedrockToolCalls:
             metadata={},
         )
 
-        tool_calls = handler.parse_tool_calls(response, "bedrock")
+        tool_calls = handler.parse_capability_calls(response, "bedrock")
 
         assert len(tool_calls) == 0
 
 
-class TestParseVertexToolCalls:
+class TestParseVertexCapabilityCalls:
     """Tests for parsing Vertex AI tool calls."""
 
     def test_parse_vertex_tool_calls_success(self, handler):
@@ -373,7 +373,7 @@ class TestParseVertexToolCalls:
             },
         )
 
-        tool_calls = handler.parse_tool_calls(response, "vertex")
+        tool_calls = handler.parse_capability_calls(response, "vertex")
 
         assert len(tool_calls) == 1
         assert tool_calls[0].id.startswith("vertex_call_")
@@ -415,7 +415,7 @@ class TestParseVertexToolCalls:
             },
         )
 
-        tool_calls = handler.parse_tool_calls(response, "vertex")
+        tool_calls = handler.parse_capability_calls(response, "vertex")
 
         assert len(tool_calls) == 2
         assert tool_calls[0].name == "get_weather"
@@ -432,12 +432,12 @@ class TestParseVertexToolCalls:
             metadata={},
         )
 
-        tool_calls = handler.parse_tool_calls(response, "vertex")
+        tool_calls = handler.parse_capability_calls(response, "vertex")
 
         assert len(tool_calls) == 0
 
 
-class TestParseAzureToolCalls:
+class TestParseAzureCapabilityCalls:
     """Tests for parsing Azure tool calls (same as OpenAI)."""
 
     def test_parse_azure_tool_calls_success(self, handler):
@@ -462,7 +462,7 @@ class TestParseAzureToolCalls:
             },
         )
 
-        tool_calls = handler.parse_tool_calls(response, "azure")
+        tool_calls = handler.parse_capability_calls(response, "azure")
 
         assert len(tool_calls) == 1
         assert tool_calls[0].id == "call_123"
@@ -483,31 +483,31 @@ class TestParseUnsupportedProvider:
         )
 
         with pytest.raises(ToolCallParsingError) as exc_info:
-            handler.parse_tool_calls(response, "unknown")
+            handler.parse_capability_calls(response, "unknown")
 
         assert "Unsupported provider" in str(exc_info.value)
 
 
-class TestExecuteToolCalls:
+class TestExecuteCapabilityCalls:
     """Tests for executing tool calls."""
 
     @pytest.mark.asyncio
-    async def test_execute_tool_calls_success(self, handler, registry, mock_capability):
+    async def test_execute_capability_calls_success(self, handler, registry, mock_capability):
         """Test successful execution of tool calls."""
         registry.register(mock_capability)
 
         tool_calls = [
-            ToolCall(
+            CapabilityCall(
                 id="call_1",
                 name="get_weather",
                 arguments={"location": "San Francisco"},
             )
         ]
 
-        results = await handler.execute_tool_calls(tool_calls)
+        results = await handler.execute_capability_calls(tool_calls)
 
         assert len(results) == 1
-        assert results[0].tool_call_id == "call_1"
+        assert results[0].capability_call_id == "call_1"
         assert results[0].name == "get_weather"
         assert results[0].result == {"temperature": 72, "condition": "sunny"}
         assert results[0].error is None
@@ -521,11 +521,11 @@ class TestExecuteToolCalls:
         registry.register(cap2)
 
         tool_calls = [
-            ToolCall(id="call_1", name="tool1", arguments={"location": "NYC"}),
-            ToolCall(id="call_2", name="tool2", arguments={"location": "LA"}),
+            CapabilityCall(id="call_1", name="tool1", arguments={"location": "NYC"}),
+            CapabilityCall(id="call_2", name="tool2", arguments={"location": "LA"}),
         ]
 
-        results = await handler.execute_tool_calls(tool_calls)
+        results = await handler.execute_capability_calls(tool_calls)
 
         assert len(results) == 2
         assert results[0].result == "result1"
@@ -535,14 +535,14 @@ class TestExecuteToolCalls:
     async def test_execute_tool_call_not_found(self, handler, registry):
         """Test executing tool call for non-existent capability."""
         tool_calls = [
-            ToolCall(
+            CapabilityCall(
                 id="call_1",
                 name="nonexistent",
                 arguments={"location": "NYC"},
             )
         ]
 
-        results = await handler.execute_tool_calls(tool_calls)
+        results = await handler.execute_capability_calls(tool_calls)
 
         assert len(results) == 1
         assert results[0].error is not None
@@ -556,14 +556,14 @@ class TestExecuteToolCalls:
         registry.register(mock_capability)
 
         tool_calls = [
-            ToolCall(
+            CapabilityCall(
                 id="call_1",
                 name="get_weather",
                 arguments={},  # Missing required 'location'
             )
         ]
 
-        results = await handler.execute_tool_calls(tool_calls)
+        results = await handler.execute_capability_calls(tool_calls)
 
         assert len(results) == 1
         assert results[0].error is not None
@@ -575,14 +575,14 @@ class TestExecuteToolCalls:
         registry.register(mock_capability)
 
         tool_calls = [
-            ToolCall(
+            CapabilityCall(
                 id="call_1",
                 name="get_weather",
                 arguments={"location": 123},  # Should be string
             )
         ]
 
-        results = await handler.execute_tool_calls(tool_calls)
+        results = await handler.execute_capability_calls(tool_calls)
 
         assert len(results) == 1
         assert results[0].error is not None
@@ -609,9 +609,9 @@ class TestExecuteToolCalls:
 
         registry.register(FailingCapability())
 
-        tool_calls = [ToolCall(id="call_1", name="failing_tool", arguments={})]
+        tool_calls = [CapabilityCall(id="call_1", name="failing_tool", arguments={})]
 
-        results = await handler.execute_tool_calls(tool_calls)
+        results = await handler.execute_capability_calls(tool_calls)
 
         assert len(results) == 1
         assert results[0].error is not None
@@ -624,15 +624,15 @@ class TestFormatOpenAIResults:
     def test_format_openai_results_success(self, handler):
         """Test formatting successful OpenAI results."""
         results = [
-            ToolResult(
-                tool_call_id="call_1",
+            CapabilityResult(
+                capability_call_id="call_1",
                 name="get_weather",
                 result={"temperature": 72, "condition": "sunny"},
                 error=None,
             )
         ]
 
-        formatted = handler.format_tool_results(results, "openai")
+        formatted = handler.format_capability_results(results, "openai")
 
         assert len(formatted) == 1
         assert formatted[0]["tool_call_id"] == "call_1"
@@ -645,15 +645,15 @@ class TestFormatOpenAIResults:
     def test_format_openai_results_with_error(self, handler):
         """Test formatting OpenAI results with error."""
         results = [
-            ToolResult(
-                tool_call_id="call_1",
+            CapabilityResult(
+                capability_call_id="call_1",
                 name="get_weather",
                 result=None,
                 error="Location not found",
             )
         ]
 
-        formatted = handler.format_tool_results(results, "openai")
+        formatted = handler.format_capability_results(results, "openai")
 
         assert len(formatted) == 1
         assert json.loads(formatted[0]["content"]) == {"error": "Location not found"}
@@ -661,15 +661,15 @@ class TestFormatOpenAIResults:
     def test_format_openai_results_string_result(self, handler):
         """Test formatting OpenAI results with string result."""
         results = [
-            ToolResult(
-                tool_call_id="call_1",
+            CapabilityResult(
+                capability_call_id="call_1",
                 name="get_weather",
                 result="Sunny and 72 degrees",
                 error=None,
             )
         ]
 
-        formatted = handler.format_tool_results(results, "openai")
+        formatted = handler.format_capability_results(results, "openai")
 
         assert formatted[0]["content"] == "Sunny and 72 degrees"
 
@@ -680,15 +680,15 @@ class TestFormatAnthropicResults:
     def test_format_anthropic_results_success(self, handler):
         """Test formatting successful Anthropic results."""
         results = [
-            ToolResult(
-                tool_call_id="toolu_1",
+            CapabilityResult(
+                capability_call_id="toolu_1",
                 name="get_weather",
                 result={"temperature": 72, "condition": "sunny"},
                 error=None,
             )
         ]
 
-        formatted = handler.format_tool_results(results, "anthropic")
+        formatted = handler.format_capability_results(results, "anthropic")
 
         assert len(formatted) == 1
         assert formatted[0]["type"] == "tool_result"
@@ -705,15 +705,15 @@ class TestFormatBedrockResults:
     def test_format_bedrock_results_success(self, handler):
         """Test formatting successful Bedrock results."""
         results = [
-            ToolResult(
-                tool_call_id="tooluse_1",
+            CapabilityResult(
+                capability_call_id="tooluse_1",
                 name="get_weather",
                 result={"temperature": 72, "condition": "sunny"},
                 error=None,
             )
         ]
 
-        formatted = handler.format_tool_results(results, "bedrock")
+        formatted = handler.format_capability_results(results, "bedrock")
 
         assert len(formatted) == 1
         assert "toolResult" in formatted[0]
@@ -726,15 +726,15 @@ class TestFormatBedrockResults:
     def test_format_bedrock_results_string_result(self, handler):
         """Test formatting Bedrock results with string result."""
         results = [
-            ToolResult(
-                tool_call_id="tooluse_1",
+            CapabilityResult(
+                capability_call_id="tooluse_1",
                 name="get_weather",
                 result='{"temperature": 72}',
                 error=None,
             )
         ]
 
-        formatted = handler.format_tool_results(results, "bedrock")
+        formatted = handler.format_capability_results(results, "bedrock")
 
         assert formatted[0]["toolResult"]["content"][0]["json"] == {"temperature": 72}
 
@@ -745,15 +745,15 @@ class TestFormatVertexResults:
     def test_format_vertex_results_success(self, handler):
         """Test formatting successful Vertex AI results."""
         results = [
-            ToolResult(
-                tool_call_id="vertex_call_0",
+            CapabilityResult(
+                capability_call_id="vertex_call_0",
                 name="get_weather",
                 result={"temperature": 72, "condition": "sunny"},
                 error=None,
             )
         ]
 
-        formatted = handler.format_tool_results(results, "vertex")
+        formatted = handler.format_capability_results(results, "vertex")
 
         assert len(formatted) == 1
         assert "functionResponse" in formatted[0]
@@ -770,15 +770,15 @@ class TestFormatAzureResults:
     def test_format_azure_results_success(self, handler):
         """Test formatting successful Azure results."""
         results = [
-            ToolResult(
-                tool_call_id="call_1",
+            CapabilityResult(
+                capability_call_id="call_1",
                 name="get_weather",
                 result={"temperature": 72},
                 error=None,
             )
         ]
 
-        formatted = handler.format_tool_results(results, "azure")
+        formatted = handler.format_capability_results(results, "azure")
 
         assert len(formatted) == 1
         assert formatted[0]["tool_call_id"] == "call_1"
@@ -791,8 +791,8 @@ class TestFormatUnsupportedProvider:
     def test_format_unsupported_provider(self, handler):
         """Test formatting with unsupported provider."""
         results = [
-            ToolResult(
-                tool_call_id="call_1",
+            CapabilityResult(
+                capability_call_id="call_1",
                 name="get_weather",
                 result={"temperature": 72},
                 error=None,
@@ -800,6 +800,6 @@ class TestFormatUnsupportedProvider:
         ]
 
         with pytest.raises(ToolCallParsingError) as exc_info:
-            handler.format_tool_results(results, "unknown")
+            handler.format_capability_results(results, "unknown")
 
         assert "Unsupported provider" in str(exc_info.value)

@@ -661,6 +661,80 @@ class TestVertexAIModelInfo:
 class TestVertexAIToolCalling:
     """Test tool calling integration with capabilities."""
 
+    def test_transform_capabilities_with_capability_interface(self) -> None:
+        """Test _transform_capabilities() with CapabilityInterface objects."""
+        from nimbus.capabilities import LocalFunctionCapability
+
+        def get_weather(location: str) -> str:
+            """Get weather for a location."""
+            return f"Weather for {location}"
+
+        capability = LocalFunctionCapability(get_weather)
+
+        provider = VertexAIProvider(
+            project_id="my-project",
+            location="us-central1"
+        )
+
+        # Test internal transformation method
+        result = provider._transform_capabilities([capability])
+
+        # Verify Vertex AI format
+        assert len(result) == 1
+        assert result[0]["name"] == "get_weather"
+        assert result[0]["description"] == "Get weather for a location."
+        assert "parameters" in result[0]
+        assert result[0]["parameters"]["type"] == "object"
+    
+    def test_transform_capabilities_with_dict_format(self) -> None:
+        """Test _transform_capabilities() with dict format."""
+        provider = VertexAIProvider(
+            project_id="my-project",
+            location="us-central1"
+        )
+        
+        # Already in Vertex format
+        capabilities = [
+            {
+                "name": "get_weather",
+                "description": "Get weather",
+                "parameters": {"type": "object", "properties": {}}
+            }
+        ]
+        
+        result = provider._transform_capabilities(capabilities)
+        
+        # Should pass through unchanged
+        assert result == capabilities
+    
+    def test_transform_capabilities_converts_openai_format(self) -> None:
+        """Test _transform_capabilities() converts OpenAI format to Vertex format."""
+        provider = VertexAIProvider(
+            project_id="my-project",
+            location="us-central1"
+        )
+        
+        # OpenAI format
+        capabilities = [
+            {
+                "type": "function",
+                "function": {
+                    "name": "get_weather",
+                    "description": "Get weather",
+                    "parameters": {"type": "object", "properties": {"location": {"type": "string"}}}
+                }
+            }
+        ]
+        
+        result = provider._transform_capabilities(capabilities)
+        
+        # Should convert to Vertex format
+        assert len(result) == 1
+        assert result[0]["name"] == "get_weather"
+        assert result[0]["description"] == "Get weather"
+        assert result[0]["parameters"]["type"] == "object"
+        assert "location" in result[0]["parameters"]["properties"]
+
     def test_transform_request_with_capabilities(self) -> None:
         """Test transformation of request with capabilities."""
         from nimbus.capabilities import LocalFunctionCapability
@@ -695,7 +769,7 @@ class TestVertexAIToolCalling:
         assert "parameters" in func_decl
 
     def test_transform_request_with_tool_choice_auto(self) -> None:
-        """Test transformation with tool_choice='auto'."""
+        """Test transformation with capability_choice='auto'."""
         from nimbus.capabilities import LocalFunctionCapability
 
         def get_weather(location: str) -> str:
@@ -712,7 +786,7 @@ class TestVertexAIToolCalling:
             messages=[UserMessage(content="What's the weather?")],
             model="gemini-1.5-pro",
             capabilities=[capability],
-            tool_choice="auto"
+            capability_choice="auto"
         )
 
         result = provider._transform_request(request)
@@ -722,7 +796,7 @@ class TestVertexAIToolCalling:
         assert result["tool_config"]["function_calling_config"]["mode"] == "AUTO"
 
     def test_transform_request_with_tool_choice_required(self) -> None:
-        """Test transformation with tool_choice='required'."""
+        """Test transformation with capability_choice='required'."""
         from nimbus.capabilities import LocalFunctionCapability
 
         def get_weather(location: str) -> str:
@@ -739,7 +813,7 @@ class TestVertexAIToolCalling:
             messages=[UserMessage(content="What's the weather?")],
             model="gemini-1.5-pro",
             capabilities=[capability],
-            tool_choice="required"
+            capability_choice="required"
         )
 
         result = provider._transform_request(request)
@@ -749,7 +823,7 @@ class TestVertexAIToolCalling:
         assert result["tool_config"]["function_calling_config"]["mode"] == "ANY"
 
     def test_transform_request_with_specific_tool_choice(self) -> None:
-        """Test transformation with specific tool name in tool_choice."""
+        """Test transformation with specific tool name in capability_choice."""
         from nimbus.capabilities import LocalFunctionCapability
 
         def get_weather(location: str) -> str:
@@ -771,7 +845,7 @@ class TestVertexAIToolCalling:
             messages=[UserMessage(content="What's the weather?")],
             model="gemini-1.5-pro",
             capabilities=[capability1, capability2],
-            tool_choice="get_weather"
+            capability_choice="get_weather"
         )
 
         result = provider._transform_request(request)
@@ -960,9 +1034,9 @@ class TestVertexAIToolCalling:
         assert "function_declarations" in call_kwargs["tools"][0]
 
     def test_tool_call_parsing_with_handler(self) -> None:
-        """Test that tool calls can be parsed by ToolCallHandler."""
+        """Test that tool calls can be parsed by CapabilityCallHandler."""
         from nimbus.capabilities import CapabilityRegistry, LocalFunctionCapability
-        from nimbus.capabilities.tool_call_handler import ToolCallHandler
+        from nimbus.capabilities.capability_call_handler import CapabilityCallHandler
 
         def get_weather(location: str) -> str:
             """Get weather for a location."""
@@ -1010,13 +1084,13 @@ class TestVertexAIToolCalling:
         result = provider._transform_response(mock_response)
 
         # Parse tool calls using handler
-        handler = ToolCallHandler(registry)
-        tool_calls = handler.parse_tool_calls(result, "vertex")
+        handler = CapabilityCallHandler(registry)
+        capability_calls = handler.parse_capability_calls(result, "vertex")
 
         # Verify parsing
-        assert len(tool_calls) == 1
-        assert tool_calls[0].name == "get_weather"
-        assert tool_calls[0].arguments == {"location": "NYC"}
+        assert len(capability_calls) == 1
+        assert capability_calls[0].name == "get_weather"
+        assert capability_calls[0].arguments == {"location": "NYC"}
 
         # Clean up
         registry.unregister("get_weather")

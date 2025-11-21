@@ -1,7 +1,10 @@
 """MCP (Model Context Protocol) capability support for Nimbus.
 
-This module provides the MCPCapability class for wrapping MCP server tools
+This module provides the MCPCapability class for wrapping MCP server capabilities
 as Nimbus capabilities. Requires the FastMCP library as an optional dependency.
+
+Note: MCP uses the term "tool" in its specification, so you'll see references to
+"MCP tools" throughout this module when referring to the MCP protocol itself.
 """
 
 import asyncio

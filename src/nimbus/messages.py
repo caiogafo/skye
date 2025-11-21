@@ -102,21 +102,20 @@ class NimbusMessage(BaseModel):
         else:
             return cls(**data)
 
-    def format_for_provider(self, provider: str) -> dict[str, Any]:
-        """Format message for specific provider (OpenAI, Anthropic, etc.).
+    def to_dict(self) -> dict[str, Any]:
+        """Convert message to dictionary format.
 
-        Args:
-            provider: The provider name (e.g., 'openai', 'anthropic', 'bedrock').
+        This is a provider-agnostic representation. Providers handle their own
+        transformation logic via their _transform_messages() method.
 
         Returns:
-            Dictionary formatted for the specific provider's API.
+            Dictionary representation of the message.
 
         Example:
             >>> msg = UserMessage(content="Hello")
-            >>> msg.format_for_provider("openai")
+            >>> msg.to_dict()
             {'role': 'user', 'content': 'Hello'}
         """
-        # Base implementation - can be overridden by subclasses
         return {"role": self.role, "content": self.content}
 
 
@@ -155,32 +154,29 @@ class AssistantMessage(NimbusMessage):
     role: Literal["assistant"] = "assistant"
     capability_calls: list[dict[str, Any]] = Field(default_factory=list)
 
-    def format_for_provider(self, provider: str) -> dict[str, Any]:
-        """Format assistant message with capability calls for provider.
+    def to_dict(self) -> dict[str, Any]:
+        """Convert assistant message to dictionary format.
 
-        Args:
-            provider: The provider name (e.g., 'openai', 'anthropic', 'bedrock').
+        This is a provider-agnostic representation. Providers handle their own
+        transformation logic via their _transform_messages() method, including
+        how to format capability calls.
 
         Returns:
-            Dictionary formatted for the specific provider's API, including
-            capability calls in the provider's expected format.
+            Dictionary representation of the message.
 
         Example:
             >>> msg = AssistantMessage(
             ...     content="Checking weather",
             ...     capability_calls=[{"name": "get_weather"}]
             ... )
-            >>> formatted = msg.format_for_provider("openai")
-            >>> "tool_calls" in formatted
-            True
+            >>> formatted = msg.to_dict()
+            >>> formatted["role"]
+            'assistant'
         """
-        base = super().format_for_provider(provider)
+        result = super().to_dict()
         if self.capability_calls:
-            if provider == "openai":
-                base["tool_calls"] = self.capability_calls
-            elif provider == "anthropic":
-                base["tool_use"] = self.capability_calls
-        return base
+            result["capability_calls"] = self.capability_calls
+        return result
 
 
 class SystemMessage(NimbusMessage):
@@ -221,15 +217,15 @@ class CapabilityMessage(NimbusMessage):
     capability_id: str
     capability_name: str
 
-    def format_for_provider(self, provider: str) -> dict[str, Any]:
-        """Format capability message for provider.
+    def to_dict(self) -> dict[str, Any]:
+        """Convert capability message to dictionary format.
 
-        Args:
-            provider: The provider name (e.g., 'openai', 'anthropic', 'bedrock').
+        This is a provider-agnostic representation. Providers handle their own
+        transformation logic via their _transform_messages() method, including
+        how to format capability messages.
 
         Returns:
-            Dictionary formatted for the specific provider's API. OpenAI uses
-            a 'tool' role, while others may use 'user' role with special formatting.
+            Dictionary representation of the message.
 
         Example:
             >>> msg = CapabilityMessage(
@@ -237,15 +233,16 @@ class CapabilityMessage(NimbusMessage):
             ...     capability_id="call_123",
             ...     capability_name="get_weather"
             ... )
-            >>> formatted = msg.format_for_provider("openai")
+            >>> formatted = msg.to_dict()
             >>> formatted["role"]
-            'tool'
+            'capability'
         """
-        base = {"role": "tool" if provider == "openai" else "user", "content": self.content}
-        if provider == "openai":
-            base["tool_call_id"] = self.capability_id
-            base["name"] = self.capability_name
-        return base
+        return {
+            "role": self.role,
+            "content": self.content,
+            "capability_id": self.capability_id,
+            "capability_name": self.capability_name,
+        }
 
 
 class ContentChunk(BaseModel):

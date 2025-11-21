@@ -169,11 +169,16 @@ def test_all_list_matches_exports():
     # Count expected exports
     expected_count = (
         1  # __version__
+        + 2  # Simple API (provider, routes)
+        + 3  # Routing - Core (ModelRouter)
+        + 5  # Routing - Configuration
+        + 3  # Routing - Metrics
         + 5  # Exceptions
         + 6  # Messages
         + 4  # Completion
         + 6  # Configuration
-        + 16  # Interfaces
+        + 15  # Interfaces (removed MessageTransformerInterface)
+        + 5  # Interfaces - Utilities
     )
 
     assert len(__all__) == expected_count, f"Expected {expected_count} exports, got {len(__all__)}"

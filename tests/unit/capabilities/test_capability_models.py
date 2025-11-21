@@ -1,17 +1,17 @@
-"""Tests for ToolCall and ToolResult models."""
+"""Tests for CapabilityCall and CapabilityResult models."""
 
 import pytest
 from pydantic import ValidationError
 
-from nimbus.capabilities.tool_models import ToolCall, ToolResult
+from nimbus.capabilities.capability_models import CapabilityCall, CapabilityResult
 
 
-class TestToolCallCreation:
-    """Test creating valid ToolCall instances."""
+class TestCapabilityCallCreation:
+    """Test creating valid CapabilityCall instances."""
 
     def test_create_valid_tool_call(self) -> None:
         """Test creating a valid tool call."""
-        tool_call = ToolCall(
+        tool_call = CapabilityCall(
             id="call_123",
             name="weather.get_current",
             arguments={"location": "San Francisco"},
@@ -23,7 +23,7 @@ class TestToolCallCreation:
 
     def test_create_tool_call_with_empty_arguments(self) -> None:
         """Test creating a tool call with no arguments."""
-        tool_call = ToolCall(
+        tool_call = CapabilityCall(
             id="call_456",
             name="simple_tool",
         )
@@ -34,7 +34,7 @@ class TestToolCallCreation:
 
     def test_create_tool_call_with_complex_arguments(self) -> None:
         """Test creating a tool call with complex nested arguments."""
-        tool_call = ToolCall(
+        tool_call = CapabilityCall(
             id="call_789",
             name="database.query",
             arguments={
@@ -53,7 +53,7 @@ class TestToolCallCreation:
 
     def test_create_tool_call_with_various_argument_types(self) -> None:
         """Test creating a tool call with various argument types."""
-        tool_call = ToolCall(
+        tool_call = CapabilityCall(
             id="call_mixed",
             name="mixed_types",
             arguments={
@@ -76,13 +76,13 @@ class TestToolCallCreation:
         assert tool_call.arguments["none_arg"] is None
 
 
-class TestToolCallValidation:
-    """Test validation of ToolCall."""
+class TestCapabilityCallValidation:
+    """Test validation of CapabilityCall."""
 
     def test_reject_missing_id(self) -> None:
         """Test that missing id is rejected."""
         with pytest.raises(ValidationError) as exc_info:
-            ToolCall(
+            CapabilityCall(
                 name="test_tool",
                 arguments={},
             )
@@ -91,7 +91,7 @@ class TestToolCallValidation:
     def test_reject_missing_name(self) -> None:
         """Test that missing name is rejected."""
         with pytest.raises(ValidationError) as exc_info:
-            ToolCall(
+            CapabilityCall(
                 id="call_123",
                 arguments={},
             )
@@ -101,7 +101,7 @@ class TestToolCallValidation:
         """Test that empty id string is accepted (validation at provider level)."""
         # Empty strings are technically valid at Pydantic level
         # Provider-specific validation would happen elsewhere
-        tool_call = ToolCall(
+        tool_call = CapabilityCall(
             id="",
             name="test_tool",
         )
@@ -111,47 +111,47 @@ class TestToolCallValidation:
         """Test that empty name string is accepted (validation at provider level)."""
         # Empty strings are technically valid at Pydantic level
         # Provider-specific validation would happen elsewhere
-        tool_call = ToolCall(
+        tool_call = CapabilityCall(
             id="call_123",
             name="",
         )
         assert tool_call.name == ""
 
 
-class TestToolResultCreation:
-    """Test creating valid ToolResult instances."""
+class TestCapabilityResultCreation:
+    """Test creating valid CapabilityResult instances."""
 
     def test_create_successful_tool_result(self) -> None:
         """Test creating a successful tool result."""
-        result = ToolResult(
-            tool_call_id="call_123",
+        result = CapabilityResult(
+            capability_call_id="call_123",
             name="weather.get_current",
             result={"temperature": 72, "condition": "sunny"},
         )
 
-        assert result.tool_call_id == "call_123"
+        assert result.capability_call_id == "call_123"
         assert result.name == "weather.get_current"
         assert result.result == {"temperature": 72, "condition": "sunny"}
         assert result.error is None
 
     def test_create_failed_tool_result(self) -> None:
         """Test creating a failed tool result with error."""
-        result = ToolResult(
-            tool_call_id="call_456",
+        result = CapabilityResult(
+            capability_call_id="call_456",
             name="weather.get_current",
             result=None,
             error="Location not found",
         )
 
-        assert result.tool_call_id == "call_456"
+        assert result.capability_call_id == "call_456"
         assert result.name == "weather.get_current"
         assert result.result is None
         assert result.error == "Location not found"
 
     def test_create_tool_result_with_string_result(self) -> None:
         """Test creating a tool result with string return value."""
-        result = ToolResult(
-            tool_call_id="call_789",
+        result = CapabilityResult(
+            capability_call_id="call_789",
             name="text_processor",
             result="Processed text output",
         )
@@ -161,8 +161,8 @@ class TestToolResultCreation:
 
     def test_create_tool_result_with_list_result(self) -> None:
         """Test creating a tool result with list return value."""
-        result = ToolResult(
-            tool_call_id="call_list",
+        result = CapabilityResult(
+            capability_call_id="call_list",
             name="search",
             result=["item1", "item2", "item3"],
         )
@@ -172,8 +172,8 @@ class TestToolResultCreation:
 
     def test_create_tool_result_with_numeric_result(self) -> None:
         """Test creating a tool result with numeric return value."""
-        result = ToolResult(
-            tool_call_id="call_calc",
+        result = CapabilityResult(
+            capability_call_id="call_calc",
             name="calculator",
             result=42,
         )
@@ -183,8 +183,8 @@ class TestToolResultCreation:
 
     def test_create_tool_result_with_complex_result(self) -> None:
         """Test creating a tool result with complex nested result."""
-        result = ToolResult(
-            tool_call_id="call_complex",
+        result = CapabilityResult(
+            capability_call_id="call_complex",
             name="database.query",
             result={
                 "rows": [
@@ -202,8 +202,8 @@ class TestToolResultCreation:
 
     def test_create_tool_result_with_both_result_and_error(self) -> None:
         """Test creating a tool result with both result and error (edge case)."""
-        result = ToolResult(
-            tool_call_id="call_edge",
+        result = CapabilityResult(
+            capability_call_id="call_edge",
             name="partial_tool",
             result={"partial": "data"},
             error="Partial failure occurred",
@@ -213,31 +213,31 @@ class TestToolResultCreation:
         assert result.error == "Partial failure occurred"
 
 
-class TestToolResultValidation:
-    """Test validation of ToolResult."""
+class TestCapabilityResultValidation:
+    """Test validation of CapabilityResult."""
 
-    def test_reject_missing_tool_call_id(self) -> None:
-        """Test that missing tool_call_id is rejected."""
+    def test_reject_missing_capability_call_id(self) -> None:
+        """Test that missing capability_call_id is rejected."""
         with pytest.raises(ValidationError) as exc_info:
-            ToolResult(
+            CapabilityResult(
                 name="test_tool",
                 result="success",
             )
-        assert "tool_call_id" in str(exc_info.value).lower()
+        assert "capability_call_id" in str(exc_info.value).lower()
 
     def test_reject_missing_name(self) -> None:
         """Test that missing name is rejected."""
         with pytest.raises(ValidationError) as exc_info:
-            ToolResult(
-                tool_call_id="call_123",
+            CapabilityResult(
+                capability_call_id="call_123",
                 result="success",
             )
         assert "name" in str(exc_info.value).lower()
 
     def test_accept_missing_result(self) -> None:
         """Test that missing result defaults to None."""
-        result = ToolResult(
-            tool_call_id="call_123",
+        result = CapabilityResult(
+            capability_call_id="call_123",
             name="test_tool",
         )
 
@@ -246,8 +246,8 @@ class TestToolResultValidation:
 
     def test_accept_missing_error(self) -> None:
         """Test that missing error defaults to None."""
-        result = ToolResult(
-            tool_call_id="call_123",
+        result = CapabilityResult(
+            capability_call_id="call_123",
             name="test_tool",
             result="success",
         )
@@ -255,12 +255,12 @@ class TestToolResultValidation:
         assert result.error is None
 
 
-class TestToolCallSerialization:
-    """Test serialization and deserialization of ToolCall."""
+class TestCapabilityCallSerialization:
+    """Test serialization and deserialization of CapabilityCall."""
 
     def test_tool_call_to_dict(self) -> None:
-        """Test converting ToolCall to dictionary."""
-        tool_call = ToolCall(
+        """Test converting CapabilityCall to dictionary."""
+        tool_call = CapabilityCall(
             id="call_123",
             name="weather.get_current",
             arguments={"location": "San Francisco"},
@@ -273,8 +273,8 @@ class TestToolCallSerialization:
         assert data["arguments"] == {"location": "San Francisco"}
 
     def test_tool_call_to_json(self) -> None:
-        """Test converting ToolCall to JSON string."""
-        tool_call = ToolCall(
+        """Test converting CapabilityCall to JSON string."""
+        tool_call = CapabilityCall(
             id="call_123",
             name="weather.get_current",
             arguments={"location": "San Francisco"},
@@ -287,52 +287,52 @@ class TestToolCallSerialization:
         assert "San Francisco" in json_str
 
     def test_tool_call_from_dict(self) -> None:
-        """Test creating ToolCall from dictionary."""
+        """Test creating CapabilityCall from dictionary."""
         data = {
             "id": "call_456",
             "name": "database.query",
             "arguments": {"query": "SELECT * FROM users"},
         }
 
-        tool_call = ToolCall(**data)
+        tool_call = CapabilityCall(**data)
 
         assert tool_call.id == "call_456"
         assert tool_call.name == "database.query"
         assert tool_call.arguments["query"] == "SELECT * FROM users"
 
     def test_tool_call_from_json(self) -> None:
-        """Test creating ToolCall from JSON string."""
+        """Test creating CapabilityCall from JSON string."""
         json_str = '{"id": "call_789", "name": "test_tool", "arguments": {"key": "value"}}'
 
-        tool_call = ToolCall.model_validate_json(json_str)
+        tool_call = CapabilityCall.model_validate_json(json_str)
 
         assert tool_call.id == "call_789"
         assert tool_call.name == "test_tool"
         assert tool_call.arguments["key"] == "value"
 
 
-class TestToolResultSerialization:
-    """Test serialization and deserialization of ToolResult."""
+class TestCapabilityResultSerialization:
+    """Test serialization and deserialization of CapabilityResult."""
 
     def test_tool_result_to_dict(self) -> None:
-        """Test converting ToolResult to dictionary."""
-        result = ToolResult(
-            tool_call_id="call_123",
+        """Test converting CapabilityResult to dictionary."""
+        result = CapabilityResult(
+            capability_call_id="call_123",
             name="weather.get_current",
             result={"temperature": 72},
         )
 
         data = result.model_dump()
 
-        assert data["tool_call_id"] == "call_123"
+        assert data["capability_call_id"] == "call_123"
         assert data["name"] == "weather.get_current"
         assert data["result"] == {"temperature": 72}
         assert data["error"] is None
 
     def test_tool_result_to_json(self) -> None:
-        """Test converting ToolResult to JSON string."""
-        result = ToolResult(
-            tool_call_id="call_123",
+        """Test converting CapabilityResult to JSON string."""
+        result = CapabilityResult(
+            capability_call_id="call_123",
             name="weather.get_current",
             result={"temperature": 72},
             error=None,
@@ -345,35 +345,35 @@ class TestToolResultSerialization:
         assert "72" in json_str
 
     def test_tool_result_from_dict(self) -> None:
-        """Test creating ToolResult from dictionary."""
+        """Test creating CapabilityResult from dictionary."""
         data = {
-            "tool_call_id": "call_456",
+            "capability_call_id": "call_456",
             "name": "database.query",
             "result": [{"id": 1}, {"id": 2}],
             "error": None,
         }
 
-        result = ToolResult(**data)
+        result = CapabilityResult(**data)
 
-        assert result.tool_call_id == "call_456"
+        assert result.capability_call_id == "call_456"
         assert result.name == "database.query"
         assert len(result.result) == 2
 
     def test_tool_result_from_json(self) -> None:
-        """Test creating ToolResult from JSON string."""
-        json_str = '{"tool_call_id": "call_789", "name": "test_tool", "result": "success", "error": null}'
+        """Test creating CapabilityResult from JSON string."""
+        json_str = '{"capability_call_id": "call_789", "name": "test_tool", "result": "success", "error": null}'
 
-        result = ToolResult.model_validate_json(json_str)
+        result = CapabilityResult.model_validate_json(json_str)
 
-        assert result.tool_call_id == "call_789"
+        assert result.capability_call_id == "call_789"
         assert result.name == "test_tool"
         assert result.result == "success"
         assert result.error is None
 
     def test_tool_result_error_serialization(self) -> None:
-        """Test serializing ToolResult with error."""
-        result = ToolResult(
-            tool_call_id="call_error",
+        """Test serializing CapabilityResult with error."""
+        result = CapabilityResult(
+            capability_call_id="call_error",
             name="failing_tool",
             result=None,
             error="Tool execution failed",
@@ -385,9 +385,9 @@ class TestToolResultSerialization:
         assert data["result"] is None
 
     def test_tool_result_error_json_serialization(self) -> None:
-        """Test JSON serializing ToolResult with error."""
-        result = ToolResult(
-            tool_call_id="call_error",
+        """Test JSON serializing CapabilityResult with error."""
+        result = CapabilityResult(
+            capability_call_id="call_error",
             name="failing_tool",
             result=None,
             error="Tool execution failed",
@@ -399,35 +399,35 @@ class TestToolResultSerialization:
         assert "call_error" in json_str
 
 
-class TestToolCallAndResultIntegration:
-    """Test integration between ToolCall and ToolResult."""
+class TestCapabilityCallAndResultIntegration:
+    """Test integration between CapabilityCall and CapabilityResult."""
 
     def test_tool_call_and_result_correspondence(self) -> None:
-        """Test that ToolResult correctly corresponds to ToolCall."""
-        tool_call = ToolCall(
+        """Test that CapabilityResult correctly corresponds to CapabilityCall."""
+        tool_call = CapabilityCall(
             id="call_123",
             name="weather.get_current",
             arguments={"location": "San Francisco"},
         )
 
-        result = ToolResult(
-            tool_call_id=tool_call.id,
+        result = CapabilityResult(
+            capability_call_id=tool_call.id,
             name=tool_call.name,
             result={"temperature": 72, "condition": "sunny"},
         )
 
-        assert result.tool_call_id == tool_call.id
+        assert result.capability_call_id == tool_call.id
         assert result.name == tool_call.name
 
     def test_multiple_tool_calls_and_results(self) -> None:
         """Test handling multiple tool calls and results."""
         tool_calls = [
-            ToolCall(
+            CapabilityCall(
                 id="call_1",
                 name="weather.get_current",
                 arguments={"location": "SF"},
             ),
-            ToolCall(
+            CapabilityCall(
                 id="call_2",
                 name="weather.get_forecast",
                 arguments={"location": "SF", "days": 3},
@@ -435,13 +435,13 @@ class TestToolCallAndResultIntegration:
         ]
 
         results = [
-            ToolResult(
-                tool_call_id="call_1",
+            CapabilityResult(
+                capability_call_id="call_1",
                 name="weather.get_current",
                 result={"temperature": 72},
             ),
-            ToolResult(
-                tool_call_id="call_2",
+            CapabilityResult(
+                capability_call_id="call_2",
                 name="weather.get_forecast",
                 result={"forecast": ["sunny", "cloudy", "rainy"]},
             ),
@@ -449,5 +449,5 @@ class TestToolCallAndResultIntegration:
 
         assert len(tool_calls) == len(results)
         for tool_call, result in zip(tool_calls, results):
-            assert result.tool_call_id == tool_call.id
+            assert result.capability_call_id == tool_call.id
             assert result.name == tool_call.name

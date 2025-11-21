@@ -8,6 +8,30 @@ inclusion: always
 
 Nimbus is a modular suite of Python libraries for building GenAI applications. This document provides architectural guidelines and conventions that all Nimbus components must follow.
 
+## Development Tools
+
+**IMPORTANT**: Always use `uv` for running commands in this project:
+
+```bash
+# Run tests
+uv run pytest tests/
+
+# Run specific test file
+uv run pytest tests/unit/test_example.py
+
+# Run with coverage
+uv run pytest tests/ --cov=src/nimbus
+
+# Run linters
+uv run ruff check src/ tests/
+uv run mypy src/
+
+# Format code
+uv run black src/ tests/
+```
+
+Do NOT use plain `pytest`, `python`, or `pip` commands. Always prefix with `uv run`.
+
 ## Core Principles
 
 ### 1. Clean Architecture
@@ -27,6 +51,8 @@ Nimbus is a modular suite of Python libraries for building GenAI applications. T
 - **No Vendor Lock-in**: Support multiple providers (OpenAI, Anthropic, AWS Bedrock, Azure, local models)
 - **Unified Interface**: Same API regardless of underlying provider
 - **Transparent Switching**: Change providers without code changes
+- **Transformation Encapsulation**: All provider-specific transformations are contained within provider client classes
+- **Core Library Independence**: Core library code (routers, capabilities, models) remains completely provider-agnostic
 
 ## Naming Conventions
 
@@ -59,6 +85,14 @@ Examples:
 - `EventHandlerInterface` (not CallbackInterface)
 - `ContentReaderInterface` (not DocumentLoaderInterface)
 
+### Capability Terminology
+
+**IMPORTANT**: Always use "Capability" terminology, never "Tool":
+- ✅ `CapabilityCall`, `CapabilityResult`, `CapabilityCallHandler`
+- ❌ `ToolCall`, `ToolResult`, `ToolCallHandler` (removed in v1.0.0)
+
+The term "capability" better represents the concept of functions/tools that LLMs can invoke.
+
 ### Model Names
 
 Use Nimbus-specific terminology:
@@ -83,6 +117,55 @@ Use Nimbus equivalents:
 - ✅ `VectorEncoder`
 - ✅ `ResponseFormatter` (or integrate into message APIs)
 - ✅ `EventHandler`
+
+## Provider Architecture
+
+### Transformation Encapsulation
+
+All provider-specific transformations MUST be encapsulated within provider client classes:
+
+**Provider Client Responsibilities:**
+- Transform Nimbus requests to provider-specific format
+- Transform provider responses to Nimbus format
+- Handle provider-specific message formats
+- Handle provider-specific capability/tool formats
+- Extract and convert tool calls from provider responses
+- Map provider-specific parameters and options
+
+**Core Library Responsibilities:**
+- Define provider-agnostic interfaces and models
+- Implement routing logic using only Nimbus models
+- Implement capability handling using only Nimbus models
+- Provide thin delegation layers for transformations
+
+**Example Provider Client:**
+```python
+class OpenAIProvider(BaseModelProvider):
+    def _transform_request(self, request: CompletionRequest) -> dict[str, Any]:
+        """All OpenAI-specific transformation logic here."""
+        return {
+            "model": request.model,
+            "messages": self._transform_messages(request.messages),
+            "tools": self._transform_capabilities(request.capabilities) if request.capabilities else None,
+            # ... all other OpenAI-specific mappings
+        }
+    
+    def _transform_messages(self, messages: list[NimbusMessage]) -> list[dict[str, Any]]:
+        """OpenAI-specific message transformation."""
+        # All OpenAI message format logic here
+        pass
+    
+    def _transform_capabilities(self, capabilities: list[CapabilityInterface]) -> list[dict[str, Any]]:
+        """OpenAI-specific capability transformation."""
+        # All OpenAI tool format logic here
+        pass
+```
+
+**Adding a New Provider:**
+To add a new provider, you only need to:
+1. Create a new provider client class inheriting from `BaseModelProvider`
+2. Implement all transformation methods for that provider
+3. No changes to core library code required
 
 ## Code Standards
 
@@ -123,14 +206,35 @@ nimbus/
 │       ├── __init__.py          # Core exports
 │       ├── completion.py        # Always included
 │       ├── messages.py          # Always included
+│       ├── config.py            # Configuration loading
+│       ├── exceptions.py        # Exception hierarchy
 │       ├── interfaces/          # Always included
+│       ├── capabilities/        # Capability system
 │       ├── providers/           # Optional extras
+│       │   ├── llm/            # LLM providers
+│       │   └── embeddings/     # Embedding providers
+│       ├── routes/              # Router with load balancing
 │       ├── agents/              # Optional extras
 │       ├── memory/              # Optional extras
-│       └── ...
+│       ├── guard/               # Safety filters
+│       ├── observe/             # Observability
+│       ├── prompts/             # Prompt management
+│       └── utils/               # Utilities
 └── tests/
-    ├── unit/
-    └── integration/
+    ├── unit/                    # Fast, isolated tests
+    │   ├── capabilities/
+    │   ├── providers/
+    │   ├── routes/
+    │   └── utils/
+    ├── integration/             # Multi-component tests
+    │   ├── capabilities/
+    │   ├── providers/
+    │   └── routes/
+    ├── stress/                  # Performance tests
+    │   ├── test_concurrent_routing.py
+    │   ├── test_rate_limiting.py
+    │   └── test_capability_load.py
+    └── fixtures/                # Shared test fixtures
 ```
 
 ### Dependencies
@@ -222,9 +326,36 @@ Use consistent naming:
 - `NIMBUS_API_KEY`
 - `NIMBUS_ENABLE_TELEMETRY`
 
+### Environment Variable Substitution
+
+Both YAML and Python configurations support environment variable substitution using `${VAR_NAME}` syntax:
+
+**In YAML:**
+```yaml
+api_key: "${OPENAI_API_KEY}"
+api_base: "${AZURE_API_BASE}"
+```
+
+**In Python:**
+```python
+from nimbus.routes import ModelTarget
+
+target = ModelTarget(
+    model="gpt-4",
+    provider="openai",
+    api_key="${OPENAI_API_KEY}"  # Will be substituted automatically
+)
+```
+
+**Security Best Practices:**
+- Never hardcode API keys in configuration files
+- Use environment variables for all sensitive data
+- Consider using `.env` files for local development
+- Use secure secret management in production (AWS Secrets Manager, Azure Key Vault, etc.)
+
 ### Configuration Files
 
-Support both YAML and JSON:
+Support both YAML and JSON with environment variable substitution:
 ```yaml
 # nimbus.yaml
 log_level: INFO
@@ -233,6 +364,43 @@ models:
     provider: openai
     api_key: ${OPENAI_API_KEY}
     temperature: 0.7
+```
+
+### Router Configuration from YAML
+
+Routers can be configured via YAML files:
+```yaml
+# router_config.yaml
+routes:
+  - alias: "gpt-3.5-turbo"
+    strategy: "rate_limit_aware"
+    targets:
+      - model: "azure/chatgpt-v-2"
+        provider: "azure"
+        api_key: "${AZURE_API_KEY}"
+        api_base: "${AZURE_API_BASE}"
+        tpm: 100000
+        rpm: 1000
+      - model: "gpt-3.5-turbo"
+        provider: "openai"
+        api_key: "${OPENAI_API_KEY}"
+        tpm: 200000
+        rpm: 2000
+
+fallbacks:
+  - primary: "gpt-4"
+    fallbacks: ["gpt-3.5-turbo"]
+
+retry_policies:
+  - error_type: "RateLimitError"
+    max_retries: 3
+```
+
+Load router from YAML:
+```python
+from nimbus.routes import ModelRouter
+
+router = ModelRouter.from_yaml("router_config.yaml")
 ```
 
 ## Version Compatibility
@@ -331,13 +499,72 @@ pip install nimbus[all]
 from nimbus.completion import CompletionRequest, CompletionResponse
 from nimbus.messages import UserMessage, AssistantMessage
 
+# Capabilities (always available)
+from nimbus.capabilities import (
+    CapabilityInterface,
+    CapabilityCall,
+    CapabilityResult,
+    CapabilityCallHandler,
+    capability,
+    CapabilityRegistry
+)
+
+# Router (always available)
+from nimbus.routes import ModelRouter, ModelTarget, RouteConfig
+from nimbus.interfaces.router import RoutingStrategy
+
 # Providers (only if installed with extras)
-from nimbus.providers.bedrock import BedrockModel
-from nimbus.providers.openai import OpenAIModel
+from nimbus.providers.llm.bedrock import BedrockModel
+from nimbus.providers.llm.openai import OpenAIModel
+from nimbus.providers.llm.anthropic import AnthropicModel
 
 # Other components (only if installed with extras)
 from nimbus.agents import AgentRuntime
 from nimbus.memory import EpisodicMemory
+```
+
+## Configuration Examples
+
+### Programmatic Configuration
+
+```python
+from nimbus.routes import ModelRouter, ModelTarget, RouteConfig
+from nimbus.interfaces.router import RoutingStrategy
+
+router = ModelRouter(routes=[
+    RouteConfig(
+        alias="gpt-3.5-turbo",
+        targets=[
+            ModelTarget(
+                model="azure/chatgpt-v-2",
+                provider="azure",
+                api_key="${AZURE_API_KEY}",  # Env var substitution
+                tpm=100000,
+                rpm=1000
+            ),
+            ModelTarget(
+                model="gpt-3.5-turbo",
+                provider="openai",
+                api_key="${OPENAI_API_KEY}",  # Env var substitution
+                tpm=200000,
+                rpm=2000
+            )
+        ],
+        strategy=RoutingStrategy.RATE_LIMIT_AWARE
+    )
+])
+```
+
+### YAML Configuration
+
+```python
+from nimbus.routes import ModelRouter
+
+# Load from YAML file
+router = ModelRouter.from_yaml("router_config.yaml")
+
+# Use the router
+response = router.route_request(request)
 ```
 
 ## References

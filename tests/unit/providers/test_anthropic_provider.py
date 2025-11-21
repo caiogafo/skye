@@ -648,7 +648,7 @@ class TestAnthropicToolCalling:
         assert result["tool_choice"] == {"type": "any"}
     
     def test_transform_response_with_tool_calls_creates_tool_call_objects(self) -> None:
-        """Test that tool calls in response are converted to ToolCall objects."""
+        """Test that tool calls in response are converted to CapabilityCall objects."""
         provider = AnthropicProvider(model="claude-3-opus-20240229", api_key="sk-ant-test")
         
         # Mock Anthropic response with tool use
@@ -677,7 +677,7 @@ class TestAnthropicToolCalling:
         assert result.tool_calls is not None
         assert len(result.tool_calls) == 1
         
-        # Verify ToolCall object structure
+        # Verify CapabilityCall object structure
         tool_call = result.tool_calls[0]
         assert tool_call.id == "toolu_abc123"
         assert tool_call.name == "get_weather"

@@ -52,7 +52,7 @@ class ModelTarget(BaseModel):
         >>> target = ModelTarget(
         ...     model="azure/chatgpt-v-2",
         ...     provider="azure",
-        ...     api_key="...",
+        ...     api_key="${AZURE_API_KEY}",  # Env var substitution
         ...     api_base="https://my-resource.openai.azure.com",
         ...     api_version="2024-02-15-preview",
         ...     region="us-east-1",
@@ -77,6 +77,34 @@ class ModelTarget(BaseModel):
     metadata: dict[str, Any] = Field(default_factory=dict, description="Additional metadata")
 
     model_config = ConfigDict(extra="allow")
+
+    def model_post_init(self, __context: Any) -> None:
+        """Post-initialization to substitute environment variables in string fields.
+
+        This method is called automatically after model initialization and
+        substitutes ${VAR_NAME} patterns with environment variable values
+        in all string fields.
+        """
+        self._substitute_env_vars()
+
+    def _substitute_env_vars(self) -> None:
+        """Substitute ${VAR_NAME} patterns with environment variables in string fields.
+
+        This method processes all string fields in the model and replaces
+        environment variable references with their actual values. It uses
+        the substitute_env_vars function from nimbus.config.
+
+        Raises:
+            ConfigurationError: If a referenced environment variable is not found.
+        """
+        from nimbus.config import substitute_env_vars
+
+        # Substitute in all string fields (access model_fields from class, not instance)
+        for field_name in self.__class__.model_fields:
+            value = getattr(self, field_name)
+            if isinstance(value, str):
+                substituted = substitute_env_vars(value)
+                setattr(self, field_name, substituted)
 
 
 class RouteConfig(BaseModel):
@@ -498,6 +526,195 @@ class ModelRouter(ModelRouterInterface):
         # Initialize allowed fails policies if provided
         if allowed_fails_policies:
             self.set_allowed_fails_policy(allowed_fails_policies)
+
+    @classmethod
+    def from_yaml(cls, yaml_path: str | Any, **kwargs) -> "ModelRouter":
+        """Create a ModelRouter from a YAML configuration file.
+
+        This class method loads router configuration from a YAML file and
+        creates a ModelRouter instance with the specified configuration.
+        Environment variables in the YAML file (using ${VAR_NAME} syntax)
+        are automatically substituted.
+
+        Args:
+            yaml_path: Path to the YAML configuration file.
+            **kwargs: Additional keyword arguments to override config values.
+
+        Returns:
+            ModelRouter instance configured from the YAML file.
+
+        Raises:
+            ConfigurationError: If the file doesn't exist, can't be parsed,
+                or contains invalid configuration.
+
+        Example:
+            >>> # Create router from YAML file
+            >>> router = ModelRouter.from_yaml("router_config.yaml")
+            >>>
+            >>> # Override specific settings
+            >>> router = ModelRouter.from_yaml(
+            ...     "router_config.yaml",
+            ...     cooldown_seconds=120.0
+            ... )
+        """
+        from pathlib import Path
+
+        from nimbus.config import load_router_config
+
+        # Load configuration from YAML
+        config_dict = load_router_config(yaml_path)
+
+        # Merge with kwargs (kwargs take precedence)
+        config_dict.update(kwargs)
+
+        # Create router from config dict
+        return cls.from_config_dict(config_dict)
+
+    @classmethod
+    def from_config_dict(cls, config: dict[str, Any], **kwargs) -> "ModelRouter":
+        """Create a ModelRouter from a configuration dictionary.
+
+        This class method creates a ModelRouter instance from a configuration
+        dictionary. The dictionary should follow the RouterConfig schema.
+
+        Args:
+            config: Configuration dictionary with router settings.
+            **kwargs: Additional keyword arguments to override config values.
+
+        Returns:
+            ModelRouter instance configured from the dictionary.
+
+        Raises:
+            ConfigurationError: If the configuration is invalid.
+
+        Example:
+            >>> config = {
+            ...     "routes": [
+            ...         {
+            ...             "alias": "gpt-3.5-turbo",
+            ...             "targets": [
+            ...                 {
+            ...                     "model": "gpt-3.5-turbo",
+            ...                     "provider": "openai",
+            ...                     "api_key": "sk-...",
+            ...                     "tpm": 200000,
+            ...                     "rpm": 2000
+            ...                 }
+            ...             ],
+            ...             "strategy": "rate_limit_aware"
+            ...         }
+            ...     ],
+            ...     "strategy": "round_robin",
+            ...     "cooldown_seconds": 60.0
+            ... }
+            >>> router = ModelRouter.from_config_dict(config)
+        """
+        # Extract router-level settings
+        strategy_str = kwargs.get("strategy", config.get("strategy", "round_robin"))
+        cooldown_seconds = kwargs.get(
+            "cooldown_seconds", config.get("cooldown_seconds", 60.0)
+        )
+        enable_pre_call_checks = kwargs.get(
+            "enable_pre_call_checks", config.get("enable_pre_call_checks", True)
+        )
+
+        # Convert strategy string to enum
+        try:
+            strategy = RoutingStrategy(strategy_str)
+        except ValueError:
+            raise ConfigurationError(
+                f"Invalid routing strategy: {strategy_str}",
+                details={
+                    "strategy": strategy_str,
+                    "valid_strategies": [s.value for s in RoutingStrategy],
+                },
+            )
+
+        # Parse routes
+        routes = []
+        for route_dict in config.get("routes", []):
+            try:
+                # Parse targets
+                targets = [ModelTarget(**target) for target in route_dict.get("targets", [])]
+
+                # Parse strategy for this route
+                route_strategy_str = route_dict.get("strategy", strategy_str)
+                try:
+                    route_strategy = RoutingStrategy(route_strategy_str)
+                except ValueError:
+                    raise ConfigurationError(
+                        f"Invalid routing strategy for route '{route_dict.get('alias')}': {route_strategy_str}",
+                        details={
+                            "alias": route_dict.get("alias"),
+                            "strategy": route_strategy_str,
+                            "valid_strategies": [s.value for s in RoutingStrategy],
+                        },
+                    )
+
+                route = RouteConfig(
+                    alias=route_dict["alias"],
+                    targets=targets,
+                    strategy=route_strategy,
+                    fallback_on_error=route_dict.get("fallback_on_error", True),
+                )
+                routes.append(route)
+            except KeyError as e:
+                raise ConfigurationError(
+                    f"Missing required field in route configuration: {e}",
+                    details={"route": route_dict, "missing_field": str(e)},
+                ) from e
+            except Exception as e:
+                raise ConfigurationError(
+                    f"Failed to parse route configuration: {e}",
+                    details={"route": route_dict, "error": str(e)},
+                ) from e
+
+        # Parse fallbacks
+        fallbacks = []
+        for fallback_dict in config.get("fallbacks", []):
+            try:
+                fallback = FallbackConfig(**fallback_dict)
+                fallbacks.append(fallback)
+            except Exception as e:
+                raise ConfigurationError(
+                    f"Failed to parse fallback configuration: {e}",
+                    details={"fallback": fallback_dict, "error": str(e)},
+                ) from e
+
+        # Parse retry policies
+        retry_policies = []
+        for policy_dict in config.get("retry_policies", []):
+            try:
+                policy = RetryPolicyConfig(**policy_dict)
+                retry_policies.append(policy)
+            except Exception as e:
+                raise ConfigurationError(
+                    f"Failed to parse retry policy configuration: {e}",
+                    details={"policy": policy_dict, "error": str(e)},
+                ) from e
+
+        # Parse allowed fails policies
+        allowed_fails_policies = []
+        for policy_dict in config.get("allowed_fails_policies", []):
+            try:
+                policy = AllowedFailsPolicyConfig(**policy_dict)
+                allowed_fails_policies.append(policy)
+            except Exception as e:
+                raise ConfigurationError(
+                    f"Failed to parse allowed fails policy configuration: {e}",
+                    details={"policy": policy_dict, "error": str(e)},
+                ) from e
+
+        # Create router instance
+        return cls(
+            routes=routes if routes else None,
+            strategy=strategy,
+            cooldown_seconds=cooldown_seconds,
+            enable_pre_call_checks=enable_pre_call_checks,
+            fallbacks=fallbacks if fallbacks else None,
+            retry_policies=retry_policies if retry_policies else None,
+            allowed_fails_policies=allowed_fails_policies if allowed_fails_policies else None,
+        )
 
     def _register_route(self, route: RouteConfig) -> None:
         """Register a route configuration with alias and targets."""

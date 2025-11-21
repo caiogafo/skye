@@ -78,6 +78,9 @@ python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
 asyncio_mode = "auto"
+markers = [
+    "stress: marks tests as stress tests (deselect with '-m \"not stress\"')",
+]
 
 [tool.coverage.run]
 source = ["src"]

@@ -46,6 +46,18 @@ class MockProvider(BaseModelProvider):
     def _transform_stream_chunk(self, chunk):
         return MagicMock()
 
+    def _transform_messages(self, messages):
+        """Transform messages to mock format."""
+        return [{"role": m.role, "content": m.content} for m in messages]
+
+    def _transform_capabilities(self, capabilities):
+        """Transform capabilities to mock format."""
+        return [{"name": c.get_schema().name} for c in capabilities]
+
+    def _extract_capability_calls(self, response):
+        """Extract capability calls from mock response."""
+        return None
+
     def _call_provider(self, request):
         self.call_count += 1
         if self.fail_count > 0:
@@ -152,6 +164,18 @@ class TestRetryDecorator:
             def _transform_stream_chunk(self, chunk):
                 return MagicMock()
 
+            def _transform_messages(self, messages):
+                """Transform messages to mock format."""
+                return [{"role": m.role, "content": m.content} for m in messages]
+
+            def _transform_capabilities(self, capabilities):
+                """Transform capabilities to mock format."""
+                return [{"name": c.get_schema().name} for c in capabilities]
+
+            def _extract_capability_calls(self, response):
+                """Extract capability calls from mock response."""
+                return None
+
             @with_retry(max_retries=2, min_wait=0.1, max_wait=0.2, multiplier=1)
             def _call_provider(self, request):
                 self.call_count += 1
@@ -198,6 +222,18 @@ class TestRetryDecorator:
 
             def _transform_stream_chunk(self, chunk):
                 return MagicMock()
+
+            def _transform_messages(self, messages):
+                """Transform messages to mock format."""
+                return [{"role": m.role, "content": m.content} for m in messages]
+
+            def _transform_capabilities(self, capabilities):
+                """Transform capabilities to mock format."""
+                return [{"name": c.get_schema().name} for c in capabilities]
+
+            def _extract_capability_calls(self, response):
+                """Extract capability calls from mock response."""
+                return None
 
             def _call_provider(self, request):
                 raise ProviderError("original error", provider="mock")
@@ -258,6 +294,18 @@ class TestRetryWithStreaming:
 
             def _transform_stream_chunk(self, chunk):
                 return MagicMock()
+
+            def _transform_messages(self, messages):
+                """Transform messages to mock format."""
+                return [{"role": m.role, "content": m.content} for m in messages]
+
+            def _transform_capabilities(self, capabilities):
+                """Transform capabilities to mock format."""
+                return [{"name": c.get_schema().name} for c in capabilities]
+
+            def _extract_capability_calls(self, response):
+                """Extract capability calls from mock response."""
+                return None
 
             def _call_provider(self, request):
                 return MagicMock()

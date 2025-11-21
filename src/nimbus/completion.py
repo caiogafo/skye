@@ -26,7 +26,7 @@ from nimbus.messages import NimbusMessage
 
 if TYPE_CHECKING:
     from nimbus.capabilities.registry import CapabilityRegistry
-    from nimbus.capabilities.tool_models import ToolResult
+    from nimbus.capabilities.capability_models import CapabilityResult
 
 
 class TokenUsage(BaseModel):
@@ -80,7 +80,7 @@ class CompletionRequest(BaseModel):
         stream: Whether to stream the response.
         capabilities: List of capabilities/tools available to the model
             (requires nimbus[capabilities]).
-        tool_choice: How the model should choose tools ('auto', 'required', or specific tool name).
+        capability_choice: How the model should choose capabilities ('auto', 'required', or specific capability name).
         mcp_servers: List of MCP server configurations to load tools from
             (requires nimbus[mcp]). Each config should contain server connection details.
         response_format: Format specification for structured outputs.
@@ -124,7 +124,7 @@ class CompletionRequest(BaseModel):
         ...     messages=[UserMessage(content="What's the weather in NYC?")],
         ...     model="gpt-4",
         ...     capabilities=[capability],
-        ...     tool_choice="auto"
+        ...     capability_choice="auto"
         ... )
         >>> len(request.capabilities)
         1
@@ -159,23 +159,23 @@ class CompletionRequest(BaseModel):
     stream: bool = False
     # List of CapabilityInterface (requires nimbus[capabilities])
     capabilities: list[Any] | None = None
-    tool_choice: str | None = None  # "auto", "required", or specific tool name
+    capability_choice: str | None = None  # "auto", "required", or specific capability name
     # MCP server configurations (requires nimbus[mcp])
     mcp_servers: list[dict[str, Any]] | None = None
     response_format: dict[str, Any] | None = None
     response_schema: type[BaseModel] | None = None
     metadata: dict[str, Any] = Field(default_factory=dict)
 
-    @field_validator("tool_choice")
+    @field_validator("capability_choice")
     @classmethod
-    def validate_tool_choice(cls, v: str | None) -> str | None:
-        """Validate tool_choice is 'auto', 'required', or a tool name."""
+    def validate_capability_choice(cls, v: str | None) -> str | None:
+        """Validate capability_choice is 'auto', 'required', or a capability name."""
         if v is not None and v not in ["auto", "required"]:
-            # If not a standard value, assume it's a specific tool name
-            # Tool names should be non-empty strings
+            # If not a standard value, assume it's a specific capability name
+            # Capability names should be non-empty strings
             if not isinstance(v, str) or not v.strip():
                 raise ValueError(
-                    "tool_choice must be 'auto', 'required', or a non-empty tool name"
+                    "capability_choice must be 'auto', 'required', or a non-empty capability name"
                 )
         return v
 
@@ -222,7 +222,7 @@ class CompletionResponse(BaseModel):
         'The answer is 4.'
 
     Example (With Tool Calls):
-        >>> from nimbus.capabilities.tool_models import ToolCall
+        >>> from nimbus.capabilities.capability_models import CapabilityCall
         >>> response = CompletionResponse(
         ...     model="gpt-4",
         ...     provider="openai",
@@ -231,7 +231,7 @@ class CompletionResponse(BaseModel):
         ...     finish_reason="tool_calls",
         ...     usage=TokenUsage(prompt_tokens=50, completion_tokens=20, total_tokens=70),
         ...     tool_calls=[
-        ...         ToolCall(
+        ...         CapabilityCall(
         ...             id="call_123",
         ...             name="weather.get_current",
         ...             arguments={"location": "San Francisco"}
@@ -254,7 +254,7 @@ class CompletionResponse(BaseModel):
     role: str = "assistant"
     finish_reason: str
     usage: TokenUsage
-    tool_calls: list[Any] | None = None  # List of ToolCall (requires nimbus[capabilities])
+    tool_calls: list[Any] | None = None  # List of CapabilityCall (requires nimbus[capabilities])
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     metadata: dict[str, Any] = Field(default_factory=dict)
 
@@ -294,7 +294,7 @@ class CompletionResponse(BaseModel):
             True if the response contains one or more tool calls, False otherwise.
 
         Example:
-            >>> from nimbus.capabilities.tool_models import ToolCall
+            >>> from nimbus.capabilities.capability_models import CapabilityCall
             >>> response = CompletionResponse(
             ...     model="gpt-4",
             ...     provider="openai",
@@ -302,7 +302,7 @@ class CompletionResponse(BaseModel):
             ...     finish_reason="tool_calls",
             ...     usage=TokenUsage(prompt_tokens=10, completion_tokens=5, total_tokens=15),
             ...     tool_calls=[
-            ...         ToolCall(id="call_1", name="get_weather", arguments={"city": "NYC"})
+            ...         CapabilityCall(id="call_1", name="get_weather", arguments={"city": "NYC"})
             ...     ]
             ... )
             >>> response.has_tool_calls()
@@ -323,18 +323,18 @@ class CompletionResponse(BaseModel):
     async def execute_tool_calls(
         self,
         registry: "CapabilityRegistry",
-    ) -> list["ToolResult"]:
+    ) -> list["CapabilityResult"]:
         """Execute all tool calls using the provided capability registry.
 
         Executes all tool calls in the response using the provided registry
-        and returns a list of ToolResult objects. This method is async to
+        and returns a list of CapabilityResult objects. This method is async to
         support asynchronous capability execution.
 
         Args:
             registry: CapabilityRegistry instance to use for executing capabilities
 
         Returns:
-            List of ToolResult objects containing execution results
+            List of CapabilityResult objects containing execution results
 
         Raises:
             ImportError: If nimbus[capabilities] is not installed
@@ -342,7 +342,7 @@ class CompletionResponse(BaseModel):
 
         Example:
             >>> from nimbus.capabilities.registry import CapabilityRegistry
-            >>> from nimbus.capabilities.tool_models import ToolCall
+            >>> from nimbus.capabilities.capability_models import CapabilityCall
             >>>
             >>> # Create response with tool calls
             >>> response = CompletionResponse(
@@ -352,7 +352,7 @@ class CompletionResponse(BaseModel):
             ...     finish_reason="tool_calls",
             ...     usage=TokenUsage(prompt_tokens=50, completion_tokens=20, total_tokens=70),
             ...     tool_calls=[
-            ...         ToolCall(
+            ...         CapabilityCall(
             ...             id="call_123",
             ...             name="weather.get_current",
             ...             arguments={"location": "San Francisco"}
@@ -368,7 +368,7 @@ class CompletionResponse(BaseModel):
         """
         # Import here to avoid circular dependency and allow optional capabilities
         try:
-            from nimbus.capabilities.tool_models import ToolResult
+            from nimbus.capabilities.capability_models import CapabilityResult
         except ImportError as e:
             raise ImportError(
                 "Tool call execution requires nimbus[capabilities]. "
@@ -378,7 +378,7 @@ class CompletionResponse(BaseModel):
         if not self.has_tool_calls():
             raise ValueError("Response has no tool calls to execute")
 
-        results: list[ToolResult] = []
+        results: list[CapabilityResult] = []
 
         for tool_call in self.tool_calls:  # type: ignore
             try:
@@ -392,8 +392,8 @@ class CompletionResponse(BaseModel):
 
                 # Create successful result
                 results.append(
-                    ToolResult(
-                        tool_call_id=tool_call.id,
+                    CapabilityResult(
+                        capability_call_id=tool_call.id,
                         name=tool_call.name,
                         result=result,
                         error=None,
@@ -403,8 +403,8 @@ class CompletionResponse(BaseModel):
             except Exception as e:
                 # Create error result
                 results.append(
-                    ToolResult(
-                        tool_call_id=tool_call.id,
+                    CapabilityResult(
+                        capability_call_id=tool_call.id,
                         name=tool_call.name,
                         result=None,
                         error=str(e),

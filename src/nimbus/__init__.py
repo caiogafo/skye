@@ -56,7 +56,6 @@ from nimbus.interfaces import (
     EventHandlerInterface,
     EventType,
     MemoryInterface,
-    MessageTransformerInterface,
     ModelInterface,
     ModelRouterInterface,
     MultimodalHandlerInterface,
@@ -143,7 +142,6 @@ __all__ = [
     "RoutingStrategy",
     # Interfaces - Prompt and Message
     "PromptBuilderInterface",
-    "MessageTransformerInterface",
     # Interfaces - Capability
     "CapabilityInterface",
     "CapabilitySchema",

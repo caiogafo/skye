@@ -2,6 +2,15 @@
 
 This module provides utilities for processing multimodal inputs (images, audio, video)
 and converting them to provider-specific formats.
+
+**ARCHITECTURAL DEBT:**
+This module contains provider-specific transformation methods (to_openai_format,
+to_anthropic_format, to_bedrock_format) that violate the provider encapsulation
+principle. In a future refactor, these methods should be moved to the respective
+provider classes as part of their _transform_messages() implementation.
+
+For now, this is acceptable as multimodal handling is a specialized concern, but
+the long-term goal is to have all provider-specific logic within provider classes.
 """
 
 import base64

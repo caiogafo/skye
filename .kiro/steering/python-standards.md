@@ -14,9 +14,9 @@ inclusion: always
 
 ### Formatting
 
-Use **Black** for code formatting:
+Use **Black** for code formatting with **uv**:
 ```bash
-black src/ tests/
+uv run black src/ tests/
 ```
 
 Configuration in pyproject.toml:
@@ -28,9 +28,9 @@ target-version = ['py310']
 
 ### Linting
 
-Use **Ruff** for fast linting:
+Use **Ruff** for fast linting with **uv**:
 ```bash
-ruff check src/ tests/
+uv run ruff check src/ tests/
 ```
 
 Configuration in pyproject.toml:
@@ -43,9 +43,9 @@ select = ["E", "F", "I", "N", "W", "UP"]
 
 ### Type Checking
 
-Use **mypy** for static type checking:
+Use **mypy** for static type checking with **uv**:
 ```bash
-mypy src/
+uv run mypy src/
 ```
 
 Configuration in pyproject.toml:
@@ -269,7 +269,14 @@ with ResourceManager() as resource:
 
 ## Testing
 
-### Use pytest
+### Use pytest with uv
+
+Run tests with **uv**:
+```bash
+uv run pytest tests/
+uv run pytest tests/ -v
+uv run pytest tests/ --cov=src/nimbus
+```
 
 ```python
 import pytest

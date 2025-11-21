@@ -736,7 +736,7 @@ class TestAzureOpenAIToolCalling:
         assert result["tool_choice"] == "required"
     
     def test_transform_response_with_tool_calls_creates_tool_call_objects(self) -> None:
-        """Test that tool calls in response are converted to ToolCall objects."""
+        """Test that tool calls in response are converted to CapabilityCall objects."""
         provider = AzureOpenAIProvider(
             model="gpt-4",
             azure_endpoint="https://myresource.openai.azure.com/",
@@ -778,7 +778,7 @@ class TestAzureOpenAIToolCalling:
         assert result.tool_calls is not None
         assert len(result.tool_calls) == 1
         
-        # Verify ToolCall object structure
+        # Verify CapabilityCall object structure
         tool_call = result.tool_calls[0]
         assert tool_call.id == "call_abc123"
         assert tool_call.name == "get_weather"

@@ -11,7 +11,6 @@ from nimbus.interfaces.cost_calculator import CostCalculatorInterface
 from nimbus.interfaces.error_handler import ErrorHandlerInterface
 from nimbus.interfaces.event_handler import EventHandlerInterface
 from nimbus.interfaces.memory import MemoryInterface
-from nimbus.interfaces.message_transformer import MessageTransformerInterface
 from nimbus.interfaces.model import ModelInterface
 from nimbus.interfaces.multimodal_handler import MultimodalHandlerInterface
 from nimbus.interfaces.observer import EventType, ObserverInterface
@@ -33,7 +32,6 @@ __all__ = [
     "RoutingStrategy",
     # Prompt and message interfaces
     "PromptBuilderInterface",
-    "MessageTransformerInterface",
     # Capability and tool interfaces
     "CapabilityInterface",
     "CapabilitySchema",

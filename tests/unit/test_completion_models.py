@@ -77,7 +77,7 @@ def test_stream_chunk():
 
 def test_completion_response_tool_calls():
     """Test CompletionResponse with tool calls."""
-    from nimbus.capabilities.tool_models import ToolCall
+    from nimbus.capabilities.capability_models import CapabilityCall
 
     usage = TokenUsage(prompt_tokens=50, completion_tokens=20, total_tokens=70)
 
@@ -93,7 +93,7 @@ def test_completion_response_tool_calls():
     assert response_no_tools.tool_calls is None
 
     # Response with tool calls
-    tool_call = ToolCall(
+    capability_call = CapabilityCall(
         id="call_123",
         name="weather.get_current",
         arguments={"location": "San Francisco"},
@@ -104,7 +104,7 @@ def test_completion_response_tool_calls():
         content="",
         finish_reason="tool_calls",
         usage=usage,
-        tool_calls=[tool_call],
+        tool_calls=[capability_call],
     )
     assert response_with_tools.has_tool_calls()
     assert len(response_with_tools.tool_calls) == 1
@@ -127,7 +127,7 @@ async def test_completion_response_execute_tool_calls():
     """Test executing tool calls from CompletionResponse."""
     from nimbus.capabilities.local_function import LocalFunctionCapability
     from nimbus.capabilities.registry import CapabilityRegistry
-    from nimbus.capabilities.tool_models import ToolCall
+    from nimbus.capabilities.capability_models import CapabilityCall
 
     # Create a test capability
     def get_weather(location: str) -> dict:
@@ -146,7 +146,7 @@ async def test_completion_response_execute_tool_calls():
 
     # Create response with tool calls
     usage = TokenUsage(prompt_tokens=50, completion_tokens=20, total_tokens=70)
-    tool_call = ToolCall(
+    capability_call = CapabilityCall(
         id="call_123",
         name="weather.get_current",
         arguments={"location": "San Francisco"},
@@ -157,7 +157,7 @@ async def test_completion_response_execute_tool_calls():
         content="",
         finish_reason="tool_calls",
         usage=usage,
-        tool_calls=[tool_call],
+        tool_calls=[capability_call],
     )
 
     # Execute tool calls
@@ -165,7 +165,7 @@ async def test_completion_response_execute_tool_calls():
 
     # Verify results
     assert len(results) == 1
-    assert results[0].tool_call_id == "call_123"
+    assert results[0].capability_call_id == "call_123"
     assert results[0].name == "weather.get_current"
     assert results[0].error is None
     assert results[0].result == {
@@ -180,7 +180,7 @@ async def test_completion_response_execute_tool_calls_error():
     """Test executing tool calls with errors."""
     from nimbus.capabilities.local_function import LocalFunctionCapability
     from nimbus.capabilities.registry import CapabilityRegistry
-    from nimbus.capabilities.tool_models import ToolCall
+    from nimbus.capabilities.capability_models import CapabilityCall
 
     # Create a test capability that raises an error
     def failing_function(value: str) -> str:
@@ -199,7 +199,7 @@ async def test_completion_response_execute_tool_calls_error():
 
     # Create response with tool calls
     usage = TokenUsage(prompt_tokens=50, completion_tokens=20, total_tokens=70)
-    tool_call = ToolCall(
+    capability_call = CapabilityCall(
         id="call_456",
         name="failing_tool",
         arguments={"value": "test"},
@@ -210,7 +210,7 @@ async def test_completion_response_execute_tool_calls_error():
         content="",
         finish_reason="tool_calls",
         usage=usage,
-        tool_calls=[tool_call],
+        tool_calls=[capability_call],
     )
 
     # Execute tool calls
@@ -218,7 +218,7 @@ async def test_completion_response_execute_tool_calls_error():
 
     # Verify error result
     assert len(results) == 1
-    assert results[0].tool_call_id == "call_456"
+    assert results[0].capability_call_id == "call_456"
     assert results[0].name == "failing_tool"
     assert results[0].result is None
     assert results[0].error is not None
@@ -251,7 +251,7 @@ async def test_completion_response_execute_multiple_tool_calls():
     """Test executing multiple tool calls."""
     from nimbus.capabilities.local_function import LocalFunctionCapability
     from nimbus.capabilities.registry import CapabilityRegistry
-    from nimbus.capabilities.tool_models import ToolCall
+    from nimbus.capabilities.capability_models import CapabilityCall
 
     # Create test capabilities
     def get_weather(location: str) -> dict:
@@ -280,13 +280,13 @@ async def test_completion_response_execute_multiple_tool_calls():
 
     # Create response with multiple tool calls
     usage = TokenUsage(prompt_tokens=50, completion_tokens=30, total_tokens=80)
-    tool_calls = [
-        ToolCall(
+    capability_calls = [
+        CapabilityCall(
             id="call_1",
             name="weather.get_current",
             arguments={"location": "NYC"},
         ),
-        ToolCall(
+        CapabilityCall(
             id="call_2",
             name="time.get_current",
             arguments={"timezone": "EST"},
@@ -298,7 +298,7 @@ async def test_completion_response_execute_multiple_tool_calls():
         content="",
         finish_reason="tool_calls",
         usage=usage,
-        tool_calls=tool_calls,
+        tool_calls=capability_calls,
     )
 
     # Execute tool calls
@@ -306,10 +306,10 @@ async def test_completion_response_execute_multiple_tool_calls():
 
     # Verify results
     assert len(results) == 2
-    assert results[0].tool_call_id == "call_1"
+    assert results[0].capability_call_id == "call_1"
     assert results[0].name == "weather.get_current"
     assert results[0].result["location"] == "NYC"
-    assert results[1].tool_call_id == "call_2"
+    assert results[1].capability_call_id == "call_2"
     assert results[1].name == "time.get_current"
     assert results[1].result["timezone"] == "EST"
 

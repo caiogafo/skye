@@ -33,12 +33,10 @@ from nimbus.completion import CompletionRequest, CompletionResponse, StreamChunk
 from nimbus.messages import AssistantMessage
 from nimbus.providers.base import BaseModelProvider
 from nimbus.providers.lazy_import import LazyImporter
-from nimbus.providers.transformers import MessageTransformer
 
-# Import ToolTransformer for capability conversion
+# Import CapabilityCall for tool call extraction
 try:
-    from nimbus.capabilities.tool_transformer import ToolTransformer
-    from nimbus.capabilities.tool_models import ToolCall
+    from nimbus.capabilities.capability_models import CapabilityCall
     CAPABILITIES_AVAILABLE = True
 except ImportError:
     CAPABILITIES_AVAILABLE = False
@@ -85,6 +83,130 @@ class AnthropicProvider(BaseModelProvider):
         anthropic = LazyImporter.import_module("anthropic", install_extra="anthropic")
         return anthropic.Anthropic(api_key=self.api_key)
     
+    def _transform_messages(self, messages: list[Any]) -> tuple[str | None, list[dict[str, Any]]]:
+        """Transform Nimbus messages to Anthropic format.
+        
+        Anthropic requires the system message to be passed separately from
+        the conversation messages. Tool results are formatted as user messages
+        with special content blocks.
+        
+        Args:
+            messages: List of Nimbus message objects
+            
+        Returns:
+            Tuple of (system_message, anthropic_messages) where system_message
+            is a string or None, and anthropic_messages is a list of dicts
+        """
+        from nimbus.messages import AssistantMessage, CapabilityMessage, SystemMessage
+        
+        system = None
+        anthropic_messages = []
+
+        for msg in messages:
+            if isinstance(msg, SystemMessage):
+                system = msg.content
+            elif isinstance(msg, CapabilityMessage):
+                anthropic_messages.append(
+                    {
+                        "role": "user",
+                        "content": [
+                            {
+                                "type": "tool_result",
+                                "tool_use_id": msg.capability_id,
+                                "content": msg.content,
+                            }
+                        ],
+                    }
+                )
+            else:
+                content: str | list[dict[str, Any]] = msg.content
+                if isinstance(msg, AssistantMessage) and msg.capability_calls:
+                    content = [
+                        {
+                            "type": "tool_use",
+                            "id": call["id"],
+                            "name": call["function"]["name"],
+                            "input": call["function"]["arguments"],
+                        }
+                        for call in msg.capability_calls
+                    ]
+                anthropic_messages.append({"role": msg.role, "content": content})
+
+        return system, anthropic_messages
+    
+    def _transform_capabilities(self, capabilities: list[Any]) -> list[dict[str, Any]]:
+        """Transform Nimbus capabilities to Anthropic tool use format.
+        
+        Anthropic uses a flat structure with "name", "description", and
+        "input_schema" fields.
+        
+        Args:
+            capabilities: List of CapabilityInterface objects or dicts
+            
+        Returns:
+            List of tool definitions in Anthropic format
+        """
+        tools = []
+        for capability in capabilities:
+            # Handle both CapabilityInterface objects and dict format
+            if isinstance(capability, dict):
+                # Check if already in Anthropic format
+                if "input_schema" in capability:
+                    tools.append(capability)
+                else:
+                    # Convert from OpenAI format to Anthropic format
+                    func = capability.get("function", {})
+                    tool = {
+                        "name": func.get("name", ""),
+                        "description": func.get("description", ""),
+                        "input_schema": func.get("parameters", {
+                            "type": "object",
+                            "properties": {},
+                        }),
+                    }
+                    tools.append(tool)
+            else:
+                # CapabilityInterface object, convert to Anthropic format
+                schema = capability.get_schema()
+                tool = {
+                    "name": schema.name,
+                    "description": schema.description,
+                    "input_schema": schema.parameters or {
+                        "type": "object",
+                        "properties": {},
+                    },
+                }
+                tools.append(tool)
+        return tools
+    
+    def _extract_capability_calls(self, response: Any) -> list[Any] | None:
+        """Extract capability calls from Anthropic response.
+        
+        Parses tool use blocks from the Anthropic response format and converts them
+        to Nimbus CapabilityCall objects.
+        
+        Args:
+            response: Anthropic response object
+            
+        Returns:
+            List of CapabilityCall objects, or None if no capability calls
+        """
+        if not CAPABILITIES_AVAILABLE:
+            return None
+        
+        tool_calls = []
+        for content_block in response.content:
+            if content_block.type == "tool_use":
+                tool_calls.append(
+                    CapabilityCall(
+                        id=content_block.id,
+                        name=content_block.name,
+                        arguments=content_block.input
+                    )
+                )
+        
+        return tool_calls if tool_calls else None
+    
     def _transform_request(self, request: CompletionRequest) -> dict[str, Any]:
         """Transform CompletionRequest to Anthropic format.
         
@@ -101,8 +223,8 @@ class AnthropicProvider(BaseModelProvider):
         if not request.messages:
             raise ValueError("messages must be provided for Anthropic provider")
         
-        # Transform messages and extract system message
-        system, anthropic_messages = MessageTransformer.to_anthropic_format(request.messages)
+        # Transform messages and extract system message using internal method
+        system, anthropic_messages = self._transform_messages(request.messages)
         
         anthropic_request: dict[str, Any] = {
             "model": request.model,
@@ -143,27 +265,27 @@ class AnthropicProvider(BaseModelProvider):
                         })
                 anthropic_request["tools"] = anthropic_tools
             elif CAPABILITIES_AVAILABLE:
-                # Use ToolTransformer to convert capabilities to Anthropic format
-                anthropic_request["tools"] = ToolTransformer.to_anthropic_format(request.capabilities)
+                # Use internal method to convert capabilities to Anthropic format
+                anthropic_request["tools"] = self._transform_capabilities(request.capabilities)
             else:
                 # Capabilities module not available
                 raise ValueError("Capabilities module not installed. Install with: pip install nimbus[capabilities]")
             
-            # Handle tool choice
-            if request.tool_choice:
-                if request.tool_choice == "auto":
+            # Handle capability choice
+            if request.capability_choice:
+                if request.capability_choice == "auto":
                     anthropic_request["tool_choice"] = {"type": "auto"}
-                elif request.tool_choice == "required":
+                elif request.capability_choice == "required":
                     anthropic_request["tool_choice"] = {"type": "any"}
-                elif isinstance(request.tool_choice, str):
-                    # Specific tool name
+                elif isinstance(request.capability_choice, str):
+                    # Specific capability name
                     anthropic_request["tool_choice"] = {
                         "type": "tool",
-                        "name": request.tool_choice
+                        "name": request.capability_choice
                     }
-                elif isinstance(request.tool_choice, dict):
+                elif isinstance(request.capability_choice, dict):
                     # Already formatted tool choice
-                    anthropic_request["tool_choice"] = request.tool_choice
+                    anthropic_request["tool_choice"] = request.capability_choice
         
         # Provider-specific metadata
         if request.metadata:
@@ -184,24 +306,13 @@ class AnthropicProvider(BaseModelProvider):
         """
         # Extract content
         content_text = ""
-        tool_calls_list = []
         tool_calls_metadata = []
         
         for content_block in response.content:
             if content_block.type == "text":
                 content_text += content_block.text
             elif content_block.type == "tool_use":
-                # Create ToolCall object if capabilities are available
-                if CAPABILITIES_AVAILABLE:
-                    tool_calls_list.append(
-                        ToolCall(
-                            id=content_block.id,
-                            name=content_block.name,
-                            arguments=content_block.input
-                        )
-                    )
-                
-                # Also store in metadata for compatibility
+                # Store in metadata for compatibility
                 tool_calls_metadata.append({
                     "id": content_block.id,
                     "type": "function",
@@ -210,6 +321,9 @@ class AnthropicProvider(BaseModelProvider):
                         "arguments": content_block.input
                     }
                 })
+        
+        # Extract capability calls using internal method
+        tool_calls_list = self._extract_capability_calls(response)
         
         # Create timestamp from current time (Anthropic doesn't provide created timestamp)
         created_at = datetime.now(timezone.utc)

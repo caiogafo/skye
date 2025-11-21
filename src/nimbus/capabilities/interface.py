@@ -27,7 +27,7 @@ class CapabilityInterface(ABC):
         >>> class MyCapability(CapabilityInterface):
         ...     def get_schema(self) -> CapabilitySchema:
         ...         return CapabilitySchema(
-        ...             name="my_tool",
+        ...             name="my_capability",
         ...             description="Does something useful",
         ...             parameters={"type": "object", "properties": {}},
         ...             returns={"type": "string"}
@@ -55,7 +55,7 @@ class CapabilityInterface(ABC):
             >>> capability = MyCapability()
             >>> schema = capability.get_schema()
             >>> print(schema.name)
-            "my_tool"
+            "my_capability"
         """
         pass
 

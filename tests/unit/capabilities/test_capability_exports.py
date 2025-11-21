@@ -49,18 +49,18 @@ def test_remote_api_capability_import():
     assert RemoteAPICapability is not None
 
 
-def test_tool_call_import():
-    """Test that ToolCall can be imported."""
-    from nimbus.capabilities import ToolCall
+def test_capability_call_import():
+    """Test that CapabilityCall can be imported."""
+    from nimbus.capabilities import CapabilityCall
     
-    assert ToolCall is not None
+    assert CapabilityCall is not None
 
 
-def test_tool_result_import():
-    """Test that ToolResult can be imported."""
-    from nimbus.capabilities import ToolResult
+def test_capability_result_import():
+    """Test that CapabilityResult can be imported."""
+    from nimbus.capabilities import CapabilityResult
     
-    assert ToolResult is not None
+    assert CapabilityResult is not None
 
 
 def test_exception_imports():
@@ -86,25 +86,22 @@ def test_exception_imports():
     assert issubclass(ToolCallParsingError, CapabilityError)
 
 
-def test_tool_transformer_import():
-    """Test that ToolTransformer can be imported."""
-    from nimbus.capabilities import ToolTransformer
+def test_capability_transformer_import():
+    """Test that CapabilityTransformer is no longer exported (removed in consolidation)."""
+    import nimbus.capabilities
     
-    assert ToolTransformer is not None
-    assert hasattr(ToolTransformer, "to_openai_format")
-    assert hasattr(ToolTransformer, "to_anthropic_format")
-    assert hasattr(ToolTransformer, "to_bedrock_format")
-    assert hasattr(ToolTransformer, "to_vertex_format")
+    # CapabilityTransformer has been removed as part of provider consolidation
+    assert not hasattr(nimbus.capabilities, "CapabilityTransformer")
 
 
-def test_tool_call_handler_import():
-    """Test that ToolCallHandler can be imported."""
-    from nimbus.capabilities import ToolCallHandler
+def test_capability_call_handler_import():
+    """Test that CapabilityCallHandler can be imported."""
+    from nimbus.capabilities import CapabilityCallHandler
     
-    assert ToolCallHandler is not None
-    assert hasattr(ToolCallHandler, "parse_tool_calls")
-    assert hasattr(ToolCallHandler, "execute_tool_calls")
-    assert hasattr(ToolCallHandler, "format_tool_results")
+    assert CapabilityCallHandler is not None
+    assert hasattr(CapabilityCallHandler, "parse_capability_calls")
+    assert hasattr(CapabilityCallHandler, "execute_capability_calls")
+    assert hasattr(CapabilityCallHandler, "format_capability_results")
 
 
 def test_mcp_capability_import():
@@ -148,15 +145,14 @@ def test_all_contains_expected_symbols():
         "CapabilityRegistry",
         "LocalFunctionCapability",
         "RemoteAPICapability",
-        "ToolCall",
-        "ToolResult",
+        "CapabilityCall",
+        "CapabilityResult",
         "CapabilityError",
         "CapabilityExecutionError",
         "CapabilityNotFoundError",
         "CapabilityValidationError",
         "ToolCallParsingError",
-        "ToolTransformer",
-        "ToolCallHandler",
+        "CapabilityCallHandler",
         "MCPCapability",
         "MCPServerClient",
         "capability",
@@ -186,8 +182,8 @@ def test_star_import():
         "CapabilityRegistry",
         "LocalFunctionCapability",
         "RemoteAPICapability",
-        "ToolCall",
-        "ToolResult",
+        "CapabilityCall",
+        "CapabilityResult",
         "CapabilityError",
         "CapabilityExecutionError",
         "CapabilityNotFoundError",
@@ -207,8 +203,8 @@ def test_combined_import():
         CapabilitySchema,
         LocalFunctionCapability,
         RemoteAPICapability,
-        ToolCall,
-        ToolResult,
+        CapabilityCall,
+        CapabilityResult,
     )
     
     assert CapabilityInterface is not None
@@ -216,8 +212,8 @@ def test_combined_import():
     assert CapabilitySchema is not None
     assert LocalFunctionCapability is not None
     assert RemoteAPICapability is not None
-    assert ToolCall is not None
-    assert ToolResult is not None
+    assert CapabilityCall is not None
+    assert CapabilityResult is not None
 
 
 def test_no_private_symbols_in_all():

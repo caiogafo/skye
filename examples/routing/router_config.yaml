@@ -1,0 +1,52 @@
+# Example Router Configuration
+# This file demonstrates how to configure a ModelRouter using YAML
+
+# Define routes with aliases and targets
+routes:
+  # Route for GPT-3.5 Turbo with multiple targets for load balancing
+  - alias: "gpt-3.5-turbo"
+    targets:
+      # Azure OpenAI target
+      - model: "gpt-3.5-turbo"
+        provider: "openai"
+        api_key: "${OPENAI_API_KEY}"  # Environment variable substitution
+        tpm: 200000  # Tokens per minute limit
+        rpm: 2000    # Requests per minute limit
+        tags: ["fast", "cost-effective"]
+    strategy: "rate_limit_aware"  # Route to target with most available capacity
+    fallback_on_error: true
+
+  # Route for GPT-4 with fallback support
+  - alias: "gpt-4"
+    targets:
+      - model: "gpt-4"
+        provider: "openai"
+        api_key: "${OPENAI_API_KEY}"
+        tpm: 100000
+        rpm: 1000
+        tags: ["premium", "high-quality"]
+    strategy: "round_robin"
+
+# Define fallback chains
+fallbacks:
+  - primary: "gpt-4"
+    fallbacks: ["gpt-3.5-turbo"]  # Try gpt-3.5-turbo if gpt-4 fails
+
+# Configure retry policies per error type
+retry_policies:
+  - error_type: "RateLimitError"
+    max_retries: 3
+  - error_type: "TimeoutError"
+    max_retries: 2
+  - error_type: "ServerError"
+    max_retries: 2
+
+# Configure allowed failures before cooldown
+allowed_fails_policies:
+  - error_type: "RateLimitError"
+    allowed_fails_per_minute: 100
+
+# Global router settings
+strategy: "rate_limit_aware"  # Default strategy for routes without explicit strategy
+cooldown_seconds: 60.0        # How long to cool down failed models
+enable_pre_call_checks: true  # Check rate limits before making calls
