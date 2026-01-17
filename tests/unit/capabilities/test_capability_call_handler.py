@@ -42,12 +42,260 @@ class MockCapability(CapabilityInterface):
         return self.result
 
 
+class MockProvider:
+    """Mock provider for testing capability call parsing and formatting."""
+    
+    def __init__(self, provider_name: str):
+        self.provider_name = provider_name
+    
+    def parse_capability_calls(self, response: CompletionResponse) -> list[CapabilityCall]:
+        """Parse capability calls based on provider type."""
+        if self.provider_name.lower() in ("openai", "azure"):
+            return self._parse_openai_capability_calls(response)
+        elif self.provider_name.lower() == "anthropic":
+            return self._parse_anthropic_capability_calls(response)
+        elif self.provider_name.lower() == "bedrock":
+            return self._parse_bedrock_capability_calls(response)
+        elif self.provider_name.lower() == "vertex":
+            return self._parse_vertex_capability_calls(response)
+        else:
+            return []
+    
+    def format_capability_results(self, results: list[CapabilityResult]) -> list[dict]:
+        """Format capability results based on provider type."""
+        if self.provider_name.lower() in ("openai", "azure"):
+            return self._format_openai_results(results)
+        elif self.provider_name.lower() == "anthropic":
+            return self._format_anthropic_results(results)
+        elif self.provider_name.lower() == "bedrock":
+            return self._format_bedrock_results(results)
+        elif self.provider_name.lower() == "vertex":
+            return self._format_vertex_results(results)
+        else:
+            return []
+    
+    def _parse_openai_capability_calls(self, response: CompletionResponse) -> list[CapabilityCall]:
+        """Parse OpenAI/Azure capability calls."""
+        tool_calls_data = response.metadata.get("tool_calls", [])
+        if not tool_calls_data:
+            return []
+
+        capability_calls = []
+        for call_data in tool_calls_data:
+            call_id = call_data.get("id")
+            if not call_id:
+                from nimbus.capabilities.exceptions import ToolCallParsingError
+                raise ToolCallParsingError("Missing tool call id", provider="openai")
+                
+            function_data = call_data.get("function", {})
+            name = function_data.get("name")
+            arguments_str = function_data.get("arguments", "{}")
+            
+            try:
+                arguments = json.loads(arguments_str)
+            except json.JSONDecodeError as e:
+                from nimbus.capabilities.exceptions import ToolCallParsingError
+                raise ToolCallParsingError(f"Invalid JSON in arguments: {e}", provider="openai")
+
+            capability_calls.append(
+                CapabilityCall(id=call_id, name=name, arguments=arguments)
+            )
+        return capability_calls
+    
+    def _parse_anthropic_capability_calls(self, response: CompletionResponse) -> list[CapabilityCall]:
+        """Parse Anthropic capability calls."""
+        content_blocks = response.metadata.get("content", [])
+        capability_calls = []
+        
+        for block in content_blocks:
+            if block.get("type") == "tool_use":
+                capability_calls.append(
+                    CapabilityCall(
+                        id=block.get("id"),
+                        name=block.get("name"),
+                        arguments=block.get("input", {})
+                    )
+                )
+        return capability_calls
+    
+    def _parse_bedrock_capability_calls(self, response: CompletionResponse) -> list[CapabilityCall]:
+        """Parse Bedrock capability calls."""
+        output = response.metadata.get("output", {})
+        message = output.get("message", {})
+        content_blocks = message.get("content", [])
+        
+        capability_calls = []
+        for block in content_blocks:
+            tool_use = block.get("toolUse")
+            if tool_use:
+                capability_calls.append(
+                    CapabilityCall(
+                        id=tool_use.get("toolUseId"),
+                        name=tool_use.get("name"),
+                        arguments=tool_use.get("input", {})
+                    )
+                )
+        return capability_calls
+    
+    def _parse_vertex_capability_calls(self, response: CompletionResponse) -> list[CapabilityCall]:
+        """Parse Vertex AI capability calls."""
+        candidates = response.metadata.get("candidates", [])
+        if not candidates:
+            return []
+        
+        capability_calls = []
+        candidate = candidates[0]
+        content = candidate.get("content", {})
+        parts = content.get("parts", [])
+        
+        for idx, part in enumerate(parts):
+            function_call = part.get("functionCall")
+            if function_call:
+                capability_calls.append(
+                    CapabilityCall(
+                        id=f"vertex_call_{idx}",
+                        name=function_call.get("name"),
+                        arguments=function_call.get("args", {})
+                    )
+                )
+        return capability_calls
+    
+    def _format_openai_results(self, results: list[CapabilityResult]) -> list[dict]:
+        """Format results for OpenAI/Azure."""
+        formatted = []
+        for result in results:
+            if result.error:
+                content = json.dumps({"error": result.error})
+            elif isinstance(result.result, str):
+                content = result.result
+            else:
+                content = json.dumps(result.result)
+
+            formatted.append({
+                "tool_call_id": result.capability_call_id,
+                "role": "tool",
+                "content": content,
+            })
+        return formatted
+    
+    def _format_anthropic_results(self, results: list[CapabilityResult]) -> list[dict]:
+        """Format results for Anthropic."""
+        formatted = []
+        for result in results:
+            if result.error:
+                content = json.dumps({"error": result.error})
+            elif isinstance(result.result, str):
+                content = result.result
+            else:
+                content = json.dumps(result.result)
+
+            formatted.append({
+                "type": "tool_result",
+                "tool_use_id": result.capability_call_id,
+                "content": content,
+            })
+        return formatted
+    
+    def _format_bedrock_results(self, results: list[CapabilityResult]) -> list[dict]:
+        """Format results for Bedrock."""
+        formatted = []
+        for result in results:
+            if result.error:
+                result_data = {"error": result.error}
+            elif isinstance(result.result, dict):
+                result_data = result.result
+            elif isinstance(result.result, str):
+                try:
+                    result_data = json.loads(result.result)
+                except json.JSONDecodeError:
+                    result_data = {"result": result.result}
+            else:
+                result_data = {"result": result.result}
+
+            formatted.append({
+                "toolResult": {
+                    "toolUseId": result.capability_call_id,
+                    "content": [{"json": result_data}],
+                }
+            })
+        return formatted
+    
+    def _format_vertex_results(self, results: list[CapabilityResult]) -> list[dict]:
+        """Format results for Vertex AI."""
+        formatted = []
+        for result in results:
+            if result.error:
+                response_data = {"error": result.error}
+            elif isinstance(result.result, dict):
+                response_data = result.result
+            elif isinstance(result.result, str):
+                try:
+                    response_data = json.loads(result.result)
+                except json.JSONDecodeError:
+                    response_data = {"result": result.result}
+            else:
+                response_data = {"result": result.result}
+
+            formatted.append({
+                "functionResponse": {
+                    "name": result.name,
+                    "response": response_data,
+                }
+            })
+        return formatted
+
+
+class MockUnsupportedProvider:
+    """Mock unsupported provider that doesn't implement capability methods."""
+    
+    def __init__(self):
+        self.provider_name = "unknown"
+    
+    # Intentionally does not implement parse_capability_calls or format_capability_results
+
+
 @pytest.fixture
 def registry():
     """Create a fresh registry for each test."""
     reg = CapabilityRegistry()
     yield reg
     reg.clear()
+
+
+@pytest.fixture
+def openai_provider():
+    """Create a mock OpenAI provider."""
+    return MockProvider("openai")
+
+
+@pytest.fixture
+def anthropic_provider():
+    """Create a mock Anthropic provider."""
+    return MockProvider("anthropic")
+
+
+@pytest.fixture
+def bedrock_provider():
+    """Create a mock Bedrock provider."""
+    return MockProvider("bedrock")
+
+
+@pytest.fixture
+def vertex_provider():
+    """Create a mock Vertex provider."""
+    return MockProvider("vertex")
+
+
+@pytest.fixture
+def azure_provider():
+    """Create a mock Azure provider."""
+    return MockProvider("azure")
+
+
+@pytest.fixture
+def unsupported_provider():
+    """Create a mock unsupported provider."""
+    return MockUnsupportedProvider()
 
 
 @pytest.fixture
@@ -74,7 +322,7 @@ class TestCapabilityCallHandlerInit:
 class TestParseOpenAICapabilityCalls:
     """Tests for parsing OpenAI tool calls."""
 
-    def test_parse_openai_tool_calls_success(self, handler):
+    def test_parse_openai_tool_calls_success(self, handler, openai_provider):
         """Test parsing valid OpenAI tool calls."""
         response = CompletionResponse(
             model="gpt-4",
@@ -96,7 +344,7 @@ class TestParseOpenAICapabilityCalls:
             },
         )
 
-        tool_calls = handler.parse_capability_calls(response, "openai")
+        tool_calls = handler.parse_capability_calls(response, openai_provider)
 
         assert len(tool_calls) == 1
         assert tool_calls[0].id == "call_123"
@@ -106,7 +354,7 @@ class TestParseOpenAICapabilityCalls:
             "units": "celsius",
         }
 
-    def test_parse_openai_multiple_tool_calls(self, handler):
+    def test_parse_openai_multiple_tool_calls(self, handler, openai_provider):
         """Test parsing multiple OpenAI tool calls."""
         response = CompletionResponse(
             model="gpt-4",
@@ -136,13 +384,13 @@ class TestParseOpenAICapabilityCalls:
             },
         )
 
-        tool_calls = handler.parse_capability_calls(response, "openai")
+        tool_calls = handler.parse_capability_calls(response, openai_provider)
 
         assert len(tool_calls) == 2
         assert tool_calls[0].name == "get_weather"
         assert tool_calls[1].name == "get_time"
 
-    def test_parse_openai_empty_tool_calls(self, handler):
+    def test_parse_openai_empty_tool_calls(self, handler, openai_provider):
         """Test parsing response with no tool calls."""
         response = CompletionResponse(
             model="gpt-4",
@@ -153,11 +401,11 @@ class TestParseOpenAICapabilityCalls:
             metadata={},
         )
 
-        tool_calls = handler.parse_capability_calls(response, "openai")
+        tool_calls = handler.parse_capability_calls(response, openai_provider)
 
         assert len(tool_calls) == 0
 
-    def test_parse_openai_invalid_json_arguments(self, handler):
+    def test_parse_openai_invalid_json_arguments(self, handler, openai_provider):
         """Test parsing OpenAI tool call with invalid JSON arguments."""
         response = CompletionResponse(
             model="gpt-4",
@@ -180,11 +428,11 @@ class TestParseOpenAICapabilityCalls:
         )
 
         with pytest.raises(ToolCallParsingError) as exc_info:
-            handler.parse_capability_calls(response, "openai")
+            handler.parse_capability_calls(response, openai_provider)
 
         assert "Invalid JSON" in str(exc_info.value)
 
-    def test_parse_openai_missing_id(self, handler):
+    def test_parse_openai_missing_id(self, handler, openai_provider):
         """Test parsing OpenAI tool call with missing id."""
         response = CompletionResponse(
             model="gpt-4",
@@ -206,13 +454,13 @@ class TestParseOpenAICapabilityCalls:
         )
 
         with pytest.raises(ToolCallParsingError):
-            handler.parse_capability_calls(response, "openai")
+            handler.parse_capability_calls(response, openai_provider)
 
 
 class TestParseAnthropicCapabilityCalls:
     """Tests for parsing Anthropic tool calls."""
 
-    def test_parse_anthropic_tool_calls_success(self, handler):
+    def test_parse_anthropic_tool_calls_success(self, handler, anthropic_provider):
         """Test parsing valid Anthropic tool calls."""
         response = CompletionResponse(
             model="claude-3-sonnet",
@@ -232,7 +480,7 @@ class TestParseAnthropicCapabilityCalls:
             },
         )
 
-        tool_calls = handler.parse_capability_calls(response, "anthropic")
+        tool_calls = handler.parse_capability_calls(response, anthropic_provider)
 
         assert len(tool_calls) == 1
         assert tool_calls[0].id == "toolu_123"
@@ -242,7 +490,7 @@ class TestParseAnthropicCapabilityCalls:
             "units": "celsius",
         }
 
-    def test_parse_anthropic_mixed_content(self, handler):
+    def test_parse_anthropic_mixed_content(self, handler, anthropic_provider):
         """Test parsing Anthropic response with mixed content blocks."""
         response = CompletionResponse(
             model="claude-3-sonnet",
@@ -263,12 +511,12 @@ class TestParseAnthropicCapabilityCalls:
             },
         )
 
-        tool_calls = handler.parse_capability_calls(response, "anthropic")
+        tool_calls = handler.parse_capability_calls(response, anthropic_provider)
 
         assert len(tool_calls) == 1
         assert tool_calls[0].name == "get_weather"
 
-    def test_parse_anthropic_empty_content(self, handler):
+    def test_parse_anthropic_empty_content(self, handler, anthropic_provider):
         """Test parsing Anthropic response with no content."""
         response = CompletionResponse(
             model="claude-3-sonnet",
@@ -279,7 +527,7 @@ class TestParseAnthropicCapabilityCalls:
             metadata={},
         )
 
-        tool_calls = handler.parse_capability_calls(response, "anthropic")
+        tool_calls = handler.parse_capability_calls(response, anthropic_provider)
 
         assert len(tool_calls) == 0
 
@@ -287,7 +535,7 @@ class TestParseAnthropicCapabilityCalls:
 class TestParseBedrockCapabilityCalls:
     """Tests for parsing Bedrock tool calls."""
 
-    def test_parse_bedrock_tool_calls_success(self, handler):
+    def test_parse_bedrock_tool_calls_success(self, handler, bedrock_provider):
         """Test parsing valid Bedrock tool calls."""
         response = CompletionResponse(
             model="anthropic.claude-3-sonnet",
@@ -315,7 +563,7 @@ class TestParseBedrockCapabilityCalls:
             },
         )
 
-        tool_calls = handler.parse_capability_calls(response, "bedrock")
+        tool_calls = handler.parse_capability_calls(response, bedrock_provider)
 
         assert len(tool_calls) == 1
         assert tool_calls[0].id == "tooluse_123"
@@ -325,7 +573,7 @@ class TestParseBedrockCapabilityCalls:
             "units": "celsius",
         }
 
-    def test_parse_bedrock_empty_output(self, handler):
+    def test_parse_bedrock_empty_output(self, handler, bedrock_provider):
         """Test parsing Bedrock response with no output."""
         response = CompletionResponse(
             model="anthropic.claude-3-sonnet",
@@ -336,7 +584,7 @@ class TestParseBedrockCapabilityCalls:
             metadata={},
         )
 
-        tool_calls = handler.parse_capability_calls(response, "bedrock")
+        tool_calls = handler.parse_capability_calls(response, bedrock_provider)
 
         assert len(tool_calls) == 0
 
@@ -344,7 +592,7 @@ class TestParseBedrockCapabilityCalls:
 class TestParseVertexCapabilityCalls:
     """Tests for parsing Vertex AI tool calls."""
 
-    def test_parse_vertex_tool_calls_success(self, handler):
+    def test_parse_vertex_tool_calls_success(self, handler, vertex_provider):
         """Test parsing valid Vertex AI tool calls."""
         response = CompletionResponse(
             model="gemini-pro",
@@ -373,7 +621,7 @@ class TestParseVertexCapabilityCalls:
             },
         )
 
-        tool_calls = handler.parse_capability_calls(response, "vertex")
+        tool_calls = handler.parse_capability_calls(response, vertex_provider)
 
         assert len(tool_calls) == 1
         assert tool_calls[0].id.startswith("vertex_call_")
@@ -383,7 +631,7 @@ class TestParseVertexCapabilityCalls:
             "units": "celsius",
         }
 
-    def test_parse_vertex_multiple_function_calls(self, handler):
+    def test_parse_vertex_multiple_function_calls(self, handler, vertex_provider):
         """Test parsing multiple Vertex AI function calls."""
         response = CompletionResponse(
             model="gemini-pro",
@@ -415,13 +663,13 @@ class TestParseVertexCapabilityCalls:
             },
         )
 
-        tool_calls = handler.parse_capability_calls(response, "vertex")
+        tool_calls = handler.parse_capability_calls(response, vertex_provider)
 
         assert len(tool_calls) == 2
         assert tool_calls[0].name == "get_weather"
         assert tool_calls[1].name == "get_time"
 
-    def test_parse_vertex_empty_candidates(self, handler):
+    def test_parse_vertex_empty_candidates(self, handler, vertex_provider):
         """Test parsing Vertex response with no candidates."""
         response = CompletionResponse(
             model="gemini-pro",
@@ -432,7 +680,7 @@ class TestParseVertexCapabilityCalls:
             metadata={},
         )
 
-        tool_calls = handler.parse_capability_calls(response, "vertex")
+        tool_calls = handler.parse_capability_calls(response, vertex_provider)
 
         assert len(tool_calls) == 0
 
@@ -440,7 +688,7 @@ class TestParseVertexCapabilityCalls:
 class TestParseAzureCapabilityCalls:
     """Tests for parsing Azure tool calls (same as OpenAI)."""
 
-    def test_parse_azure_tool_calls_success(self, handler):
+    def test_parse_azure_tool_calls_success(self, handler, azure_provider):
         """Test parsing valid Azure tool calls."""
         response = CompletionResponse(
             model="gpt-4",
@@ -462,7 +710,7 @@ class TestParseAzureCapabilityCalls:
             },
         )
 
-        tool_calls = handler.parse_capability_calls(response, "azure")
+        tool_calls = handler.parse_capability_calls(response, azure_provider)
 
         assert len(tool_calls) == 1
         assert tool_calls[0].id == "call_123"
@@ -472,7 +720,7 @@ class TestParseAzureCapabilityCalls:
 class TestParseUnsupportedProvider:
     """Tests for unsupported provider."""
 
-    def test_parse_unsupported_provider(self, handler):
+    def test_parse_unsupported_provider(self, handler, unsupported_provider):
         """Test parsing with unsupported provider."""
         response = CompletionResponse(
             model="test-model",
@@ -483,9 +731,9 @@ class TestParseUnsupportedProvider:
         )
 
         with pytest.raises(ToolCallParsingError) as exc_info:
-            handler.parse_capability_calls(response, "unknown")
+            handler.parse_capability_calls(response, unsupported_provider)
 
-        assert "Unsupported provider" in str(exc_info.value)
+        assert "does not support capability call parsing" in str(exc_info.value)
 
 
 class TestExecuteCapabilityCalls:
@@ -621,7 +869,7 @@ class TestExecuteCapabilityCalls:
 class TestFormatOpenAIResults:
     """Tests for formatting OpenAI results."""
 
-    def test_format_openai_results_success(self, handler):
+    def test_format_openai_results_success(self, handler, openai_provider):
         """Test formatting successful OpenAI results."""
         results = [
             CapabilityResult(
@@ -632,7 +880,7 @@ class TestFormatOpenAIResults:
             )
         ]
 
-        formatted = handler.format_capability_results(results, "openai")
+        formatted = handler.format_capability_results(results, openai_provider)
 
         assert len(formatted) == 1
         assert formatted[0]["tool_call_id"] == "call_1"
@@ -642,7 +890,7 @@ class TestFormatOpenAIResults:
             "condition": "sunny",
         }
 
-    def test_format_openai_results_with_error(self, handler):
+    def test_format_openai_results_with_error(self, handler, openai_provider):
         """Test formatting OpenAI results with error."""
         results = [
             CapabilityResult(
@@ -653,12 +901,12 @@ class TestFormatOpenAIResults:
             )
         ]
 
-        formatted = handler.format_capability_results(results, "openai")
+        formatted = handler.format_capability_results(results, openai_provider)
 
         assert len(formatted) == 1
         assert json.loads(formatted[0]["content"]) == {"error": "Location not found"}
 
-    def test_format_openai_results_string_result(self, handler):
+    def test_format_openai_results_string_result(self, handler, openai_provider):
         """Test formatting OpenAI results with string result."""
         results = [
             CapabilityResult(
@@ -669,7 +917,7 @@ class TestFormatOpenAIResults:
             )
         ]
 
-        formatted = handler.format_capability_results(results, "openai")
+        formatted = handler.format_capability_results(results, openai_provider)
 
         assert formatted[0]["content"] == "Sunny and 72 degrees"
 
@@ -677,7 +925,7 @@ class TestFormatOpenAIResults:
 class TestFormatAnthropicResults:
     """Tests for formatting Anthropic results."""
 
-    def test_format_anthropic_results_success(self, handler):
+    def test_format_anthropic_results_success(self, handler, anthropic_provider):
         """Test formatting successful Anthropic results."""
         results = [
             CapabilityResult(
@@ -688,7 +936,7 @@ class TestFormatAnthropicResults:
             )
         ]
 
-        formatted = handler.format_capability_results(results, "anthropic")
+        formatted = handler.format_capability_results(results, anthropic_provider)
 
         assert len(formatted) == 1
         assert formatted[0]["type"] == "tool_result"
@@ -702,7 +950,7 @@ class TestFormatAnthropicResults:
 class TestFormatBedrockResults:
     """Tests for formatting Bedrock results."""
 
-    def test_format_bedrock_results_success(self, handler):
+    def test_format_bedrock_results_success(self, handler, bedrock_provider):
         """Test formatting successful Bedrock results."""
         results = [
             CapabilityResult(
@@ -713,7 +961,7 @@ class TestFormatBedrockResults:
             )
         ]
 
-        formatted = handler.format_capability_results(results, "bedrock")
+        formatted = handler.format_capability_results(results, bedrock_provider)
 
         assert len(formatted) == 1
         assert "toolResult" in formatted[0]
@@ -723,7 +971,7 @@ class TestFormatBedrockResults:
             "condition": "sunny",
         }
 
-    def test_format_bedrock_results_string_result(self, handler):
+    def test_format_bedrock_results_string_result(self, handler, bedrock_provider):
         """Test formatting Bedrock results with string result."""
         results = [
             CapabilityResult(
@@ -734,7 +982,7 @@ class TestFormatBedrockResults:
             )
         ]
 
-        formatted = handler.format_capability_results(results, "bedrock")
+        formatted = handler.format_capability_results(results, bedrock_provider)
 
         assert formatted[0]["toolResult"]["content"][0]["json"] == {"temperature": 72}
 
@@ -742,7 +990,7 @@ class TestFormatBedrockResults:
 class TestFormatVertexResults:
     """Tests for formatting Vertex AI results."""
 
-    def test_format_vertex_results_success(self, handler):
+    def test_format_vertex_results_success(self, handler, vertex_provider):
         """Test formatting successful Vertex AI results."""
         results = [
             CapabilityResult(
@@ -753,7 +1001,7 @@ class TestFormatVertexResults:
             )
         ]
 
-        formatted = handler.format_capability_results(results, "vertex")
+        formatted = handler.format_capability_results(results, vertex_provider)
 
         assert len(formatted) == 1
         assert "functionResponse" in formatted[0]
@@ -767,7 +1015,7 @@ class TestFormatVertexResults:
 class TestFormatAzureResults:
     """Tests for formatting Azure results (same as OpenAI)."""
 
-    def test_format_azure_results_success(self, handler):
+    def test_format_azure_results_success(self, handler, azure_provider):
         """Test formatting successful Azure results."""
         results = [
             CapabilityResult(
@@ -778,7 +1026,7 @@ class TestFormatAzureResults:
             )
         ]
 
-        formatted = handler.format_capability_results(results, "azure")
+        formatted = handler.format_capability_results(results, azure_provider)
 
         assert len(formatted) == 1
         assert formatted[0]["tool_call_id"] == "call_1"
@@ -788,7 +1036,7 @@ class TestFormatAzureResults:
 class TestFormatUnsupportedProvider:
     """Tests for formatting with unsupported provider."""
 
-    def test_format_unsupported_provider(self, handler):
+    def test_format_unsupported_provider(self, handler, unsupported_provider):
         """Test formatting with unsupported provider."""
         results = [
             CapabilityResult(
@@ -800,6 +1048,6 @@ class TestFormatUnsupportedProvider:
         ]
 
         with pytest.raises(ToolCallParsingError) as exc_info:
-            handler.format_capability_results(results, "unknown")
+            handler.format_capability_results(results, unsupported_provider)
 
-        assert "Unsupported provider" in str(exc_info.value)
+        assert "does not support capability result formatting" in str(exc_info.value)

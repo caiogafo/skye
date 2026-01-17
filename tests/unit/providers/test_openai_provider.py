@@ -241,8 +241,8 @@ class TestOpenAIResponseTransformation:
         assert result.usage.total_tokens == 30
         assert result.metadata["system_fingerprint"] == "fp_123"
     
-    def test_transform_response_with_tool_calls(self) -> None:
-        """Test transformation of response with tool calls."""
+    def test_transform_response_with_capability_calls(self) -> None:
+        """Test transformation of response with capability calls."""
         provider = OpenAIProvider(api_key="sk-test")
         
         # Mock OpenAI response with tool calls
@@ -681,8 +681,8 @@ class TestOpenAIToolCalling:
         # Verify tool_choice is passed through as-is for 'required'
         assert result["tool_choice"] == "required"
     
-    def test_transform_response_with_tool_calls_creates_tool_call_objects(self) -> None:
-        """Test that tool calls in response are converted to CapabilityCall objects."""
+    def test_transform_response_with_capability_calls_creates_capability_call_objects(self) -> None:
+        """Test that capability calls in response are converted to CapabilityCall objects."""
         provider = OpenAIProvider(model="gpt-4", api_key="sk-test")
         
         # Mock OpenAI response with tool calls
@@ -715,23 +715,23 @@ class TestOpenAIToolCalling:
         
         result = provider._transform_response(mock_response)
         
-        # Verify tool_calls are present in response
-        assert result.tool_calls is not None
-        assert len(result.tool_calls) == 1
+        # Verify capability_calls are present in response
+        assert result.capability_calls is not None
+        assert len(result.capability_calls) == 1
         
         # Verify CapabilityCall object structure
-        tool_call = result.tool_calls[0]
-        assert tool_call.id == "call_abc123"
-        assert tool_call.name == "get_weather"
-        assert tool_call.arguments == {"location": "San Francisco", "unit": "celsius"}
+        capability_call = result.capability_calls[0]
+        assert capability_call.id == "call_abc123"
+        assert capability_call.name == "get_weather"
+        assert capability_call.arguments == {"location": "San Francisco", "unit": "celsius"}
         
         # Verify metadata also contains raw tool calls
         assert result.metadata["tool_calls"] is not None
         assert len(result.metadata["tool_calls"]) == 1
         assert result.metadata["tool_calls"][0]["id"] == "call_abc123"
     
-    def test_transform_response_with_parallel_tool_calls(self) -> None:
-        """Test handling of parallel tool calls in response."""
+    def test_transform_response_with_parallel_capability_calls(self) -> None:
+        """Test handling of parallel capability calls in response."""
         provider = OpenAIProvider(model="gpt-4", api_key="sk-test")
         
         # Mock OpenAI response with multiple parallel tool calls
@@ -771,19 +771,19 @@ class TestOpenAIToolCalling:
         
         result = provider._transform_response(mock_response)
         
-        # Verify both tool calls are present
-        assert result.tool_calls is not None
-        assert len(result.tool_calls) == 2
+        # Verify both capability calls are present
+        assert result.capability_calls is not None
+        assert len(result.capability_calls) == 2
         
-        # Verify first tool call
-        assert result.tool_calls[0].id == "call_1"
-        assert result.tool_calls[0].name == "get_weather"
-        assert result.tool_calls[0].arguments == {"location": "NYC"}
+        # Verify first capability call
+        assert result.capability_calls[0].id == "call_1"
+        assert result.capability_calls[0].name == "get_weather"
+        assert result.capability_calls[0].arguments == {"location": "NYC"}
         
-        # Verify second tool call
-        assert result.tool_calls[1].id == "call_2"
-        assert result.tool_calls[1].name == "get_time"
-        assert result.tool_calls[1].arguments == {"timezone": "EST"}
+        # Verify second capability call
+        assert result.capability_calls[1].id == "call_2"
+        assert result.capability_calls[1].name == "get_time"
+        assert result.capability_calls[1].arguments == {"timezone": "EST"}
     
     def test_transform_response_with_invalid_json_arguments(self) -> None:
         """Test handling of tool calls with invalid JSON arguments."""
@@ -819,10 +819,10 @@ class TestOpenAIToolCalling:
         
         result = provider._transform_response(mock_response)
         
-        # Verify tool call is still created with empty arguments
-        assert result.tool_calls is not None
-        assert len(result.tool_calls) == 1
-        assert result.tool_calls[0].arguments == {}
+        # Verify capability call is still created with empty arguments
+        assert result.capability_calls is not None
+        assert len(result.capability_calls) == 1
+        assert result.capability_calls[0].arguments == {}
     
     def test_transform_capabilities_with_multiple_capabilities(self) -> None:
         """Test _transform_capabilities() with multiple capabilities."""
@@ -888,8 +888,8 @@ class TestOpenAIToolCalling:
         assert result["tools"][1]["function"]["name"] == "get_time"
     
     @patch("nimbus.providers.llm.openai_provider.LazyImporter.import_module")
-    def test_complete_with_tool_calls(self, mock_import: Mock) -> None:
-        """Test end-to-end completion with tool calls."""
+    def test_complete_with_capability_calls(self, mock_import: Mock) -> None:
+        """Test end-to-end completion with capability calls."""
         # Setup mocks
         mock_openai = MagicMock()
         mock_import.return_value = mock_openai
@@ -952,9 +952,9 @@ class TestOpenAIToolCalling:
         
         # Verify
         assert result.finish_reason == "tool_calls"
-        assert result.has_tool_calls()
-        assert len(result.tool_calls) == 1
-        assert result.tool_calls[0].name == "get_weather"
+        assert result.has_capability_calls()
+        assert len(result.capability_calls) == 1
+        assert result.capability_calls[0].name == "get_weather"
         
         # Verify the API was called with tools
         call_args = mock_client.chat.completions.create.call_args

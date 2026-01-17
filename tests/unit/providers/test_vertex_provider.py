@@ -336,11 +336,11 @@ class TestVertexAIResponseTransformation:
         # New format stores tool calls in metadata["candidates"]
         assert "candidates" in result.metadata
         assert len(result.metadata["candidates"]) == 1
-        # Also check that tool_calls list is populated
-        assert result.tool_calls is not None
-        assert len(result.tool_calls) == 1
-        assert result.tool_calls[0].name == "get_weather"
-        assert result.tool_calls[0].arguments == {"location": "NYC"}
+        # Also check that capability_calls list is populated
+        assert result.capability_calls is not None
+        assert len(result.capability_calls) == 1
+        assert result.capability_calls[0].name == "get_weather"
+        assert result.capability_calls[0].arguments == {"location": "NYC"}
 
     def test_transform_response_without_usage(self) -> None:
         """Test transformation of response without usage metadata."""
@@ -892,12 +892,12 @@ class TestVertexAIToolCalling:
 
         result = provider._transform_response(mock_response)
 
-        # Verify tool_calls are present
-        assert result.tool_calls is not None
-        assert len(result.tool_calls) == 1
-        assert result.tool_calls[0].name == "get_weather"
-        assert result.tool_calls[0].arguments == {"location": "NYC"}
-        assert result.tool_calls[0].id.startswith("vertex_call_")
+        # Verify capability_calls are present
+        assert result.capability_calls is not None
+        assert len(result.capability_calls) == 1
+        assert result.capability_calls[0].name == "get_weather"
+        assert result.capability_calls[0].arguments == {"location": "NYC"}
+        assert result.capability_calls[0].id.startswith("vertex_call_")
 
         # Verify metadata contains raw tool calls
         assert "candidates" in result.metadata
@@ -948,13 +948,13 @@ class TestVertexAIToolCalling:
 
         result = provider._transform_response(mock_response)
 
-        # Verify multiple tool_calls are present
-        assert result.tool_calls is not None
-        assert len(result.tool_calls) == 2
-        assert result.tool_calls[0].name == "get_weather"
-        assert result.tool_calls[0].arguments == {"location": "NYC"}
-        assert result.tool_calls[1].name == "get_time"
-        assert result.tool_calls[1].arguments == {"timezone": "EST"}
+        # Verify multiple capability_calls are present
+        assert result.capability_calls is not None
+        assert len(result.capability_calls) == 2
+        assert result.capability_calls[0].name == "get_weather"
+        assert result.capability_calls[0].arguments == {"location": "NYC"}
+        assert result.capability_calls[1].name == "get_time"
+        assert result.capability_calls[1].arguments == {"timezone": "EST"}
 
     @patch("nimbus.providers.llm.vertex_provider.LazyImporter.import_module")
     def test_complete_with_tool_calling(self, mock_import: Mock) -> None:
@@ -1022,10 +1022,10 @@ class TestVertexAIToolCalling:
 
         # Verify
         assert isinstance(result, CompletionResponse)
-        assert result.tool_calls is not None
-        assert len(result.tool_calls) == 1
-        assert result.tool_calls[0].name == "get_weather"
-        assert result.tool_calls[0].arguments == {"location": "San Francisco"}
+        assert result.capability_calls is not None
+        assert len(result.capability_calls) == 1
+        assert result.capability_calls[0].name == "get_weather"
+        assert result.capability_calls[0].arguments == {"location": "San Francisco"}
 
         # Verify the call was made with tools
         call_kwargs = mock_model.generate_content.call_args[1]
@@ -1083,9 +1083,9 @@ class TestVertexAIToolCalling:
         # Transform response
         result = provider._transform_response(mock_response)
 
-        # Parse tool calls using handler
+        # Parse tool calls using handler with provider instance
         handler = CapabilityCallHandler(registry)
-        capability_calls = handler.parse_capability_calls(result, "vertex")
+        capability_calls = handler.parse_capability_calls(result, provider)
 
         # Verify parsing
         assert len(capability_calls) == 1

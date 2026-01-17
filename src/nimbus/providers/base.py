@@ -404,6 +404,86 @@ class BaseModelProvider(ModelInterface, ABC):
             ...     return capability_calls if capability_calls else None
         """
         pass
+
+    def parse_capability_calls(self, response: Any) -> list[Any]:
+        """Parse capability calls from provider response using provider-specific logic.
+        
+        This is a public interface that delegates to the provider-specific
+        _extract_capability_calls method. It provides a consistent interface
+        for the CapabilityCallHandler to use.
+        
+        Args:
+            response: Provider-specific response object (CompletionResponse or raw response)
+            
+        Returns:
+            List of CapabilityCall objects (empty list if none found)
+            
+        Example:
+            >>> provider = OpenAIProvider(api_key="...")
+            >>> response = provider.complete(request)
+            >>> capability_calls = provider.parse_capability_calls(response)
+        """
+        # If it's a CompletionResponse and already has capability_calls, return them
+        if hasattr(response, 'capability_calls') and response.capability_calls is not None:
+            return response.capability_calls
+        
+        # Handle both CompletionResponse and raw provider response
+        if hasattr(response, 'metadata') and 'raw_response' in response.metadata:
+            # Use raw response if available in metadata
+            raw_response = response.metadata['raw_response']
+        else:
+            # Assume it's already a raw response
+            raw_response = response
+            
+        capability_calls = self._extract_capability_calls(raw_response)
+        return capability_calls or []
+
+    @abstractmethod
+    def format_capability_results(self, results: list[Any]) -> list[dict[str, Any]]:
+        """Format capability results for sending back to provider.
+        
+        This method encapsulates provider-specific logic for formatting
+        CapabilityResult objects into the format expected by the provider
+        for continuing the conversation.
+        
+        **Provider-Specific Responsibilities:**
+        - Convert CapabilityResult objects to provider message format
+        - Handle both successful results and errors
+        - Format JSON content appropriately
+        - Include required provider-specific fields
+        
+        Args:
+            results: List of CapabilityResult objects to format
+            
+        Returns:
+            List of formatted result dictionaries in provider format
+            
+        Example (OpenAI):
+            >>> def format_capability_results(self, results):
+            ...     formatted = []
+            ...     for result in results:
+            ...         content = json.dumps({"error": result.error}) if result.error else json.dumps(result.result)
+            ...         formatted.append({
+            ...             "tool_call_id": result.capability_call_id,
+            ...             "role": "tool",
+            ...             "content": content
+            ...         })
+            ...     return formatted
+        
+        Example (Bedrock):
+            >>> def format_capability_results(self, results):
+            ...     formatted = []
+            ...     for result in results:
+            ...         result_data = {"error": result.error} if result.error else result.result
+            ...         formatted.append({
+            ...             "toolResult": {
+            ...                 "toolUseId": result.capability_call_id,
+            ...                 "content": [{"json": result_data}]
+            ...             }
+            ...         })
+            ...     return formatted
+        """
+        pass
     
     def complete(
         self,

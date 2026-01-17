@@ -19,8 +19,8 @@ class MockEmbeddingProvider(BaseEmbeddingProvider):
         self.client_initialized = True
         return {"mock": "embedding_client"}
     
-    def encode_batch(self, texts: list[str]) -> list[list[float]]:
-        """Mock batch encoding."""
+    def _encode_batch_impl(self, texts: list[str]) -> list[list[float]]:
+        """Mock batch encoding implementation."""
         # Return mock embeddings (simplified for testing)
         return [[float(i) for i in range(self.dimension)] for _ in texts]
     

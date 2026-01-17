@@ -368,7 +368,7 @@ class BedrockProvider(BaseModelProvider):
             role="assistant",
             finish_reason=finish_reason,
             usage=usage,
-            tool_calls=tool_calls_list if tool_calls_list else None,
+            capability_calls=tool_calls_list if tool_calls_list else None,
             created_at=datetime.now(tz=timezone.utc),
             metadata={
                 "stop_reason": stop_reason,
@@ -437,6 +437,53 @@ class BedrockProvider(BaseModelProvider):
         # The stream is in response["stream"]
         for event in response.get("stream", []):
             yield event
+    
+    def format_capability_results(self, results: list[Any]) -> list[dict[str, Any]]:
+        """Format capability results for Bedrock.
+        
+        Bedrock expects tool results in this format:
+        {
+            "toolResult": {
+                "toolUseId": "tooluse_123",
+                "content": [
+                    {
+                        "json": {"result": "value"}
+                    }
+                ]
+            }
+        }
+        
+        Args:
+            results: List of CapabilityResult objects
+            
+        Returns:
+            List of formatted result dictionaries in Bedrock format
+        """
+        import json
+        
+        formatted = []
+        for result in results:
+            # Convert result to appropriate format
+            if result.error:
+                result_data = {"error": result.error}
+            elif isinstance(result.result, dict):
+                result_data = result.result
+            elif isinstance(result.result, str):
+                try:
+                    result_data = json.loads(result.result)
+                except json.JSONDecodeError:
+                    result_data = {"result": result.result}
+            else:
+                result_data = {"result": result.result}
+
+            formatted.append({
+                "toolResult": {
+                    "toolUseId": result.capability_call_id,
+                    "content": [{"json": result_data}],
+                }
+            })
+
+        return formatted
     
     def get_model_info(self) -> dict[str, Any]:
         """Return model metadata and capabilities.

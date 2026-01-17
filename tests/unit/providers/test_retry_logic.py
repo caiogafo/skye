@@ -8,6 +8,7 @@ Tests cover:
 """
 
 import time
+from typing import Any
 from unittest.mock import MagicMock, Mock, patch
 
 import pytest
@@ -57,6 +58,10 @@ class MockProvider(BaseModelProvider):
     def _extract_capability_calls(self, response):
         """Extract capability calls from mock response."""
         return None
+    
+    def format_capability_results(self, results: list[Any]) -> list[dict[str, Any]]:
+        """Format capability results for mock provider."""
+        return [{"mock_result": "formatted"} for _ in results]
 
     def _call_provider(self, request):
         self.call_count += 1
@@ -176,6 +181,10 @@ class TestRetryDecorator:
                 """Extract capability calls from mock response."""
                 return None
 
+            def format_capability_results(self, results: list[Any]) -> list[dict[str, Any]]:
+                """Format capability results for mock provider."""
+                return [{"mock_result": "formatted"} for _ in results]
+
             @with_retry(max_retries=2, min_wait=0.1, max_wait=0.2, multiplier=1)
             def _call_provider(self, request):
                 self.call_count += 1
@@ -234,6 +243,10 @@ class TestRetryDecorator:
             def _extract_capability_calls(self, response):
                 """Extract capability calls from mock response."""
                 return None
+
+            def format_capability_results(self, results: list[Any]) -> list[dict[str, Any]]:
+                """Format capability results for mock provider."""
+                return [{"mock_result": "formatted"} for _ in results]
 
             def _call_provider(self, request):
                 raise ProviderError("original error", provider="mock")
@@ -306,6 +319,10 @@ class TestRetryWithStreaming:
             def _extract_capability_calls(self, response):
                 """Extract capability calls from mock response."""
                 return None
+
+            def format_capability_results(self, results: list[Any]) -> list[dict[str, Any]]:
+                """Format capability results for mock provider."""
+                return [{"mock_result": "formatted"} for _ in results]
 
             def _call_provider(self, request):
                 return MagicMock()

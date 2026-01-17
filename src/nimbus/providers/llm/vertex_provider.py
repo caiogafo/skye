@@ -420,7 +420,7 @@ class VertexAIProvider(BaseModelProvider):
                 completion_tokens=completion_tokens,
                 total_tokens=total_tokens
             ),
-            tool_calls=tool_calls_list,
+            capability_calls=tool_calls_list,
             created_at=datetime.now(tz=timezone.utc),
             metadata=tool_calls_metadata or {}
         )
@@ -559,6 +559,49 @@ class VertexAIProvider(BaseModelProvider):
         # For now, use sync version
         # Vertex AI SDK has async support but requires additional setup
         return self.complete(request)
+
+    def format_capability_results(self, results: list[Any]) -> list[dict[str, Any]]:
+        """Format capability results for Vertex AI.
+        
+        Vertex expects tool results in this format:
+        {
+            "functionResponse": {
+                "name": "get_weather",
+                "response": {"result": "value"}
+            }
+        }
+        
+        Args:
+            results: List of CapabilityResult objects
+            
+        Returns:
+            List of formatted result dictionaries in Vertex format
+        """
+        import json
+        
+        formatted = []
+        for result in results:
+            # Convert result to appropriate format
+            if result.error:
+                response_data = {"error": result.error}
+            elif isinstance(result.result, dict):
+                response_data = result.result
+            elif isinstance(result.result, str):
+                try:
+                    response_data = json.loads(result.result)
+                except json.JSONDecodeError:
+                    response_data = {"result": result.result}
+            else:
+                response_data = {"result": result.result}
+
+            formatted.append({
+                "functionResponse": {
+                    "name": result.name,
+                    "response": response_data,
+                }
+            })
+
+        return formatted
 
     def get_model_info(self) -> dict[str, Any]:
         """Return model metadata and capabilities.

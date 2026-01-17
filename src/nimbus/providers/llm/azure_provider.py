@@ -329,7 +329,7 @@ class AzureOpenAIProvider(BaseModelProvider):
                 completion_tokens=response.usage.completion_tokens,
                 total_tokens=response.usage.total_tokens
             ),
-            tool_calls=tool_calls_list,
+            capability_calls=tool_calls_list,
             created_at=datetime.fromtimestamp(response.created, tz=timezone.utc),
             metadata={
                 "tool_calls": tool_calls_metadata
@@ -396,6 +396,42 @@ class AzureOpenAIProvider(BaseModelProvider):
         provider_request = self._transform_request(request)
         response = await async_client.chat.completions.create(**provider_request)
         return self._transform_response(response)
+    
+    def format_capability_results(self, results: list[Any]) -> list[dict[str, Any]]:
+        """Format capability results for Azure OpenAI.
+        
+        Azure OpenAI uses the same format as OpenAI:
+        {
+            "tool_call_id": "call_123",
+            "role": "tool",
+            "content": "{\"result\": \"value\"}"
+        }
+        
+        Args:
+            results: List of CapabilityResult objects
+            
+        Returns:
+            List of formatted result dictionaries in Azure OpenAI format
+        """
+        import json
+        
+        formatted = []
+        for result in results:
+            # Convert result to JSON string
+            if result.error:
+                content = json.dumps({"error": result.error})
+            elif isinstance(result.result, str):
+                content = result.result
+            else:
+                content = json.dumps(result.result)
+
+            formatted.append({
+                "tool_call_id": result.capability_call_id,
+                "role": "tool",
+                "content": content,
+            })
+
+        return formatted
     
     def get_model_info(self) -> dict[str, Any]:
         """Return model metadata and capabilities.

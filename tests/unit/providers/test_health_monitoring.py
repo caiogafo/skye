@@ -5,6 +5,7 @@ for LLM and embedding providers.
 """
 
 import time
+from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -193,6 +194,22 @@ class MockModelProvider(BaseModelProvider):
     def _call_provider_stream(self, request: dict):
         """Call provider stream."""
         yield {"choices": [{"delta": {"content": "test"}}]}
+    
+    def _transform_messages(self, messages: list) -> list[dict]:
+        """Transform Nimbus messages to provider format."""
+        return [{"role": msg.role, "content": msg.content} for msg in messages]
+    
+    def _transform_capabilities(self, capabilities: list) -> list[dict]:
+        """Transform Nimbus capabilities to provider tool format."""
+        return [{"name": "mock_tool", "description": "Mock tool"}]
+    
+    def _extract_capability_calls(self, response: dict) -> list | None:
+        """Extract capability calls from provider response."""
+        return None  # Mock provider doesn't support capability calls
+    
+    def format_capability_results(self, results: list[Any]) -> list[dict[str, Any]]:
+        """Format capability results for mock provider."""
+        return [{"mock_result": "formatted"} for _ in results]
     
     def get_model_info(self) -> dict:
         """Get model info."""

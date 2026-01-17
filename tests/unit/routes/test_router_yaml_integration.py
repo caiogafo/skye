@@ -7,16 +7,78 @@ to ensure proper router instantiation from configuration.
 import os
 import tempfile
 from pathlib import Path
+from typing import Any, Iterator
+from datetime import datetime, timezone
 
 import pytest
 
 from nimbus.exceptions import ConfigurationError
 from nimbus.interfaces.router import RoutingStrategy
 from nimbus.routes.model_router import ModelRouter
+from nimbus.providers.registry import ProviderRegistry
+from nimbus.providers.base import BaseModelProvider
+from nimbus.completion import CompletionRequest, CompletionResponse, StreamChunk, TokenUsage
+
+
+class MockProvider(BaseModelProvider):
+    """Mock provider for testing."""
+    
+    def _initialize_client(self) -> Any:
+        return {"mock": "client"}
+    
+    def _transform_request(self, request: CompletionRequest) -> dict[str, Any]:
+        return {"model": request.model, "messages": []}
+    
+    def _transform_response(self, response: Any) -> CompletionResponse:
+        return CompletionResponse(
+            id="test_id",
+            model="test_model",
+            provider="mock",
+            content="Mock response",
+            finish_reason="stop",
+            usage=TokenUsage(prompt_tokens=10, completion_tokens=20, total_tokens=30),
+            created_at=datetime.now(timezone.utc)
+        )
+    
+    def _transform_stream_chunk(self, chunk: Any) -> StreamChunk:
+        return StreamChunk(id="test", delta="", index=0)
+    
+    def _call_provider(self, request: dict[str, Any]) -> Any:
+        return {"content": "Mock response"}
+    
+    def _call_provider_stream(self, request: dict[str, Any]) -> Iterator[Any]:
+        yield {"delta": "Mock response"}
+    
+    def _transform_messages(self, messages: list[Any]) -> list[dict[str, Any]]:
+        return [{"role": "user", "content": "test"}]
+    
+    def _transform_capabilities(self, capabilities: list[Any]) -> list[dict[str, Any]]:
+        return []
+    
+    def _extract_capability_calls(self, response: Any) -> list[Any] | None:
+        return None
+    
+    def format_capability_results(self, results: list[Any]) -> list[dict[str, Any]]:
+        """Format capability results for mock provider."""
+        return [{"mock_result": "formatted"} for _ in results]
+    
+    def get_model_info(self) -> dict[str, Any]:
+        """Get model information."""
+        return {"provider": "mock", "model": "test-model"}
 
 
 class TestModelRouterFromConfigDict:
     """Tests for ModelRouter.from_config_dict() class method."""
+
+    def setup_method(self):
+        """Set up test fixtures."""
+        # Register mock provider for testing
+        ProviderRegistry.register_model_provider("mock", MockProvider)
+
+    def teardown_method(self):
+        """Clean up test fixtures."""
+        # Clear provider registry
+        ProviderRegistry._model_providers = {}
 
     def test_from_config_dict_minimal(self):
         """Test creating router from minimal config dict."""
@@ -70,7 +132,7 @@ class TestModelRouterFromConfigDict:
                     "targets": [
                         {
                             "model": "gpt-3.5-turbo",
-                            "provider": "openai",
+                            "provider": "mock",
                             "api_key": "sk-test",
                             "tpm": 200000,
                             "rpm": 2000,
@@ -93,13 +155,13 @@ class TestModelRouterFromConfigDict:
                 {
                     "alias": "gpt-4",
                     "targets": [
-                        {"model": "gpt-4", "provider": "openai", "api_key": "sk-test"}
+                        {"model": "gpt-4", "provider": "mock", "api_key": "sk-test"}
                     ],
                 },
                 {
                     "alias": "gpt-3.5-turbo",
                     "targets": [
-                        {"model": "gpt-3.5-turbo", "provider": "openai", "api_key": "sk-test"}
+                        {"model": "gpt-3.5-turbo", "provider": "mock", "api_key": "sk-test"}
                     ],
                 },
             ],
@@ -146,7 +208,7 @@ class TestModelRouterFromConfigDict:
                 {
                     # Missing 'alias' field
                     "targets": [
-                        {"model": "gpt-3.5-turbo", "provider": "openai", "api_key": "sk-test"}
+                        {"model": "gpt-3.5-turbo", "provider": "mock", "api_key": "sk-test"}
                     ]
                 }
             ]
@@ -171,6 +233,16 @@ class TestModelRouterFromConfigDict:
 
 class TestModelRouterFromYAML:
     """Tests for ModelRouter.from_yaml() class method."""
+
+    def setup_method(self):
+        """Set up test fixtures."""
+        # Register mock provider for testing
+        ProviderRegistry.register_model_provider("mock", MockProvider)
+
+    def teardown_method(self):
+        """Clean up test fixtures."""
+        # Clear provider registry
+        ProviderRegistry._model_providers = {}
 
     def test_from_yaml_minimal(self):
         """Test creating router from minimal YAML file."""
@@ -197,7 +269,7 @@ routes:
   - alias: "test-model"
     targets:
       - model: "gpt-3.5-turbo"
-        provider: "openai"
+        provider: "mock"
         api_key: "sk-test"
         tpm: 200000
         rpm: 2000
@@ -230,7 +302,7 @@ routes:
   - alias: "test-model"
     targets:
       - model: "gpt-3.5-turbo"
-        provider: "openai"
+        provider: "mock"
         api_key: "${TEST_API_KEY}"
         tpm: 200000
 """
@@ -255,7 +327,7 @@ routes:
   - alias: "test-model"
     targets:
       - model: "gpt-3.5-turbo"
-        provider: "openai"
+        provider: "mock"
         api_key: "sk-test"
 """
 
@@ -304,13 +376,13 @@ routes:
   - alias: "gpt-4"
     targets:
       - model: "gpt-4"
-        provider: "openai"
+        provider: "mock"
         api_key: "sk-test-1"
         tpm: 100000
         rpm: 1000
         tags: ["premium"]
       - model: "gpt-4-turbo"
-        provider: "openai"
+        provider: "mock"
         api_key: "sk-test-2"
         api_base: "https://api.openai.com/v1"
         tpm: 80000
@@ -320,7 +392,7 @@ routes:
   - alias: "gpt-3.5-turbo"
     targets:
       - model: "gpt-3.5-turbo"
-        provider: "openai"
+        provider: "mock"
         api_key: "sk-test-3"
         tpm: 200000
         rpm: 2000
@@ -388,7 +460,7 @@ class TestModelTargetEnvVarSubstitution:
         try:
             target = ModelTarget(
                 model="gpt-4",
-                provider="openai",
+                provider="mock",
                 api_key="${TEST_API_KEY_UNIQUE}",
                 api_base="${TEST_API_BASE_UNIQUE}",
             )
@@ -407,7 +479,7 @@ class TestModelTargetEnvVarSubstitution:
 
         with pytest.raises(ConfigurationError) as exc_info:
             ModelTarget(
-                model="gpt-4", provider="openai", api_key="${NONEXISTENT_VAR}"
+                model="gpt-4", provider="mock", api_key="${NONEXISTENT_VAR}"
             )
 
         assert "NONEXISTENT_VAR" in str(exc_info.value)
@@ -417,7 +489,7 @@ class TestModelTargetEnvVarSubstitution:
         from nimbus.routes.model_router import ModelTarget
 
         target = ModelTarget(
-            model="gpt-4", provider="openai", api_key="sk-plain-key"
+            model="gpt-4", provider="mock", api_key="sk-plain-key"
         )
 
         assert target.api_key == "sk-plain-key"
@@ -428,7 +500,7 @@ class TestModelTargetEnvVarSubstitution:
 
         # This should not trigger substitution (missing closing brace)
         target = ModelTarget(
-            model="gpt-4", provider="openai", api_key="sk-${PARTIAL"
+            model="gpt-4", provider="mock", api_key="sk-${PARTIAL"
         )
 
         # Should remain unchanged

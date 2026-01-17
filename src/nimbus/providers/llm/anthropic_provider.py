@@ -427,6 +427,42 @@ class AnthropicProvider(BaseModelProvider):
         response = await async_client.messages.create(**provider_request)
         return self._transform_response(response)
     
+    def format_capability_results(self, results: list[Any]) -> list[dict[str, Any]]:
+        """Format capability results for Anthropic.
+        
+        Anthropic expects tool results in this format:
+        {
+            "type": "tool_result",
+            "tool_use_id": "toolu_123",
+            "content": "{\"result\": \"value\"}"
+        }
+        
+        Args:
+            results: List of CapabilityResult objects
+            
+        Returns:
+            List of formatted result dictionaries in Anthropic format
+        """
+        import json
+        
+        formatted = []
+        for result in results:
+            # Convert result to JSON string
+            if result.error:
+                content = json.dumps({"error": result.error})
+            elif isinstance(result.result, str):
+                content = result.result
+            else:
+                content = json.dumps(result.result)
+
+            formatted.append({
+                "type": "tool_result",
+                "tool_use_id": result.capability_call_id,
+                "content": content,
+            })
+
+        return formatted
+    
     def get_model_info(self) -> dict[str, Any]:
         """Return model metadata and capabilities.
         

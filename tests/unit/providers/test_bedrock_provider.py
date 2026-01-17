@@ -523,7 +523,7 @@ class TestBedrockToolCalling:
             messages=[UserMessage(content="What's the weather in NYC?")],
             model="anthropic.claude-3-sonnet-20240229-v1:0",
             capabilities=[mock_capability],
-            tool_choice="auto"
+            capability_choice="auto"
         )
         
         result = provider._transform_request(request)
@@ -560,7 +560,7 @@ class TestBedrockToolCalling:
             messages=[UserMessage(content="What's the weather?")],
             model="anthropic.claude-3-sonnet-20240229-v1:0",
             capabilities=[mock_capability],
-            tool_choice="get_weather"
+            capability_choice="get_weather"
         )
         
         result = provider._transform_request(request)
@@ -585,7 +585,7 @@ class TestBedrockToolCalling:
             messages=[UserMessage(content="Calculate 2+2")],
             model="anthropic.claude-3-sonnet-20240229-v1:0",
             capabilities=[mock_capability],
-            tool_choice="required"
+            capability_choice="required"
         )
         
         result = provider._transform_request(request)
@@ -628,15 +628,15 @@ class TestBedrockToolCalling:
         
         result = provider._transform_response(bedrock_response)
         
-        # Verify tool_calls are present in response
-        assert result.tool_calls is not None
-        assert len(result.tool_calls) == 1
+        # Verify capability_calls are present in response
+        assert result.capability_calls is not None
+        assert len(result.capability_calls) == 1
         
         # Verify CapabilityCall object structure
-        tool_call = result.tool_calls[0]
-        assert tool_call.id == "tooluse_abc123"
-        assert tool_call.name == "get_weather"
-        assert tool_call.arguments == {"location": "San Francisco", "unit": "celsius"}
+        capability_call = result.capability_calls[0]
+        assert capability_call.id == "tooluse_abc123"
+        assert capability_call.name == "get_weather"
+        assert capability_call.arguments == {"location": "San Francisco", "unit": "celsius"}
         
         # Verify metadata also contains raw tool calls
         assert result.metadata["tool_calls"] is not None
@@ -685,19 +685,19 @@ class TestBedrockToolCalling:
         
         result = provider._transform_response(bedrock_response)
         
-        # Verify both tool calls are present
-        assert result.tool_calls is not None
-        assert len(result.tool_calls) == 2
+        # Verify both capability calls are present
+        assert result.capability_calls is not None
+        assert len(result.capability_calls) == 2
         
-        # Verify first tool call
-        assert result.tool_calls[0].id == "tooluse_1"
-        assert result.tool_calls[0].name == "get_weather"
-        assert result.tool_calls[0].arguments == {"location": "NYC"}
+        # Verify first capability call
+        assert result.capability_calls[0].id == "tooluse_1"
+        assert result.capability_calls[0].name == "get_weather"
+        assert result.capability_calls[0].arguments == {"location": "NYC"}
         
-        # Verify second tool call
-        assert result.tool_calls[1].id == "tooluse_2"
-        assert result.tool_calls[1].name == "get_time"
-        assert result.tool_calls[1].arguments == {"timezone": "EST"}
+        # Verify second capability call
+        assert result.capability_calls[1].id == "tooluse_2"
+        assert result.capability_calls[1].name == "get_time"
+        assert result.capability_calls[1].arguments == {"timezone": "EST"}
     
     def test_transform_response_with_text_and_tool_use(self):
         """Test handling of response with both text and tool use."""
@@ -736,9 +736,9 @@ class TestBedrockToolCalling:
         
         # Verify both text content and tool calls are present
         assert result.content == "Let me check the weather for you. "
-        assert result.tool_calls is not None
-        assert len(result.tool_calls) == 1
-        assert result.tool_calls[0].name == "get_weather"
+        assert result.capability_calls is not None
+        assert len(result.capability_calls) == 1
+        assert result.capability_calls[0].name == "get_weather"
     
     def test_transform_request_with_multiple_capabilities(self):
         """Test transformation with multiple capabilities."""
@@ -838,16 +838,16 @@ class TestBedrockToolCalling:
             messages=[UserMessage(content="What's the weather in Boston?")],
             model="anthropic.claude-3-sonnet-20240229-v1:0",
             capabilities=[mock_capability],
-            tool_choice="auto"
+            capability_choice="auto"
         )
         
         result = provider.complete(request)
         
         # Verify
         assert result.finish_reason == "tool_calls"
-        assert result.has_tool_calls()
-        assert len(result.tool_calls) == 1
-        assert result.tool_calls[0].name == "get_weather"
+        assert result.has_capability_calls()
+        assert len(result.capability_calls) == 1
+        assert result.capability_calls[0].name == "get_weather"
         
         # Verify the API was called with tools
         call_args = mock_client.converse.call_args[1]

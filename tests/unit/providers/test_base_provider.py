@@ -49,6 +49,45 @@ class MockProvider(BaseModelProvider):
         )
     
     def _transform_stream_chunk(self, chunk: Any) -> StreamChunk:
+        """Transform mock stream chunk to StreamChunk."""
+        return StreamChunk(
+            id="test_stream",
+            delta=chunk.get("delta", ""),
+            finish_reason=chunk.get("finish_reason"),
+            index=0
+        )
+    
+    def _call_provider(self, request: dict[str, Any]) -> Any:
+        """Make mock provider API call."""
+        if self.should_fail:
+            raise Exception("Mock provider failure")
+        return {"content": "Mock response"}
+    
+    def _call_provider_stream(self, request: dict[str, Any]) -> Iterator[Any]:
+        """Make mock streaming provider API call."""
+        if self.fail_on_stream:
+            raise Exception("Mock stream failure")
+        yield {"delta": "Mock "}
+        yield {"delta": "stream "}
+        yield {"delta": "response", "finish_reason": "stop"}
+    
+    def _transform_messages(self, messages: list[Any]) -> list[dict[str, Any]]:
+        """Transform Nimbus messages to mock format."""
+        return [{"role": msg.role, "content": msg.content} for msg in messages]
+    
+    def _transform_capabilities(self, capabilities: list[Any]) -> list[dict[str, Any]]:
+        """Transform Nimbus capabilities to mock tool format."""
+        return [{"name": "mock_tool", "description": "Mock tool"}]
+    
+    def _extract_capability_calls(self, response: Any) -> list[Any] | None:
+        """Extract capability calls from mock response."""
+        return None  # Mock provider doesn't support capability calls
+    
+    def format_capability_results(self, results: list[Any]) -> list[dict[str, Any]]:
+        """Format capability results for mock provider."""
+        return [{"mock_result": "formatted"} for _ in results]
+    
+    def _transform_stream_chunk(self, chunk: Any) -> StreamChunk:
         """Transform mock chunk to StreamChunk."""
         return StreamChunk(
             id="stream_id",

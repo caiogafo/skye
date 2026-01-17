@@ -3,46 +3,21 @@
 This module provides the CapabilityCallHandler class for processing capability calls from
 different LLM providers, executing capabilities, and formatting results.
 
-**ARCHITECTURAL DEBT:**
-This module contains provider-specific parsing and formatting methods that violate
-the provider encapsulation principle. All provider-specific logic should be in
-provider client classes, not in core library modules.
+**REFACTORED ARCHITECTURE:**
+This module now follows the provider encapsulation principle by delegating all
+provider-specific parsing and formatting to the provider classes themselves.
 
-Current provider-specific methods:
-- _parse_openai_capability_calls() / _format_openai_results()
-- _parse_anthropic_capability_calls() / _format_anthropic_results()
-- _parse_bedrock_capability_calls() / _format_bedrock_results()
-- _parse_vertex_capability_calls() / _format_vertex_results()
+The CapabilityCallHandler is now a thin delegation layer that:
+- Uses provider.parse_capability_calls() for parsing capability calls
+- Uses provider.format_capability_results() for formatting results
+- Handles capability execution and validation (provider-agnostic logic)
 
-**Future Refactor:**
-Move this logic to provider classes as:
-- provider._parse_capability_calls(response) - Parse from provider response
-- provider._format_capability_results(results) - Format for provider
+This aligns with the provider transformation architecture where all provider-specific
+logic is contained within provider client classes.
 
-This would make CapabilityCallHandler a thin delegation layer like MessageTransformer
-and CapabilityTransformer, fully aligning with the provider encapsulation architecture.
-
-See docs/provider-transformation-architecture.md for complete architecture documentation
-- _parse_bedrock_capability_calls()
-- _parse_vertex_capability_calls()
-- _format_openai_results()
-- _format_anthropic_results()
-- _format_bedrock_results()
-- _format_vertex_results()
-
-In a future refactor, this logic should be moved to provider classes as:
-- provider._parse_capability_calls(response) -> list[CapabilityCall]
-- provider._format_capability_results(results) -> list[dict]
-
-This would make CapabilityCallHandler a thin delegation layer like MessageTransformer
-and CapabilityTransformer, completing the provider encapsulation architecture.
-
-For now, providers already implement _extract_capability_calls() which is used during
-response transformation, so this handler provides an alternative interface for
-capability execution workflows.
+See docs/provider-transformation-architecture.md for complete architecture documentation.
 """
 
-import json
 import logging
 from typing import Any
 
@@ -61,13 +36,14 @@ logger = logging.getLogger(__name__)
 class CapabilityCallHandler:
     """Handler for parsing and executing capability calls from provider responses.
 
-    Processes capability calls from different LLM providers (OpenAI, Anthropic, Bedrock,
-    Azure, Vertex), executes the corresponding capabilities, and formats results
-    for sending back to the provider.
+    Processes capability calls from different LLM providers by delegating parsing
+    and formatting to the provider classes, while handling the provider-agnostic
+    capability execution logic.
 
-    The handler supports provider-specific parsing and formatting while providing
-    a unified interface for capability execution. It validates arguments against capability
-    schemas and handles errors gracefully.
+    The handler now follows the provider encapsulation architecture:
+    - Provider-specific parsing: Delegated to provider.parse_capability_calls()
+    - Provider-agnostic execution: Handled by this class
+    - Provider-specific formatting: Delegated to provider.format_capability_results()
 
     Attributes:
         registry: CapabilityRegistry instance for looking up capabilities
@@ -75,15 +51,16 @@ class CapabilityCallHandler:
     Example:
         >>> registry = CapabilityRegistry.get_instance()
         >>> handler = CapabilityCallHandler(registry)
+        >>> provider = OpenAIProvider(api_key="...")
         >>>
-        >>> # Parse capability calls from provider response
-        >>> capability_calls = handler.parse_capability_calls(response, "openai")
+        >>> # Parse capability calls using provider logic
+        >>> capability_calls = handler.parse_capability_calls(response, provider)
         >>>
-        >>> # Execute capability calls
+        >>> # Execute capability calls (provider-agnostic)
         >>> results = await handler.execute_capability_calls(capability_calls)
         >>>
-        >>> # Format results for provider
-        >>> formatted = handler.format_capability_results(results, "openai")
+        >>> # Format results using provider logic
+        >>> formatted = handler.format_capability_results(results, provider)
     """
 
     def __init__(self, registry: CapabilityRegistry) -> None:
@@ -101,350 +78,50 @@ class CapabilityCallHandler:
     def parse_capability_calls(
         self,
         response: CompletionResponse,
-        provider: str,
+        provider: Any,
     ) -> list[CapabilityCall]:
-        """Parse capability calls from a provider response.
+        """Parse capability calls from a provider response using provider-specific logic.
 
-        Extracts capability calls from the provider-specific response format and
-        converts them to a unified CapabilityCall format. Supports OpenAI, Anthropic,
-        Bedrock, Azure, and Vertex AI response formats.
+        Delegates to the provider's parse_capability_calls method to handle
+        provider-specific response formats. This ensures all provider-specific
+        logic is contained within the provider classes.
 
         Args:
             response: CompletionResponse from the provider
-            provider: Provider name ('openai', 'anthropic', 'bedrock', 'azure', 'vertex')
+            provider: Provider instance with parse_capability_calls method
 
         Returns:
             List of CapabilityCall objects parsed from the response
 
         Raises:
-            ToolCallParsingError: If parsing fails or format is invalid
+            ToolCallParsingError: If parsing fails or provider doesn't support capability calls
 
         Example:
             >>> handler = CapabilityCallHandler(registry)
-            >>> capability_calls = handler.parse_capability_calls(response, "openai")
+            >>> provider = OpenAIProvider(api_key="...")
+            >>> capability_calls = handler.parse_capability_calls(response, provider)
             >>> for call in capability_calls:
             ...     print(f"{call.name}: {call.arguments}")
         """
-        provider_lower = provider.lower()
-
         try:
-            if provider_lower in ("openai", "azure"):
-                return self._parse_openai_capability_calls(response)
-            elif provider_lower == "anthropic":
-                return self._parse_anthropic_capability_calls(response)
-            elif provider_lower == "bedrock":
-                return self._parse_bedrock_capability_calls(response)
-            elif provider_lower == "vertex":
-                return self._parse_vertex_capability_calls(response)
-            else:
+            if not hasattr(provider, 'parse_capability_calls'):
                 raise ToolCallParsingError(
-                    f"Unsupported provider: {provider}",
-                    provider=provider,
+                    f"Provider {type(provider).__name__} does not support capability call parsing",
+                    provider=type(provider).__name__,
                 )
+            
+            capability_calls = provider.parse_capability_calls(response)
+            return capability_calls or []
+            
         except ToolCallParsingError:
             raise
         except Exception as e:
+            provider_name = getattr(provider, '__class__', type(provider)).__name__
             raise ToolCallParsingError(
-                f"Failed to parse capability calls from {provider}: {e}",
-                provider=provider,
+                f"Failed to parse capability calls from {provider_name}: {e}",
+                provider=provider_name,
                 original_error=str(e),
             ) from e
-
-    def _parse_openai_capability_calls(
-        self,
-        response: CompletionResponse,
-    ) -> list[CapabilityCall]:
-        """Parse capability calls from OpenAI/Azure response format.
-
-        OpenAI format:
-        {
-            "tool_calls": [
-                {
-                    "id": "call_123",
-                    "type": "function",
-                    "function": {
-                        "name": "get_weather",
-                        "arguments": "{\"location\": \"San Francisco\"}"
-                    }
-                }
-            ]
-        }
-
-        Args:
-            response: CompletionResponse from OpenAI/Azure
-
-        Returns:
-            List of CapabilityCall objects
-
-        Raises:
-            ToolCallParsingError: If parsing fails
-        """
-        tool_calls_data = response.metadata.get("tool_calls", [])
-        if not tool_calls_data:
-            return []
-
-        capability_calls = []
-        for call_data in tool_calls_data:
-            try:
-                call_id = call_data.get("id")
-                if not call_id:
-                    raise ValueError("Missing tool call id")
-
-                function_data = call_data.get("function", {})
-                name = function_data.get("name")
-                if not name:
-                    raise ValueError("Missing function name")
-
-                # Parse arguments JSON string
-                arguments_str = function_data.get("arguments", "{}")
-                try:
-                    arguments = json.loads(arguments_str)
-                except json.JSONDecodeError as e:
-                    raise ValueError(f"Invalid JSON in arguments: {e}") from e
-
-                capability_calls.append(
-                    CapabilityCall(
-                        id=call_id,
-                        name=name,
-                        arguments=arguments,
-                    )
-                )
-            except Exception as e:
-                logger.warning(
-                    "Failed to parse OpenAI capability call",
-                    extra={"error": str(e), "call_data": call_data},
-                )
-                raise ToolCallParsingError(
-                    f"Failed to parse OpenAI capability call: {e}",
-                    provider="openai",
-                    call_data=call_data,
-                ) from e
-
-        return capability_calls
-
-    def _parse_anthropic_capability_calls(
-        self,
-        response: CompletionResponse,
-    ) -> list[CapabilityCall]:
-        """Parse capability calls from Anthropic response format.
-
-        Anthropic format:
-        {
-            "content": [
-                {
-                    "type": "tool_use",
-                    "id": "toolu_123",
-                    "name": "get_weather",
-                    "input": {"location": "San Francisco"}
-                }
-            ]
-        }
-
-        Args:
-            response: CompletionResponse from Anthropic
-
-        Returns:
-            List of CapabilityCall objects
-
-        Raises:
-            ToolCallParsingError: If parsing fails
-        """
-        content_blocks = response.metadata.get("content", [])
-        if not content_blocks:
-            return []
-
-        capability_calls = []
-        for block in content_blocks:
-            try:
-                if block.get("type") != "tool_use":
-                    continue
-
-                call_id = block.get("id")
-                if not call_id:
-                    raise ValueError("Missing tool use id")
-
-                name = block.get("name")
-                if not name:
-                    raise ValueError("Missing tool name")
-
-                # Anthropic uses "input" instead of "arguments"
-                arguments = block.get("input", {})
-
-                capability_calls.append(
-                    CapabilityCall(
-                        id=call_id,
-                        name=name,
-                        arguments=arguments,
-                    )
-                )
-            except Exception as e:
-                logger.warning(
-                    "Failed to parse Anthropic capability call",
-                    extra={"error": str(e), "block": block},
-                )
-                raise ToolCallParsingError(
-                    f"Failed to parse Anthropic capability call: {e}",
-                    provider="anthropic",
-                    block=block,
-                ) from e
-
-        return capability_calls
-
-    def _parse_bedrock_capability_calls(
-        self,
-        response: CompletionResponse,
-    ) -> list[CapabilityCall]:
-        """Parse capability calls from Bedrock response format.
-
-        Bedrock format (Converse API):
-        {
-            "output": {
-                "message": {
-                    "content": [
-                        {
-                            "toolUse": {
-                                "toolUseId": "tooluse_123",
-                                "name": "get_weather",
-                                "input": {"location": "San Francisco"}
-                            }
-                        }
-                    ]
-                }
-            }
-        }
-
-        Args:
-            response: CompletionResponse from Bedrock
-
-        Returns:
-            List of CapabilityCall objects
-
-        Raises:
-            ToolCallParsingError: If parsing fails
-        """
-        # Bedrock stores capability calls in nested structure
-        output = response.metadata.get("output", {})
-        message = output.get("message", {})
-        content_blocks = message.get("content", [])
-
-        if not content_blocks:
-            return []
-
-        capability_calls = []
-        for block in content_blocks:
-            try:
-                tool_use = block.get("toolUse")
-                if not tool_use:
-                    continue
-
-                call_id = tool_use.get("toolUseId")
-                if not call_id:
-                    raise ValueError("Missing toolUseId")
-
-                name = tool_use.get("name")
-                if not name:
-                    raise ValueError("Missing tool name")
-
-                arguments = tool_use.get("input", {})
-
-                capability_calls.append(
-                    CapabilityCall(
-                        id=call_id,
-                        name=name,
-                        arguments=arguments,
-                    )
-                )
-            except Exception as e:
-                logger.warning(
-                    "Failed to parse Bedrock capability call",
-                    extra={"error": str(e), "block": block},
-                )
-                raise ToolCallParsingError(
-                    f"Failed to parse Bedrock capability call: {e}",
-                    provider="bedrock",
-                    block=block,
-                ) from e
-
-        return capability_calls
-
-    def _parse_vertex_capability_calls(
-        self,
-        response: CompletionResponse,
-    ) -> list[CapabilityCall]:
-        """Parse capability calls from Vertex AI response format.
-
-        Vertex format (Gemini):
-        {
-            "candidates": [
-                {
-                    "content": {
-                        "parts": [
-                            {
-                                "functionCall": {
-                                    "name": "get_weather",
-                                    "args": {"location": "San Francisco"}
-                                }
-                            }
-                        ]
-                    }
-                }
-            ]
-        }
-
-        Args:
-            response: CompletionResponse from Vertex AI
-
-        Returns:
-            List of CapabilityCall objects
-
-        Raises:
-            ToolCallParsingError: If parsing fails
-        """
-        candidates = response.metadata.get("candidates", [])
-        if not candidates:
-            return []
-
-        capability_calls = []
-        # Process first candidate
-        candidate = candidates[0]
-        content = candidate.get("content", {})
-        parts = content.get("parts", [])
-
-        for idx, part in enumerate(parts):
-            try:
-                function_call = part.get("functionCall")
-                if not function_call:
-                    continue
-
-                name = function_call.get("name")
-                if not name:
-                    raise ValueError("Missing function name")
-
-                # Vertex uses "args" instead of "arguments"
-                arguments = function_call.get("args", {})
-
-                # Generate ID since Vertex doesn't provide one
-                call_id = f"vertex_call_{idx}"
-
-                capability_calls.append(
-                    CapabilityCall(
-                        id=call_id,
-                        name=name,
-                        arguments=arguments,
-                    )
-                )
-            except Exception as e:
-                logger.warning(
-                    "Failed to parse Vertex capability call",
-                    extra={"error": str(e), "part": part},
-                )
-                raise ToolCallParsingError(
-                    f"Failed to parse Vertex capability call: {e}",
-                    provider="vertex",
-                    part=part,
-                ) from e
-
-        return capability_calls
 
     async def execute_capability_calls(
         self,
@@ -455,6 +132,8 @@ class CapabilityCallHandler:
         Executes each capability call by looking up the capability in the registry,
         validating arguments, and executing the capability. Handles errors
         gracefully by capturing them in the CapabilityResult.
+
+        This method is provider-agnostic and handles the core capability execution logic.
 
         Args:
             capability_calls: List of CapabilityCall objects to execute
@@ -637,25 +316,27 @@ class CapabilityCallHandler:
     def format_capability_results(
         self,
         results: list[CapabilityResult],
-        provider: str,
+        provider: Any,
     ) -> list[dict[str, Any]]:
-        """Format capability results for sending back to provider.
+        """Format capability results for sending back to provider using provider-specific logic.
 
-        Converts CapabilityResult objects to provider-specific format for sending
-        back to the LLM. Each provider expects results in a different format.
+        Delegates to the provider's format_capability_results method to handle
+        provider-specific result formats. This ensures all provider-specific
+        logic is contained within the provider classes.
 
         Args:
             results: List of CapabilityResult objects to format
-            provider: Provider name ('openai', 'anthropic', 'bedrock', 'azure', 'vertex')
+            provider: Provider instance with format_capability_results method
 
         Returns:
             List of formatted result dictionaries
 
         Raises:
-            ToolCallParsingError: If formatting fails
+            ToolCallParsingError: If formatting fails or provider doesn't support capability results
 
         Example:
             >>> handler = CapabilityCallHandler(registry)
+            >>> provider = OpenAIProvider(api_key="...")
             >>> results = [
             ...     CapabilityResult(
             ...         capability_call_id="call_1",
@@ -663,203 +344,23 @@ class CapabilityCallHandler:
             ...         result={"temp": 72}
             ...     )
             ... ]
-            >>> formatted = handler.format_capability_results(results, "openai")
+            >>> formatted = handler.format_capability_results(results, provider)
         """
-        provider_lower = provider.lower()
-
         try:
-            if provider_lower in ("openai", "azure"):
-                return self._format_openai_results(results)
-            elif provider_lower == "anthropic":
-                return self._format_anthropic_results(results)
-            elif provider_lower == "bedrock":
-                return self._format_bedrock_results(results)
-            elif provider_lower == "vertex":
-                return self._format_vertex_results(results)
-            else:
+            if not hasattr(provider, 'format_capability_results'):
                 raise ToolCallParsingError(
-                    f"Unsupported provider: {provider}",
-                    provider=provider,
+                    f"Provider {type(provider).__name__} does not support capability result formatting",
+                    provider=type(provider).__name__,
                 )
+            
+            return provider.format_capability_results(results)
+            
         except ToolCallParsingError:
             raise
         except Exception as e:
+            provider_name = getattr(provider, '__class__', type(provider)).__name__
             raise ToolCallParsingError(
-                f"Failed to format capability results for {provider}: {e}",
-                provider=provider,
+                f"Failed to format capability results for {provider_name}: {e}",
+                provider=provider_name,
                 original_error=str(e),
             ) from e
-
-    def _format_openai_results(
-        self,
-        results: list[CapabilityResult],
-    ) -> list[dict[str, Any]]:
-        """Format results for OpenAI/Azure.
-
-        OpenAI format:
-        {
-            "tool_call_id": "call_123",
-            "role": "tool",
-            "content": "{\"result\": \"value\"}"
-        }
-
-        Args:
-            results: List of CapabilityResult objects
-
-        Returns:
-            List of formatted result dictionaries
-        """
-        formatted = []
-        for result in results:
-            # Convert result to JSON string
-            if result.error:
-                content = json.dumps({"error": result.error})
-            elif isinstance(result.result, str):
-                content = result.result
-            else:
-                content = json.dumps(result.result)
-
-            formatted.append(
-                {
-                    "tool_call_id": result.capability_call_id,
-                    "role": "tool",
-                    "content": content,
-                }
-            )
-
-        return formatted
-
-    def _format_anthropic_results(
-        self,
-        results: list[CapabilityResult],
-    ) -> list[dict[str, Any]]:
-        """Format results for Anthropic.
-
-        Anthropic format:
-        {
-            "type": "tool_result",
-            "tool_use_id": "toolu_123",
-            "content": "{\"result\": \"value\"}"
-        }
-
-        Args:
-            results: List of CapabilityResult objects
-
-        Returns:
-            List of formatted result dictionaries
-        """
-        formatted = []
-        for result in results:
-            # Convert result to JSON string
-            if result.error:
-                content = json.dumps({"error": result.error})
-            elif isinstance(result.result, str):
-                content = result.result
-            else:
-                content = json.dumps(result.result)
-
-            formatted.append(
-                {
-                    "type": "tool_result",
-                    "tool_use_id": result.capability_call_id,
-                    "content": content,
-                }
-            )
-
-        return formatted
-
-    def _format_bedrock_results(
-        self,
-        results: list[CapabilityResult],
-    ) -> list[dict[str, Any]]:
-        """Format results for Bedrock.
-
-        Bedrock format:
-        {
-            "toolResult": {
-                "toolUseId": "tooluse_123",
-                "content": [
-                    {
-                        "json": {"result": "value"}
-                    }
-                ]
-            }
-        }
-
-        Args:
-            results: List of CapabilityResult objects
-
-        Returns:
-            List of formatted result dictionaries
-        """
-        formatted = []
-        for result in results:
-            # Convert result to appropriate format
-            if result.error:
-                result_data = {"error": result.error}
-            elif isinstance(result.result, dict):
-                result_data = result.result
-            elif isinstance(result.result, str):
-                try:
-                    result_data = json.loads(result.result)
-                except json.JSONDecodeError:
-                    result_data = {"result": result.result}
-            else:
-                result_data = {"result": result.result}
-
-            formatted.append(
-                {
-                    "toolResult": {
-                        "toolUseId": result.capability_call_id,
-                        "content": [{"json": result_data}],
-                    }
-                }
-            )
-
-        return formatted
-
-    def _format_vertex_results(
-        self,
-        results: list[CapabilityResult],
-    ) -> list[dict[str, Any]]:
-        """Format results for Vertex AI.
-
-        Vertex format:
-        {
-            "functionResponse": {
-                "name": "get_weather",
-                "response": {"result": "value"}
-            }
-        }
-
-        Args:
-            results: List of CapabilityResult objects
-
-        Returns:
-            List of formatted result dictionaries
-        """
-        formatted = []
-        for result in results:
-            # Convert result to appropriate format
-            if result.error:
-                response_data = {"error": result.error}
-            elif isinstance(result.result, dict):
-                response_data = result.result
-            elif isinstance(result.result, str):
-                try:
-                    response_data = json.loads(result.result)
-                except json.JSONDecodeError:
-                    response_data = {"result": result.result}
-            else:
-                response_data = {"result": result.result}
-
-            formatted.append(
-                {
-                    "functionResponse": {
-                        "name": result.name,
-                        "response": response_data,
-                    }
-                }
-            )
-
-        return formatted

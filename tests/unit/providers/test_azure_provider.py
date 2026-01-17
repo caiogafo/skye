@@ -662,7 +662,7 @@ class TestAzureOpenAIToolCalling:
             messages=[UserMessage(content="What's the weather in NYC?")],
             model="gpt-4",
             capabilities=[mock_capability],
-            tool_choice="auto"
+            capability_choice="auto"
         )
         
         result = provider._transform_request(request)
@@ -675,8 +675,8 @@ class TestAzureOpenAIToolCalling:
         assert result["tools"][0]["function"]["description"] == "Get weather for a location"
         assert result["tool_choice"] == "auto"
     
-    def test_transform_request_with_specific_tool_choice(self) -> None:
-        """Test transformation with specific tool name in tool_choice."""
+    def test_transform_request_with_specific_capability_choice(self) -> None:
+        """Test transformation with specific capability name in capability_choice."""
         # Mock capability
         mock_capability = Mock()
         mock_schema = Mock()
@@ -696,7 +696,7 @@ class TestAzureOpenAIToolCalling:
             messages=[UserMessage(content="What's the weather?")],
             model="gpt-4",
             capabilities=[mock_capability],
-            tool_choice="get_weather"
+            capability_choice="get_weather"
         )
         
         result = provider._transform_request(request)
@@ -727,7 +727,7 @@ class TestAzureOpenAIToolCalling:
             messages=[UserMessage(content="Calculate 2+2")],
             model="gpt-4",
             capabilities=[mock_capability],
-            tool_choice="required"
+            capability_choice="required"
         )
         
         result = provider._transform_request(request)
@@ -774,15 +774,15 @@ class TestAzureOpenAIToolCalling:
         
         result = provider._transform_response(mock_response)
         
-        # Verify tool_calls are present in response
-        assert result.tool_calls is not None
-        assert len(result.tool_calls) == 1
+        # Verify capability_calls are present in response
+        assert result.capability_calls is not None
+        assert len(result.capability_calls) == 1
         
         # Verify CapabilityCall object structure
-        tool_call = result.tool_calls[0]
-        assert tool_call.id == "call_abc123"
-        assert tool_call.name == "get_weather"
-        assert tool_call.arguments == {"location": "San Francisco", "unit": "celsius"}
+        capability_call = result.capability_calls[0]
+        assert capability_call.id == "call_abc123"
+        assert capability_call.name == "get_weather"
+        assert capability_call.arguments == {"location": "San Francisco", "unit": "celsius"}
         
         # Verify metadata also contains raw tool calls
         assert result.metadata["tool_calls"] is not None
@@ -835,19 +835,19 @@ class TestAzureOpenAIToolCalling:
         
         result = provider._transform_response(mock_response)
         
-        # Verify both tool calls are present
-        assert result.tool_calls is not None
-        assert len(result.tool_calls) == 2
+        # Verify both capability calls are present
+        assert result.capability_calls is not None
+        assert len(result.capability_calls) == 2
         
-        # Verify first tool call
-        assert result.tool_calls[0].id == "call_1"
-        assert result.tool_calls[0].name == "get_weather"
-        assert result.tool_calls[0].arguments == {"location": "NYC"}
+        # Verify first capability call
+        assert result.capability_calls[0].id == "call_1"
+        assert result.capability_calls[0].name == "get_weather"
+        assert result.capability_calls[0].arguments == {"location": "NYC"}
         
-        # Verify second tool call
-        assert result.tool_calls[1].id == "call_2"
-        assert result.tool_calls[1].name == "get_time"
-        assert result.tool_calls[1].arguments == {"timezone": "EST"}
+        # Verify second capability call
+        assert result.capability_calls[1].id == "call_2"
+        assert result.capability_calls[1].name == "get_time"
+        assert result.capability_calls[1].arguments == {"timezone": "EST"}
     
     def test_transform_response_with_invalid_json_arguments(self) -> None:
         """Test handling of tool calls with invalid JSON arguments."""
@@ -888,10 +888,10 @@ class TestAzureOpenAIToolCalling:
         
         result = provider._transform_response(mock_response)
         
-        # Verify tool call is still created with empty arguments
-        assert result.tool_calls is not None
-        assert len(result.tool_calls) == 1
-        assert result.tool_calls[0].arguments == {}
+        # Verify capability call is still created with empty arguments
+        assert result.capability_calls is not None
+        assert len(result.capability_calls) == 1
+        assert result.capability_calls[0].arguments == {}
     
     def test_transform_request_with_multiple_capabilities(self) -> None:
         """Test transformation with multiple capabilities."""
@@ -996,16 +996,16 @@ class TestAzureOpenAIToolCalling:
             messages=[UserMessage(content="What's the weather in Boston?")],
             model="gpt-4",
             capabilities=[mock_capability],
-            tool_choice="auto"
+            capability_choice="auto"
         )
         
         result = provider.complete(request)
         
         # Verify
         assert result.finish_reason == "tool_calls"
-        assert result.has_tool_calls()
-        assert len(result.tool_calls) == 1
-        assert result.tool_calls[0].name == "get_weather"
+        assert result.has_capability_calls()
+        assert len(result.capability_calls) == 1
+        assert result.capability_calls[0].name == "get_weather"
         
         # Verify the API was called with tools
         call_args = mock_client.chat.completions.create.call_args
