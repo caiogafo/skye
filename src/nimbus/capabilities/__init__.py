@@ -22,7 +22,7 @@ from nimbus.capabilities.exceptions import (
     CapabilityExecutionError,
     CapabilityNotFoundError,
     CapabilityValidationError,
-    ToolCallParsingError,
+    CapabilityCallParsingError,
 )
 from nimbus.capabilities.interface import CapabilityInterface
 from nimbus.capabilities.local_function import LocalFunctionCapability
@@ -50,5 +50,5 @@ __all__ = [
     "CapabilityExecutionError",
     "CapabilityNotFoundError",
     "CapabilityValidationError",
-    "ToolCallParsingError",
+    "CapabilityCallParsingError",
 ]

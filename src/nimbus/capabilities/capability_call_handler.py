@@ -24,7 +24,7 @@ from typing import Any
 from nimbus.capabilities.exceptions import (
     CapabilityNotFoundError,
     CapabilityValidationError,
-    ToolCallParsingError,
+    CapabilityCallParsingError,
 )
 from nimbus.capabilities.registry import CapabilityRegistry
 from nimbus.capabilities.capability_models import CapabilityCall, CapabilityResult
@@ -94,7 +94,7 @@ class CapabilityCallHandler:
             List of CapabilityCall objects parsed from the response
 
         Raises:
-            ToolCallParsingError: If parsing fails or provider doesn't support capability calls
+            CapabilityCallParsingError: If parsing fails or provider doesn't support capability calls
 
         Example:
             >>> handler = CapabilityCallHandler(registry)
@@ -105,7 +105,7 @@ class CapabilityCallHandler:
         """
         try:
             if not hasattr(provider, 'parse_capability_calls'):
-                raise ToolCallParsingError(
+                raise CapabilityCallParsingError(
                     f"Provider {type(provider).__name__} does not support capability call parsing",
                     provider=type(provider).__name__,
                 )
@@ -113,11 +113,11 @@ class CapabilityCallHandler:
             capability_calls = provider.parse_capability_calls(response)
             return capability_calls or []
             
-        except ToolCallParsingError:
+        except CapabilityCallParsingError:
             raise
         except Exception as e:
             provider_name = getattr(provider, '__class__', type(provider)).__name__
-            raise ToolCallParsingError(
+            raise CapabilityCallParsingError(
                 f"Failed to parse capability calls from {provider_name}: {e}",
                 provider=provider_name,
                 original_error=str(e),
@@ -332,7 +332,7 @@ class CapabilityCallHandler:
             List of formatted result dictionaries
 
         Raises:
-            ToolCallParsingError: If formatting fails or provider doesn't support capability results
+            CapabilityCallParsingError: If formatting fails or provider doesn't support capability results
 
         Example:
             >>> handler = CapabilityCallHandler(registry)
@@ -348,18 +348,18 @@ class CapabilityCallHandler:
         """
         try:
             if not hasattr(provider, 'format_capability_results'):
-                raise ToolCallParsingError(
+                raise CapabilityCallParsingError(
                     f"Provider {type(provider).__name__} does not support capability result formatting",
                     provider=type(provider).__name__,
                 )
             
             return provider.format_capability_results(results)
             
-        except ToolCallParsingError:
+        except CapabilityCallParsingError:
             raise
         except Exception as e:
             provider_name = getattr(provider, '__class__', type(provider)).__name__
-            raise ToolCallParsingError(
+            raise CapabilityCallParsingError(
                 f"Failed to format capability results for {provider_name}: {e}",
                 provider=provider_name,
                 original_error=str(e),

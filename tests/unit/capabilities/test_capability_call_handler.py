@@ -4,7 +4,7 @@ import json
 
 import pytest
 
-from nimbus.capabilities.exceptions import ToolCallParsingError
+from nimbus.capabilities.exceptions import CapabilityCallParsingError
 from nimbus.capabilities.interface import CapabilityInterface
 from nimbus.capabilities.registry import CapabilityRegistry
 from nimbus.capabilities.schema import CapabilitySchema
@@ -84,8 +84,7 @@ class MockProvider:
         for call_data in tool_calls_data:
             call_id = call_data.get("id")
             if not call_id:
-                from nimbus.capabilities.exceptions import ToolCallParsingError
-                raise ToolCallParsingError("Missing tool call id", provider="openai")
+                raise CapabilityCallParsingError("Missing tool call id", provider="openai")
                 
             function_data = call_data.get("function", {})
             name = function_data.get("name")
@@ -94,8 +93,7 @@ class MockProvider:
             try:
                 arguments = json.loads(arguments_str)
             except json.JSONDecodeError as e:
-                from nimbus.capabilities.exceptions import ToolCallParsingError
-                raise ToolCallParsingError(f"Invalid JSON in arguments: {e}", provider="openai")
+                raise CapabilityCallParsingError(f"Invalid JSON in arguments: {e}", provider="openai")
 
             capability_calls.append(
                 CapabilityCall(id=call_id, name=name, arguments=arguments)
@@ -427,7 +425,7 @@ class TestParseOpenAICapabilityCalls:
             },
         )
 
-        with pytest.raises(ToolCallParsingError) as exc_info:
+        with pytest.raises(CapabilityCallParsingError) as exc_info:
             handler.parse_capability_calls(response, openai_provider)
 
         assert "Invalid JSON" in str(exc_info.value)
@@ -453,7 +451,7 @@ class TestParseOpenAICapabilityCalls:
             },
         )
 
-        with pytest.raises(ToolCallParsingError):
+        with pytest.raises(CapabilityCallParsingError):
             handler.parse_capability_calls(response, openai_provider)
 
 
@@ -730,7 +728,7 @@ class TestParseUnsupportedProvider:
             usage=TokenUsage(prompt_tokens=10, completion_tokens=5, total_tokens=15),
         )
 
-        with pytest.raises(ToolCallParsingError) as exc_info:
+        with pytest.raises(CapabilityCallParsingError) as exc_info:
             handler.parse_capability_calls(response, unsupported_provider)
 
         assert "does not support capability call parsing" in str(exc_info.value)
@@ -1047,7 +1045,7 @@ class TestFormatUnsupportedProvider:
             )
         ]
 
-        with pytest.raises(ToolCallParsingError) as exc_info:
+        with pytest.raises(CapabilityCallParsingError) as exc_info:
             handler.format_capability_results(results, unsupported_provider)
 
         assert "does not support capability result formatting" in str(exc_info.value)

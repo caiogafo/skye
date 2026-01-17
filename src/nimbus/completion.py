@@ -78,10 +78,10 @@ class CompletionRequest(BaseModel):
         top_p: Nucleus sampling parameter (0.0-1.0).
         stop: List of sequences that will stop generation.
         stream: Whether to stream the response.
-        capabilities: List of capabilities/tools available to the model
+        capabilities: List of capabilities available to the model
             (requires nimbus[capabilities]).
         capability_choice: How the model should choose capabilities ('auto', 'required', or specific capability name).
-        mcp_servers: List of MCP server configurations to load tools from
+        mcp_servers: List of MCP server configurations to load capabilities from
             (requires nimbus[mcp]). Each config should contain server connection details.
         response_format: Format specification for structured outputs.
         response_schema: Pydantic model class for structured output validation.
@@ -108,7 +108,7 @@ class CompletionRequest(BaseModel):
         'math_solver'
 
     Example (With nimbus[capabilities]):
-        >>> # Using capabilities/tools (requires nimbus[capabilities])
+        >>> # Using capabilities (requires nimbus[capabilities])
         >>> from nimbus.capabilities import LocalFunctionCapability
         >>>
         >>> def get_weather(location: str) -> str:
@@ -193,7 +193,7 @@ class CompletionResponse(BaseModel):
     """Response from model completion.
 
     Represents the response from an LLM provider, including the generated content,
-    token usage, optional structured output, and tool calls.
+    token usage, optional structured output, and capability calls.
 
     Attributes:
         id: Unique identifier for the response.

@@ -7,7 +7,7 @@ Features:
 - Lazy loading of Azure SDK
 - Azure-specific configuration (endpoint, deployment, API version)
 - Structured outputs via response_format
-- Function/tool calling
+- Function calling
 - Streaming support
 - Async support with AsyncAzureOpenAI
 - Multimodal inputs (images)
@@ -110,7 +110,7 @@ class AzureOpenAIProvider(BaseModelProvider):
         """Transform Nimbus messages to Azure OpenAI format.
         
         Azure OpenAI uses the same format as OpenAI: a simple role-content format
-        with tool calls as a separate field. System messages are included in the
+        with capability calls as a separate field. System messages are included in the
         messages array.
         
         Args:
@@ -177,7 +177,7 @@ class AzureOpenAIProvider(BaseModelProvider):
     def _extract_capability_calls(self, response: Any) -> list[Any] | None:
         """Extract capability calls from Azure OpenAI response.
         
-        Azure OpenAI uses the same format as OpenAI for tool calls.
+        Azure OpenAI uses the same format as OpenAI for capability calls.
         
         Args:
             response: Azure OpenAI response object
@@ -256,7 +256,7 @@ class AzureOpenAIProvider(BaseModelProvider):
         elif request.response_format:
             azure_request["response_format"] = request.response_format
         
-        # Handle capabilities/tool calling (Azure uses OpenAI-compatible format)
+        # Handle capabilities (Azure uses OpenAI-compatible format)
         if request.capabilities:
             # Convert capabilities to Azure/OpenAI format using internal method
             azure_request["tools"] = self._transform_capabilities(request.capabilities)
@@ -299,12 +299,12 @@ class AzureOpenAIProvider(BaseModelProvider):
             structured_output = message.parsed
         
         # Extract capability calls using internal method
-        tool_calls_list = self._extract_capability_calls(response)
+        capability_calls_list = self._extract_capability_calls(response)
         
-        # Store raw tool calls in metadata for compatibility
-        tool_calls_metadata = None
+        # Store raw capability calls in metadata for compatibility
+        capability_calls_metadata = None
         if hasattr(message, "tool_calls") and message.tool_calls:
-            tool_calls_metadata = [
+            capability_calls_metadata = [
                 {
                     "id": tc.id,
                     "type": tc.type,
@@ -329,10 +329,10 @@ class AzureOpenAIProvider(BaseModelProvider):
                 completion_tokens=response.usage.completion_tokens,
                 total_tokens=response.usage.total_tokens
             ),
-            capability_calls=tool_calls_list,
+            capability_calls=capability_calls_list,
             created_at=datetime.fromtimestamp(response.created, tz=timezone.utc),
             metadata={
-                "tool_calls": tool_calls_metadata
+                "tool_calls": capability_calls_metadata
             }
         )
     

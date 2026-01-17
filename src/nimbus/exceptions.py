@@ -108,7 +108,7 @@ class ValidationError(NimbusError):
 class CapabilityExecutionError(NimbusError):
     """Error during capability execution.
 
-    Raised when a capability (tool/function) fails to execute properly.
+    Raised when a capability fails to execute properly.
 
     Args:
         message: Human-readable error message

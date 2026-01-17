@@ -14,8 +14,8 @@ and makes it easy to add new providers without modifying core code.
 
 Each provider client handles ALL transformations for that provider:
 - Message format conversion (Nimbus messages → provider format)
-- Capability/tool format conversion (Nimbus capabilities → provider tools)
-- Tool call extraction (provider response → Nimbus CapabilityCall objects)
+- Capability format conversion (Nimbus capabilities → provider capabilities)
+- Capability call extraction (provider response → Nimbus CapabilityCall objects)
 - Parameter mapping and provider-specific options
 
 ### Core Library Provider Agnosticism
@@ -64,8 +64,8 @@ class BaseModelProvider(ModelInterface, ABC):
     
     Each provider client handles ALL transformations for that provider:
     - Message format conversion (Nimbus messages → provider format)
-    - Capability/tool format conversion (Nimbus capabilities → provider tools)
-    - Tool call extraction (provider response → Nimbus CapabilityCall objects)
+    - Capability format conversion (Nimbus capabilities → provider capabilities)
+    - Capability call extraction (provider response → Nimbus CapabilityCall objects)
     - Parameter mapping and provider-specific options
     
     Subclasses must implement:
@@ -104,7 +104,7 @@ class BaseModelProvider(ModelInterface, ABC):
         ...
         ...     def _extract_capability_calls(self, response):
         ...         # Extract capability calls from OpenAI response
-        ...         return [CapabilityCall(...) for tc in response.tool_calls]
+        ...         return [CapabilityCall(...) for tc in response.capability_calls]
         ...
         ...     # ... implement other abstract methods
     """
@@ -273,7 +273,7 @@ class BaseModelProvider(ModelInterface, ABC):
         **Provider-Specific Responsibilities:**
         - Convert Nimbus message objects to provider's message format
         - Handle system messages (some providers require separate handling)
-        - Handle capability/tool messages and results
+        - Handle capability messages and results
         - Handle multimodal content (images, etc.)
         - Map message roles to provider-specific roles
         
@@ -301,23 +301,23 @@ class BaseModelProvider(ModelInterface, ABC):
     
     @abstractmethod
     def _transform_capabilities(self, capabilities: list[Any]) -> list[dict[str, Any]]:
-        """Transform Nimbus capabilities to provider-specific tool format.
+        """Transform Nimbus capabilities to provider-specific capability format.
         
-        This method encapsulates all provider-specific capability/tool transformation
-        logic. Each provider has different requirements for tool definitions, and this
+        This method encapsulates all provider-specific capability transformation
+        logic. Each provider has different requirements for capability definitions, and this
         method handles those differences.
         
         **Provider-Specific Responsibilities:**
-        - Convert CapabilityInterface objects to provider's tool format
-        - Generate proper JSON Schema for tool parameters
-        - Handle provider-specific tool metadata
+        - Convert CapabilityInterface objects to provider's capability format
+        - Generate proper JSON Schema for capability parameters
+        - Handle provider-specific capability metadata
         - Map capability names and descriptions appropriately
         
         Args:
             capabilities: List of CapabilityInterface objects
             
         Returns:
-            List of dictionaries in provider-specific tool format
+            List of dictionaries in provider-specific capability format
             
         Example (OpenAI):
             >>> def _transform_capabilities(self, capabilities):
@@ -352,7 +352,7 @@ class BaseModelProvider(ModelInterface, ABC):
     def _extract_capability_calls(self, response: Any) -> list[Any] | None:
         """Extract capability calls from provider response.
         
-        This method encapsulates provider-specific logic for extracting tool/function
+        This method encapsulates provider-specific logic for extracting capability
         calls from the provider's response and converting them to Nimbus CapabilityCall
         objects.
         
@@ -371,14 +371,14 @@ class BaseModelProvider(ModelInterface, ABC):
             
         Example (OpenAI):
             >>> def _extract_capability_calls(self, response):
-            ...     if not hasattr(response.choices[0].message, "tool_calls"):
+            ...     if not hasattr(response.choices[0].message, "capability_calls"):
             ...         return None
             ...     
             ...     from nimbus.capabilities.capability_models import CapabilityCall
             ...     import json
             ...     
             ...     capability_calls = []
-            ...     for tc in response.choices[0].message.tool_calls:
+            ...     for tc in response.choices[0].message.capability_calls:
             ...         capability_calls.append(
             ...             CapabilityCall(
             ...                 id=tc.id,

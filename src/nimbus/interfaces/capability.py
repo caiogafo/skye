@@ -1,6 +1,6 @@
-"""Capability interface for tools and functions.
+"""Capability interface for capabilities and functions.
 
-This module defines the abstract interface for capabilities (tools/functions)
+This module defines the abstract interface for capabilities (functions)
 that agents can invoke. It includes schema definition for LLM function calling.
 
 Example:
@@ -60,7 +60,7 @@ class CapabilitySchema(BaseModel):
 
 
 class CapabilityInterface(ABC):
-    """Abstract interface for agent capabilities (tools).
+    """Abstract interface for agent capabilities.
 
     This interface defines the contract for executable capabilities that extend
     agent functionality. Capabilities can be synchronous or asynchronous and

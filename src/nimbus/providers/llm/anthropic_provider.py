@@ -34,7 +34,7 @@ from nimbus.messages import AssistantMessage
 from nimbus.providers.base import BaseModelProvider
 from nimbus.providers.lazy_import import LazyImporter
 
-# Import CapabilityCall for tool call extraction
+# Import CapabilityCall for capability call extraction
 try:
     from nimbus.capabilities.capability_models import CapabilityCall
     CAPABILITIES_AVAILABLE = True
@@ -306,14 +306,14 @@ class AnthropicProvider(BaseModelProvider):
         """
         # Extract content
         content_text = ""
-        tool_calls_metadata = []
+        capability_calls_metadata = []
         
         for content_block in response.content:
             if content_block.type == "text":
                 content_text += content_block.text
             elif content_block.type == "tool_use":
                 # Store in metadata for compatibility
-                tool_calls_metadata.append({
+                capability_calls_metadata.append({
                     "id": content_block.id,
                     "type": "function",
                     "function": {
@@ -345,7 +345,7 @@ class AnthropicProvider(BaseModelProvider):
             capability_calls=capability_calls_list if capability_calls_list else None,
             metadata={
                 "stop_sequence": response.stop_sequence,
-                "tool_calls": tool_calls_metadata if tool_calls_metadata else None,
+                "tool_calls": capability_calls_metadata if capability_calls_metadata else None,
                 "content": [
                     {
                         "type": block.type,

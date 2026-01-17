@@ -32,7 +32,7 @@ __all__ = [
     "RoutingStrategy",
     # Prompt and message interfaces
     "PromptBuilderInterface",
-    # Capability and tool interfaces
+    # Capability interfaces
     "CapabilityInterface",
     "CapabilitySchema",
     # Memory and storage interfaces

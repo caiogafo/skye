@@ -10,7 +10,7 @@ from nimbus.capabilities.exceptions import (
     CapabilityExecutionError,
     CapabilityNotFoundError,
     CapabilityValidationError,
-    ToolCallParsingError,
+    CapabilityCallParsingError,
 )
 from nimbus.exceptions import NimbusError
 
@@ -168,23 +168,23 @@ class TestCapabilityExecutionError:
         assert error.details["exception_type"] == "ValueError"
 
 
-class TestToolCallParsingError:
-    """Tests for ToolCallParsingError."""
+class TestCapabilityCallParsingError:
+    """Tests for CapabilityCallParsingError."""
 
     def test_inherits_from_capability_error(self):
-        """Test that ToolCallParsingError inherits from CapabilityError."""
-        assert issubclass(ToolCallParsingError, CapabilityError)
+        """Test that CapabilityCallParsingError inherits from CapabilityError."""
+        assert issubclass(CapabilityCallParsingError, CapabilityError)
 
     def test_creation_with_provider(self):
         """Test exception creation with provider name."""
-        error = ToolCallParsingError("Failed to parse tool call", provider="openai")
-        assert error.message == "Failed to parse tool call"
+        error = CapabilityCallParsingError("Failed to parse capability call", provider="openai")
+        assert error.message == "Failed to parse capability call"
         assert error.details["provider"] == "openai"
 
     def test_creation_with_parsing_context(self):
         """Test exception creation with parsing context."""
-        error = ToolCallParsingError(
-            "Invalid tool call format",
+        error = CapabilityCallParsingError(
+            "Invalid capability call format",
             provider="anthropic",
             raw_response={"type": "tool_use", "name": "invalid"},
             expected_format="tool_use with id and input",
@@ -196,7 +196,7 @@ class TestToolCallParsingError:
     def test_error_context_preservation(self):
         """Test that parsing error context is preserved."""
         raw_data = {"function": {"name": "test", "arguments": "invalid json"}}
-        error = ToolCallParsingError(
+        error = CapabilityCallParsingError(
             "JSON parsing failed",
             provider="openai",
             raw_data=raw_data,

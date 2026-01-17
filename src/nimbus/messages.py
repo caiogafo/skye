@@ -136,11 +136,10 @@ class UserMessage(NimbusMessage):
 class AssistantMessage(NimbusMessage):
     """Message from an AI assistant.
 
-    Represents output from the AI model, potentially including capability calls
-    (tool/function calls).
+    Represents output from the AI model, potentially including capability calls.
 
     Attributes:
-        capability_calls: List of capability/tool calls made by the assistant.
+        capability_calls: List of capability calls made by the assistant.
 
     Example:
         >>> msg = AssistantMessage(
@@ -196,7 +195,7 @@ class SystemMessage(NimbusMessage):
 class CapabilityMessage(NimbusMessage):
     """Message containing capability execution results.
 
-    Represents the result of a capability/tool execution that is being
+    Represents the result of a capability execution that is being
     fed back to the model.
 
     Attributes:

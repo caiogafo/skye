@@ -67,16 +67,16 @@ class CapabilityExecutionError(CapabilityError):
         super().__init__(message, details)
 
 
-class ToolCallParsingError(CapabilityError):
-    """Raised when tool call parsing fails.
+class CapabilityCallParsingError(CapabilityError):
+    """Raised when capability call parsing fails.
 
     Args:
         message: Human-readable error message
-        provider: Name of the provider that generated the tool call
+        provider: Name of the provider that generated the capability call
         **kwargs: Additional context to include in details
     """
 
     def __init__(self, message: str, provider: str, **kwargs: Any) -> None:
-        """Initialize ToolCallParsingError with provider context."""
+        """Initialize CapabilityCallParsingError with provider context."""
         details = {"provider": provider, **kwargs}
         super().__init__(message, details)

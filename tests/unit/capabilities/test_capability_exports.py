@@ -70,20 +70,20 @@ def test_exception_imports():
         CapabilityExecutionError,
         CapabilityNotFoundError,
         CapabilityValidationError,
-        ToolCallParsingError,
+        CapabilityCallParsingError,
     )
     
     assert CapabilityError is not None
     assert CapabilityExecutionError is not None
     assert CapabilityNotFoundError is not None
     assert CapabilityValidationError is not None
-    assert ToolCallParsingError is not None
+    assert CapabilityCallParsingError is not None
     
     # Verify inheritance
     assert issubclass(CapabilityExecutionError, CapabilityError)
     assert issubclass(CapabilityNotFoundError, CapabilityError)
     assert issubclass(CapabilityValidationError, CapabilityError)
-    assert issubclass(ToolCallParsingError, CapabilityError)
+    assert issubclass(CapabilityCallParsingError, CapabilityError)
 
 
 def test_capability_transformer_import():
@@ -151,7 +151,7 @@ def test_all_contains_expected_symbols():
         "CapabilityExecutionError",
         "CapabilityNotFoundError",
         "CapabilityValidationError",
-        "ToolCallParsingError",
+        "CapabilityCallParsingError",
         "CapabilityCallHandler",
         "MCPCapability",
         "MCPServerClient",
@@ -188,7 +188,7 @@ def test_star_import():
         "CapabilityExecutionError",
         "CapabilityNotFoundError",
         "CapabilityValidationError",
-        "ToolCallParsingError",
+        "CapabilityCallParsingError",
     ]
     
     for symbol in expected_symbols:

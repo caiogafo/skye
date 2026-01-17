@@ -269,7 +269,7 @@ class VertexAIProvider(BaseModelProvider):
         if request.metadata and "grounding" in request.metadata:
             vertex_request["grounding"] = request.metadata["grounding"]
 
-        # Handle capabilities/tool calling
+        # Handle capabilities
         if request.capabilities:
             # Convert capabilities to Vertex format using internal method
             function_declarations = self._transform_capabilities(request.capabilities)
@@ -326,8 +326,8 @@ class VertexAIProvider(BaseModelProvider):
         # Extract content from the response
         content = ""
         finish_reason = "stop"
-        tool_calls_list = None
-        tool_calls_metadata = None
+        capability_calls_list = None
+        capability_calls_metadata = None
 
         if hasattr(response, "candidates") and response.candidates:
             candidate = response.candidates[0]
@@ -358,7 +358,7 @@ class VertexAIProvider(BaseModelProvider):
                 
                 # Store raw function calls in metadata for CapabilityCallHandler
                 if function_calls_raw:
-                    tool_calls_metadata = {
+                    capability_calls_metadata = {
                         "candidates": [
                             {
                                 "content": {
@@ -380,12 +380,12 @@ class VertexAIProvider(BaseModelProvider):
                     try:
                         from nimbus.capabilities.capability_models import CapabilityCall
                         
-                        tool_calls_list = []
+                        capability_calls_list = []
                         for fc in function_calls_raw:
                             # Generate ID since Vertex doesn't provide one
                             call_id = f"vertex_call_{fc['idx']}"
                             
-                            tool_calls_list.append(
+                            capability_calls_list.append(
                                 CapabilityCall(
                                     id=call_id,
                                     name=fc["name"],
@@ -393,7 +393,7 @@ class VertexAIProvider(BaseModelProvider):
                                 )
                             )
                     except ImportError:
-                        # If capabilities package not installed, tool_calls_list stays None
+                        # If capabilities package not installed, capability_calls_list stays None
                         pass
 
         # Extract usage information
@@ -420,9 +420,9 @@ class VertexAIProvider(BaseModelProvider):
                 completion_tokens=completion_tokens,
                 total_tokens=total_tokens
             ),
-            capability_calls=tool_calls_list,
+            capability_calls=capability_calls_list,
             created_at=datetime.now(tz=timezone.utc),
-            metadata=tool_calls_metadata or {}
+            metadata=capability_calls_metadata or {}
         )
 
     def _transform_stream_chunk(self, chunk: Any) -> StreamChunk:

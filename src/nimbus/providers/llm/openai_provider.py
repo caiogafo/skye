@@ -6,7 +6,7 @@ supporting GPT-4, GPT-3.5, o1, o3, and other OpenAI models.
 Features:
 - Lazy loading of OpenAI SDK
 - Structured outputs via response_format
-- Function/tool calling
+- Function calling
 - Streaming support
 - Async support with AsyncOpenAI
 - Multimodal inputs (images)
@@ -93,7 +93,7 @@ class OpenAIProvider(BaseModelProvider):
     def _transform_messages(self, messages: list[Any]) -> list[dict[str, Any]]:
         """Transform Nimbus messages to OpenAI format.
         
-        OpenAI uses a simple role-content format with tool calls as a separate field.
+        OpenAI uses a simple role-content format with capability calls as a separate field.
         System messages are included in the messages array.
         
         Args:
@@ -160,7 +160,7 @@ class OpenAIProvider(BaseModelProvider):
     def _extract_capability_calls(self, response: Any) -> list[Any] | None:
         """Extract capability calls from OpenAI response.
         
-        Parses tool calls from the OpenAI response format and converts them
+        Parses capability calls from the OpenAI response format and converts them
         to Nimbus CapabilityCall objects.
         
         Args:

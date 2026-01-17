@@ -910,9 +910,9 @@ MIT License - see [LICENSE](LICENSE) file for details.
 - [x] Configuration system
 - [x] Exception hierarchy
 - [ ] Provider implementations (OpenAI, Anthropic, Bedrock)
+- [ ] Prompt management
 - [ ] Agent runtime
 - [ ] Memory systems
-- [ ] Prompt management
 - [ ] Safety filters
 - [ ] Observability integration
 
