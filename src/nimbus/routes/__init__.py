@@ -8,6 +8,7 @@ This package provides a comprehensive routing solution with support for:
 - Fallback chains
 - Tag-based routing
 - Cooldown mechanisms
+- Multiple storage backends (in-memory, Redis, DynamoDB, PostgreSQL, FileSystem, DurableFunction)
 
 Example (With Aliases):
     >>> from nimbus import ModelRouter, ModelTarget, RouteConfig
@@ -42,6 +43,17 @@ Example (With Aliases):
     ...     CompletionRequest(messages=[...], model="gpt-3.5-turbo")
     ... )
 
+Example (With External Storage):
+    >>> from nimbus.routes import ModelRouter
+    >>> from nimbus.routes.storage_backends import RedisBackend
+    >>>
+    >>> # Use Redis for persistent state in serverless environments
+    >>> storage = RedisBackend("redis://localhost:6379")
+    >>> router = ModelRouter(
+    ...     routes=[...],
+    ...     storage=storage
+    ... )
+
 Example (Direct Registration):
     >>> from nimbus import ModelRouter
     >>> from nimbus.interfaces.router import RoutingStrategy
@@ -64,16 +76,25 @@ Example (Direct Registration):
     >>> print(f"Success rate: {health['success_rate']:.1%}")
 """
 
-from nimbus.routes.model_router import (
+from nimbus.routes.config_models import (
     AllowedFailsPolicyConfig,
     CooldownInfo,
     FallbackConfig,
     ModelHealthMetrics,
-    ModelRouter,
     ModelTarget,
     RetryPolicyConfig,
     RouteConfig,
     UsageStats,
+)
+from nimbus.routes.model_router import ModelRouter
+from nimbus.routes.storage_backends import (
+    StorageBackend,
+    InMemoryBackend,
+    RedisBackend,
+    DynamoDBBackend,
+    PostgreSQLBackend,
+    FileSystemBackend,
+    DurableFunctionBackend,
 )
 
 __all__ = [
@@ -89,4 +110,12 @@ __all__ = [
     "ModelHealthMetrics",
     "UsageStats",
     "CooldownInfo",
+    # Storage backends
+    "StorageBackend",
+    "InMemoryBackend",
+    "RedisBackend",
+    "DynamoDBBackend",
+    "PostgreSQLBackend",
+    "FileSystemBackend",
+    "DurableFunctionBackend",
 ]
