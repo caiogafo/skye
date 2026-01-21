@@ -1,0 +1,68 @@
+{% if system_prompt -%}
+[SYSTEM]
+{{ system_prompt }}
+{% else -%}
+[SYSTEM]
+You are an intelligent text classification system. You analyze text and classify it into predefined categories with high accuracy.
+{% endif %}
+
+{% if description -%}
+{{ description }}
+
+{% endif -%}
+
+{% if domain -%}
+## Domain: {{ domain }}
+Please classify within the context of {{ domain }}.
+{% endif %}
+
+## Classification Task:
+Classify the following text into one of these categories: {{ categories | join(", ") }}.
+
+{% if category_descriptions -%}
+## Category Descriptions:
+{% for category in category_descriptions -%}
+- **{{ category.name }}**: {{ category.description }}
+{% endfor %}
+{% endif %}
+
+{% if examples -%}
+## Examples:
+{% for example in examples -%}
+**Text:** "{{ example.text }}"
+**Category:** {{ example.category }}
+{% if example.reasoning -%}**Reasoning:** {{ example.reasoning }}{% endif %}
+
+{% endfor -%}
+{% endif %}
+
+## Text to Classify:
+"{{ text }}"
+
+{% if confidence_required -%}
+Please also provide a confidence score between 0.0 and 1.0.
+{% endif -%}
+
+{% if reasoning_required -%}
+Please explain your reasoning for the classification.
+{% endif -%}
+
+{% if output_format == "json" -%}
+Please format your response as JSON:
+```json
+{
+  "category": "selected_category"{% if confidence_required %},
+  "confidence": 0.0{% endif %}{% if reasoning_required %},
+  "reasoning": "explanation for the classification"{% endif %}
+}
+```
+{% else -%}
+## Classification Result:
+Category: 
+{% if confidence_required -%}
+Confidence: 
+{% endif -%}
+{% if reasoning_required -%}
+Reasoning: 
+{% endif -%}
+{% endif -%}

@@ -92,7 +92,10 @@ def test_router_with_yaml_config():
     )
     
     # Execute request
-    response = router.route_request(request)
+    response = router.complete(
+        messages=[UserMessage("Hello!")],
+        model="gpt-4"
+    )
     
     # Verify response
     assert response is not None
@@ -159,7 +162,10 @@ def test_router_with_capabilities():
     )
     
     # Execute
-    response = router.route_request(request)
+    response = router.complete(
+        messages=[UserMessage("Hello!")],
+        model="gpt-4"
+    )
     
     assert response is not None
 ```
@@ -184,7 +190,10 @@ def test_fallback_chain_execution():
     
     # Mock primary failure and verify fallback
     # (Implementation depends on how you want to simulate failure)
-    response = router.route_request(request)
+    response = router.complete(
+        messages=[UserMessage("Hello!")],
+        model="gpt-4"
+    )
     
     assert response is not None
 ```
@@ -238,7 +247,10 @@ def configured_router():
 
 def test_with_router(configured_router):
     """Test using configured router fixture."""
-    response = configured_router.route_request(request)
+    response = configured_router.complete(
+        messages=[UserMessage("Hello!")],
+        model="gpt-4"
+    )
     assert response is not None
 ```
 

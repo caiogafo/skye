@@ -67,7 +67,7 @@ def basic_router_example():
     try:
         print("\nMaking 3 requests with round-robin load balancing:")
         for i in range(3):
-            response = router.route_request(
+            response = router.complete(
                 messages=[UserMessage(content="What is 2+2?")],
                 model="gpt-3.5-turbo",
                 max_tokens=50
@@ -75,6 +75,86 @@ def basic_router_example():
             print(f"\n  Request {i+1}:")
             print(f"    Response: {response.content[:60]}...")
             print(f"    Tokens: {response.usage.total_tokens}")
+    
+    except Exception as e:
+        print(f"\n❌ Error: {e}")
+
+
+def tag_based_routing():
+    """Demonstrate tag-based routing."""
+    print("\n" + "=" * 60)
+    print("Tag-Based Routing")
+    print("=" * 60)
+    
+    api_key = os.getenv("OPENAI_API_KEY")
+    if not api_key:
+        print("⚠️  OPENAI_API_KEY not set, showing configuration only")
+        return
+    
+    # Create router with tagged models
+    router = ModelRouter(
+        routes=[
+            RouteConfig(
+                alias="fast-model",
+                targets=[
+                    ModelTarget(
+                        model="gpt-3.5-turbo",
+                        provider="openai",
+                        api_key=api_key,
+                        tpm=200000,
+                        rpm=2000,
+                        tags=["fast", "cheap", "general"]
+                    ),
+                ],
+                strategy=RoutingStrategy.ROUND_ROBIN
+            ),
+            RouteConfig(
+                alias="smart-model",
+                targets=[
+                    ModelTarget(
+                        model="gpt-4",
+                        provider="openai",
+                        api_key=api_key,
+                        tpm=100000,
+                        rpm=500,
+                        tags=["smart", "expensive", "reasoning"]
+                    ),
+                ],
+                strategy=RoutingStrategy.ROUND_ROBIN
+            ),
+        ]
+    )
+    
+    try:
+        # Use tag-based selection only
+        print("\n--- Using tag-based selection (fast models) ---")
+        response = router.complete(
+            messages=[UserMessage(content="What is 5 + 7?")],
+            tags=["fast", "cheap"],
+            max_tokens=30
+        )
+        print(f"Response: {response.content}")
+        
+        # Use specific model with tag validation
+        print("\n--- Using model with tag validation ---")
+        response = router.complete(
+            messages=[UserMessage(content="Explain quantum physics")],
+            model="smart-model",
+            tags=["reasoning"],  # Ensures model has reasoning capability
+            max_tokens=100
+        )
+        print(f"Response: {response.content[:150]}...")
+        
+        # This would fail - model doesn't have required tags
+        print("\n--- This would fail (model lacks required tags) ---")
+        try:
+            response = router.complete(
+                messages=[UserMessage(content="Hello")],
+                model="fast-model",
+                tags=["expensive"]  # fast-model doesn't have "expensive" tag
+            )
+        except ValueError as e:
+            print(f"Expected error: {e}")
     
     except Exception as e:
         print(f"\n❌ Error: {e}")
@@ -129,7 +209,7 @@ def multi_model_router():
     try:
         # Use 'fast' alias for simple question
         print("\n--- Using 'fast' alias for simple math ---")
-        response = router.route_request(
+        response = router.complete(
             messages=[UserMessage(content="What is 5 + 7?")],
             model="fast",
             max_tokens=30
@@ -138,7 +218,7 @@ def multi_model_router():
         
         # Use 'smart' alias for complex question
         print("\n--- Using 'smart' alias for complex reasoning ---")
-        response = router.route_request(
+        response = router.complete(
             messages=[UserMessage(content="Explain quantum entanglement in simple terms")],
             model="smart",
             max_tokens=100
@@ -272,7 +352,7 @@ def bedrock_multi_region():
     
     try:
         print("\n--- Making request with router ---")
-        response = router.route_request(
+        response = router.complete(
             messages=[UserMessage(content="What is AWS Bedrock?")],
             model="claude",
             max_tokens=100
@@ -293,6 +373,7 @@ def main():
     try:
         basic_router_example()
         multi_model_router()
+        tag_based_routing()
         routing_strategies()
         azure_multi_region()
         bedrock_multi_region()
@@ -304,6 +385,7 @@ def main():
         print("  • Routers distribute requests across multiple targets")
         print("  • Different strategies optimize for different goals")
         print("  • Aliases provide semantic names for model groups")
+        print("  • Tag-based routing enables flexible model selection")
         print("  • Multi-region setup enables geographic redundancy")
         
     except Exception as e:

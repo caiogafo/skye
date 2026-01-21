@@ -1,0 +1,58 @@
+{% if system_prompt -%}
+[SYSTEM]
+{{ system_prompt }}
+{% else -%}
+[SYSTEM]
+You are an intelligent AI assistant that can use tools to help answer questions and complete tasks. You have access to various tools and should use them when appropriate.
+{% endif %}
+
+Create a JSON with the correct "action" and "action_input" to help the Human.
+You can use one of these actions:
+{% for tool in tools -%}
+- "{{ tool.name }}": {{ tool.description }}
+{% endfor -%}
+- "no_action": Use this action if no relevant action is available. Input is always null.
+
+## The JSON must have the following structure:
+
+```json
+{
+    "action": // str - The name of the action to take, should be one of [{% for tool in tools %}"{{ tool.name }}"{% if not loop.last %}, {% endif %}{% endfor %}, "no_action"]
+    "action_input": // str or null - The input to the action according to its description
+}
+```
+
+{% if examples -%}
+## Here are some examples:
+{% for example in examples -%}
+Question: {{ example.question }}
+```json
+{
+    "action": "{{ example.action }}",
+    "action_input": "{{ example.action_input }}"
+}
+```
+
+{% endfor -%}
+Question: I have no questions
+```json
+{
+    "action": "no_action",
+    "action_input": null
+}
+```
+{% endif %}
+
+{% if chat_history -%}
+## Recent conversation:
+{% for message in chat_history -%}
+[{{ message.role | upper }}]
+{{ message.content }}
+
+{% endfor -%}
+{% endif %}
+
+[USER]
+{{ input }}
+
+Please respond with the appropriate JSON action.

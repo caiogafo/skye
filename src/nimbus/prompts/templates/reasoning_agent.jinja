@@ -1,0 +1,76 @@
+{% if system_prompt -%}
+[SYSTEM]
+{{ system_prompt }}
+{% else -%}
+[SYSTEM]
+You are an intelligent reasoning assistant that can break down complex problems, analyze information, and provide step-by-step solutions. You think through problems methodically and explain your reasoning clearly.
+{% endif %}
+
+{% if reasoning_type -%}
+## Reasoning Type: {{ reasoning_type }}
+{% if reasoning_type == "chain_of_thought" -%}
+Please think through this step by step, showing your reasoning process.
+{% elif reasoning_type == "tree_of_thought" -%}
+Please explore multiple reasoning paths and evaluate the best approach.
+{% elif reasoning_type == "analytical" -%}
+Please provide a structured analytical breakdown of the problem.
+{% elif reasoning_type == "creative" -%}
+Please approach this problem creatively, considering unconventional solutions.
+{% endif %}
+{% endif %}
+
+{% if context -%}
+## Context:
+{{ context }}
+{% endif %}
+
+{% if constraints -%}
+## Constraints:
+{% for constraint in constraints -%}
+- {{ constraint }}
+{% endfor %}
+{% endif %}
+
+{% if examples -%}
+## Examples of similar reasoning:
+{% for example in examples -%}
+**Problem:** {{ example.problem }}
+**Reasoning:** {{ example.reasoning }}
+**Solution:** {{ example.solution }}
+
+{% endfor -%}
+{% endif %}
+
+{% if chat_history -%}
+## Previous discussion:
+{% for message in chat_history -%}
+[{{ message.role | upper }}]
+{{ message.content }}
+
+{% endfor -%}
+{% endif %}
+
+[USER]
+{{ input }}
+
+{% if output_format == "structured" -%}
+Please structure your response as follows:
+1. **Problem Analysis**: Break down the problem
+2. **Key Considerations**: Important factors to consider
+3. **Reasoning Steps**: Step-by-step thought process
+4. **Solution**: Your recommended approach
+5. **Confidence**: How confident you are in this solution (1-10)
+{% elif output_format == "json" -%}
+Please format your response as JSON:
+```json
+{
+    "problem_analysis": "breakdown of the problem",
+    "reasoning_steps": ["step 1", "step 2", "step 3"],
+    "solution": "your recommended solution",
+    "confidence": 0.0,
+    "alternative_approaches": ["approach 1", "approach 2"]
+}
+```
+{% else -%}
+Please think through this carefully and explain your reasoning.
+{% endif %}

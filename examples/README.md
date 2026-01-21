@@ -183,7 +183,16 @@ router = ModelRouter(
     ]
 )
 
-response = router.route_request(request)
+response = router.complete(
+    messages=[UserMessage("Hello!")],
+    model="gpt-4"
+)
+
+# Tag-based selection
+response = router.complete(
+    messages=[UserMessage("Hello!")],
+    tags=["fast", "cheap"]
+)
 ```
 
 ### With YAML Configuration
@@ -202,7 +211,10 @@ routes:
 from nimbus.routes import ModelRouter
 
 router = ModelRouter.from_yaml("router_config.yaml")
-response = router.route_request(request)
+response = router.complete(
+    messages=[UserMessage("Hello!")],
+    model="gpt-4"
+)
 ```
 
 ## Supported Providers

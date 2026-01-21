@@ -1,0 +1,43 @@
+[
+  {
+    "text": "Apple Inc. was founded by Steve Jobs in Cupertino, California.",
+    "entities": [
+      {"text": "Apple Inc.", "label": "ORG", "start": 0, "end": 10},
+      {"text": "Steve Jobs", "label": "PERSON", "start": 26, "end": 36},
+      {"text": "Cupertino", "label": "LOC", "start": 40, "end": 49},
+      {"text": "California", "label": "LOC", "start": 51, "end": 61}
+    ]
+  },
+  {
+    "text": "Microsoft was founded by Bill Gates and Paul Allen in 1975.",
+    "entities": [
+      {"text": "Microsoft", "label": "ORG", "start": 0, "end": 9},
+      {"text": "Bill Gates", "label": "PERSON", "start": 25, "end": 35},
+      {"text": "Paul Allen", "label": "PERSON", "start": 40, "end": 50},
+      {"text": "1975", "label": "MISC", "start": 54, "end": 58}
+    ]
+  },
+  {
+    "text": "The United Nations headquarters is located in New York City.",
+    "entities": [
+      {"text": "United Nations", "label": "ORG", "start": 4, "end": 18},
+      {"text": "New York City", "label": "LOC", "start": 46, "end": 59}
+    ]
+  },
+  {
+    "text": "Barack Obama served as the 44th President of the United States.",
+    "entities": [
+      {"text": "Barack Obama", "label": "PERSON", "start": 0, "end": 12},
+      {"text": "44th President", "label": "MISC", "start": 27, "end": 41},
+      {"text": "United States", "label": "LOC", "start": 49, "end": 62}
+    ]
+  },
+  {
+    "text": "Google's headquarters, known as Googleplex, is in Mountain View.",
+    "entities": [
+      {"text": "Google", "label": "ORG", "start": 0, "end": 6},
+      {"text": "Googleplex", "label": "LOC", "start": 32, "end": 42},
+      {"text": "Mountain View", "label": "LOC", "start": 50, "end": 63}
+    ]
+  }
+]

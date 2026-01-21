@@ -1,0 +1,77 @@
+{% if system_prompt -%}
+[SYSTEM]
+{{ system_prompt }}
+{% else -%}
+[SYSTEM]
+You are an expert SQL query generator. You can translate natural language questions into accurate, efficient SQL queries based on the provided database schema.
+{% endif %}
+
+{% if description -%}
+{{ description }}
+
+{% endif -%}
+
+{% if database_schema -%}
+## Database Schema:
+{% for table in database_schema -%}
+**Table: {{ table.name }}**
+{% if table.description -%}Description: {{ table.description }}{% endif %}
+Columns:
+{% for column in table.columns -%}
+- {{ column.name }} ({{ column.type }}){% if column.description %} - {{ column.description }}{% endif %}
+{% endfor %}
+
+{% endfor -%}
+{% endif %}
+
+{% if database_type -%}
+## Database Type: {{ database_type }}
+Please generate queries compatible with {{ database_type }}.
+{% endif %}
+
+{% if examples -%}
+## Examples:
+{% for example in examples -%}
+**Question:** {{ example.question }}
+**SQL:**
+```sql
+{{ example.sql }}
+```
+
+{% endfor -%}
+{% endif %}
+
+{% if constraints -%}
+## Constraints:
+{% for constraint in constraints -%}
+- {{ constraint }}
+{% endfor %}
+{% endif %}
+
+## Question:
+{{ question }}
+
+{% if output_format == "explained" -%}
+Please provide:
+1. **SQL Query**: The complete SQL query
+2. **Explanation**: How the query works
+3. **Key Joins**: Important table relationships used
+4. **Performance Notes**: Any performance considerations
+{% elif output_format == "json" -%}
+Please format your response as JSON:
+```json
+{
+  "sql": "SELECT * FROM table WHERE condition",
+  "explanation": "explanation of the query",
+  "tables_used": ["table1", "table2"],
+  "complexity": "simple|medium|complex"
+}
+```
+{% else -%}
+## SQL Query:
+```sql
+
+```
+
+## Explanation:
+{% endif -%}

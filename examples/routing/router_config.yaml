@@ -400,9 +400,23 @@ enable_pre_call_checks: true
 #   
 #   router = ModelRouter.from_yaml("router_config.yaml")
 #   
-#   response = router.route_request(
+#   # Use specific alias
+#   response = router.complete(
 #       messages=[UserMessage(content="Hello!")],
 #       model="gpt-3.5-turbo"  # Use alias from this config
+#   )
+#   
+#   # Use tag-based selection
+#   response = router.complete(
+#       messages=[UserMessage(content="Hello!")],
+#       tags=["fast", "cost-effective"]  # Router picks best model with these tags
+#   )
+#   
+#   # Combine model and tags
+#   response = router.complete(
+#       messages=[UserMessage(content="Hello!")],
+#       model="gpt-4",
+#       tags=["premium"]  # Ensures gpt-4 has premium tag
 #   )
 #
 # See examples/routing/yaml_config.py for more examples.

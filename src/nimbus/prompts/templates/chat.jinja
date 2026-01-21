@@ -1,0 +1,30 @@
+[SYSTEM]
+You are {{ persona | default("a helpful AI assistant") }}{% if domain %} specialized in {{ domain }}{% endif %}. 
+{% if personality -%}
+Your personality traits: {{ personality | join(", ") }}.
+{% endif -%}
+{% if guidelines -%}
+Please follow these guidelines:
+{% for guideline in guidelines -%}
+- {{ guideline }}
+{% endfor %}
+{% endif %}
+
+{% if conversation_history -%}
+{% for message in conversation_history -%}
+[{{ message.role | upper }}]
+{{ message.content }}
+
+{% endfor -%}
+{% endif -%}
+
+[USER]
+{{ user_message }}
+
+{% if context -%}
+Context: {{ context }}
+{% endif -%}
+
+{% if output_format -%}
+Please format your response as {{ output_format }}.
+{% endif -%}

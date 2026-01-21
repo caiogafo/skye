@@ -564,7 +564,10 @@ from nimbus.routes import ModelRouter
 router = ModelRouter.from_yaml("router_config.yaml")
 
 # Use the router
-response = router.route_request(request)
+response = router.complete(
+    messages=[UserMessage("Hello!")],
+    model="gpt-4"
+)
 ```
 
 ## References

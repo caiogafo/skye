@@ -1,0 +1,35 @@
+{% if system_prompt -%}
+[SYSTEM]
+{{ system_prompt }}
+
+{% endif -%}
+[USER]
+{% if description -%}
+{{ description }}
+
+{% endif -%}
+Answer the following question based on the provided context. If the answer cannot be found in the context, please say "I cannot answer this question based on the provided context."
+
+{% if examples -%}
+Examples:
+{{ examples }}
+
+{% endif -%}
+Context: {{ context }}
+
+Question: {{ question }}
+
+{% if answer_length -%}
+Please provide a {{ answer_length }} answer.
+{% endif -%}
+
+{% if output_format == "json" -%}
+Please format your response as JSON:
+{
+  "answer": "your answer here",
+  "confidence": 0.0,
+  "source_relevant": true/false
+}
+{% else -%}
+Answer: 
+{% endif -%}

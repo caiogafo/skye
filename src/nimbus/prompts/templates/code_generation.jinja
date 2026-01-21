@@ -1,0 +1,43 @@
+{% if system_prompt -%}
+[SYSTEM]
+{{ system_prompt }}
+
+{% else -%}
+[SYSTEM]
+You are an expert programmer. Generate clean, efficient, and well-documented code.
+{% endif %}
+
+[USER]
+{% if description -%}
+{{ description }}
+
+{% endif -%}
+Generate {{ language | default("Python") }} code for the following task: {{ task }}
+
+{% if requirements -%}
+Requirements:
+{% for req in requirements -%}
+- {{ req }}
+{% endfor %}
+
+{% endif -%}
+{% if examples -%}
+Examples:
+{{ examples }}
+
+{% endif -%}
+{% if input_format -%}
+Input format: {{ input_format }}
+{% endif -%}
+{% if output_format -%}
+Expected output format: {{ output_format }}
+{% endif -%}
+
+{% if include_tests -%}
+Please include unit tests for your code.
+{% endif -%}
+{% if include_comments -%}
+Please include detailed comments explaining the code.
+{% endif -%}
+
+Code:

@@ -1,0 +1,32 @@
+[
+  {
+    "context": "The capital of France is Paris. Paris is located in the north-central part of France and has a population of over 2 million people. It is known for landmarks like the Eiffel Tower and the Louvre Museum.",
+    "question": "What is the capital of France?",
+    "answer": "Paris",
+    "confidence": 1.0
+  },
+  {
+    "context": "Photosynthesis is the process by which plants convert sunlight, carbon dioxide, and water into glucose and oxygen. This process occurs in the chloroplasts of plant cells and is essential for plant growth.",
+    "question": "What do plants produce during photosynthesis?",
+    "answer": "Plants produce glucose and oxygen during photosynthesis.",
+    "confidence": 0.95
+  },
+  {
+    "context": "The Great Wall of China is a series of fortifications built across the northern borders of China. Construction began in the 7th century BC and continued for centuries. The wall stretches over 13,000 miles.",
+    "question": "How long is the Great Wall of China?",
+    "answer": "The Great Wall of China stretches over 13,000 miles.",
+    "confidence": 0.98
+  },
+  {
+    "context": "Machine learning is a subset of artificial intelligence that enables computers to learn and improve from experience without being explicitly programmed. It uses algorithms to analyze data and make predictions.",
+    "question": "What is machine learning?",
+    "answer": "Machine learning is a subset of artificial intelligence that enables computers to learn and improve from experience without being explicitly programmed.",
+    "confidence": 0.92
+  },
+  {
+    "context": "The human brain contains approximately 86 billion neurons. These neurons communicate through electrical and chemical signals, forming complex networks that enable thought, memory, and behavior.",
+    "question": "How many neurons are in the human brain?",
+    "answer": "The human brain contains approximately 86 billion neurons.",
+    "confidence": 0.97
+  }
+]

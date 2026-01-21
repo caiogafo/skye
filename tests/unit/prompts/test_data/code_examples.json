@@ -1,0 +1,50 @@
+[
+  {
+    "task": "sort a list of numbers",
+    "language": "python",
+    "code": "numbers = [3, 1, 4, 1, 5, 9, 2, 6]\nnumbers.sort()\nprint(numbers)",
+    "explanation": "Use the built-in sort() method to sort the list in-place"
+  },
+  {
+    "task": "read a file",
+    "language": "python",
+    "code": "with open('filename.txt', 'r') as file:\n    content = file.read()\n    print(content)",
+    "explanation": "Use context manager to safely open and read a file"
+  },
+  {
+    "task": "make HTTP GET request",
+    "language": "python",
+    "code": "import requests\n\nresponse = requests.get('https://api.example.com/data')\nif response.status_code == 200:\n    data = response.json()\n    print(data)",
+    "explanation": "Use requests library to make HTTP GET request and parse JSON response"
+  },
+  {
+    "task": "create a class",
+    "language": "python",
+    "code": "class Person:\n    def __init__(self, name, age):\n        self.name = name\n        self.age = age\n    \n    def greet(self):\n        return f'Hello, my name is {self.name}'",
+    "explanation": "Define a class with constructor and method"
+  },
+  {
+    "task": "handle exceptions",
+    "language": "python",
+    "code": "try:\n    result = 10 / 0\nexcept ZeroDivisionError as e:\n    print(f'Error: {e}')\nfinally:\n    print('Cleanup code here')",
+    "explanation": "Use try-except-finally blocks to handle exceptions gracefully"
+  },
+  {
+    "task": "create a dictionary",
+    "language": "python",
+    "code": "# Method 1: Dictionary literal\nmy_dict = {'key1': 'value1', 'key2': 'value2'}\n\n# Method 2: dict() constructor\nmy_dict = dict(key1='value1', key2='value2')",
+    "explanation": "Two common ways to create dictionaries in Python"
+  },
+  {
+    "task": "iterate over a list",
+    "language": "python",
+    "code": "items = ['apple', 'banana', 'cherry']\n\n# Method 1: Simple iteration\nfor item in items:\n    print(item)\n\n# Method 2: With index\nfor i, item in enumerate(items):\n    print(f'{i}: {item}')",
+    "explanation": "Different ways to iterate over lists with and without indices"
+  },
+  {
+    "task": "parse JSON",
+    "language": "python",
+    "code": "import json\n\n# Parse JSON string\njson_string = '{\"name\": \"John\", \"age\": 30}'\ndata = json.loads(json_string)\n\n# Convert to JSON string\njson_output = json.dumps(data, indent=2)",
+    "explanation": "Use json module to parse and generate JSON data"
+  }
+]

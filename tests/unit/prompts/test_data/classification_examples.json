@@ -1,0 +1,42 @@
+[
+  {
+    "text": "The new iPhone features an advanced AI chip and improved camera system.",
+    "category": "technology",
+    "confidence": 0.95
+  },
+  {
+    "text": "The Lakers won their game last night with a score of 112-108.",
+    "category": "sports",
+    "confidence": 0.98
+  },
+  {
+    "text": "The President announced new policies regarding healthcare reform.",
+    "category": "politics",
+    "confidence": 0.92
+  },
+  {
+    "text": "The latest Marvel movie broke box office records this weekend.",
+    "category": "entertainment",
+    "confidence": 0.89
+  },
+  {
+    "text": "Scientists discover new exoplanet using advanced telescope technology.",
+    "category": "science",
+    "confidence": 0.94
+  },
+  {
+    "text": "Stock markets showed mixed results following the Federal Reserve announcement.",
+    "category": "business",
+    "confidence": 0.87
+  },
+  {
+    "text": "New study reveals the health benefits of Mediterranean diet.",
+    "category": "health",
+    "confidence": 0.91
+  },
+  {
+    "text": "Climate change summit brings together world leaders to discuss carbon emissions.",
+    "category": "environment",
+    "confidence": 0.93
+  }
+]

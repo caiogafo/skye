@@ -7,7 +7,6 @@ with environment variable substitution for API keys and other sensitive data.
 import os
 from pathlib import Path
 
-from nimbus.completion import CompletionRequest
 from nimbus.messages import UserMessage
 from nimbus.routes import ModelRouter
 
@@ -40,16 +39,24 @@ def main():
 
     # Use the router to make a request
     print("\nMaking a completion request...")
-    request = CompletionRequest(
-        messages=[UserMessage(content="Hello, how are you?")],
-        model="gpt-3.5-turbo",  # Use the alias defined in YAML
-        max_tokens=50,
-    )
 
     try:
         # The router will automatically select the best target based on strategy
-        response = router.route_request(request)
+        response = router.complete(
+            messages=[UserMessage(content="Hello, how are you?")],
+            model="gpt-3.5-turbo",  # Use the alias defined in YAML
+            max_tokens=50
+        )
         print(f"Response: {response.content}")
+
+        # Example with async
+        print("\nMaking async request...")
+        response = await router.acomplete(
+            messages=[UserMessage(content="What is Python?")],
+            model="gpt-3.5-turbo",
+            max_tokens=30
+        )
+        print(f"Async response: {response.content}")
 
         # Check router health metrics
         print("\nRouter health metrics:")
@@ -69,5 +76,11 @@ def main():
         print(f"Error: {e}")
 
 
+async def main_async():
+    """Async version of the main function."""
+    await main()
+
+
 if __name__ == "__main__":
-    main()
+    import asyncio
+    asyncio.run(main_async())

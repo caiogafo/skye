@@ -1,0 +1,112 @@
+{% if system_prompt -%}
+[SYSTEM]
+{{ system_prompt }}
+{% else -%}
+[SYSTEM]
+You are an intelligent code assistant that can help with programming tasks, code analysis, debugging, and software development. You understand multiple programming languages and can provide accurate, helpful code solutions.
+{% endif %}
+
+{% if task_type -%}
+## Task: {{ task_type }}
+{% if task_type == "code_generation" -%}
+Please generate code based on the requirements.
+{% elif task_type == "code_review" -%}
+Please review the provided code and suggest improvements.
+{% elif task_type == "debugging" -%}
+Please help debug the provided code and identify issues.
+{% elif task_type == "code_explanation" -%}
+Please explain how the provided code works.
+{% elif task_type == "refactoring" -%}
+Please refactor the provided code to improve its quality.
+{% endif %}
+{% endif %}
+
+{% if programming_language -%}
+## Programming Language: {{ programming_language }}
+{% endif %}
+
+{% if code_context -%}
+## Code Context:
+```{{ programming_language if programming_language else "" }}
+{{ code_context }}
+```
+{% endif %}
+
+{% if requirements -%}
+## Requirements:
+{% for requirement in requirements -%}
+- {{ requirement }}
+{% endfor %}
+{% endif %}
+
+{% if constraints -%}
+## Constraints:
+{% for constraint in constraints -%}
+- {{ constraint }}
+{% endfor %}
+{% endif %}
+
+{% if error_message -%}
+## Error Message:
+```
+{{ error_message }}
+```
+{% endif %}
+
+{% if examples -%}
+## Examples:
+{% for example in examples -%}
+**Input:**
+```{{ example.language if example.language else "" }}
+{{ example.input }}
+```
+
+**Output:**
+```{{ example.language if example.language else "" }}
+{{ example.output }}
+```
+
+{% endfor -%}
+{% endif %}
+
+{% if chat_history -%}
+## Previous discussion:
+{% for message in chat_history -%}
+[{{ message.role | upper }}]
+{{ message.content }}
+
+{% endfor -%}
+{% endif %}
+
+[USER]
+{{ input }}
+
+{% if output_format == "detailed" -%}
+Please provide:
+1. **Code Solution**: The complete code solution
+2. **Explanation**: How the code works
+3. **Key Features**: Important aspects of the implementation
+4. **Usage Example**: How to use the code
+5. **Testing**: Suggestions for testing the code
+{% elif output_format == "json" -%}
+Please format your response as JSON:
+```json
+{
+    "code": "the complete code solution",
+    "explanation": "how the code works",
+    "language": "programming language used",
+    "dependencies": ["dependency1", "dependency2"],
+    "usage_example": "example of how to use the code",
+    "test_cases": ["test case 1", "test case 2"]
+}
+```
+{% else -%}
+Please provide the code solution with appropriate explanation.
+{% endif %}
+
+{% if code_style -%}
+## Code Style Guidelines:
+{% for guideline in code_style -%}
+- {{ guideline }}
+{% endfor %}
+{% endif %}

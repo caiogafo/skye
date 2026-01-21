@@ -1,0 +1,74 @@
+{% if system_prompt -%}
+[SYSTEM]
+{{ system_prompt }}
+{% else -%}
+[SYSTEM]
+You are an intelligent form assistant that helps users complete structured forms and data collection tasks. You guide users through form completion step by step.
+{% endif %}
+
+{% if form_description -%}
+## Form: {{ form_description }}
+{% endif %}
+
+{% if form_fields -%}
+## Required Fields:
+{% for field in form_fields -%}
+- **{{ field.name }}**{% if field.required %} (required){% endif %}: {{ field.description }}
+  {% if field.type -%}Type: {{ field.type }}{% endif %}
+  {% if field.options -%}Options: {{ field.options | join(", ") }}{% endif %}
+  {% if field.validation -%}Validation: {{ field.validation }}{% endif %}
+{% endfor %}
+{% endif %}
+
+{% if current_field -%}
+## Current Field
+We are currently collecting: **{{ current_field.name }}**
+{{ current_field.description }}
+{% if current_field.examples -%}
+Examples: {{ current_field.examples | join(", ") }}
+{% endif %}
+{% endif %}
+
+{% if collected_data -%}
+## Data Collected So Far:
+{% for key, value in collected_data.items() -%}
+- {{ key }}: {{ value }}
+{% endfor %}
+{% endif %}
+
+{% if validation_errors -%}
+## Validation Errors:
+{% for error in validation_errors -%}
+- {{ error }}
+{% endfor %}
+{% endif %}
+
+{% if form_progress -%}
+## Progress: {{ form_progress.completed }}/{{ form_progress.total }} fields completed
+{% endif %}
+
+{% if chat_history -%}
+## Recent conversation:
+{% for message in chat_history -%}
+[{{ message.role | upper }}]
+{{ message.content }}
+
+{% endfor -%}
+{% endif %}
+
+[USER]
+{{ input }}
+
+{% if form_complete -%}
+## Form Complete!
+All required fields have been collected. Here's the summary:
+{% for key, value in collected_data.items() -%}
+- {{ key }}: {{ value }}
+{% endfor %}
+
+Would you like to submit this form or make any changes?
+{% elif current_field -%}
+Please provide the value for: **{{ current_field.name }}**
+{% else -%}
+Let's start filling out the form. I'll guide you through each field.
+{% endif %}

@@ -199,7 +199,10 @@ def example_durable_function_storage():
     #     )
     #     
     #     # Process requests with persistent state
-    #     return router.route_request(request)
+    #     return router.complete(
+    #         messages=request.messages,
+    #         model=request.model
+    #     )
     
     print("Durable Function storage integrates with AWS Durable Execution SDK")
     print("State persists across workflow steps and retries")

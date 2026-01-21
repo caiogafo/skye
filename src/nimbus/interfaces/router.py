@@ -74,26 +74,75 @@ class ModelRouterInterface(ABC):
         pass
 
     @abstractmethod
-    def route_request(self, request: CompletionRequest) -> CompletionResponse:
-        """Route a request to an appropriate model.
+    def complete(
+        self,
+        messages: list[Any],
+        model: str | None = None,
+        tags: list[str] | None = None,
+        **kwargs: Any
+    ) -> CompletionResponse:
+        """Complete a request using the router.
+
+        This method provides a unified interface for routing with flexible model
+        and tag-based selection. At least one of model or tags must be provided.
 
         Args:
-            request: The completion request.
+            messages: List of messages for the completion.
+            model: Model name or alias to use for completion (optional).
+            tags: Tags to filter models by (optional).
+            **kwargs: Additional completion parameters.
 
         Returns:
             The completion response from the selected model.
+
+        Raises:
+            ValueError: If neither model nor tags are provided, or if no models
+                match the specified criteria.
+
+        Examples:
+            >>> # Use specific model/alias
+            >>> response = router.complete(
+            ...     messages=[UserMessage("Hello!")],
+            ...     model="gpt-4"
+            ... )
+            >>>
+            >>> # Use tag-based selection
+            >>> response = router.complete(
+            ...     messages=[UserMessage("Hello!")],
+            ...     tags=["paid", "premium"]
+            ... )
+            >>>
+            >>> # Use both model and tags (model must have all tags)
+            >>> response = router.complete(
+            ...     messages=[UserMessage("Hello!")],
+            ...     model="gpt-4",
+            ...     tags=["premium"]
+            ... )
         """
         pass
 
     @abstractmethod
-    async def aroute_request(self, request: CompletionRequest) -> CompletionResponse:
-        """Route a request to an appropriate model asynchronously.
+    async def acomplete(
+        self,
+        messages: list[Any],
+        model: str | None = None,
+        tags: list[str] | None = None,
+        **kwargs: Any
+    ) -> CompletionResponse:
+        """Complete a request using the router asynchronously.
 
         Args:
-            request: The completion request.
+            messages: List of messages for the completion.
+            model: Model name or alias to use for completion (optional).
+            tags: Tags to filter models by (optional).
+            **kwargs: Additional completion parameters.
 
         Returns:
             The completion response from the selected model.
+
+        Raises:
+            ValueError: If neither model nor tags are provided, or if no models
+                match the specified criteria.
         """
         pass
 
@@ -284,29 +333,5 @@ class ModelRouterInterface(ABC):
         Example:
             >>> router.set_model_tags("gpt-4-paid", ["paid", "premium"])
             >>> router.set_model_tags("gpt-3.5-free", ["free", "basic"])
-        """
-        pass
-
-    @abstractmethod
-    def route_with_tags(
-        self, request: CompletionRequest, required_tags: list[str]
-    ) -> CompletionResponse:
-        """Route request to models matching required tags.
-
-        Args:
-            request: The completion request.
-            required_tags: Tags that the selected model must have.
-
-        Returns:
-            The completion response from a model with matching tags.
-
-        Raises:
-            ValueError: If no models with required tags are available.
-
-        Example:
-            >>> response = router.route_with_tags(
-            ...     request,
-            ...     required_tags=["paid", "premium"]
-            ... )
         """
         pass

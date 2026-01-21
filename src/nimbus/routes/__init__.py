@@ -39,8 +39,9 @@ Example (With Aliases):
     ... ])
     >>>
     >>> # Use alias in requests
-    >>> response = router.route_request(
-    ...     CompletionRequest(messages=[...], model="gpt-3.5-turbo")
+    >>> response = router.complete(
+    ...     messages=[UserMessage("Hello!")],
+    ...     model="gpt-3.5-turbo"
     ... )
 
 Example (With External Storage):
@@ -69,7 +70,10 @@ Example (Direct Registration):
     ... ])
     >>>
     >>> # Route requests
-    >>> response = router.route_request(request)
+    >>> response = router.complete(
+    ...     messages=[UserMessage("Hello!")],
+    ...     model="gpt-4"
+    ... )
     >>>
     >>> # Check health
     >>> health = router.get_model_health("gpt-4")

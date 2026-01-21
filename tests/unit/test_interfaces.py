@@ -1245,7 +1245,11 @@ class TestModelRouterInterface:
                 )
 
             async def aroute_request(self, request: CompletionRequest) -> CompletionResponse:
-                return self.route_request(request)
+                return self.complete(
+                    messages=request.messages,
+                    model=request.model,
+                    **{k: v for k, v in request.__dict__.items() if k not in ['messages', 'model']}
+                )
 
             def mark_model_failed(self, model_id: str) -> None:
                 pass
@@ -1288,7 +1292,12 @@ class TestModelRouterInterface:
             def route_with_tags(
                 self, request: CompletionRequest, required_tags: list[str]
             ) -> CompletionResponse:
-                return self.route_request(request)
+                return self.complete(
+                    messages=request.messages,
+                    model=request.model,
+                    tags=required_tags,
+                    **{k: v for k, v in request.__dict__.items() if k not in ['messages', 'model']}
+                )
 
         router = CompleteRouter()
         assert router is not None

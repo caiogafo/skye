@@ -74,11 +74,10 @@ router.register_model(
 )
 
 # Route requests
-request = CompletionRequest(
+response = router.complete(
     messages=[UserMessage(content="What is the capital of France?")],
     model="gpt-4"
 )
-response = router.route_request(request)
 print(f"Response: {response.content}")
 ```
 
@@ -153,11 +152,10 @@ router = ModelRouter(
 )
 
 # Use alias in requests - router selects best target
-request = CompletionRequest(
+response = router.complete(
     messages=[UserMessage(content="What is the capital of France?")],
     model="gpt-3.5-turbo"  # This is an alias with 2 targets
 )
-response = router.route_request(request)
 print(f"Response: {response.content}")
 ```
 

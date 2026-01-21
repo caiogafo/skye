@@ -63,7 +63,10 @@ class ModelRouter(ModelRouterInterface):
         >>> router.register_model("gpt-3.5", gpt35_model)
         >>> router.set_rate_limits("gpt-4", tpm=100000, rpm=1000)
         >>>
-        >>> response = router.route_request(request)
+        >>> response = router.complete(
+        ...     messages=[UserMessage("Hello!")],
+        ...     model="gpt-4"
+        ... )
 
     Example (With Aliases and Targets):
         >>> from nimbus import ModelRouter, ModelTarget, RouteConfig
@@ -93,8 +96,9 @@ class ModelRouter(ModelRouterInterface):
         ... ])
         >>>
         >>> # Use alias in requests
-        >>> response = router.route_request(
-        ...     CompletionRequest(messages=[...], model="gpt-3.5-turbo")
+        >>> response = router.complete(
+        ...     messages=[UserMessage("Hello!")],
+        ...     model="gpt-3.5-turbo"
         ... )
     """
 
@@ -506,8 +510,111 @@ class ModelRouter(ModelRouterInterface):
         strategy = route.strategy if route.strategy else self.strategy
         return self._strategy_selector.apply_strategy(available_models, alias, strategy)
 
-    def route_request(self, request: CompletionRequest) -> CompletionResponse:
-        """Route a request to an appropriate model."""
+    def complete(
+        self,
+        messages: list[Any],
+        model: str | None = None,
+        tags: list[str] | None = None,
+        **kwargs: Any
+    ) -> CompletionResponse:
+        """Complete a request using the router.
+
+        This method provides a unified interface for routing with flexible model
+        and tag-based selection. At least one of model or tags must be provided.
+
+        Args:
+            messages: List of messages for the completion.
+            model: Model name or alias to use for completion (optional).
+            tags: Tags to filter models by (optional).
+            **kwargs: Additional completion parameters.
+
+        Returns:
+            The completion response from the selected model.
+
+        Raises:
+            ValueError: If neither model nor tags are provided, or if no models
+                match the specified criteria.
+
+        Examples:
+            >>> # Use specific model/alias
+            >>> response = router.complete(
+            ...     messages=[UserMessage("Hello!")],
+            ...     model="gpt-4"
+            ... )
+            >>>
+            >>> # Use tag-based selection
+            >>> response = router.complete(
+            ...     messages=[UserMessage("Hello!")],
+            ...     tags=["paid", "premium"]
+            ... )
+            >>>
+            >>> # Use both model and tags (model must have all tags)
+            >>> response = router.complete(
+            ...     messages=[UserMessage("Hello!")],
+            ...     model="gpt-4",
+            ...     tags=["premium"]
+            ... )
+        """
+        # Validate input parameters
+        if not model and not tags:
+            raise ValueError("At least one of 'model' or 'tags' must be provided")
+
+        # Create internal CompletionRequest
+        from nimbus.completion import CompletionRequest
+        request = CompletionRequest(
+            messages=messages,
+            model=model or "",  # Will be selected by router if empty
+            **kwargs
+        )
+
+        # Handle tag-based filtering
+        if tags:
+            return self._route_with_tags_internal(request, tags)
+        else:
+            return self._route_request_internal(request)
+
+    async def acomplete(
+        self,
+        messages: list[Any],
+        model: str | None = None,
+        tags: list[str] | None = None,
+        **kwargs: Any
+    ) -> CompletionResponse:
+        """Complete a request using the router asynchronously.
+
+        Args:
+            messages: List of messages for the completion.
+            model: Model name or alias to use for completion (optional).
+            tags: Tags to filter models by (optional).
+            **kwargs: Additional completion parameters.
+
+        Returns:
+            The completion response from the selected model.
+
+        Raises:
+            ValueError: If neither model nor tags are provided, or if no models
+                match the specified criteria.
+        """
+        # Validate input parameters
+        if not model and not tags:
+            raise ValueError("At least one of 'model' or 'tags' must be provided")
+
+        # Create internal CompletionRequest
+        from nimbus.completion import CompletionRequest
+        request = CompletionRequest(
+            messages=messages,
+            model=model or "",  # Will be selected by router if empty
+            **kwargs
+        )
+
+        # Handle tag-based filtering
+        if tags:
+            return await self._aroute_with_tags_internal(request, tags)
+        else:
+            return await self._aroute_request_internal(request)
+
+    def _route_request_internal(self, request: CompletionRequest) -> CompletionResponse:
+        """Route a request to an appropriate model (internal method)."""
         import asyncio
         
         # Check if we're already in an async context
@@ -517,14 +624,14 @@ class ModelRouter(ModelRouterInterface):
             # Create a new thread to run the async code
             import concurrent.futures
             with concurrent.futures.ThreadPoolExecutor() as executor:
-                future = executor.submit(asyncio.run, self.aroute_request(request))
+                future = executor.submit(asyncio.run, self._aroute_request_internal(request))
                 return future.result()
         except RuntimeError:
             # No running loop, we can use asyncio.run
-            return asyncio.run(self.aroute_request(request))
+            return asyncio.run(self._aroute_request_internal(request))
 
-    async def aroute_request(self, request: CompletionRequest) -> CompletionResponse:
-        """Route a request asynchronously."""
+    async def _aroute_request_internal(self, request: CompletionRequest) -> CompletionResponse:
+        """Route a request asynchronously (internal method)."""
         model_id = request.model if request.model else await self.select_model(request)
         fallback_chain = self.fallbacks.get(model_id, [])
 
@@ -894,10 +1001,10 @@ class ModelRouter(ModelRouterInterface):
             self.health[model_id].tags = tags
             logger.info(f"Set tags for {model_id}: {tags}")
 
-    def route_with_tags(
+    def _route_with_tags_internal(
         self, request: CompletionRequest, required_tags: list[str]
     ) -> CompletionResponse:
-        """Route request to models matching required tags."""
+        """Route request to models matching required tags (internal method)."""
         # Filter models by tags
         matching_models = [
             model_id
@@ -905,16 +1012,95 @@ class ModelRouter(ModelRouterInterface):
             if all(tag in health.tags for tag in required_tags)
         ]
 
+        # If model is specified, also check if it matches the tags
+        if request.model:
+            # Check if request.model is an alias
+            if request.model in self.aliases:
+                # Get all model IDs for this alias
+                alias_models = [
+                    model_id for model_id in self.models.keys() 
+                    if model_id.startswith(f"{request.model}:")
+                ]
+                # Filter alias models by tags
+                matching_models = [
+                    model_id for model_id in alias_models 
+                    if model_id in matching_models
+                ]
+            else:
+                # Direct model ID - check if it has the required tags
+                if request.model not in matching_models:
+                    raise ValueError(
+                        f"Model '{request.model}' does not have required tags: {required_tags}"
+                    )
+                matching_models = [request.model]
+
         if not matching_models:
-            raise ValueError(
-                f"No models found with required tags: {required_tags}"
-            )
+            if request.model:
+                raise ValueError(
+                    f"No models found matching model '{request.model}' with required tags: {required_tags}"
+                )
+            else:
+                raise ValueError(
+                    f"No models found with required tags: {required_tags}"
+                )
 
         # Temporarily override available models for selection
         original_models = self.models
         self.models = {k: v for k, v in self.models.items() if k in matching_models}
 
         try:
-            return self.route_request(request)
+            return self._route_request_internal(request)
+        finally:
+            self.models = original_models
+
+    async def _aroute_with_tags_internal(
+        self, request: CompletionRequest, required_tags: list[str]
+    ) -> CompletionResponse:
+        """Route request to models matching required tags asynchronously (internal method)."""
+        # Filter models by tags
+        matching_models = [
+            model_id
+            for model_id, health in self.health.items()
+            if all(tag in health.tags for tag in required_tags)
+        ]
+
+        # If model is specified, also check if it matches the tags
+        if request.model:
+            # Check if request.model is an alias
+            if request.model in self.aliases:
+                # Get all model IDs for this alias
+                alias_models = [
+                    model_id for model_id in self.models.keys() 
+                    if model_id.startswith(f"{request.model}:")
+                ]
+                # Filter alias models by tags
+                matching_models = [
+                    model_id for model_id in alias_models 
+                    if model_id in matching_models
+                ]
+            else:
+                # Direct model ID - check if it has the required tags
+                if request.model not in matching_models:
+                    raise ValueError(
+                        f"Model '{request.model}' does not have required tags: {required_tags}"
+                    )
+                matching_models = [request.model]
+
+        if not matching_models:
+            if request.model:
+                raise ValueError(
+                    f"No models found matching model '{request.model}' with required tags: {required_tags}"
+                )
+            else:
+                raise ValueError(
+                    f"No models found with required tags: {required_tags}"
+                )
+
+        # Temporarily override available models for selection
+        original_models = self.models
+        self.models = {k: v for k, v in self.models.items() if k in matching_models}
+
+        try:
+            return await self._aroute_request_internal(request)
         finally:
             self.models = original_models

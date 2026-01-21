@@ -1,0 +1,61 @@
+[
+  {
+    "image_url": "https://example.com/images/sunset-beach.jpg",
+    "description": "A beautiful sunset over a calm beach with palm trees",
+    "content_type": "image",
+    "format": "url",
+    "metadata": {
+      "scene": "beach",
+      "time_of_day": "sunset",
+      "mood": "peaceful",
+      "objects": ["palm trees", "beach", "ocean", "sunset"]
+    }
+  },
+  {
+    "image_url": "https://example.com/images/city-skyline.jpg",
+    "description": "Modern city skyline at night with illuminated skyscrapers",
+    "content_type": "image",
+    "format": "url",
+    "metadata": {
+      "scene": "urban",
+      "time_of_day": "night",
+      "mood": "energetic",
+      "objects": ["skyscrapers", "lights", "city", "buildings"]
+    }
+  },
+  {
+    "audio_url": "https://example.com/audio/nature-sounds.mp3",
+    "description": "Relaxing nature sounds with birds chirping and water flowing",
+    "content_type": "audio",
+    "format": "url",
+    "metadata": {
+      "duration": "5 minutes",
+      "genre": "nature sounds",
+      "mood": "relaxing",
+      "elements": ["birds", "water", "wind"]
+    }
+  },
+  {
+    "video_url": "https://example.com/videos/cooking-demo.mp4",
+    "description": "Step-by-step cooking demonstration for pasta recipe",
+    "content_type": "video",
+    "format": "url",
+    "metadata": {
+      "duration": "10 minutes",
+      "category": "cooking",
+      "difficulty": "beginner",
+      "ingredients": ["pasta", "tomatoes", "garlic", "olive oil"]
+    }
+  },
+  {
+    "file_path": "/path/to/document.pdf",
+    "description": "Technical documentation for API integration",
+    "content_type": "document",
+    "format": "file",
+    "metadata": {
+      "pages": 25,
+      "category": "technical",
+      "topics": ["API", "integration", "authentication", "endpoints"]
+    }
+  }
+]

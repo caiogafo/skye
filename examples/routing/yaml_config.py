@@ -457,7 +457,7 @@ Then run this example again.
     
     try:
         # Make a request using the alias from YAML
-        response = router.route_request(
+        response = router.complete(
             messages=[UserMessage(content="What is 2+2? Answer briefly.")],
             model="gpt-3.5-turbo",  # Alias from YAML
             max_tokens=50
