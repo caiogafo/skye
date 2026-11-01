@@ -27,6 +27,14 @@ from nimbus.tools.exceptions import (
 from nimbus.tools.interface import CapabilityInterface
 from nimbus.tools.local_function import LocalFunctionCapability
 from nimbus.tools.mcp_capability import MCPCapability
+from nimbus.tools.mcp_boundary import MCPPrompt, MCPPromptArgument
+from nimbus.tools.mcp_client import (
+    BuiltinMCPClient,
+    MCPClientPort,
+    MCPToolCapability,
+    create_mcp_client,
+)
+from nimbus.tools.mcp_resource import Resource
 from nimbus.tools.mcp_server_client import MCPServerClient
 from nimbus.tools.registry import CapabilityRegistry
 from nimbus.tools.remote_api import RemoteAPICapability
@@ -41,6 +49,13 @@ __all__ = [
     "RemoteAPICapability",
     "MCPCapability",
     "MCPServerClient",
+    "MCPClientPort",
+    "BuiltinMCPClient",
+    "MCPToolCapability",
+    "MCPPrompt",
+    "MCPPromptArgument",
+    "Resource",
+    "create_mcp_client",
     "capability",
     "CapabilityRegistry",
     "CapabilityCallHandler",

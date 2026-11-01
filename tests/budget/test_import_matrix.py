@@ -38,7 +38,7 @@ ALLOWED: dict[str, set[str]] = {
     "models": {"base"},
     "store": {"base"},
     "router": {"base", "models", "store"},
-    "tools": {"base"},
+    "tools": {"base", "prompts"},  # prompts: peer, for the MCP client prompt facet (Req 19.2)
     "prompts": {"base"},
     "memory": {"base", "store"},
     "guard": {"base", "models"},

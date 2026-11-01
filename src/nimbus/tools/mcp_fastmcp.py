@@ -1,0 +1,92 @@
+"""fastmcp-backed MCP client behind :class:`MCPClientPort` (Req 19.4).
+
+fastmcp is imported lazily when a client is constructed, never at ``import nimbus`` or
+``import nimbus.tools``. Everything fastmcp returns goes straight into
+``nimbus.tools.mcp_boundary``; no fastmcp/``mcp.types`` object leaves this module.
+"""
+
+from __future__ import annotations
+
+import functools
+from collections.abc import Awaitable, Callable
+from typing import Any, TypeVar
+
+from nimbus.base.exceptions import NimbusError, ProviderError
+from nimbus.base.lazy_import import missing_extra
+from nimbus.prompts.messages import NimbusMessage
+from nimbus.tools import mcp_boundary as boundary
+from nimbus.tools.interface import CapabilityInterface
+from nimbus.tools.mcp_boundary import MCPPrompt
+from nimbus.tools.mcp_client import MCPClientPort, _ToolsFacet, _tool_value
+from nimbus.tools.mcp_resource import Resource
+
+
+_T = TypeVar("_T")
+
+
+def _nimbus_errors(fn: Callable[..., Awaitable[_T]]) -> Callable[..., Awaitable[_T]]:
+    """Convert anything the fastmcp/mcp/httpx stack raises into ``ProviderError`` (the built-in's category).
+
+    Without this a protocol error surfaces as ``mcp.shared.exceptions.MCPError`` (a library type
+    leaking past the boundary); found by the differential tests.
+    """
+
+    @functools.wraps(fn)
+    async def wrapper(*args: Any, **kwargs: Any) -> _T:
+        try:
+            return await fn(*args, **kwargs)
+        except NimbusError:
+            raise
+        except Exception as e:
+            code = getattr(getattr(e, "error", None), "code", None)
+            raise ProviderError(f"MCP error: {e}", provider="mcp", code=code) from e
+
+    return wrapper
+
+
+class FastMCPClient(_ToolsFacet, MCPClientPort):
+    """Each call opens a short-lived ``fastmcp.Client`` session (stateless, like the built-in)."""
+
+    def __init__(self, target: Any, *, headers: dict[str, str] | None = None, timeout: float = 30.0) -> None:
+        self._fastmcp = missing_extra("fastmcp", extra="mcp")
+        self._target = target
+        self._kwargs: dict[str, Any] = {"timeout": timeout}
+        if headers:
+            from_transport = getattr(self._fastmcp, "client", None)
+            transport_mod = getattr(from_transport, "transports", None)
+            if transport_mod is not None and isinstance(target, str):
+                self._target = transport_mod.StreamableHttpTransport(target, headers=headers)
+
+    def _client(self) -> Any:
+        return self._fastmcp.Client(self._target, **self._kwargs)
+
+    @_nimbus_errors
+    async def list_tools(self) -> list[CapabilityInterface]:
+        async with self._client() as c:
+            return self._capabilities(await c.list_tools())
+
+    @_nimbus_errors
+    async def call_tool(self, name: str, arguments: dict[str, Any] | None = None) -> Any:
+        async with self._client() as c:
+            raw = await c.call_tool(name, arguments or {}, raise_on_error=False)
+        return _tool_value(name, raw)
+
+    @_nimbus_errors
+    async def list_prompts(self) -> list[MCPPrompt]:
+        async with self._client() as c:
+            return [boundary.to_prompt(p) for p in await c.list_prompts()]
+
+    @_nimbus_errors
+    async def get_prompt(self, name: str, arguments: dict[str, str] | None = None) -> list[NimbusMessage]:
+        async with self._client() as c:
+            return boundary.to_prompt_messages(await c.get_prompt(name, arguments or {}))
+
+    @_nimbus_errors
+    async def list_resources(self) -> list[Resource]:
+        async with self._client() as c:
+            return [boundary.to_resource(r) for r in await c.list_resources()]
+
+    @_nimbus_errors
+    async def read_resource(self, uri: str) -> Resource:
+        async with self._client() as c:
+            return boundary.to_read_resource(await c.read_resource(uri))

@@ -53,6 +53,8 @@ class BedrockProvider(BaseModelProvider):
         >>> provider = BedrockProvider(region_name="us-west-2")
         >>> response = provider.complete(request)
     """
+
+    impl_backend = "bedrock"  # SDK-only today: no REST adapter yet (Req 17)
     
     def __init__(
         self,

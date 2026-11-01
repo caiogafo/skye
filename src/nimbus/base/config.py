@@ -604,3 +604,18 @@ class ConfigLoader:
                     config_data[config_key] = value
 
         return config_data
+
+
+def load_impl_config(path: str | Path | None = None) -> dict[str, Any]:
+    """Read the raw ``nimbus.yaml`` mapping for backend selection (``impl:`` section).
+
+    Path: ``path``, else env ``NIMBUS_CONFIG``, else ``./nimbus.yaml`` (absent default file means
+    ``{}``; an explicitly named missing file raises ``ConfigurationError``). Reuses the
+    ``ConfigLoader`` file reader (env substitution included); called at backend construction,
+    never at import.
+    """
+    explicit = path or os.environ.get("NIMBUS_CONFIG")
+    target = Path(explicit) if explicit else Path("nimbus.yaml")
+    if not explicit and not target.is_file():
+        return {}
+    return ConfigLoader._load_from_file(target)
