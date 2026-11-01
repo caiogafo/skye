@@ -1,0 +1,71 @@
+name: budgets
+
+# Size and load budgets for Nimbus (see budgets.toml and docs/budgets.md).
+# A pull request that makes the library heavier, slower to load, or dependent on a
+# compiled package fails here.
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: budgets-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  fast:
+    name: fast checks (python ${{ matrix.python }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.10", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - run: uv python install ${{ matrix.python }}
+      - run: uv sync --group dev --python ${{ matrix.python }}
+      - name: Dependency policy, import audit, import leaks
+        run: uv run --python ${{ matrix.python }} pytest tests/budget -q
+
+  footprint:
+    name: footprint (${{ matrix.target }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        target:
+          - "test_core or test_serverless"
+          - "test_extra_footprint and anthropic"
+          - "test_extra_footprint and azure"
+          - "test_extra_footprint and bedrock"
+          - "test_extra_footprint and cohere"
+          - "test_extra_footprint and memory"
+          - "test_extra_footprint and observe"
+          - "test_extra_footprint and openai"
+          - "test_extra_footprint and tools"
+          - "test_extra_footprint and vertex"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - run: uv python install 3.13
+      - run: uv sync --group dev --python 3.13
+      - name: Install into clean environments and measure
+        env:
+          NIMBUS_BUDGET_REPORT: ${{ runner.temp }}/budget-report.md
+        run: |
+          echo "| what | packages / modules | size / time | memory / compiled |" >> "$NIMBUS_BUDGET_REPORT"
+          echo "|---|---|---|---|" >> "$NIMBUS_BUDGET_REPORT"
+          uv run --python 3.13 pytest tests/budget -m budget -q -k "${{ matrix.target }}"
+      - name: Job summary
+        if: always()
+        run: |
+          [ -f "${{ runner.temp }}/budget-report.md" ] && cat "${{ runner.temp }}/budget-report.md" >> "$GITHUB_STEP_SUMMARY" || true

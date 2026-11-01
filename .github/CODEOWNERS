@@ -1,0 +1,5 @@
+# Raising a budget is a decision, not a side effect of a feature.
+/budgets.toml                      @ggiallo28
+/tests/budget/                     @ggiallo28
+/.github/workflows/budgets.yml     @ggiallo28
+/.github/CODEOWNERS                @ggiallo28

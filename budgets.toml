@@ -1,0 +1,125 @@
+# Size and load budgets for Nimbus. Checked by tests/budget and by the "budgets"
+# GitHub workflow on every pull request. See docs/budgets.md.
+#
+# Principles, in this order of preference, for everything Nimbus imports:
+#   1. the Python standard library;
+#   2. libraries the AWS Lambda Python runtime already contains (see [lambda] below);
+#   3. pure-Python packages (wheel tagged py3-none-any), only when 1 and 2 cannot do the job;
+#   4. never a compiled package (C or Rust extension) in the core: the library is I/O bound,
+#      and a compiled wheel forces a container build for the right architecture and Python.
+# The lists below record where Nimbus stands today. They only shrink.
+#
+# Rule: a budget only goes DOWN. Raising a number needs a reason in the PR and a
+# review from the owner of this file (.github/CODEOWNERS).
+#
+# Values were measured on 2026-10-30, Python 3.13, macOS arm64, wheels from PyPI.
+# "now" is what was measured, "max" is what the test enforces (headroom for
+# dependency patch releases), "target" is where the module should end up.
+
+[core]
+# Install with no extras.
+max_distributions = 12              # now 10
+max_installed_mb = 11               # now 9.0
+allowed_dependencies = ["jinja2", "pydantic", "pyyaml", "tenacity"]
+# Modules that fail to import on a core-only install. Each entry must be fixed
+# (move the import behind LazyImporter, or declare the dependency) and removed.
+# The test fails if an entry starts working, so the list cannot go stale.
+# Compiled (non pure-Python) distributions in the core install. Target: none.
+# The test fails if the set changes, in either direction.
+known_compiled = ["markupsafe", "pydantic-core", "pyyaml"]
+known_import_failures = ["nimbus.capabilities"]   # imports httpx, declared only in extra "tools"
+
+# Third-party libraries imported at module level in src/nimbus, with the number of
+# files that import them. Standard library and Lambda libraries are always allowed.
+# Anything else must be listed here; the count must match exactly, so every fix lowers
+# it (and removes the dependency when it reaches zero). Target: empty.
+[imports.max_files]
+pydantic = 10
+yaml = 1
+jinja2 = 1
+tenacity = 1
+httpx = 1
+requests = 1
+
+[load]
+# `import nimbus` in a fresh interpreter. Module count, time and memory are measured
+# in a clean core-only environment (tests/budget/test_footprint_budget.py), because a
+# development environment has extra libraries installed. The forbidden-import check
+# also runs in every normal test run.
+max_modules_loaded = 340            # now 293
+max_import_ms = 250                 # best of 5, now about 95 on a laptop (CI runners are slower)
+max_rss_delta_mb = 32               # now about 24
+# Importing nimbus must not import any provider SDK or optional dependency.
+# Known leaks: libraries that `import nimbus` still imports when they are installed.
+# nimbus/capabilities/remote_api.py imports httpx and requests at module level and
+# nimbus.providers.llm.anthropic_provider pulls it in. Fix it with LazyImporter and
+# remove the entries: the test fails if a listed library stops leaking.
+known_leaks = ["httpx", "requests"]
+forbidden_at_import = [
+  "openai", "anthropic", "boto3", "botocore", "google", "azure", "cohere",
+  "redis", "psycopg2", "httpx", "requests", "tiktoken",
+  "opentelemetry", "prometheus_client", "numpy",
+]
+
+[lambda]
+# Libraries that the AWS Lambda Python runtime already contains. They do not
+# count towards the size of a deployment package.
+preinstalled = ["boto3", "botocore", "s3transfer", "jmespath", "python-dateutil", "six", "urllib3"]
+unzipped_limit_mb = 250             # hard AWS limit for code plus layers
+profile_extra = "bedrock"           # the serverless profile: core + this extra
+max_profile_mb = 30                 # core + bedrock without the preinstalled libraries, now about 9
+
+# Megabytes added over the core install, preinstalled libraries excluded, and the number of
+# compiled distributions added over the core install (target 0 for every extra).
+[extras.bedrock]
+max_compiled_over_core = 0
+max_over_core_mb = 1
+target_over_core_mb = 1
+
+[extras.observe]
+max_compiled_over_core = 0
+max_over_core_mb = 1
+target_over_core_mb = 1
+
+[extras.tools]
+max_compiled_over_core = 1
+max_over_core_mb = 4
+target_over_core_mb = 2
+
+[extras.anthropic]
+max_compiled_over_core = 1
+max_over_core_mb = 12
+target_over_core_mb = 3
+
+[extras.memory]
+max_compiled_over_core = 1
+max_over_core_mb = 13
+target_over_core_mb = 4
+
+[extras.azure]
+max_compiled_over_core = 3
+max_over_core_mb = 18
+target_over_core_mb = 3
+
+[extras.openai]
+max_compiled_over_core = 4
+max_over_core_mb = 20
+target_over_core_mb = 4
+
+[extras.cohere]
+max_compiled_over_core = 4
+max_over_core_mb = 35
+target_over_core_mb = 3
+
+[extras.vertex]
+max_compiled_over_core = 9
+max_over_core_mb = 180
+target_over_core_mb = 10
+
+# Extras that have no dependencies today. They are modules, not extras: remove them
+# from pyproject.toml and from this list. The test fails if an extra is empty and
+# not listed here, and if a listed extra stops being empty.
+[extras_policy]
+known_empty = ["agents", "guard", "prompts"]   # "prompts" only repeats jinja2, already a core dependency
+# Convenience bundles. They are not budgeted one by one: each member extra is.
+bundles = ["llm-providers", "embedding-providers", "all-providers", "providers", "all"]

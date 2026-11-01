@@ -50,6 +50,7 @@ dev = [
     "responses>=0.23",
     "requests>=2.31",
     "httpx>=0.24",
+    "tomli>=2.0; python_version < '3.11'",
 ]
 
 [build-system]
@@ -81,7 +82,9 @@ python_functions = ["test_*"]
 asyncio_mode = "auto"
 markers = [
     "stress: marks tests as stress tests (deselect with '-m \"not stress\"')",
+    "budget: installs Nimbus in clean environments to check size budgets (needs uv and network; run with '-m budget')",
 ]
+addopts = "-m 'not budget'"
 
 [tool.coverage.run]
 source = ["src"]

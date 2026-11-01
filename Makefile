@@ -1,4 +1,4 @@
-.PHONY: help install install-dev clean format lint type-check type-check-providers test test-unit test-integration test-cov test-providers test-capabilities check all
+.PHONY: help install install-dev clean format lint type-check type-check-providers test test-unit test-integration test-cov test-providers test-capabilities check all budget budget-fast
 
 # Default target
 help:
@@ -24,6 +24,9 @@ help:
 	@echo "  make test-providers   Run provider unit tests only"
 	@echo "  make test-capabilities Run capability unit tests only"
 	@echo "  make test-cov         Run tests with coverage report"
+	@echo ""
+	@echo "  make budget-fast      Size/load policy checks (no network)"
+	@echo "  make budget           Install in clean envs and check size budgets (needs uv, network)"
 	@echo ""
 	@echo "Utilities:"
 	@echo "  make clean            Remove build artifacts and cache"
@@ -119,3 +122,10 @@ all: format check test
 	@echo "========================================"
 	@echo "✓ All tasks completed successfully!"
 	@echo "========================================"
+
+# Size and load budgets (see budgets.toml and docs/budgets.md)
+budget-fast:
+	uv run pytest tests/budget -q
+
+budget:
+	uv run pytest tests/budget -m budget -q
