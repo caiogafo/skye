@@ -40,10 +40,10 @@ EXTRA_PATHS: dict[str, list[str]] = {
     "openai": ["models/llm/openai_compatible.py", "models/embeddings/openai_embeddings.py"],
     "anthropic": ["models/llm/anthropic.py"],
     "bedrock": ["models/llm/bedrock.py", "models/embeddings/bedrock_embeddings.py"],
-    "vertex": [
-        "models/llm/vertex_provider.py",
-        "models/embeddings/vertex_embeddings.py",
-        "models/embeddings/vertex_multimodal_embeddings.py",
+    "google": [
+        "models/llm/google_provider.py",
+        "models/embeddings/google_embeddings.py",
+        "models/embeddings/google_multimodal_embeddings.py",
     ],
     "cohere": ["models/embeddings/cohere_embeddings.py"],
     "tools": [

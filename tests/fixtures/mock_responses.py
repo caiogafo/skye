@@ -111,8 +111,8 @@ BEDROCK_EMBEDDING_RESPONSE = {
 AZURE_COMPLETION_RESPONSE = OPENAI_COMPLETION_RESPONSE.copy()
 
 
-# Vertex AI Mock Responses
-VERTEX_COMPLETION_RESPONSE = {
+# Google Mock Responses
+GOOGLE_COMPLETION_RESPONSE = {
     "candidates": [
         {
             "content": {
@@ -130,7 +130,7 @@ VERTEX_COMPLETION_RESPONSE = {
     },
 }
 
-VERTEX_EMBEDDING_RESPONSE = {
+GOOGLE_EMBEDDING_RESPONSE = {
     "predictions": [{"embeddings": {"values": [0.1] * 768}}],
 }
 
@@ -148,7 +148,7 @@ def get_mock_response(provider: str, response_type: str) -> dict[str, Any]:
     """Get a mock response for a specific provider and response type.
 
     Args:
-        provider: Provider name (openai, anthropic, bedrock, azure, vertex, cohere)
+        provider: Provider name (openai, anthropic, bedrock, azure, google, cohere)
         response_type: Type of response (completion, streaming, embedding)
 
     Returns:
@@ -175,9 +175,9 @@ def get_mock_response(provider: str, response_type: str) -> dict[str, Any]:
             "completion": AZURE_COMPLETION_RESPONSE,
             "streaming": OPENAI_STREAMING_CHUNK,
         },
-        "vertex": {
-            "completion": VERTEX_COMPLETION_RESPONSE,
-            "embedding": VERTEX_EMBEDDING_RESPONSE,
+        "google": {
+            "completion": GOOGLE_COMPLETION_RESPONSE,
+            "embedding": GOOGLE_EMBEDDING_RESPONSE,
         },
         "cohere": {
             "embedding": COHERE_EMBEDDING_RESPONSE,

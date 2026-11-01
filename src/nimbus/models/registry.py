@@ -173,7 +173,7 @@ class ProviderRegistry(ProviderRegistryInterface):
         Example:
             >>> providers = ProviderRegistry.list_model_providers()
             >>> print(providers)
-            ['openai', 'anthropic', 'bedrock', 'azure', 'vertex']
+            ['openai', 'anthropic', 'bedrock', 'azure', 'google']
         """
         return list(cls._model_providers.keys())
 
@@ -187,7 +187,7 @@ class ProviderRegistry(ProviderRegistryInterface):
         Example:
             >>> providers = ProviderRegistry.list_embedding_providers()
             >>> print(providers)
-            ['openai', 'bedrock', 'cohere', 'vertex']
+            ['openai', 'bedrock', 'cohere', 'google']
         """
         return list(cls._embedding_providers.keys())
 
@@ -244,9 +244,9 @@ def provider(name: str, **config: Any) -> ModelInterface | VectorEncoderInterfac
         ... )
         >>> vectors = embedder.encode_batch(["text1", "text2"])
         >>>
-        >>> # Vertex AI Embeddings
+        >>> # Google Embeddings
         >>> embedder = provider(
-        ...     "vertex",
+        ...     "google",
         ...     project_id="my-project",
         ...     location="us-central1",
         ...     model="textembedding-gecko@003",

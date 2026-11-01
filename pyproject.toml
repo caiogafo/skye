@@ -18,7 +18,7 @@ dependencies = [
 openai = ["openai>=1.0", "tiktoken>=0.5"]
 anthropic = ["anthropic>=0.25"]
 bedrock = ["boto3>=1.28"]  # Optional in Lambda environments
-vertex = ["google-cloud-aiplatform>=1.38"]
+google = ["google-cloud-aiplatform>=1.38"]
 cohere = ["cohere>=5.0"]
 
 # Individual components

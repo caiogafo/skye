@@ -215,11 +215,11 @@ class ErrorHandler:
         )
 
     @staticmethod
-    def handle_vertex_error(error: Exception, provider: str = "vertex") -> ProviderError:
-        """Handle Google Vertex AI-specific errors.
+    def handle_google_error(error: Exception, provider: str = "google") -> ProviderError:
+        """Handle Google-specific errors.
 
         Args:
-            error: The Vertex error to handle
+            error: The Google error to handle
             provider: Provider name for context
 
         Returns:
@@ -251,7 +251,7 @@ class ErrorHandler:
             error_classification = "unknown_error"
 
         return ProviderError(
-            f"Vertex AI API error: {error_message}",
+            f"Google API error: {error_message}",
             provider=provider,
             status_code=status_code,
             error_type=error_classification,
@@ -269,7 +269,7 @@ class ErrorHandler:
 
         Args:
             error: The error to wrap
-            provider: Provider name (openai, anthropic, bedrock, azure, vertex)
+            provider: Provider name (openai, anthropic, bedrock, azure, google)
 
         Returns:
             ProviderError with appropriate context
@@ -287,8 +287,8 @@ class ErrorHandler:
             return ErrorHandler.handle_bedrock_error(error, provider)
         elif provider == "azure":
             return ErrorHandler.handle_azure_error(error, provider)
-        elif provider == "vertex":
-            return ErrorHandler.handle_vertex_error(error, provider)
+        elif provider == "google":
+            return ErrorHandler.handle_google_error(error, provider)
         else:
             # Generic error handling for unknown providers
             return ProviderError(

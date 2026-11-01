@@ -1,10 +1,10 @@
-"""Google Vertex AI Provider Example (Boto3-style Nimbus API).
+"""Google Provider Example (Boto3-style Nimbus API).
 
 This version demonstrates:
-- Basic completion with Vertex AI (Gemini models)
+- Basic completion with Google (Gemini models)
 - Streaming responses
 - GCP project and location configuration
-- Simple client creation: create_provider("vertex")
+- Simple client creation: create_provider("google")
 """
 
 import os
@@ -13,9 +13,9 @@ from nimbus.base.messages import UserMessage, SystemMessage
 
 
 def basic_completion():
-    """Basic completion using Vertex AI."""
+    """Basic completion using Google."""
     print("=" * 60)
-    print("Vertex AI - Basic Completion")
+    print("Google - Basic Completion")
     print("=" * 60)
     
     project_id = os.getenv("GCP_PROJECT_ID")
@@ -28,13 +28,13 @@ def basic_completion():
     
     try:
         client = create_provider(
-            "vertex",
+            "google",
             project_id=project_id,
             location=location
         )
     except ImportError as e:
         print(f"⚠️  Error: {e}")
-        print("\nTo use Vertex AI, install with: pip install nimbus[vertex]")
+        print("\nTo use Google, install with: pip install nimbus[google]")
         return
     
     messages = [
@@ -57,9 +57,9 @@ def basic_completion():
 
 
 def streaming_example():
-    """Streaming completion using Vertex AI."""
+    """Streaming completion using Google."""
     print("\n" + "=" * 60)
-    print("Vertex AI - Streaming")
+    print("Google - Streaming")
     print("=" * 60)
     
     project_id = os.getenv("GCP_PROJECT_ID")
@@ -70,7 +70,7 @@ def streaming_example():
         return
     
     client = create_provider(
-        "vertex",
+        "google",
         project_id=project_id,
         location=location
     )
@@ -89,7 +89,7 @@ def streaming_example():
 def multiple_models():
     """Run the same prompt on different Gemini models."""
     print("\n" + "=" * 60)
-    print("Vertex AI - Multiple Models")
+    print("Google - Multiple Models")
     print("=" * 60)
     
     project_id = os.getenv("GCP_PROJECT_ID")
@@ -100,7 +100,7 @@ def multiple_models():
         return
     
     client = create_provider(
-        "vertex",
+        "google",
         project_id=project_id,
         location=location
     )
@@ -127,11 +127,11 @@ def multiple_models():
 def cloud_run_example():
     """Example for Google Cloud Run deployment."""
     print("\n" + "=" * 60)
-    print("Vertex AI - Cloud Run Deployment")
+    print("Google - Cloud Run Deployment")
     print("=" * 60)
     
     print("""
-Example Cloud Run service using Nimbus with Vertex AI:
+Example Cloud Run service using Nimbus with Google:
 
 ```python
 from nimbus.models.registry import provider as create_provider
@@ -142,7 +142,7 @@ app = Flask(__name__)
 
 # Initialize client (uses Application Default Credentials)
 client = create_provider(
-    "vertex",
+    "google",
     project_id="your-project-id",
     location="us-central1"
 )
@@ -167,35 +167,35 @@ if __name__ == "__main__":
 ```
 
 Deployment:
-1. Create Dockerfile with nimbus[vertex]
+1. Create Dockerfile with nimbus[google]
 2. Deploy to Cloud Run
-3. Set service account with Vertex AI permissions
+3. Set service account with Google permissions
 4. Cloud Run provides authentication automatically
 """)
 
 
 def configuration_example():
-    """Example showing Vertex AI configuration options."""
+    """Example showing Google configuration options."""
     print("\n" + "=" * 60)
-    print("Vertex AI - Configuration")
+    print("Google - Configuration")
     print("=" * 60)
     
     print("""
-Vertex AI configuration options:
+Google configuration options:
 
 ```python
 from nimbus.models.registry import provider as create_provider
 
 # Basic configuration
 client = create_provider(
-    "vertex",
+    "google",
     project_id="your-project-id",
     location="us-central1"  # or "europe-west1", "asia-northeast1", etc.
 )
 
 # With custom credentials
 client = create_provider(
-    "vertex",
+    "google",
     project_id="your-project-id",
     location="us-central1",
     credentials_path="/path/to/service-account.json"
@@ -219,7 +219,7 @@ Authentication methods:
 def main():
     """Run all examples."""
     print("\n" + "🌐 " * 20)
-    print("NIMBUS - Vertex AI Provider Examples")
+    print("NIMBUS - Google Provider Examples")
     print("🌐 " * 20)
     
     try:
@@ -236,10 +236,10 @@ def main():
     except Exception as e:
         print(f"\n❌ Error: {e}")
         print("\nMake sure you have:")
-        print("  1. Installed nimbus[vertex]: pip install nimbus[vertex]")
+        print("  1. Installed nimbus[google]: pip install nimbus[google]")
         print("  2. Set GCP_PROJECT_ID environment variable")
         print("  3. Configured GCP authentication (gcloud auth or service account)")
-        print("  4. Enabled Vertex AI API in your GCP project")
+        print("  4. Enabled Google API in your GCP project")
 
 
 if __name__ == "__main__":

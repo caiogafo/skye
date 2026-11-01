@@ -43,7 +43,7 @@ class ProviderArchitectureValidator:
             "bedrock",
             "anthropic",
             "azure",
-            "vertex",
+            "google",
         ]
     
     def validate(self) -> bool:

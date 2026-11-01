@@ -1,4 +1,4 @@
-"""Unit tests for Vertex AI embedding provider.
+"""Unit tests for Google embedding provider.
 
 Tests cover:
 - Client initialization
@@ -11,15 +11,15 @@ from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 
-from nimbus.models.embeddings.vertex_embeddings import VertexEmbeddingProvider
+from nimbus.models.embeddings.google_embeddings import GoogleEmbeddingProvider
 
 
-class TestVertexEmbeddingProviderInitialization:
-    """Test Vertex AI embedding provider initialization."""
+class TestGoogleEmbeddingProviderInitialization:
+    """Test Google embedding provider initialization."""
     
     def test_init_with_required_params(self) -> None:
         """Test initialization with required parameters."""
-        provider = VertexEmbeddingProvider(
+        provider = GoogleEmbeddingProvider(
             model="text-embedding-004",
             project_id="my-project",
             location="us-central1"
@@ -30,7 +30,7 @@ class TestVertexEmbeddingProviderInitialization:
     
     def test_init_with_additional_config(self) -> None:
         """Test initialization with additional configuration."""
-        provider = VertexEmbeddingProvider(
+        provider = GoogleEmbeddingProvider(
             model="text-multilingual-embedding-002",
             project_id="my-project",
             location="us-west1",
@@ -41,7 +41,7 @@ class TestVertexEmbeddingProviderInitialization:
         assert provider.location == "us-west1"
         assert provider.config["credentials_path"] == "/path/to/creds.json"
     
-    @patch("nimbus.models.embeddings.vertex_embeddings.LazyImporter.import_module")
+    @patch("nimbus.models.embeddings.google_embeddings.LazyImporter.import_module")
     def test_lazy_client_initialization(self, mock_import: Mock) -> None:
         """Test that client is lazily initialized."""
         mock_aiplatform = MagicMock()
@@ -49,7 +49,7 @@ class TestVertexEmbeddingProviderInitialization:
         mock_aiplatform.TextEmbeddingModel.from_pretrained.return_value = mock_model
         mock_import.return_value = mock_aiplatform
         
-        provider = VertexEmbeddingProvider(
+        provider = GoogleEmbeddingProvider(
             model="text-embedding-004",
             project_id="my-project",
             location="us-central1"
@@ -65,7 +65,7 @@ class TestVertexEmbeddingProviderInitialization:
         mock_import.assert_called_once_with(
             "google.cloud.aiplatform",
             package_name="google-cloud-aiplatform",
-            install_extra="vertex"
+            install_extra="google"
         )
         mock_aiplatform.init.assert_called_once_with(
             project="my-project",
@@ -76,10 +76,10 @@ class TestVertexEmbeddingProviderInitialization:
         )
 
 
-class TestVertexEmbeddingProviderBatchEncoding:
+class TestGoogleEmbeddingProviderBatchEncoding:
     """Test batch encoding functionality."""
     
-    @patch("nimbus.models.embeddings.vertex_embeddings.LazyImporter.import_module")
+    @patch("nimbus.models.embeddings.google_embeddings.LazyImporter.import_module")
     def test_encode_batch(self, mock_import: Mock) -> None:
         """Test batch encoding."""
         # Setup mock
@@ -97,7 +97,7 @@ class TestVertexEmbeddingProviderBatchEncoding:
         mock_model.get_embeddings.return_value = [mock_embedding_1, mock_embedding_2]
         
         # Test
-        provider = VertexEmbeddingProvider(
+        provider = GoogleEmbeddingProvider(
             model="text-embedding-004",
             project_id="my-project",
             location="us-central1"
@@ -112,7 +112,7 @@ class TestVertexEmbeddingProviderBatchEncoding:
         
         mock_model.get_embeddings.assert_called_once_with(["text1", "text2"])
     
-    @patch("nimbus.models.embeddings.vertex_embeddings.LazyImporter.import_module")
+    @patch("nimbus.models.embeddings.google_embeddings.LazyImporter.import_module")
     def test_encode_single_text(self, mock_import: Mock) -> None:
         """Test encoding single text."""
         # Setup mock
@@ -128,7 +128,7 @@ class TestVertexEmbeddingProviderBatchEncoding:
         mock_model.get_embeddings.return_value = [mock_embedding]
         
         # Test
-        provider = VertexEmbeddingProvider(
+        provider = GoogleEmbeddingProvider(
             model="text-embedding-004",
             project_id="my-project",
             location="us-central1"
@@ -142,12 +142,12 @@ class TestVertexEmbeddingProviderBatchEncoding:
         mock_model.get_embeddings.assert_called_once_with(["hello"])
 
 
-class TestVertexEmbeddingProviderVectorDimensions:
+class TestGoogleEmbeddingProviderVectorDimensions:
     """Test vector dimension retrieval."""
     
     def test_get_vector_dimension_text_embedding_004(self) -> None:
         """Test vector dimension for text-embedding-004."""
-        provider = VertexEmbeddingProvider(
+        provider = GoogleEmbeddingProvider(
             model="text-embedding-004",
             project_id="my-project",
             location="us-central1"
@@ -156,7 +156,7 @@ class TestVertexEmbeddingProviderVectorDimensions:
     
     def test_get_vector_dimension_multilingual(self) -> None:
         """Test vector dimension for text-multilingual-embedding-002."""
-        provider = VertexEmbeddingProvider(
+        provider = GoogleEmbeddingProvider(
             model="text-multilingual-embedding-002",
             project_id="my-project",
             location="us-central1"
@@ -165,7 +165,7 @@ class TestVertexEmbeddingProviderVectorDimensions:
     
     def test_get_vector_dimension_unknown_model(self) -> None:
         """Test vector dimension for unknown model."""
-        provider = VertexEmbeddingProvider(
+        provider = GoogleEmbeddingProvider(
             model="unknown-model",
             project_id="my-project",
             location="us-central1"

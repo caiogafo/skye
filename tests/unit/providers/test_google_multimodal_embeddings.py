@@ -1,4 +1,4 @@
-"""Unit tests for Vertex AI multimodal embedding provider.
+"""Unit tests for Google multimodal embedding provider.
 
 Tests cover:
 - Client initialization
@@ -14,17 +14,17 @@ from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 
-from nimbus.models.embeddings.vertex_multimodal_embeddings import (
-    VertexMultimodalEmbeddingProvider,
+from nimbus.models.embeddings.google_multimodal_embeddings import (
+    GoogleMultimodalEmbeddingProvider,
 )
 
 
-class TestVertexMultimodalEmbeddingProviderInitialization:
-    """Test Vertex AI multimodal embedding provider initialization."""
+class TestGoogleMultimodalEmbeddingProviderInitialization:
+    """Test Google multimodal embedding provider initialization."""
     
     def test_init_with_required_params(self) -> None:
         """Test initialization with required parameters."""
-        provider = VertexMultimodalEmbeddingProvider(
+        provider = GoogleMultimodalEmbeddingProvider(
             project_id="my-project",
             location="us-central1"
         )
@@ -34,7 +34,7 @@ class TestVertexMultimodalEmbeddingProviderInitialization:
     
     def test_init_with_additional_config(self) -> None:
         """Test initialization with additional configuration."""
-        provider = VertexMultimodalEmbeddingProvider(
+        provider = GoogleMultimodalEmbeddingProvider(
             project_id="my-project",
             location="us-west1",
             credentials_path="/path/to/creds.json"
@@ -44,7 +44,7 @@ class TestVertexMultimodalEmbeddingProviderInitialization:
         assert provider.location == "us-west1"
         assert provider.config["credentials_path"] == "/path/to/creds.json"
     
-    @patch("nimbus.models.embeddings.vertex_multimodal_embeddings.LazyImporter.import_module")
+    @patch("nimbus.models.embeddings.google_multimodal_embeddings.LazyImporter.import_module")
     def test_lazy_client_initialization(self, mock_import: Mock) -> None:
         """Test that client is lazily initialized."""
         mock_aiplatform = MagicMock()
@@ -52,7 +52,7 @@ class TestVertexMultimodalEmbeddingProviderInitialization:
         mock_aiplatform.MultimodalEmbeddingModel.from_pretrained.return_value = mock_model
         mock_import.return_value = mock_aiplatform
         
-        provider = VertexMultimodalEmbeddingProvider(
+        provider = GoogleMultimodalEmbeddingProvider(
             project_id="my-project",
             location="us-central1"
         )
@@ -67,7 +67,7 @@ class TestVertexMultimodalEmbeddingProviderInitialization:
         mock_import.assert_called_once_with(
             "google.cloud.aiplatform",
             package_name="google-cloud-aiplatform",
-            install_extra="vertex"
+            install_extra="google"
         )
         mock_aiplatform.init.assert_called_once_with(
             project="my-project",
@@ -78,12 +78,12 @@ class TestVertexMultimodalEmbeddingProviderInitialization:
         )
 
 
-class TestVertexMultimodalEmbeddingProviderImageDetection:
+class TestGoogleMultimodalEmbeddingProviderImageDetection:
     """Test image input detection."""
     
     def test_is_image_input_jpg_file(self) -> None:
         """Test detection of JPG file."""
-        provider = VertexMultimodalEmbeddingProvider(
+        provider = GoogleMultimodalEmbeddingProvider(
             project_id="my-project",
             location="us-central1"
         )
@@ -92,7 +92,7 @@ class TestVertexMultimodalEmbeddingProviderImageDetection:
     
     def test_is_image_input_png_file(self) -> None:
         """Test detection of PNG file."""
-        provider = VertexMultimodalEmbeddingProvider(
+        provider = GoogleMultimodalEmbeddingProvider(
             project_id="my-project",
             location="us-central1"
         )
@@ -101,7 +101,7 @@ class TestVertexMultimodalEmbeddingProviderImageDetection:
     
     def test_is_image_input_image_url(self) -> None:
         """Test detection of image URL."""
-        provider = VertexMultimodalEmbeddingProvider(
+        provider = GoogleMultimodalEmbeddingProvider(
             project_id="my-project",
             location="us-central1"
         )
@@ -110,7 +110,7 @@ class TestVertexMultimodalEmbeddingProviderImageDetection:
     
     def test_is_image_input_base64_data(self) -> None:
         """Test detection of base64 image data."""
-        provider = VertexMultimodalEmbeddingProvider(
+        provider = GoogleMultimodalEmbeddingProvider(
             project_id="my-project",
             location="us-central1"
         )
@@ -118,7 +118,7 @@ class TestVertexMultimodalEmbeddingProviderImageDetection:
     
     def test_is_image_input_text(self) -> None:
         """Test that plain text is not detected as image."""
-        provider = VertexMultimodalEmbeddingProvider(
+        provider = GoogleMultimodalEmbeddingProvider(
             project_id="my-project",
             location="us-central1"
         )
@@ -126,10 +126,10 @@ class TestVertexMultimodalEmbeddingProviderImageDetection:
         assert provider._is_image_input("This is some text") is False
 
 
-class TestVertexMultimodalEmbeddingProviderTextEncoding:
+class TestGoogleMultimodalEmbeddingProviderTextEncoding:
     """Test text encoding functionality."""
     
-    @patch("nimbus.models.embeddings.vertex_multimodal_embeddings.LazyImporter.import_module")
+    @patch("nimbus.models.embeddings.google_multimodal_embeddings.LazyImporter.import_module")
     def test_encode_text(self, mock_import: Mock) -> None:
         """Test text encoding."""
         # Setup mock
@@ -145,7 +145,7 @@ class TestVertexMultimodalEmbeddingProviderTextEncoding:
         mock_model.get_embeddings.return_value = [mock_embedding]
         
         # Test
-        provider = VertexMultimodalEmbeddingProvider(
+        provider = GoogleMultimodalEmbeddingProvider(
             project_id="my-project",
             location="us-central1"
         )
@@ -157,10 +157,10 @@ class TestVertexMultimodalEmbeddingProviderTextEncoding:
         mock_model.get_embeddings.assert_called_once_with(texts=["hello"])
 
 
-class TestVertexMultimodalEmbeddingProviderBatchEncoding:
+class TestGoogleMultimodalEmbeddingProviderBatchEncoding:
     """Test batch encoding functionality."""
     
-    @patch("nimbus.models.embeddings.vertex_multimodal_embeddings.LazyImporter.import_module")
+    @patch("nimbus.models.embeddings.google_multimodal_embeddings.LazyImporter.import_module")
     def test_encode_batch_text_only(self, mock_import: Mock) -> None:
         """Test batch encoding with text only."""
         # Setup mock
@@ -181,7 +181,7 @@ class TestVertexMultimodalEmbeddingProviderBatchEncoding:
         ]
         
         # Test
-        provider = VertexMultimodalEmbeddingProvider(
+        provider = GoogleMultimodalEmbeddingProvider(
             project_id="my-project",
             location="us-central1"
         )
@@ -193,8 +193,8 @@ class TestVertexMultimodalEmbeddingProviderBatchEncoding:
         assert result[0] == [0.1, 0.2, 0.3]
         assert result[1] == [0.4, 0.5, 0.6]
     
-    @patch("nimbus.models.embeddings.vertex_multimodal_embeddings.ImageHandler.process_image")
-    @patch("nimbus.models.embeddings.vertex_multimodal_embeddings.LazyImporter.import_module")
+    @patch("nimbus.models.embeddings.google_multimodal_embeddings.ImageHandler.process_image")
+    @patch("nimbus.models.embeddings.google_multimodal_embeddings.LazyImporter.import_module")
     def test_encode_batch_mixed_content(self, mock_import: Mock, mock_process_image: Mock) -> None:
         """Test batch encoding with mixed text and images."""
         # Setup mock
@@ -221,7 +221,7 @@ class TestVertexMultimodalEmbeddingProviderBatchEncoding:
         ]
         
         # Test
-        provider = VertexMultimodalEmbeddingProvider(
+        provider = GoogleMultimodalEmbeddingProvider(
             project_id="my-project",
             location="us-central1"
         )
@@ -233,7 +233,7 @@ class TestVertexMultimodalEmbeddingProviderBatchEncoding:
         assert result[0] == [0.1, 0.2, 0.3]
         assert result[1] == [0.4, 0.5, 0.6]
     
-    @patch("nimbus.models.embeddings.vertex_multimodal_embeddings.LazyImporter.import_module")
+    @patch("nimbus.models.embeddings.google_multimodal_embeddings.LazyImporter.import_module")
     def test_encode_single_text(self, mock_import: Mock) -> None:
         """Test encoding single text."""
         # Setup mock
@@ -249,7 +249,7 @@ class TestVertexMultimodalEmbeddingProviderBatchEncoding:
         mock_model.get_embeddings.return_value = [mock_embedding]
         
         # Test
-        provider = VertexMultimodalEmbeddingProvider(
+        provider = GoogleMultimodalEmbeddingProvider(
             project_id="my-project",
             location="us-central1"
         )
@@ -260,12 +260,12 @@ class TestVertexMultimodalEmbeddingProviderBatchEncoding:
         assert result == [0.1, 0.2, 0.3]
 
 
-class TestVertexMultimodalEmbeddingProviderVectorDimensions:
+class TestGoogleMultimodalEmbeddingProviderVectorDimensions:
     """Test vector dimension retrieval."""
     
     def test_get_vector_dimension(self) -> None:
         """Test vector dimension for multimodalembedding@001."""
-        provider = VertexMultimodalEmbeddingProvider(
+        provider = GoogleMultimodalEmbeddingProvider(
             project_id="my-project",
             location="us-central1"
         )

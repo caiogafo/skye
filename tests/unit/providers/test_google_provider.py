@@ -1,4 +1,4 @@
-"""Unit tests for Vertex AI provider implementation.
+"""Unit tests for Google provider implementation.
 
 Tests cover:
 - Client initialization
@@ -19,15 +19,15 @@ import pytest
 from nimbus.base.completion import CompletionRequest, CompletionResponse, StreamChunk, TokenUsage
 from nimbus.base.exceptions import ProviderError
 from nimbus.base.messages import AssistantMessage, SystemMessage, UserMessage
-from nimbus.models.llm.vertex_provider import VertexAIProvider
+from nimbus.models.llm.google_provider import GoogleProvider
 
 
-class TestVertexAIProviderInitialization:
-    """Test Vertex AI provider initialization."""
+class TestGoogleProviderInitialization:
+    """Test Google provider initialization."""
 
     def test_init_with_required_params(self) -> None:
         """Test initialization with required parameters."""
-        provider = VertexAIProvider(
+        provider = GoogleProvider(
             project_id="my-project",
             location="us-central1"
         )
@@ -38,7 +38,7 @@ class TestVertexAIProviderInitialization:
     def test_init_with_all_params(self) -> None:
         """Test initialization with all parameters."""
         mock_creds = Mock()
-        provider = VertexAIProvider(
+        provider = GoogleProvider(
             project_id="my-project",
             location="europe-west1",
             credentials=mock_creds
@@ -47,13 +47,13 @@ class TestVertexAIProviderInitialization:
         assert provider.location == "europe-west1"
         assert provider.credentials is mock_creds
 
-    @patch("nimbus.models.llm.vertex_provider.LazyImporter.import_module")
+    @patch("nimbus.models.llm.google_provider.LazyImporter.import_module")
     def test_lazy_client_initialization(self, mock_import: Mock) -> None:
         """Test that client is lazily initialized."""
         mock_vertexai = MagicMock()
         mock_import.return_value = mock_vertexai
 
-        provider = VertexAIProvider(
+        provider = GoogleProvider(
             project_id="my-project",
             location="us-central1"
         )
@@ -68,7 +68,7 @@ class TestVertexAIProviderInitialization:
         mock_import.assert_called_once_with(
             "google.cloud.aiplatform",
             package_name="google-cloud-aiplatform",
-            install_extra="vertex"
+            install_extra="google"
         )
         mock_vertexai.init.assert_called_once_with(
             project="my-project",
@@ -77,12 +77,12 @@ class TestVertexAIProviderInitialization:
         )
 
 
-class TestVertexAIRequestTransformation:
-    """Test request transformation to Vertex AI format."""
+class TestGoogleAIRequestTransformation:
+    """Test request transformation to Google format."""
 
     def test_transform_basic_request(self) -> None:
         """Test transformation of basic completion request."""
-        provider = VertexAIProvider(
+        provider = GoogleProvider(
             project_id="my-project",
             location="us-central1"
         )
@@ -102,7 +102,7 @@ class TestVertexAIRequestTransformation:
 
     def test_transform_with_system_message(self) -> None:
         """Test transformation with system message."""
-        provider = VertexAIProvider(
+        provider = GoogleProvider(
             project_id="my-project",
             location="us-central1"
         )
@@ -123,7 +123,7 @@ class TestVertexAIRequestTransformation:
 
     def test_transform_with_max_tokens(self) -> None:
         """Test transformation with max_tokens parameter."""
-        provider = VertexAIProvider(
+        provider = GoogleProvider(
             project_id="my-project",
             location="us-central1"
         )
@@ -139,7 +139,7 @@ class TestVertexAIRequestTransformation:
 
     def test_transform_with_stop_sequences(self) -> None:
         """Test transformation with stop sequences."""
-        provider = VertexAIProvider(
+        provider = GoogleProvider(
             project_id="my-project",
             location="us-central1"
         )
@@ -155,7 +155,7 @@ class TestVertexAIRequestTransformation:
 
     def test_transform_with_safety_settings(self) -> None:
         """Test transformation with safety settings."""
-        provider = VertexAIProvider(
+        provider = GoogleProvider(
             project_id="my-project",
             location="us-central1"
         )
@@ -177,7 +177,7 @@ class TestVertexAIRequestTransformation:
 
     def test_transform_with_grounding(self) -> None:
         """Test transformation with grounding features."""
-        provider = VertexAIProvider(
+        provider = GoogleProvider(
             project_id="my-project",
             location="us-central1"
         )
@@ -195,8 +195,8 @@ class TestVertexAIRequestTransformation:
         assert result["grounding"] == grounding_config
 
     def test_transform_with_function_calling(self) -> None:
-        """Test transformation with function calling (legacy test - now handled by TestVertexAIToolCalling)."""
-        # This test is now superseded by the more comprehensive TestVertexAIToolCalling tests
+        """Test transformation with function calling (legacy test - now handled by TestGoogleAIToolCalling)."""
+        # This test is now superseded by the more comprehensive TestGoogleAIToolCalling tests
         # Keeping it for backwards compatibility but updating to use proper CapabilityInterface
         from nimbus.tools import LocalFunctionCapability
 
@@ -206,7 +206,7 @@ class TestVertexAIRequestTransformation:
 
         capability = LocalFunctionCapability(get_weather)
 
-        provider = VertexAIProvider(
+        provider = GoogleProvider(
             project_id="my-project",
             location="us-central1"
         )
@@ -226,7 +226,7 @@ class TestVertexAIRequestTransformation:
 
     def test_transform_with_provider_metadata(self) -> None:
         """Test transformation with provider-specific metadata."""
-        provider = VertexAIProvider(
+        provider = GoogleProvider(
             project_id="my-project",
             location="us-central1"
         )
@@ -234,8 +234,8 @@ class TestVertexAIRequestTransformation:
             messages=[UserMessage(content="Hello")],
             model="gemini-1.5-pro",
             metadata={
-                "vertex_candidate_count": 1,
-                "vertex_presence_penalty": 0.5,
+                "google_candidate_count": 1,
+                "google_presence_penalty": 0.5,
                 "other_key": "ignored"
             }
         )
@@ -247,17 +247,17 @@ class TestVertexAIRequestTransformation:
         assert "other_key" not in result
 
 
-class TestVertexAIResponseTransformation:
-    """Test response transformation from Vertex AI format."""
+class TestGoogleAIResponseTransformation:
+    """Test response transformation from Google format."""
 
     def test_transform_basic_response(self) -> None:
-        """Test transformation of basic Vertex AI response."""
-        provider = VertexAIProvider(
+        """Test transformation of basic Google response."""
+        provider = GoogleProvider(
             project_id="my-project",
             location="us-central1"
         )
 
-        # Mock Vertex AI response
+        # Mock Google response
         mock_response = Mock()
         mock_response.name = "response-123"
         mock_response.model = "gemini-1.5-pro"
@@ -285,7 +285,7 @@ class TestVertexAIResponseTransformation:
         assert isinstance(result, CompletionResponse)
         assert result.id == "response-123"
         assert result.model == "gemini-1.5-pro"
-        assert result.provider == "vertex"
+        assert result.provider == "google"
         assert result.content == "Hello! How can I help?"
         assert result.role == "assistant"
         assert result.finish_reason == "stop"
@@ -294,15 +294,15 @@ class TestVertexAIResponseTransformation:
         assert result.usage.total_tokens == 30
 
     def test_transform_response_with_function_call(self) -> None:
-        """Test transformation of response with function call (legacy test - now handled by TestVertexAIToolCalling)."""
-        # This test is now superseded by the more comprehensive TestVertexAIToolCalling tests
+        """Test transformation of response with function call (legacy test - now handled by TestGoogleAIToolCalling)."""
+        # This test is now superseded by the more comprehensive TestGoogleAIToolCalling tests
         # Updating to match new metadata format
-        provider = VertexAIProvider(
+        provider = GoogleProvider(
             project_id="my-project",
             location="us-central1"
         )
 
-        # Mock Vertex AI response with function call
+        # Mock Google response with function call
         mock_response = Mock()
         mock_response.name = "response-123"
         mock_response.model = "gemini-1.5-pro"
@@ -344,12 +344,12 @@ class TestVertexAIResponseTransformation:
 
     def test_transform_response_without_usage(self) -> None:
         """Test transformation of response without usage metadata."""
-        provider = VertexAIProvider(
+        provider = GoogleProvider(
             project_id="my-project",
             location="us-central1"
         )
 
-        # Mock Vertex AI response without usage
+        # Mock Google response without usage
         mock_response = Mock()
         mock_response.name = "response-123"
         mock_response.model = "gemini-1.5-pro"
@@ -374,17 +374,17 @@ class TestVertexAIResponseTransformation:
         assert result.usage.total_tokens == 0
 
 
-class TestVertexAIStreamTransformation:
+class TestGoogleAIStreamTransformation:
     """Test stream chunk transformation."""
 
     def test_transform_stream_chunk(self) -> None:
         """Test transformation of stream chunk."""
-        provider = VertexAIProvider(
+        provider = GoogleProvider(
             project_id="my-project",
             location="us-central1"
         )
 
-        # Mock Vertex AI stream chunk
+        # Mock Google stream chunk
         mock_chunk = Mock()
 
         mock_part = Mock()
@@ -407,7 +407,7 @@ class TestVertexAIStreamTransformation:
 
     def test_transform_final_stream_chunk(self) -> None:
         """Test transformation of final stream chunk."""
-        provider = VertexAIProvider(
+        provider = GoogleProvider(
             project_id="my-project",
             location="us-central1"
         )
@@ -433,10 +433,10 @@ class TestVertexAIStreamTransformation:
         assert result.finish_reason == "stop"
 
 
-class TestVertexAIProviderCalls:
+class TestGoogleProviderCalls:
     """Test actual provider API calls."""
 
-    @patch("nimbus.models.llm.vertex_provider.LazyImporter.import_module")
+    @patch("nimbus.models.llm.google_provider.LazyImporter.import_module")
     def test_complete_success(self, mock_import: Mock) -> None:
         """Test successful completion call."""
         # Setup mocks
@@ -475,7 +475,7 @@ class TestVertexAIProviderCalls:
         mock_model.generate_content.return_value = mock_response
 
         # Execute
-        provider = VertexAIProvider(
+        provider = GoogleProvider(
             project_id="my-project",
             location="us-central1"
         )
@@ -489,10 +489,10 @@ class TestVertexAIProviderCalls:
         # Verify
         assert isinstance(result, CompletionResponse)
         assert result.content == "Test response"
-        assert result.provider == "vertex"
+        assert result.provider == "google"
         mock_model.generate_content.assert_called_once()
 
-    @patch("nimbus.models.llm.vertex_provider.LazyImporter.import_module")
+    @patch("nimbus.models.llm.google_provider.LazyImporter.import_module")
     def test_complete_error_handling(self, mock_import: Mock) -> None:
         """Test error handling in complete."""
         # Setup mocks
@@ -509,7 +509,7 @@ class TestVertexAIProviderCalls:
         mock_model.generate_content.side_effect = Exception("API Error")
 
         # Execute and verify error
-        provider = VertexAIProvider(
+        provider = GoogleProvider(
             project_id="my-project",
             location="us-central1"
         )
@@ -522,9 +522,9 @@ class TestVertexAIProviderCalls:
             provider.complete(request)
 
         assert "Provider call failed" in str(exc_info.value)
-        assert exc_info.value.details["provider"] == "vertex"
+        assert exc_info.value.details["provider"] == "google"
 
-    @patch("nimbus.models.llm.vertex_provider.LazyImporter.import_module")
+    @patch("nimbus.models.llm.google_provider.LazyImporter.import_module")
     def test_stream_success(self, mock_import: Mock) -> None:
         """Test successful streaming call."""
         # Setup mocks
@@ -558,7 +558,7 @@ class TestVertexAIProviderCalls:
         mock_model.generate_content.return_value = iter(mock_chunks)
 
         # Execute
-        provider = VertexAIProvider(
+        provider = GoogleProvider(
             project_id="my-project",
             location="us-central1"
         )
@@ -578,11 +578,11 @@ class TestVertexAIProviderCalls:
         assert chunks[2].finish_reason == "stop"
 
 
-class TestVertexAIAsyncSupport:
+class TestGoogleAIAsyncSupport:
     """Test async completion support."""
 
     @pytest.mark.asyncio
-    @patch("nimbus.models.llm.vertex_provider.LazyImporter.import_module")
+    @patch("nimbus.models.llm.google_provider.LazyImporter.import_module")
     async def test_acomplete_success(self, mock_import: Mock) -> None:
         """Test successful async completion."""
         # Setup mocks
@@ -621,7 +621,7 @@ class TestVertexAIAsyncSupport:
         mock_model.generate_content.return_value = mock_response
 
         # Execute
-        provider = VertexAIProvider(
+        provider = GoogleProvider(
             project_id="my-project",
             location="us-central1"
         )
@@ -636,29 +636,29 @@ class TestVertexAIAsyncSupport:
         assert isinstance(result, CompletionResponse)
         assert result.content == "Async response"
         assert result.model == "gemini-1.5-pro"
-        assert result.provider == "vertex"
+        assert result.provider == "google"
 
 
-class TestVertexAIModelInfo:
+class TestGoogleAIModelInfo:
     """Test model info retrieval."""
 
     def test_get_model_info(self) -> None:
         """Test getting model information."""
-        provider = VertexAIProvider(
+        provider = GoogleProvider(
             project_id="my-project",
             location="us-central1"
         )
 
         info = provider.get_model_info()
 
-        assert info["provider"] == "vertex"
+        assert info["provider"] == "google"
         assert info["supports_streaming"] is True
         assert info["supports_function_calling"] is True
         assert info["supports_structured_output"] is False
         assert info["supports_multimodal"] is True
 
 
-class TestVertexAIToolCalling:
+class TestGoogleAIToolCalling:
     """Test tool calling integration with capabilities."""
 
     def test_transform_capabilities_with_capability_interface(self) -> None:
@@ -671,7 +671,7 @@ class TestVertexAIToolCalling:
 
         capability = LocalFunctionCapability(get_weather)
 
-        provider = VertexAIProvider(
+        provider = GoogleProvider(
             project_id="my-project",
             location="us-central1"
         )
@@ -679,7 +679,7 @@ class TestVertexAIToolCalling:
         # Test internal transformation method
         result = provider._transform_capabilities([capability])
 
-        # Verify Vertex AI format
+        # Verify Google format
         assert len(result) == 1
         assert result[0]["name"] == "get_weather"
         assert result[0]["description"] == "Get weather for a location."
@@ -688,12 +688,12 @@ class TestVertexAIToolCalling:
     
     def test_transform_capabilities_with_dict_format(self) -> None:
         """Test _transform_capabilities() with dict format."""
-        provider = VertexAIProvider(
+        provider = GoogleProvider(
             project_id="my-project",
             location="us-central1"
         )
         
-        # Already in Vertex format
+        # Already in Google format
         capabilities = [
             {
                 "name": "get_weather",
@@ -708,8 +708,8 @@ class TestVertexAIToolCalling:
         assert result == capabilities
     
     def test_transform_capabilities_converts_openai_format(self) -> None:
-        """Test _transform_capabilities() converts OpenAI format to Vertex format."""
-        provider = VertexAIProvider(
+        """Test _transform_capabilities() converts OpenAI format to Google format."""
+        provider = GoogleProvider(
             project_id="my-project",
             location="us-central1"
         )
@@ -728,7 +728,7 @@ class TestVertexAIToolCalling:
         
         result = provider._transform_capabilities(capabilities)
         
-        # Should convert to Vertex format
+        # Should convert to Google format
         assert len(result) == 1
         assert result[0]["name"] == "get_weather"
         assert result[0]["description"] == "Get weather"
@@ -745,7 +745,7 @@ class TestVertexAIToolCalling:
 
         capability = LocalFunctionCapability(get_weather)
 
-        provider = VertexAIProvider(
+        provider = GoogleProvider(
             project_id="my-project",
             location="us-central1"
         )
@@ -778,7 +778,7 @@ class TestVertexAIToolCalling:
 
         capability = LocalFunctionCapability(get_weather)
 
-        provider = VertexAIProvider(
+        provider = GoogleProvider(
             project_id="my-project",
             location="us-central1"
         )
@@ -805,7 +805,7 @@ class TestVertexAIToolCalling:
 
         capability = LocalFunctionCapability(get_weather)
 
-        provider = VertexAIProvider(
+        provider = GoogleProvider(
             project_id="my-project",
             location="us-central1"
         )
@@ -837,7 +837,7 @@ class TestVertexAIToolCalling:
         capability1 = LocalFunctionCapability(get_weather)
         capability2 = LocalFunctionCapability(get_time)
 
-        provider = VertexAIProvider(
+        provider = GoogleProvider(
             project_id="my-project",
             location="us-central1"
         )
@@ -857,12 +857,12 @@ class TestVertexAIToolCalling:
 
     def test_transform_response_with_tool_calls(self) -> None:
         """Test transformation of response with tool calls."""
-        provider = VertexAIProvider(
+        provider = GoogleProvider(
             project_id="my-project",
             location="us-central1"
         )
 
-        # Mock Vertex AI response with function call
+        # Mock Google response with function call
         mock_response = Mock()
         mock_response.name = "response-123"
         mock_response.model = "gemini-1.5-pro"
@@ -897,7 +897,7 @@ class TestVertexAIToolCalling:
         assert len(result.capability_calls) == 1
         assert result.capability_calls[0].name == "get_weather"
         assert result.capability_calls[0].arguments == {"location": "NYC"}
-        assert result.capability_calls[0].id.startswith("vertex_call_")
+        assert result.capability_calls[0].id.startswith("google_call_")
 
         # Verify metadata contains raw tool calls
         assert "candidates" in result.metadata
@@ -905,12 +905,12 @@ class TestVertexAIToolCalling:
 
     def test_transform_response_with_multiple_tool_calls(self) -> None:
         """Test transformation of response with multiple tool calls."""
-        provider = VertexAIProvider(
+        provider = GoogleProvider(
             project_id="my-project",
             location="us-central1"
         )
 
-        # Mock Vertex AI response with multiple function calls
+        # Mock Google response with multiple function calls
         mock_response = Mock()
         mock_response.name = "response-123"
         mock_response.model = "gemini-1.5-pro"
@@ -956,7 +956,7 @@ class TestVertexAIToolCalling:
         assert result.capability_calls[1].name == "get_time"
         assert result.capability_calls[1].arguments == {"timezone": "EST"}
 
-    @patch("nimbus.models.llm.vertex_provider.LazyImporter.import_module")
+    @patch("nimbus.models.llm.google_provider.LazyImporter.import_module")
     def test_complete_with_tool_calling(self, mock_import: Mock) -> None:
         """Test complete with tool calling end-to-end."""
         from nimbus.tools import LocalFunctionCapability
@@ -1008,7 +1008,7 @@ class TestVertexAIToolCalling:
         mock_model.generate_content.return_value = mock_response
 
         # Execute
-        provider = VertexAIProvider(
+        provider = GoogleProvider(
             project_id="my-project",
             location="us-central1"
         )
@@ -1047,12 +1047,12 @@ class TestVertexAIToolCalling:
         registry = CapabilityRegistry.get_instance()
         registry.register(capability)
 
-        provider = VertexAIProvider(
+        provider = GoogleProvider(
             project_id="my-project",
             location="us-central1"
         )
 
-        # Mock Vertex AI response with function call
+        # Mock Google response with function call
         mock_response = Mock()
         mock_response.name = "response-123"
         mock_response.model = "gemini-1.5-pro"

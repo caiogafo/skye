@@ -21,14 +21,14 @@ class TestProviderExports:
             AzureOpenAIProvider,
             BedrockProvider,
             OpenAIProvider,
-            VertexAIProvider,
+            GoogleProvider,
         )
 
         assert OpenAIProvider is not None
         assert AnthropicProvider is not None
         assert BedrockProvider is not None
         assert AzureOpenAIProvider is not None
-        assert VertexAIProvider is not None
+        assert GoogleProvider is not None
 
     def test_all_embedding_providers_importable(self):
         """Test that all embedding provider classes are importable."""
@@ -36,15 +36,15 @@ class TestProviderExports:
             BedrockEmbeddingProvider,
             CohereEmbeddingProvider,
             OpenAIEmbeddingProvider,
-            VertexEmbeddingProvider,
-            VertexMultimodalEmbeddingProvider,
+            GoogleEmbeddingProvider,
+            GoogleMultimodalEmbeddingProvider,
         )
 
         assert OpenAIEmbeddingProvider is not None
         assert BedrockEmbeddingProvider is not None
         assert CohereEmbeddingProvider is not None
-        assert VertexEmbeddingProvider is not None
-        assert VertexMultimodalEmbeddingProvider is not None
+        assert GoogleEmbeddingProvider is not None
+        assert GoogleMultimodalEmbeddingProvider is not None
 
     def test_utility_classes_importable(self):
         """Test that utility classes are importable."""
@@ -90,7 +90,7 @@ class TestProviderExports:
             "AnthropicProvider",
             "BedrockProvider",
             "AzureOpenAIProvider",
-            "VertexAIProvider",
+            "GoogleProvider",
         ]
 
         for provider in expected_providers:
@@ -104,8 +104,8 @@ class TestProviderExports:
             "OpenAIEmbeddingProvider",
             "BedrockEmbeddingProvider",
             "CohereEmbeddingProvider",
-            "VertexEmbeddingProvider",
-            "VertexMultimodalEmbeddingProvider",
+            "GoogleEmbeddingProvider",
+            "GoogleMultimodalEmbeddingProvider",
         ]
 
         for provider in expected_providers:
@@ -206,14 +206,14 @@ class TestProviderExports:
             AzureOpenAIProvider,
             BedrockProvider,
             OpenAIProvider,
-            VertexAIProvider,
+            GoogleProvider,
         )
 
         assert isinstance(OpenAIProvider, type)
         assert isinstance(AnthropicProvider, type)
         assert isinstance(BedrockProvider, type)
         assert isinstance(AzureOpenAIProvider, type)
-        assert isinstance(VertexAIProvider, type)
+        assert isinstance(GoogleProvider, type)
 
     def test_embedding_provider_classes_are_types(self):
         """Test that all embedding provider classes are actually types."""
@@ -221,15 +221,15 @@ class TestProviderExports:
             BedrockEmbeddingProvider,
             CohereEmbeddingProvider,
             OpenAIEmbeddingProvider,
-            VertexEmbeddingProvider,
-            VertexMultimodalEmbeddingProvider,
+            GoogleEmbeddingProvider,
+            GoogleMultimodalEmbeddingProvider,
         )
 
         assert isinstance(OpenAIEmbeddingProvider, type)
         assert isinstance(BedrockEmbeddingProvider, type)
         assert isinstance(CohereEmbeddingProvider, type)
-        assert isinstance(VertexEmbeddingProvider, type)
-        assert isinstance(VertexMultimodalEmbeddingProvider, type)
+        assert isinstance(GoogleEmbeddingProvider, type)
+        assert isinstance(GoogleMultimodalEmbeddingProvider, type)
 
     def test_utility_classes_are_types(self):
         """Test that all utility classes are actually types."""

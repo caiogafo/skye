@@ -101,7 +101,7 @@ max_compiled_over_core = 4
 max_over_core_mb = 35
 target_over_core_mb = 3
 
-[extras.vertex]
+[extras.google]
 max_compiled_over_core = 9
 max_over_core_mb = 180
 target_over_core_mb = 10

@@ -5,7 +5,7 @@ This example demonstrates how to use embedding providers with Nimbus.
 Features shown:
 - OpenAI embeddings (text-embedding-3-small)
 - AWS Bedrock embeddings (Titan)
-- Google Vertex AI embeddings (textembedding-gecko)
+- Google embeddings (textembedding-gecko)
 - Single text encoding
 - Batch encoding
 - Async encoding
@@ -17,7 +17,7 @@ Usage:
 Requirements:
     - Set OPENAI_API_KEY for OpenAI examples
     - Configure AWS credentials for Bedrock examples
-    - Set GOOGLE_CLOUD_PROJECT for Vertex AI examples
+    - Set GOOGLE_CLOUD_PROJECT for Google examples
 """
 
 import asyncio
@@ -115,10 +115,10 @@ def bedrock_embeddings():
         print("  2. Access to Bedrock embeddings")
 
 
-def vertex_embeddings():
-    """Vertex AI embeddings example."""
+def google_embeddings():
+    """Google embeddings example."""
     print("\n" + "=" * 60)
-    print("Google Vertex AI Embeddings")
+    print("Google Embeddings")
     print("=" * 60)
     
     project_id = os.getenv("GOOGLE_CLOUD_PROJECT")
@@ -128,7 +128,7 @@ def vertex_embeddings():
     
     try:
         embedder = create_provider(
-            "vertex",
+            "google",
             model="textembedding-gecko@003",
             project_id=project_id,
             location="us-central1",
@@ -136,7 +136,7 @@ def vertex_embeddings():
         )
     except ImportError as e:
         print(f"⚠️  Error: {e}")
-        print("\nTo use Vertex AI embeddings, install with: pip install nimbus[vertex]")
+        print("\nTo use Google embeddings, install with: pip install nimbus[google]")
         return
     
     texts = [
@@ -144,7 +144,7 @@ def vertex_embeddings():
         "Deep learning powers modern AI systems"
     ]
     
-    print(f"\nEncoding {len(texts)} texts with Vertex AI...")
+    print(f"\nEncoding {len(texts)} texts with Google...")
     print("-" * 40)
     
     try:
@@ -158,7 +158,7 @@ def vertex_embeddings():
         print(f"\n❌ Error: {e}")
         print("\nMake sure you have:")
         print("  1. Google Cloud credentials configured")
-        print("  2. Vertex AI API enabled")
+        print("  2. Google API enabled")
 
 
 def cosine_similarity(a: list[float], b: list[float]) -> float:
@@ -309,12 +309,12 @@ def main():
     print("Set the appropriate API keys/credentials as environment variables:")
     print("  - OPENAI_API_KEY for OpenAI")
     print("  - AWS credentials for Bedrock")
-    print("  - GOOGLE_CLOUD_PROJECT for Vertex AI")
+    print("  - GOOGLE_CLOUD_PROJECT for Google")
     
     try:
         openai_embeddings()
         bedrock_embeddings()
-        vertex_embeddings()
+        google_embeddings()
         single_text_encoding()
         batch_processing()
         

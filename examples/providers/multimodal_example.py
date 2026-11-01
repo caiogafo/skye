@@ -225,7 +225,7 @@ Different providers support different vision models:
 - claude-3-sonnet (vision capable)
 - claude-3-haiku (vision capable)
 
-**Google Vertex AI:**
+**Google:**
 - gemini-pro-vision
 - gemini-1.5-pro (multimodal)
 

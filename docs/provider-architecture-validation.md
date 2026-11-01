@@ -60,7 +60,7 @@ All provider implementations properly encapsulate transformations:
 - ✅ `_transform_response()` - Complete response transformation
 
 #### Other Providers
-- AnthropicProvider, AzureOpenAIProvider, VertexAIProvider all follow the same pattern
+- AnthropicProvider, AzureOpenAIProvider, GoogleProvider all follow the same pattern
 
 ### ⚠️ Known Architectural Debt
 
@@ -74,11 +74,11 @@ All provider implementations properly encapsulate transformations:
 - `_parse_openai_capability_calls()`
 - `_parse_anthropic_capability_calls()`
 - `_parse_bedrock_capability_calls()`
-- `_parse_vertex_capability_calls()`
+- `_parse_google_capability_calls()`
 - `_format_openai_results()`
 - `_format_anthropic_results()`
 - `_format_bedrock_results()`
-- `_format_vertex_results()`
+- `_format_google_results()`
 
 **Documentation**: This architectural debt is clearly documented in the file header with:
 - `**ARCHITECTURAL DEBT:**` section explaining the issue

@@ -5,7 +5,7 @@ Tests cover:
 - Anthropic error wrapping
 - Bedrock error wrapping
 - Azure error wrapping
-- Vertex AI error wrapping
+- Google error wrapping
 - Error context preservation
 - Error classification
 """
@@ -216,8 +216,8 @@ class TestAzureErrorHandling:
         assert result.details["error_type"] == "authentication_error"
 
 
-class TestVertexErrorHandling:
-    """Test Vertex AI error handling."""
+class TestGoogleErrorHandling:
+    """Test Google error handling."""
 
     def test_handle_rate_limit_error(self) -> None:
         """Test handling of rate limit error."""
@@ -226,10 +226,10 @@ class TestVertexErrorHandling:
         error.code = 8
         error.__str__ = lambda self: "Rate limit exceeded"
 
-        result = ErrorHandler.handle_vertex_error(error)
+        result = ErrorHandler.handle_google_error(error)
 
         assert isinstance(result, ProviderError)
-        assert result.details["provider"] == "vertex"
+        assert result.details["provider"] == "google"
         assert result.details["error_type"] == "rate_limit"
 
     def test_handle_deadline_exceeded_error(self) -> None:
@@ -239,10 +239,10 @@ class TestVertexErrorHandling:
         error.code = 4
         error.__str__ = lambda self: "Deadline exceeded"
 
-        result = ErrorHandler.handle_vertex_error(error)
+        result = ErrorHandler.handle_google_error(error)
 
         assert isinstance(result, ProviderError)
-        assert result.details["provider"] == "vertex"
+        assert result.details["provider"] == "google"
         assert result.details["error_type"] == "timeout"
 
     def test_handle_unavailable_error(self) -> None:
@@ -252,10 +252,10 @@ class TestVertexErrorHandling:
         error.code = 14
         error.__str__ = lambda self: "Service unavailable"
 
-        result = ErrorHandler.handle_vertex_error(error)
+        result = ErrorHandler.handle_google_error(error)
 
         assert isinstance(result, ProviderError)
-        assert result.details["provider"] == "vertex"
+        assert result.details["provider"] == "google"
         assert result.details["error_type"] == "service_unavailable"
 
     def test_handle_permission_denied_error(self) -> None:
@@ -265,10 +265,10 @@ class TestVertexErrorHandling:
         error.code = 7
         error.__str__ = lambda self: "Permission denied"
 
-        result = ErrorHandler.handle_vertex_error(error)
+        result = ErrorHandler.handle_google_error(error)
 
         assert isinstance(result, ProviderError)
-        assert result.details["provider"] == "vertex"
+        assert result.details["provider"] == "google"
         assert result.details["error_type"] == "permission_error"
 
 
@@ -331,17 +331,17 @@ class TestWrapProviderError:
         assert isinstance(result, ProviderError)
         assert result.details["provider"] == "azure"
 
-    def test_wrap_vertex_error(self) -> None:
-        """Test wrapping Vertex error."""
+    def test_wrap_google_error(self) -> None:
+        """Test wrapping Google error."""
         error = MagicMock()
         error.__class__.__name__ = "GoogleAPIError"
         error.code = 14
         error.__str__ = lambda self: "Unavailable"
 
-        result = ErrorHandler.wrap_provider_error(error, "vertex")
+        result = ErrorHandler.wrap_provider_error(error, "google")
 
         assert isinstance(result, ProviderError)
-        assert result.details["provider"] == "vertex"
+        assert result.details["provider"] == "google"
 
     def test_wrap_unknown_provider_error(self) -> None:
         """Test wrapping error from unknown provider."""

@@ -9,14 +9,14 @@ Supported LLM Providers:
 - Anthropic (Claude 3.x)
 - AWS Bedrock (Claude, Titan, Llama, etc.)
 - Azure OpenAI
-- Google Vertex AI (Gemini, PaLM)
+- Google (Gemini, PaLM)
 
 Supported Embedding Providers:
 - OpenAI (text-embedding-3-small/large, ada-002)
 - AWS Bedrock Titan Embeddings
 - Cohere Embeddings
-- Vertex AI Text Embeddings
-- Vertex AI Multimodal Embeddings
+- Google Text Embeddings
+- Google Multimodal Embeddings
 
 Example:
     >>> from nimbus.models import ProviderRegistry
@@ -35,15 +35,15 @@ from nimbus.models.transport.cost import CostCalculator
 from nimbus.models.embeddings.bedrock_embeddings import BedrockEmbeddingProvider
 from nimbus.models.embeddings.cohere_embeddings import CohereEmbeddingProvider
 from nimbus.models.embeddings.openai_embeddings import OpenAIEmbeddingProvider
-from nimbus.models.embeddings.vertex_embeddings import VertexEmbeddingProvider
-from nimbus.models.embeddings.vertex_multimodal_embeddings import (
-    VertexMultimodalEmbeddingProvider,
+from nimbus.models.embeddings.google_embeddings import GoogleEmbeddingProvider
+from nimbus.models.embeddings.google_multimodal_embeddings import (
+    GoogleMultimodalEmbeddingProvider,
 )
 from nimbus.models.lazy_import import LazyImporter
 from nimbus.models.llm.anthropic import AnthropicProvider
 from nimbus.models.llm.bedrock import BedrockProvider
 from nimbus.models.llm.openai_compatible import AzureOpenAIProvider, OpenAIProvider
-from nimbus.models.llm.vertex_provider import VertexAIProvider
+from nimbus.models.llm.google_provider import GoogleProvider
 from nimbus.models.transport.multimodal import ImageHandler
 from nimbus.models.registry import ProviderRegistry
 from nimbus.models.transport.token_counter import TokenCounter
@@ -53,14 +53,14 @@ ProviderRegistry.register_model_provider("openai", OpenAIProvider)
 ProviderRegistry.register_model_provider("anthropic", AnthropicProvider)
 ProviderRegistry.register_model_provider("bedrock", BedrockProvider)
 ProviderRegistry.register_model_provider("azure", AzureOpenAIProvider)
-ProviderRegistry.register_model_provider("vertex", VertexAIProvider)
+ProviderRegistry.register_model_provider("google", GoogleProvider)
 
 # Register embedding providers
 ProviderRegistry.register_embedding_provider("openai", OpenAIEmbeddingProvider)
 ProviderRegistry.register_embedding_provider("bedrock", BedrockEmbeddingProvider)
 ProviderRegistry.register_embedding_provider("cohere", CohereEmbeddingProvider)
-ProviderRegistry.register_embedding_provider("vertex", VertexEmbeddingProvider)
-ProviderRegistry.register_embedding_provider("vertex-multimodal", VertexMultimodalEmbeddingProvider)
+ProviderRegistry.register_embedding_provider("google", GoogleEmbeddingProvider)
+ProviderRegistry.register_embedding_provider("google-multimodal", GoogleMultimodalEmbeddingProvider)
 
 __all__ = [
     "BaseModelProvider",
@@ -74,10 +74,10 @@ __all__ = [
     "AnthropicProvider",
     "BedrockProvider",
     "AzureOpenAIProvider",
-    "VertexAIProvider",
+    "GoogleProvider",
     "OpenAIEmbeddingProvider",
     "BedrockEmbeddingProvider",
     "CohereEmbeddingProvider",
-    "VertexEmbeddingProvider",
-    "VertexMultimodalEmbeddingProvider",
+    "GoogleEmbeddingProvider",
+    "GoogleMultimodalEmbeddingProvider",
 ]

@@ -1,12 +1,14 @@
-"""Google Vertex AI multimodal embedding provider implementation.
+"""Google (Gemini Enterprise Agent Platform, formerly Vertex AI) multimodal embedding provider.
 
-This module provides the VertexMultimodalEmbeddingProvider class for generating
-embeddings from text and images using Google Vertex AI's multimodal embedding model.
+Renamed from `vertex` (Google renamed Vertex AI to Gemini Enterprise Agent Platform in April 2026); the extra is now `google`.
+
+This module provides the GoogleMultimodalEmbeddingProvider class for generating
+embeddings from text and images using Google's multimodal embedding model.
 
 Example:
-    >>> from nimbus.models.embeddings import VertexMultimodalEmbeddingProvider
+    >>> from nimbus.models.embeddings import GoogleMultimodalEmbeddingProvider
     >>>
-    >>> embedder = VertexMultimodalEmbeddingProvider(
+    >>> embedder = GoogleMultimodalEmbeddingProvider(
     ...     project_id="my-project",
     ...     location="us-central1"
     ... )
@@ -25,17 +27,17 @@ from nimbus.models.lazy_import import LazyImporter
 from nimbus.models.transport.multimodal import ImageHandler
 
 
-class VertexMultimodalEmbeddingProvider(BaseEmbeddingProvider):
-    """Google Vertex AI multimodal embedding provider implementation.
+class GoogleMultimodalEmbeddingProvider(BaseEmbeddingProvider):
+    """Google multimodal embedding provider implementation.
     
-    Supports Vertex AI's multimodal embedding model:
+    Supports Google's multimodal embedding model:
     - multimodalembedding@001 (1408 dimensions)
     
     This provider can encode both text and images into the same vector space,
     enabling cross-modal retrieval and similarity search.
     
     Example:
-        >>> embedder = VertexMultimodalEmbeddingProvider(
+        >>> embedder = GoogleMultimodalEmbeddingProvider(
         ...     project_id="my-project",
         ...     location="us-central1"
         ... )
@@ -57,7 +59,7 @@ class VertexMultimodalEmbeddingProvider(BaseEmbeddingProvider):
         location: str,
         **config: Any
     ) -> None:
-        """Initialize Vertex AI multimodal embedding provider.
+        """Initialize Google multimodal embedding provider.
         
         Args:
             project_id: Google Cloud project ID
@@ -74,15 +76,15 @@ class VertexMultimodalEmbeddingProvider(BaseEmbeddingProvider):
         self.location = location
     
     def _initialize_client(self) -> Any:
-        """Initialize Vertex AI client.
+        """Initialize Google client.
         
         Returns:
-            Vertex AI MultimodalEmbeddingModel instance
+            Google MultimodalEmbeddingModel instance
         """
         aiplatform = LazyImporter.import_module(
             "google.cloud.aiplatform",
             package_name="google-cloud-aiplatform",
-            install_extra="vertex"
+            install_extra="google"
         )
         
         aiplatform.init(project=self.project_id, location=self.location)
@@ -172,7 +174,7 @@ class VertexMultimodalEmbeddingProvider(BaseEmbeddingProvider):
         # Process image using ImageHandler
         processed_image = ImageHandler.process_image(image_input)
         
-        # Extract image data for Vertex API
+        # Extract image data for Google API
         if processed_image["type"] == "image_url":
             url = processed_image["image_url"]["url"]
             
@@ -182,7 +184,7 @@ class VertexMultimodalEmbeddingProvider(BaseEmbeddingProvider):
                 parts = url.split(",", 1)
                 base64_data = parts[1]
                 
-                # Use Vertex API with base64 image
+                # Use Google API with base64 image
                 from google.cloud.aiplatform.gapic.types import content
                 
                 image_data = content.Blob(

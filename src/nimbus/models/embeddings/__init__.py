@@ -14,15 +14,15 @@ Example:
 from nimbus.models.embeddings.bedrock_embeddings import BedrockEmbeddingProvider
 from nimbus.models.embeddings.cohere_embeddings import CohereEmbeddingProvider
 from nimbus.models.embeddings.openai_embeddings import OpenAIEmbeddingProvider
-from nimbus.models.embeddings.vertex_embeddings import VertexEmbeddingProvider
-from nimbus.models.embeddings.vertex_multimodal_embeddings import (
-    VertexMultimodalEmbeddingProvider,
+from nimbus.models.embeddings.google_embeddings import GoogleEmbeddingProvider
+from nimbus.models.embeddings.google_multimodal_embeddings import (
+    GoogleMultimodalEmbeddingProvider,
 )
 
 __all__ = [
     "OpenAIEmbeddingProvider",
     "BedrockEmbeddingProvider",
     "CohereEmbeddingProvider",
-    "VertexEmbeddingProvider",
-    "VertexMultimodalEmbeddingProvider",
+    "GoogleEmbeddingProvider",
+    "GoogleMultimodalEmbeddingProvider",
 ]

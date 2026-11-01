@@ -77,11 +77,11 @@ response = client.complete(
 
 **Installation:** `pip install nimbus[azure]`
 
-### Google Vertex AI
+### Google
 
 ```python
 client = create_provider(
-    "vertex",
+    "google",
     project_id="your-project-id",
     location="us-central1"
 )
@@ -91,7 +91,7 @@ response = client.complete(
 )
 ```
 
-**Installation:** `pip install nimbus[vertex]`
+**Installation:** `pip install nimbus[google]`
 
 ## API Reference
 
@@ -101,7 +101,7 @@ response = client.complete(
 client = create_provider(name, **config)
 ```
 
-- `name`: Provider name ("openai", "bedrock", "anthropic", "azure", "vertex")
+- `name`: Provider name ("openai", "bedrock", "anthropic", "azure", "google")
 - `**config`: Provider-specific configuration
 
 ### Completion
@@ -162,7 +162,7 @@ messages = [
 - `openai_example.py` - OpenAI GPT models
 - `anthropic_example.py` - Anthropic Claude models
 - `azure_example.py` - Azure OpenAI deployments
-- `vertex_example.py` - Google Vertex AI Gemini models
+- `google_example.py` - Google Gemini models
 
 ## Running Examples
 

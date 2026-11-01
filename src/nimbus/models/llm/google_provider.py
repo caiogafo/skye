@@ -1,10 +1,12 @@
-"""Vertex AI provider implementation.
+"""Google (Gemini Enterprise Agent Platform, formerly Vertex AI) provider implementation.
 
-This module provides the Vertex AI (Google Cloud) implementation of the ModelInterface,
-supporting Gemini and other Vertex AI models.
+Renamed from `vertex` (Google renamed Vertex AI to Gemini Enterprise Agent Platform in April 2026); the extra is now `google`.
+
+This module provides the Google Cloud implementation of the ModelInterface,
+supporting Gemini and other Google models.
 
 Features:
-- Lazy loading of Vertex AI SDK
+- Lazy loading of Google SDK
 - Support for Gemini models
 - Safety settings configuration
 - Grounding features
@@ -13,11 +15,11 @@ Features:
 - Multimodal inputs (images, video)
 
 Example:
-    >>> from nimbus.models.llm.vertex_provider import VertexAIProvider
+    >>> from nimbus.models.llm.google_provider import GoogleProvider
     >>> from nimbus.base.completion import CompletionRequest
     >>> from nimbus.base.messages import UserMessage
     >>>
-    >>> provider = VertexAIProvider(
+    >>> provider = GoogleProvider(
     ...     project_id="my-project",
     ...     location="us-central1"
     ... )
@@ -39,11 +41,11 @@ from nimbus.models.base import BaseModelProvider
 from nimbus.models.lazy_import import LazyImporter
 
 
-class VertexAIProvider(BaseModelProvider):
-    """Vertex AI provider implementation.
+class GoogleProvider(BaseModelProvider):
+    """Google provider implementation.
 
-    Implements the ModelInterface for Google Cloud's Vertex AI API, supporting
-    Gemini models and other Vertex AI generative models.
+    Implements the ModelInterface for Google Cloud's Google API, supporting
+    Gemini models and other Google generative models.
 
     Args:
         project_id: Google Cloud project ID
@@ -53,7 +55,7 @@ class VertexAIProvider(BaseModelProvider):
         **kwargs: Additional configuration parameters
 
     Example:
-        >>> provider = VertexAIProvider(
+        >>> provider = GoogleProvider(
         ...     project_id="my-project",
         ...     location="us-central1"
         ... )
@@ -69,7 +71,7 @@ class VertexAIProvider(BaseModelProvider):
         router: Any | None = None,
         **kwargs: Any
     ) -> None:
-        """Initialize Vertex AI provider.
+        """Initialize Google provider.
 
         Args:
             project_id: Google Cloud project ID
@@ -79,7 +81,7 @@ class VertexAIProvider(BaseModelProvider):
             router: Optional model router for load balancing
             **kwargs: Additional configuration parameters
         """
-        # For Vertex, model is typically specified in the request, not at init
+        # For Google, model is typically specified in the request, not at init
         # If neither model nor router is provided, use a placeholder
         if model is None and router is None:
             model = "gemini-1.5-pro"  # Default model as placeholder
@@ -97,18 +99,18 @@ class VertexAIProvider(BaseModelProvider):
         self.credentials = credentials
 
     def _initialize_client(self) -> Any:
-        """Initialize Vertex AI client with lazy import.
+        """Initialize Google client with lazy import.
 
         Returns:
-            Initialized Vertex AI GenerativeModel client
+            Initialized Google GenerativeModel client
         """
         vertexai = LazyImporter.import_module(
             "google.cloud.aiplatform",
             package_name="google-cloud-aiplatform",
-            install_extra="vertex"
+            install_extra="google"
         )
 
-        # Initialize Vertex AI
+        # Initialize Google
         vertexai.init(
             project=self.project_id,
             location=self.location,
@@ -119,23 +121,23 @@ class VertexAIProvider(BaseModelProvider):
         return vertexai.generative_models
     
     def _transform_messages(self, messages: list[Any]) -> list[dict[str, Any]]:
-        """Transform Nimbus messages to Vertex AI (Gemini) format.
+        """Transform Nimbus messages to Google (Gemini) format.
         
-        Vertex AI uses a parts-based format where content is broken into parts.
+        Google uses a parts-based format where content is broken into parts.
         System instructions are typically handled separately in the API call.
         
         Args:
             messages: List of Nimbus message objects
             
         Returns:
-            List of dictionaries in Vertex AI format
+            List of dictionaries in Google format
         """
         from nimbus.base.messages import AssistantMessage, CapabilityMessage, SystemMessage
         
         result = []
         for msg in messages:
             if isinstance(msg, SystemMessage):
-                # System messages are typically passed separately in Vertex AI
+                # System messages are typically passed separately in Google
                 # but we include them here for completeness
                 result.append({"role": "system", "parts": [{"text": msg.content}]})
             elif isinstance(msg, CapabilityMessage):
@@ -153,7 +155,7 @@ class VertexAIProvider(BaseModelProvider):
                     }
                 )
             else:
-                # Map assistant to model for Vertex AI
+                # Map assistant to model for Google
                 role = "model" if msg.role == "assistant" else msg.role
                 parts: list[dict[str, Any]] = [{"text": msg.content}]
 
@@ -172,26 +174,26 @@ class VertexAIProvider(BaseModelProvider):
         return result
     
     def _transform_capabilities(self, capabilities: list[Any]) -> list[dict[str, Any]]:
-        """Transform Nimbus capabilities to Vertex AI Gemini format.
+        """Transform Nimbus capabilities to Google Gemini format.
         
-        Vertex AI uses a format with "name", "description", and "parameters"
+        Google uses a format with "name", "description", and "parameters"
         fields. The parameters field is the JSON Schema for parameters.
         
         Args:
             capabilities: List of CapabilityInterface objects or dicts
             
         Returns:
-            List of tool definitions in Vertex AI format
+            List of tool definitions in Google format
         """
         tools = []
         for capability in capabilities:
             # Handle both CapabilityInterface objects and dict format
             if isinstance(capability, dict):
-                # Check if already in Vertex format
+                # Check if already in Google format
                 if "parameters" in capability and "function" not in capability:
                     tools.append(capability)
                 else:
-                    # Convert from OpenAI format to Vertex format
+                    # Convert from OpenAI format to Google format
                     func = capability.get("function", {})
                     tool = {
                         "name": func.get("name", ""),
@@ -203,7 +205,7 @@ class VertexAIProvider(BaseModelProvider):
                     }
                     tools.append(tool)
             else:
-                # CapabilityInterface object, convert to Vertex format
+                # CapabilityInterface object, convert to Google format
                 schema = capability.get_schema()
                 tool = {
                     "name": schema.name,
@@ -217,34 +219,34 @@ class VertexAIProvider(BaseModelProvider):
         return tools
     
     def _extract_capability_calls(self, response: Any) -> list[Any] | None:
-        """Extract capability calls from Vertex AI response.
+        """Extract capability calls from Google response.
         
-        Parses function calls from the Vertex AI response format and converts them
+        Parses function calls from the Google response format and converts them
         to Nimbus CapabilityCall objects.
         
         Args:
-            response: Vertex AI response object
+            response: Google response object
             
         Returns:
             List of CapabilityCall objects, or None if no capability calls
         """
-        # Vertex AI response structure varies, need to check for function calls
-        # This is a placeholder - actual implementation depends on Vertex AI SDK structure
+        # Google response structure varies, need to check for function calls
+        # This is a placeholder - actual implementation depends on Google SDK structure
         return None
 
     def _transform_request(self, request: CompletionRequest) -> dict[str, Any]:
-        """Transform CompletionRequest to Vertex AI format.
+        """Transform CompletionRequest to Google format.
 
         Args:
             request: The nimbus CompletionRequest
 
         Returns:
-            Dictionary in Vertex AI API format
+            Dictionary in Google API format
         """
         if not request.messages:
-            raise ValueError("messages must be provided for Vertex AI provider")
+            raise ValueError("messages must be provided for Google provider")
 
-        vertex_request: dict[str, Any] = {
+        google_request: dict[str, Any] = {
             "model": request.model,
             "messages": self._transform_messages(request.messages),
             "generation_config": {
@@ -253,53 +255,53 @@ class VertexAIProvider(BaseModelProvider):
         }
 
         if request.max_tokens:
-            vertex_request["generation_config"]["max_output_tokens"] = request.max_tokens
+            google_request["generation_config"]["max_output_tokens"] = request.max_tokens
 
         if request.top_p:
-            vertex_request["generation_config"]["top_p"] = request.top_p
+            google_request["generation_config"]["top_p"] = request.top_p
 
         if request.stop:
-            vertex_request["generation_config"]["stop_sequences"] = request.stop
+            google_request["generation_config"]["stop_sequences"] = request.stop
 
         # Handle safety settings
         if request.metadata and "safety_settings" in request.metadata:
-            vertex_request["safety_settings"] = request.metadata["safety_settings"]
+            google_request["safety_settings"] = request.metadata["safety_settings"]
 
         # Handle grounding features
         if request.metadata and "grounding" in request.metadata:
-            vertex_request["grounding"] = request.metadata["grounding"]
+            google_request["grounding"] = request.metadata["grounding"]
 
         # Handle capabilities
         if request.capabilities:
-            # Convert capabilities to Vertex format using internal method
+            # Convert capabilities to Google format using internal method
             function_declarations = self._transform_capabilities(request.capabilities)
-            vertex_request["tools"] = [
+            google_request["tools"] = [
                 {
                     "function_declarations": function_declarations
                 }
             ]
             
             # Handle capability_choice parameter
-            # Note: Vertex AI doesn't have direct capability_choice support like OpenAI
+            # Note: Google doesn't have direct capability_choice support like OpenAI
             # We can use function_calling_config for similar behavior
             if request.capability_choice:
                 if request.capability_choice == "required":
                     # Force function calling
-                    vertex_request["tool_config"] = {
+                    google_request["tool_config"] = {
                         "function_calling_config": {
                             "mode": "ANY"
                         }
                     }
                 elif request.capability_choice == "auto":
                     # Let model decide
-                    vertex_request["tool_config"] = {
+                    google_request["tool_config"] = {
                         "function_calling_config": {
                             "mode": "AUTO"
                         }
                     }
                 elif request.capability_choice != "none":
                     # Specific capability name - use allowed_function_names
-                    vertex_request["tool_config"] = {
+                    google_request["tool_config"] = {
                         "function_calling_config": {
                             "mode": "ANY",
                             "allowed_function_names": [request.capability_choice]
@@ -309,16 +311,16 @@ class VertexAIProvider(BaseModelProvider):
         # Provider-specific metadata
         if request.metadata:
             for key, value in request.metadata.items():
-                if key.startswith("vertex_"):
-                    vertex_request[key[7:]] = value
+                if key.startswith("google_"):
+                    google_request[key[7:]] = value
 
-        return vertex_request
+        return google_request
 
     def _transform_response(self, response: Any) -> CompletionResponse:
-        """Transform Vertex AI response to CompletionResponse.
+        """Transform Google response to CompletionResponse.
 
         Args:
-            response: The Vertex AI response object
+            response: The Google response object
 
         Returns:
             CompletionResponse in nimbus format
@@ -382,8 +384,8 @@ class VertexAIProvider(BaseModelProvider):
                         
                         capability_calls_list = []
                         for fc in function_calls_raw:
-                            # Generate ID since Vertex doesn't provide one
-                            call_id = f"vertex_call_{fc['idx']}"
+                            # Generate ID since Google doesn't provide one
+                            call_id = f"google_call_{fc['idx']}"
                             
                             capability_calls_list.append(
                                 CapabilityCall(
@@ -410,7 +412,7 @@ class VertexAIProvider(BaseModelProvider):
         return CompletionResponse(
             id=getattr(response, "name", ""),
             model=getattr(response, "model", ""),
-            provider="vertex",
+            provider="google",
             content=content,
             structured_output=None,
             role="assistant",
@@ -426,10 +428,10 @@ class VertexAIProvider(BaseModelProvider):
         )
 
     def _transform_stream_chunk(self, chunk: Any) -> StreamChunk:
-        """Transform Vertex AI stream chunk to StreamChunk.
+        """Transform Google stream chunk to StreamChunk.
 
         Args:
-            chunk: The Vertex AI stream chunk
+            chunk: The Google stream chunk
 
         Returns:
             StreamChunk in nimbus format
@@ -461,13 +463,13 @@ class VertexAIProvider(BaseModelProvider):
         )
 
     def _call_provider(self, request: dict[str, Any]) -> Any:
-        """Call Vertex AI API.
+        """Call Google API.
 
         Args:
             request: Provider-specific request dictionary
 
         Returns:
-            Vertex AI response object
+            Google response object
         """
         generative_models = self.client
         model_name = request.pop("model")
@@ -504,13 +506,13 @@ class VertexAIProvider(BaseModelProvider):
         return model.generate_content(**call_kwargs)
 
     def _call_provider_stream(self, request: dict[str, Any]) -> Iterator[Any]:
-        """Call Vertex AI streaming API.
+        """Call Google streaming API.
 
         Args:
             request: Provider-specific request dictionary
 
         Yields:
-            Vertex AI stream chunks
+            Google stream chunks
         """
         generative_models = self.client
         model_name = request.pop("model")
@@ -557,13 +559,13 @@ class VertexAIProvider(BaseModelProvider):
             CompletionResponse with the model's output
         """
         # For now, use sync version
-        # Vertex AI SDK has async support but requires additional setup
+        # Google SDK has async support but requires additional setup
         return self.complete(request)
 
     def format_capability_results(self, results: list[Any]) -> list[dict[str, Any]]:
-        """Format capability results for Vertex AI.
+        """Format capability results for Google.
         
-        Vertex expects tool results in this format:
+        Google expects tool results in this format:
         {
             "functionResponse": {
                 "name": "get_weather",
@@ -575,7 +577,7 @@ class VertexAIProvider(BaseModelProvider):
             results: List of CapabilityResult objects
             
         Returns:
-            List of formatted result dictionaries in Vertex format
+            List of formatted result dictionaries in Google format
         """
         import json
         
@@ -610,7 +612,7 @@ class VertexAIProvider(BaseModelProvider):
             Dictionary with provider information and capabilities
         """
         return {
-            "provider": "vertex",
+            "provider": "google",
             "supports_streaming": True,
             "supports_function_calling": True,
             "supports_structured_output": False,

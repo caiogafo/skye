@@ -17,7 +17,7 @@ This directory contains tests for:
 - `test_bedrock_integration.py` - AWS Bedrock provider integration tests
 - `test_anthropic_integration.py` - Anthropic provider integration tests
 - `test_azure_integration.py` - Azure OpenAI provider integration tests
-- `test_vertex_integration.py` - Google Vertex AI provider integration tests
+- `test_google_integration.py` - Google provider integration tests
 - `test_multi_provider.py` - Multi-provider workflow tests
 
 ## Running Tests

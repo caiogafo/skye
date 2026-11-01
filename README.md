@@ -163,8 +163,8 @@ pip install nimbus[bedrock]
 # Azure OpenAI (served by the openai extra)
 pip install nimbus[openai]
 
-# Google Vertex AI
-pip install nimbus[vertex]
+# Google
+pip install nimbus[google]
 
 # Cohere (embeddings)
 pip install nimbus[cohere]
@@ -242,14 +242,14 @@ response = client.complete(
 )
 ```
 
-#### Google Vertex AI
+#### Google
 
 ```python
 from nimbus.models.registry import provider as create_provider
 from nimbus.base.messages import UserMessage
 
 client = create_provider(
-    "vertex",
+    "google",
     project_id="your-project",
     location="us-central1"
 )
@@ -291,9 +291,9 @@ embedder = create_provider(
 
 embeddings = embedder.encode_batch(["Hello world"])
 
-# Vertex AI embeddings
+# Google embeddings
 embedder = create_provider(
-    "vertex",
+    "google",
     model="textembedding-gecko@003",
     project_id="my-project",
     location="us-central1",

@@ -1,12 +1,14 @@
-"""Google Vertex AI embedding provider implementation.
+"""Google (Gemini Enterprise Agent Platform, formerly Vertex AI) embedding provider implementation.
 
-This module provides the VertexEmbeddingProvider class for generating embeddings
-using Google Vertex AI's embedding models.
+Renamed from `vertex` (Google renamed Vertex AI to Gemini Enterprise Agent Platform in April 2026); the extra is now `google`.
+
+This module provides the GoogleEmbeddingProvider class for generating embeddings
+using Google's embedding models.
 
 Example:
-    >>> from nimbus.models.embeddings import VertexEmbeddingProvider
+    >>> from nimbus.models.embeddings import GoogleEmbeddingProvider
     >>>
-    >>> embedder = VertexEmbeddingProvider(
+    >>> embedder = GoogleEmbeddingProvider(
     ...     model="text-embedding-004",
     ...     project_id="my-project",
     ...     location="us-central1"
@@ -21,15 +23,15 @@ from nimbus.models.base import BaseEmbeddingProvider
 from nimbus.models.lazy_import import LazyImporter
 
 
-class VertexEmbeddingProvider(BaseEmbeddingProvider):
-    """Google Vertex AI embedding provider implementation.
+class GoogleEmbeddingProvider(BaseEmbeddingProvider):
+    """Google embedding provider implementation.
     
-    Supports Vertex AI's embedding models:
+    Supports Google's embedding models:
     - text-embedding-004 (768 dimensions)
     - text-multilingual-embedding-002 (768 dimensions)
     
     Example:
-        >>> embedder = VertexEmbeddingProvider(
+        >>> embedder = GoogleEmbeddingProvider(
         ...     model="text-embedding-004",
         ...     project_id="my-project",
         ...     location="us-central1"
@@ -51,7 +53,7 @@ class VertexEmbeddingProvider(BaseEmbeddingProvider):
         location: str,
         **config: Any
     ) -> None:
-        """Initialize Vertex AI embedding provider.
+        """Initialize Google embedding provider.
         
         Args:
             model: Model identifier (e.g., 'text-embedding-004')
@@ -64,22 +66,22 @@ class VertexEmbeddingProvider(BaseEmbeddingProvider):
         self.location = location
     
     def _initialize_client(self) -> Any:
-        """Initialize Vertex AI client.
+        """Initialize Google client.
         
         Returns:
-            Vertex AI TextEmbeddingModel instance
+            Google TextEmbeddingModel instance
         """
         aiplatform = LazyImporter.import_module(
             "google.cloud.aiplatform",
             package_name="google-cloud-aiplatform",
-            install_extra="vertex"
+            install_extra="google"
         )
         
         aiplatform.init(project=self.project_id, location=self.location)
         return aiplatform.TextEmbeddingModel.from_pretrained(self.model)
     
     def _encode_batch_impl(self, texts: list[str]) -> list[list[float]]:
-        """Encode multiple texts to vectors using Vertex AI API.
+        """Encode multiple texts to vectors using Google API.
         
         Args:
             texts: List of texts to encode

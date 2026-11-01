@@ -199,11 +199,11 @@ The `CapabilityCallHandler` class in `src/nimbus/tools/capability_call_handler.p
 - `_parse_openai_capability_calls()`
 - `_parse_anthropic_capability_calls()`
 - `_parse_bedrock_capability_calls()`
-- `_parse_vertex_capability_calls()`
+- `_parse_google_capability_calls()`
 - `_format_openai_results()`
 - `_format_anthropic_results()`
 - `_format_bedrock_results()`
-- `_format_vertex_results()`
+- `_format_google_results()`
 
 **Status**: This is documented architectural debt. The provider clients already implement `_extract_capability_calls()` which is used during response transformation, so the `CapabilityCallHandler` provides an alternative interface for capability execution workflows.
 

@@ -67,7 +67,7 @@ class CostCalculator:
         "anthropic.claude-3-sonnet-20240229-v1:0": {"prompt": 3.00, "completion": 15.00},
         "anthropic.claude-3-haiku-20240307-v1:0": {"prompt": 0.25, "completion": 1.25},
         "anthropic.claude-3-5-sonnet-20240620-v1:0": {"prompt": 3.00, "completion": 15.00},
-        # Google Vertex AI models (approximate)
+        # Google models (approximate)
         "gemini-pro": {"prompt": 0.50, "completion": 1.50},
         "gemini-pro-vision": {"prompt": 0.50, "completion": 1.50},
         "gemini-1.5-pro": {"prompt": 3.50, "completion": 10.50},

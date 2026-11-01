@@ -56,8 +56,8 @@ class MockProvider:
             return self._parse_anthropic_capability_calls(response)
         elif self.provider_name.lower() == "bedrock":
             return self._parse_bedrock_capability_calls(response)
-        elif self.provider_name.lower() == "vertex":
-            return self._parse_vertex_capability_calls(response)
+        elif self.provider_name.lower() == "google":
+            return self._parse_google_capability_calls(response)
         else:
             return []
     
@@ -69,8 +69,8 @@ class MockProvider:
             return self._format_anthropic_results(results)
         elif self.provider_name.lower() == "bedrock":
             return self._format_bedrock_results(results)
-        elif self.provider_name.lower() == "vertex":
-            return self._format_vertex_results(results)
+        elif self.provider_name.lower() == "google":
+            return self._format_google_results(results)
         else:
             return []
     
@@ -135,8 +135,8 @@ class MockProvider:
                 )
         return capability_calls
     
-    def _parse_vertex_capability_calls(self, response: CompletionResponse) -> list[CapabilityCall]:
-        """Parse Vertex AI capability calls."""
+    def _parse_google_capability_calls(self, response: CompletionResponse) -> list[CapabilityCall]:
+        """Parse Google capability calls."""
         candidates = response.metadata.get("candidates", [])
         if not candidates:
             return []
@@ -151,7 +151,7 @@ class MockProvider:
             if function_call:
                 capability_calls.append(
                     CapabilityCall(
-                        id=f"vertex_call_{idx}",
+                        id=f"google_call_{idx}",
                         name=function_call.get("name"),
                         arguments=function_call.get("args", {})
                     )
@@ -218,8 +218,8 @@ class MockProvider:
             })
         return formatted
     
-    def _format_vertex_results(self, results: list[CapabilityResult]) -> list[dict]:
-        """Format results for Vertex AI."""
+    def _format_google_results(self, results: list[CapabilityResult]) -> list[dict]:
+        """Format results for Google."""
         formatted = []
         for result in results:
             if result.error:
@@ -279,9 +279,9 @@ def bedrock_provider():
 
 
 @pytest.fixture
-def vertex_provider():
-    """Create a mock Vertex provider."""
-    return MockProvider("vertex")
+def google_provider():
+    """Create a mock Google provider."""
+    return MockProvider("google")
 
 
 @pytest.fixture
@@ -587,14 +587,14 @@ class TestParseBedrockCapabilityCalls:
         assert len(tool_calls) == 0
 
 
-class TestParseVertexCapabilityCalls:
-    """Tests for parsing Vertex AI tool calls."""
+class TestParseGoogleCapabilityCalls:
+    """Tests for parsing Google tool calls."""
 
-    def test_parse_vertex_tool_calls_success(self, handler, vertex_provider):
-        """Test parsing valid Vertex AI tool calls."""
+    def test_parse_google_tool_calls_success(self, handler, google_provider):
+        """Test parsing valid Google tool calls."""
         response = CompletionResponse(
             model="gemini-pro",
-            provider="vertex",
+            provider="google",
             content="",
             finish_reason="tool_calls",
             usage=TokenUsage(prompt_tokens=10, completion_tokens=5, total_tokens=15),
@@ -619,21 +619,21 @@ class TestParseVertexCapabilityCalls:
             },
         )
 
-        tool_calls = handler.parse_capability_calls(response, vertex_provider)
+        tool_calls = handler.parse_capability_calls(response, google_provider)
 
         assert len(tool_calls) == 1
-        assert tool_calls[0].id.startswith("vertex_call_")
+        assert tool_calls[0].id.startswith("google_call_")
         assert tool_calls[0].name == "get_weather"
         assert tool_calls[0].arguments == {
             "location": "San Francisco",
             "units": "celsius",
         }
 
-    def test_parse_vertex_multiple_function_calls(self, handler, vertex_provider):
-        """Test parsing multiple Vertex AI function calls."""
+    def test_parse_google_multiple_function_calls(self, handler, google_provider):
+        """Test parsing multiple Google function calls."""
         response = CompletionResponse(
             model="gemini-pro",
-            provider="vertex",
+            provider="google",
             content="",
             finish_reason="tool_calls",
             usage=TokenUsage(prompt_tokens=10, completion_tokens=5, total_tokens=15),
@@ -661,24 +661,24 @@ class TestParseVertexCapabilityCalls:
             },
         )
 
-        tool_calls = handler.parse_capability_calls(response, vertex_provider)
+        tool_calls = handler.parse_capability_calls(response, google_provider)
 
         assert len(tool_calls) == 2
         assert tool_calls[0].name == "get_weather"
         assert tool_calls[1].name == "get_time"
 
-    def test_parse_vertex_empty_candidates(self, handler, vertex_provider):
-        """Test parsing Vertex response with no candidates."""
+    def test_parse_google_empty_candidates(self, handler, google_provider):
+        """Test parsing Google response with no candidates."""
         response = CompletionResponse(
             model="gemini-pro",
-            provider="vertex",
+            provider="google",
             content="Hello",
             finish_reason="stop",
             usage=TokenUsage(prompt_tokens=10, completion_tokens=5, total_tokens=15),
             metadata={},
         )
 
-        tool_calls = handler.parse_capability_calls(response, vertex_provider)
+        tool_calls = handler.parse_capability_calls(response, google_provider)
 
         assert len(tool_calls) == 0
 
@@ -985,21 +985,21 @@ class TestFormatBedrockResults:
         assert formatted[0]["toolResult"]["content"][0]["json"] == {"temperature": 72}
 
 
-class TestFormatVertexResults:
-    """Tests for formatting Vertex AI results."""
+class TestFormatGoogleResults:
+    """Tests for formatting Google results."""
 
-    def test_format_vertex_results_success(self, handler, vertex_provider):
-        """Test formatting successful Vertex AI results."""
+    def test_format_google_results_success(self, handler, google_provider):
+        """Test formatting successful Google results."""
         results = [
             CapabilityResult(
-                capability_call_id="vertex_call_0",
+                capability_call_id="google_call_0",
                 name="get_weather",
                 result={"temperature": 72, "condition": "sunny"},
                 error=None,
             )
         ]
 
-        formatted = handler.format_capability_results(results, vertex_provider)
+        formatted = handler.format_capability_results(results, google_provider)
 
         assert len(formatted) == 1
         assert "functionResponse" in formatted[0]

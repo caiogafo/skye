@@ -5,7 +5,7 @@ Unit tests for Nimbus provider implementations.
 ## Test Coverage
 
 This directory contains tests for:
-- **Provider implementations** - OpenAI, Bedrock, Anthropic, Azure, Vertex
+- **Provider implementations** - OpenAI, Bedrock, Anthropic, Azure, Google
 - **Provider registry** - Registration and lookup
 - **Provider transformations** - Message and capability transformations
 - **Provider-specific logic** - API client configuration, error handling
@@ -17,7 +17,7 @@ This directory contains tests for:
 - `test_bedrock_provider.py` - Tests for AWS Bedrock provider
 - `test_anthropic_provider.py` - Tests for Anthropic provider
 - `test_azure_provider.py` - Tests for Azure OpenAI provider
-- `test_vertex_provider.py` - Tests for Google Vertex AI provider
+- `test_google_provider.py` - Tests for Google provider
 - `test_provider_registry.py` - Tests for provider registration system
 
 ## Running Tests

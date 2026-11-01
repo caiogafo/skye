@@ -14,7 +14,7 @@ This document summarizes the validation and consolidation of provider transforma
 
 **Verified**: All provider-specific transformation logic is in provider client classes.
 
-Each provider (OpenAI, Bedrock, Anthropic, Azure, Vertex) implements:
+Each provider (OpenAI, Bedrock, Anthropic, Azure, Google) implements:
 - `_transform_messages()` - Convert Nimbus messages to provider format
 - `_transform_capabilities()` - Convert Nimbus capabilities to provider tool format
 - `_extract_capability_calls()` - Extract capability calls from provider response

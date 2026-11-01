@@ -12,8 +12,6 @@ from __future__ import annotations
 import ast
 from pathlib import Path
 
-import pytest
-
 SRC = Path(__file__).resolve().parents[2] / "src" / "nimbus"
 
 LAYERS = {"base": 0, "adapters": 1, "services": 2, "runtime": 3}
@@ -54,12 +52,10 @@ ALLOWED: dict[str, set[str]] = {
 ORCHESTRATORS = {"agents", "teams", "flows"}
 
 # Top-level modules that are not Components: they belong to the Layer 0 foundation.
-NON_COMPONENT_TO_COMPONENT = {"utils": "base"}
-
-# Pairs (importing Component, imported Component) that were violations of Requirement 2.7
-# before the structure moves (completion -> capabilities, providers -> capabilities,
-# interfaces -> memory). Each must now have no import at all.
-RESOLVED_VIOLATIONS = [("base", "tools"), ("models", "tools"), ("base", "memory")]
+# `utils` is a stdlib-only helper package that lives alongside `base` in Layer 0.
+NON_COMPONENT_TO_COMPONENT = {
+    "utils": "base",
+}
 
 
 def component_of(parts: tuple[str, ...]) -> str | None:
@@ -161,13 +157,3 @@ def test_every_module_resolves_to_a_component() -> None:
 def test_no_import_violates_the_matrix() -> None:
     violations = [v["message"] for v in collect_violations()]
     assert not violations, "Import-matrix violations:\n  " + "\n  ".join(violations)
-
-
-@pytest.mark.parametrize(("importer", "imported"), RESOLVED_VIOLATIONS)
-def test_resolved_violation_stays_gone(importer: str, imported: str) -> None:
-    hits = [
-        v["message"]
-        for v in collect_violations()
-        if (v["key_importer"], v["key_imported"]) == (importer, imported)
-    ]
-    assert not hits, "\n".join(hits)
