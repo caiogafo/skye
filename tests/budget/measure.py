@@ -133,7 +133,9 @@ print(json.dumps({
     "modules": len(new),
     "ms": elapsed * 1000,
     "rss_mb": (r1 - r0) / scale,
-    "loaded": sorted({m.split(".")[0] for m in sys.modules}),
+    # only what `import nimbus` itself loaded: a .pth file of an installed SDK (e.g. the
+    # google-cloud-aiplatform nspkg.pth) pre-imports `google` at interpreter start-up
+    "loaded": sorted({m.split(".")[0] for m in new}),
 }))
 """
 

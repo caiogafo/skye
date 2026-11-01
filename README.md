@@ -61,6 +61,8 @@ uv pip install nimbus[all]
 | `mcp` | MCP client | fastmcp (heavy: about 43 MB, 7 compiled) |
 | `memory` | Persistent memory | redis, asyncpg |
 | `guard` | Safety filters | - |
+| `teams` | Multi-agent teams | - |
+| `flows` | Declarative flows | - |
 | `observe` | Observability | - (no telemetry library yet) |
 | `all` | All components | All of the above |
 

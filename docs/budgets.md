@@ -35,6 +35,10 @@ make budget         # installs Nimbus in clean environments, about a minute
 
 Sizes exclude the libraries Lambda already ships. Time is the best of five fresh interpreters. Measurements were taken on Python 3.13; the workflow runs the fast checks on 3.10 and 3.13 and the footprint checks on 3.13.
 
+## No external-library type outside its Component
+
+`tests/budget/test_boundary_rule.py` (part of `make budget-fast`) checks Requirement 20: provider SDKs (`openai`, `anthropic`, `boto3`, `vertexai`/`google.cloud.aiplatform`, `cohere`) and `fastmcp`/`mcp` are imported only by the files that own them, only inside a function, `tools/mcp_boundary.py` imports no third-party library, no public annotation in `models`/`tools` names an external type, and the provider and MCP conversions return Nimbus types only. A new external backend (for `observe`, `store`, `prompts`, `agents`) adds its owning file to `SDK_OWNERS` in that test; no new Component or Port. `tests/differential/test_boundary_leak.py` runs the same check on both MCP clients (needs `fastmcp`, dev group).
+
 ## Changing a budget
 
 A budget only goes down. When a PR fixes something (removes a dependency, moves an import behind `LazyImporter`), the matching test fails until the list in `budgets.toml` is updated, so the number follows the code. Raising a number needs a reason in the PR and a review from the owner of `budgets.toml` (`.github/CODEOWNERS`).
@@ -47,6 +51,6 @@ To make the check blocking, require the `budgets / fast checks` and `budgets / f
 |---|---|---|
 | Core depends on `pydantic`, `jinja2`, `pyyaml`, `tenacity` (none in Lambda, none in the standard library) | about 9 MB and 10 packages | standard library only |
 | Compiled in the core: `pydantic-core` (Rust), `pyyaml` and `markupsafe` (C) | needs a container build | none |
-| Extras `agents`, `guard`, `prompts` have no dependencies of their own | they are modules, not extras | remove from `pyproject.toml` |
+| Extras `agents`, `guard`, `prompts`, `teams`, `flows` have no dependencies of their own | they are modules, not extras | remove from `pyproject.toml` |
 | Extra sizes over the core: `google` 176 MB, `cohere` 33 MB, `openai` 18 MB, `memory` 12 MB, `anthropic` 10 MB | most come from provider SDKs | call the provider REST APIs with the standard library or `urllib3` |
 | `nimbus[all]` is about 274 MB, over the Lambda limit | cannot be deployed | not advertised for Lambda |

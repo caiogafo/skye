@@ -110,6 +110,6 @@ target_over_core_mb = 10
 # from pyproject.toml and from this list. The test fails if an extra is empty and
 # not listed here, and if a listed extra stops being empty.
 [extras_policy]
-known_empty = ["agents", "guard", "observe", "prompts", "tools"]   # "prompts" only repeats jinja2, already a core dependency; "observe" has no telemetry import yet
+known_empty = ["agents", "guard", "observe", "prompts", "teams", "flows", "tools"]   # "prompts" only repeats jinja2, already a core dependency; "observe" has no telemetry import yet
 # Convenience bundles. They are not budgeted one by one: each member extra is.
 bundles = ["llm-providers", "embedding-providers", "all-providers", "providers", "all"]

@@ -28,6 +28,10 @@ A budget only goes down. Raising one needs a reason in the pull request and a re
 
 Design work is spec driven, with Kiro. Requirements, design and tasks for each feature live in `.kiro/specs/`, and project-wide rules in `.kiro/steering/`. For a new feature, add or update the spec in the same pull request.
 
+## Built-in vs external library
+
+When a Component offers a built-in standard-library implementation and one backed by an external library (a provider SDK, `fastmcp`), both sit behind the same Port and return the same Nimbus types. The external types are converted to Nimbus types at one boundary point inside the owning Component, and none is exposed in a Port return value, parameter or public API. Today this governs `models` (provider SDKs; only the SDK path exists, no REST adapter yet) and the `tools` MCP client (`mcp_client.py` built-in, `mcp_fastmcp.py` fastmcp, one conversion in `mcp_boundary.py`, which imports no third-party library). A future external backend for `observe`, `store`, `prompts` or `agents` follows the same rule, with no new Component and no new Port. Keep the library import inside a function in the owning file, convert at the boundary, and add the file to `SDK_OWNERS` in `tests/budget/test_boundary_rule.py` (`make budget-fast` enforces it; `tests/differential/test_boundary_leak.py` checks both MCP clients against the fake server). Details: `docs/budgets.md`, Requirement 20 in `.kiro/specs/structure/`.
+
 ## Before you open a pull request
 
 ```bash

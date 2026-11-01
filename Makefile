@@ -1,4 +1,4 @@
-.PHONY: help install install-dev clean format lint type-check type-check-providers test test-unit test-integration test-cov test-providers test-capabilities check all budget budget-fast
+.PHONY: help install install-dev clean format lint type-check type-check-providers test test-unit test-integration test-cov test-providers test-capabilities check all budget budget-fast differential
 
 # Default target
 help:
@@ -27,6 +27,8 @@ help:
 	@echo ""
 	@echo "  make budget-fast      Size/load policy checks (no network)"
 	@echo "  make budget           Install in clean envs and check size budgets (needs uv, network)"
+	@echo ""
+	@echo "  make differential     Built-in vs official-SDK differential tests (dev env)"
 	@echo ""
 	@echo "Utilities:"
 	@echo "  make clean            Remove build artifacts and cache"
@@ -129,3 +131,7 @@ budget-fast:
 
 budget:
 	uv run pytest tests/budget -m budget -q
+
+# Built-in vs official-SDK equivalence tests (dev env; SDKs come from the dev dependency group)
+differential:
+	uv run pytest tests/differential -m differential -q
