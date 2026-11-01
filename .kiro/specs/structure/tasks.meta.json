@@ -1,0 +1,492 @@
+{
+  "pbtResults": {},
+  "executionHistory": {
+    "1.1 Write the AST import-matrix test": [
+      {
+        "executionId": "f4dc0f3d-649f-4e0d-b9cf-df065490093a",
+        "chatSessionId": "sess_696a272c-3ccb-4801-a772-0f814a451e4a",
+        "timestamp": 1793554553339
+      },
+      {
+        "executionId": "f4dc0f3d-649f-4e0d-b9cf-df065490093a",
+        "chatSessionId": "sess_696a272c-3ccb-4801-a772-0f814a451e4a",
+        "timestamp": 1793554564548
+      },
+      {
+        "executionId": "f4dc0f3d-649f-4e0d-b9cf-df065490093a",
+        "chatSessionId": "sess_696a272c-3ccb-4801-a772-0f814a451e4a",
+        "timestamp": 1793555292249
+      }
+    ],
+    "1.2 Write the codename test": [
+      {
+        "executionId": "f4dc0f3d-649f-4e0d-b9cf-df065490093a",
+        "chatSessionId": "sess_696a272c-3ccb-4801-a772-0f814a451e4a",
+        "timestamp": 1793554553405
+      },
+      {
+        "executionId": "f4dc0f3d-649f-4e0d-b9cf-df065490093a",
+        "chatSessionId": "sess_696a272c-3ccb-4801-a772-0f814a451e4a",
+        "timestamp": 1793554565390
+      },
+      {
+        "executionId": "f4dc0f3d-649f-4e0d-b9cf-df065490093a",
+        "chatSessionId": "sess_696a272c-3ccb-4801-a772-0f814a451e4a",
+        "timestamp": 1793555293032
+      }
+    ],
+    "1.3 Write the extras-declare-exactly test and the clean-import/footprint test": [
+      {
+        "executionId": "f4dc0f3d-649f-4e0d-b9cf-df065490093a",
+        "chatSessionId": "sess_696a272c-3ccb-4801-a772-0f814a451e4a",
+        "timestamp": 1793554553456
+      },
+      {
+        "executionId": "f4dc0f3d-649f-4e0d-b9cf-df065490093a",
+        "chatSessionId": "sess_696a272c-3ccb-4801-a772-0f814a451e4a",
+        "timestamp": 1793554566546
+      },
+      {
+        "executionId": "f4dc0f3d-649f-4e0d-b9cf-df065490093a",
+        "chatSessionId": "sess_696a272c-3ccb-4801-a772-0f814a451e4a",
+        "timestamp": 1793555293818
+      }
+    ],
+    "2.1 Create the `base` package and move core models": [
+      {
+        "executionId": "f4dc0f3d-649f-4e0d-b9cf-df065490093a",
+        "chatSessionId": "sess_696a272c-3ccb-4801-a772-0f814a451e4a",
+        "timestamp": 1793554553497
+      },
+      {
+        "executionId": "f4dc0f3d-649f-4e0d-b9cf-df065490093a",
+        "chatSessionId": "sess_696a272c-3ccb-4801-a772-0f814a451e4a",
+        "timestamp": 1793555298301
+      },
+      {
+        "executionId": "f4dc0f3d-649f-4e0d-b9cf-df065490093a",
+        "chatSessionId": "sess_696a272c-3ccb-4801-a772-0f814a451e4a",
+        "timestamp": 1793556228709
+      }
+    ],
+    "2.2 Move the Ports into `base/interfaces` and add the new Ports": [
+      {
+        "executionId": "f4dc0f3d-649f-4e0d-b9cf-df065490093a",
+        "chatSessionId": "sess_696a272c-3ccb-4801-a772-0f814a451e4a",
+        "timestamp": 1793554553526
+      },
+      {
+        "executionId": "f4dc0f3d-649f-4e0d-b9cf-df065490093a",
+        "chatSessionId": "sess_696a272c-3ccb-4801-a772-0f814a451e4a",
+        "timestamp": 1793556232440
+      },
+      {
+        "executionId": "f4dc0f3d-649f-4e0d-b9cf-df065490093a",
+        "chatSessionId": "sess_696a272c-3ccb-4801-a772-0f814a451e4a",
+        "timestamp": 1793557956137
+      }
+    ],
+    "2.3 Add the pure capability schema to base": [
+      {
+        "executionId": "f4dc0f3d-649f-4e0d-b9cf-df065490093a",
+        "chatSessionId": "sess_696a272c-3ccb-4801-a772-0f814a451e4a",
+        "timestamp": 1793554553572
+      },
+      {
+        "executionId": "f4dc0f3d-649f-4e0d-b9cf-df065490093a",
+        "chatSessionId": "sess_696a272c-3ccb-4801-a772-0f814a451e4a",
+        "timestamp": 1793557960137
+      },
+      {
+        "executionId": "f4dc0f3d-649f-4e0d-b9cf-df065490093a",
+        "chatSessionId": "sess_696a272c-3ccb-4801-a772-0f814a451e4a",
+        "timestamp": 1793558042747
+      }
+    ],
+    "2.4 Move the lazy-import helper into base as a thin wrapper": [
+      {
+        "executionId": "f4dc0f3d-649f-4e0d-b9cf-df065490093a",
+        "chatSessionId": "sess_696a272c-3ccb-4801-a772-0f814a451e4a",
+        "timestamp": 1793554553605
+      },
+      {
+        "executionId": "f4dc0f3d-649f-4e0d-b9cf-df065490093a",
+        "chatSessionId": "sess_696a272c-3ccb-4801-a772-0f814a451e4a",
+        "timestamp": 1793557960975
+      },
+      {
+        "executionId": "f4dc0f3d-649f-4e0d-b9cf-df065490093a",
+        "chatSessionId": "sess_696a272c-3ccb-4801-a772-0f814a451e4a",
+        "timestamp": 1793558043481
+      }
+    ],
+    "3. Checkpoint - Ensure all tests pass": [
+      {
+        "executionId": "f4dc0f3d-649f-4e0d-b9cf-df065490093a",
+        "chatSessionId": "sess_696a272c-3ccb-4801-a772-0f814a451e4a",
+        "timestamp": 1793554553640
+      },
+      {
+        "executionId": "f4dc0f3d-649f-4e0d-b9cf-df065490093a",
+        "chatSessionId": "sess_696a272c-3ccb-4801-a772-0f814a451e4a",
+        "timestamp": 1793565796572
+      }
+    ],
+    "4. models component (adapters) with the shared stdlib transport": [
+      {
+        "executionId": "f4dc0f3d-649f-4e0d-b9cf-df065490093a",
+        "chatSessionId": "sess_696a272c-3ccb-4801-a772-0f814a451e4a",
+        "timestamp": 1793554553675
+      },
+      {
+        "executionId": "f4dc0f3d-649f-4e0d-b9cf-df065490093a",
+        "chatSessionId": "sess_696a272c-3ccb-4801-a772-0f814a451e4a",
+        "timestamp": 1793565806420
+      }
+    ],
+    "4.1 Rename `providers` → `models`": [
+      {
+        "executionId": "f4dc0f3d-649f-4e0d-b9cf-df065490093a",
+        "chatSessionId": "sess_696a272c-3ccb-4801-a772-0f814a451e4a",
+        "timestamp": 1793554553713
+      },
+      {
+        "executionId": "f4dc0f3d-649f-4e0d-b9cf-df065490093a",
+        "chatSessionId": "sess_696a272c-3ccb-4801-a772-0f814a451e4a",
+        "timestamp": 1793558053775
+      },
+      {
+        "executionId": "f4dc0f3d-649f-4e0d-b9cf-df065490093a",
+        "chatSessionId": "sess_696a272c-3ccb-4801-a772-0f814a451e4a",
+        "timestamp": 1793558442056
+      }
+    ],
+    "4.2 Split the shared transport out of the base adapter": [
+      {
+        "executionId": "f4dc0f3d-649f-4e0d-b9cf-df065490093a",
+        "chatSessionId": "sess_696a272c-3ccb-4801-a772-0f814a451e4a",
+        "timestamp": 1793554553756
+      },
+      {
+        "executionId": "f4dc0f3d-649f-4e0d-b9cf-df065490093a",
+        "chatSessionId": "sess_696a272c-3ccb-4801-a772-0f814a451e4a",
+        "timestamp": 1793558450957
+      },
+      {
+        "executionId": "f4dc0f3d-649f-4e0d-b9cf-df065490093a",
+        "chatSessionId": "sess_696a272c-3ccb-4801-a772-0f814a451e4a",
+        "timestamp": 1793558737209
+      }
+    ],
+    "4.3 Consolidate the LLM adapters and implement the Runnable port": [
+      {
+        "executionId": "f4dc0f3d-649f-4e0d-b9cf-df065490093a",
+        "chatSessionId": "sess_696a272c-3ccb-4801-a772-0f814a451e4a",
+        "timestamp": 1793554553799
+      },
+      {
+        "executionId": "f4dc0f3d-649f-4e0d-b9cf-df065490093a",
+        "chatSessionId": "sess_696a272c-3ccb-4801-a772-0f814a451e4a",
+        "timestamp": 1793558742506
+      },
+      {
+        "executionId": "f4dc0f3d-649f-4e0d-b9cf-df065490093a",
+        "chatSessionId": "sess_696a272c-3ccb-4801-a772-0f814a451e4a",
+        "timestamp": 1793558882537
+      }
+    ],
+    "4.5 Move remote_api onto the stdlib transport to eliminate the HTTP leak": [
+      {
+        "executionId": "f4dc0f3d-649f-4e0d-b9cf-df065490093a",
+        "chatSessionId": "sess_696a272c-3ccb-4801-a772-0f814a451e4a",
+        "timestamp": 1793554553833
+      },
+      {
+        "executionId": "f4dc0f3d-649f-4e0d-b9cf-df065490093a",
+        "chatSessionId": "sess_696a272c-3ccb-4801-a772-0f814a451e4a",
+        "timestamp": 1793558744620
+      },
+      {
+        "executionId": "f4dc0f3d-649f-4e0d-b9cf-df065490093a",
+        "chatSessionId": "sess_696a272c-3ccb-4801-a772-0f814a451e4a",
+        "timestamp": 1793558881574
+      }
+    ],
+    "4.6 Unify the two registries (Overlap A)": [
+      {
+        "executionId": "f4dc0f3d-649f-4e0d-b9cf-df065490093a",
+        "chatSessionId": "sess_696a272c-3ccb-4801-a772-0f814a451e4a",
+        "timestamp": 1793554553864
+      },
+      {
+        "executionId": "f4dc0f3d-649f-4e0d-b9cf-df065490093a",
+        "chatSessionId": "sess_696a272c-3ccb-4801-a772-0f814a451e4a",
+        "timestamp": 1793558743821
+      },
+      {
+        "executionId": "f4dc0f3d-649f-4e0d-b9cf-df065490093a",
+        "chatSessionId": "sess_696a272c-3ccb-4801-a772-0f814a451e4a",
+        "timestamp": 1793558883527
+      }
+    ],
+    "5. Checkpoint - Ensure all tests pass": [
+      {
+        "executionId": "f4dc0f3d-649f-4e0d-b9cf-df065490093a",
+        "chatSessionId": "sess_696a272c-3ccb-4801-a772-0f814a451e4a",
+        "timestamp": 1793554553897
+      },
+      {
+        "executionId": "f4dc0f3d-649f-4e0d-b9cf-df065490093a",
+        "chatSessionId": "sess_696a272c-3ccb-4801-a772-0f814a451e4a",
+        "timestamp": 1793565810900
+      }
+    ],
+    "6.1 Create the shared `store` Component": [
+      {
+        "executionId": "f4dc0f3d-649f-4e0d-b9cf-df065490093a",
+        "chatSessionId": "sess_696a272c-3ccb-4801-a772-0f814a451e4a",
+        "timestamp": 1793554553932
+      },
+      {
+        "executionId": "f4dc0f3d-649f-4e0d-b9cf-df065490093a",
+        "chatSessionId": "sess_696a272c-3ccb-4801-a772-0f814a451e4a",
+        "timestamp": 1793558055104
+      },
+      {
+        "executionId": "f4dc0f3d-649f-4e0d-b9cf-df065490093a",
+        "chatSessionId": "sess_696a272c-3ccb-4801-a772-0f814a451e4a",
+        "timestamp": 1793558441161
+      }
+    ],
+    "7.1 Rename `routes` → `router` and merge health tracking": [
+      {
+        "executionId": "f4dc0f3d-649f-4e0d-b9cf-df065490093a",
+        "chatSessionId": "sess_696a272c-3ccb-4801-a772-0f814a451e4a",
+        "timestamp": 1793554554006
+      },
+      {
+        "executionId": "f4dc0f3d-649f-4e0d-b9cf-df065490093a",
+        "chatSessionId": "sess_696a272c-3ccb-4801-a772-0f814a451e4a",
+        "timestamp": 1793558448860
+      },
+      {
+        "executionId": "f4dc0f3d-649f-4e0d-b9cf-df065490093a",
+        "chatSessionId": "sess_696a272c-3ccb-4801-a772-0f814a451e4a",
+        "timestamp": 1793558736276
+      }
+    ],
+    "7.2 Rename `capabilities` → `tools` and split the capability models": [
+      {
+        "executionId": "f4dc0f3d-649f-4e0d-b9cf-df065490093a",
+        "chatSessionId": "sess_696a272c-3ccb-4801-a772-0f814a451e4a",
+        "timestamp": 1793554554047
+      },
+      {
+        "executionId": "f4dc0f3d-649f-4e0d-b9cf-df065490093a",
+        "chatSessionId": "sess_696a272c-3ccb-4801-a772-0f814a451e4a",
+        "timestamp": 1793558450222
+      },
+      {
+        "executionId": "f4dc0f3d-649f-4e0d-b9cf-df065490093a",
+        "chatSessionId": "sess_696a272c-3ccb-4801-a772-0f814a451e4a",
+        "timestamp": 1793558735269
+      }
+    ],
+    "7.3 Reorganize the prompts Component": [
+      {
+        "executionId": "f4dc0f3d-649f-4e0d-b9cf-df065490093a",
+        "chatSessionId": "sess_696a272c-3ccb-4801-a772-0f814a451e4a",
+        "timestamp": 1793554554075
+      },
+      {
+        "executionId": "f4dc0f3d-649f-4e0d-b9cf-df065490093a",
+        "chatSessionId": "sess_696a272c-3ccb-4801-a772-0f814a451e4a",
+        "timestamp": 1793558056061
+      },
+      {
+        "executionId": "f4dc0f3d-649f-4e0d-b9cf-df065490093a",
+        "chatSessionId": "sess_696a272c-3ccb-4801-a772-0f814a451e4a",
+        "timestamp": 1793558443455
+      }
+    ],
+    "8.1 Ensure the declared-but-minimal packages exist": [
+      {
+        "executionId": "f4dc0f3d-649f-4e0d-b9cf-df065490093a",
+        "chatSessionId": "sess_696a272c-3ccb-4801-a772-0f814a451e4a",
+        "timestamp": 1793554554113
+      },
+      {
+        "executionId": "f4dc0f3d-649f-4e0d-b9cf-df065490093a",
+        "chatSessionId": "sess_696a272c-3ccb-4801-a772-0f814a451e4a",
+        "timestamp": 1793558057009
+      },
+      {
+        "executionId": "f4dc0f3d-649f-4e0d-b9cf-df065490093a",
+        "chatSessionId": "sess_696a272c-3ccb-4801-a772-0f814a451e4a",
+        "timestamp": 1793558444242
+      }
+    ],
+    "9.1 Place the cost/error/token Ports in base and impls in models/transport": [
+      {
+        "executionId": "f4dc0f3d-649f-4e0d-b9cf-df065490093a",
+        "chatSessionId": "sess_696a272c-3ccb-4801-a772-0f814a451e4a",
+        "timestamp": 1793554554141
+      },
+      {
+        "executionId": "f4dc0f3d-649f-4e0d-b9cf-df065490093a",
+        "chatSessionId": "sess_696a272c-3ccb-4801-a772-0f814a451e4a",
+        "timestamp": 1793558888620
+      },
+      {
+        "executionId": "f4dc0f3d-649f-4e0d-b9cf-df065490093a",
+        "chatSessionId": "sess_696a272c-3ccb-4801-a772-0f814a451e4a",
+        "timestamp": 1793559870382
+      }
+    ],
+    "10.1 Reduce `nimbus/__init__.py` to the curated four": [
+      {
+        "executionId": "f4dc0f3d-649f-4e0d-b9cf-df065490093a",
+        "chatSessionId": "sess_696a272c-3ccb-4801-a772-0f814a451e4a",
+        "timestamp": 1793554554175
+      },
+      {
+        "executionId": "f4dc0f3d-649f-4e0d-b9cf-df065490093a",
+        "chatSessionId": "sess_696a272c-3ccb-4801-a772-0f814a451e4a",
+        "timestamp": 1793559875581
+      },
+      {
+        "executionId": "f4dc0f3d-649f-4e0d-b9cf-df065490093a",
+        "chatSessionId": "sess_696a272c-3ccb-4801-a772-0f814a451e4a",
+        "timestamp": 1793562676454
+      }
+    ],
+    "11.1 Correct the `memory` Extra and align all Extras": [
+      {
+        "executionId": "f4dc0f3d-649f-4e0d-b9cf-df065490093a",
+        "chatSessionId": "sess_696a272c-3ccb-4801-a772-0f814a451e4a",
+        "timestamp": 1793554554210
+      },
+      {
+        "executionId": "f4dc0f3d-649f-4e0d-b9cf-df065490093a",
+        "chatSessionId": "sess_696a272c-3ccb-4801-a772-0f814a451e4a",
+        "timestamp": 1793562681168
+      },
+      {
+        "executionId": "f4dc0f3d-649f-4e0d-b9cf-df065490093a",
+        "chatSessionId": "sess_696a272c-3ccb-4801-a772-0f814a451e4a",
+        "timestamp": 1793565121956
+      }
+    ],
+    "12.1 Update all call sites to the new paths and delete the shims": [
+      {
+        "executionId": "f4dc0f3d-649f-4e0d-b9cf-df065490093a",
+        "chatSessionId": "sess_696a272c-3ccb-4801-a772-0f814a451e4a",
+        "timestamp": 1793554554268
+      },
+      {
+        "executionId": "f4dc0f3d-649f-4e0d-b9cf-df065490093a",
+        "chatSessionId": "sess_696a272c-3ccb-4801-a772-0f814a451e4a",
+        "timestamp": 1793565127292
+      },
+      {
+        "executionId": "f4dc0f3d-649f-4e0d-b9cf-df065490093a",
+        "chatSessionId": "sess_696a272c-3ccb-4801-a772-0f814a451e4a",
+        "timestamp": 1793565578557
+      }
+    ],
+    "13.1 Run the full budget suite": [
+      {
+        "executionId": "f4dc0f3d-649f-4e0d-b9cf-df065490093a",
+        "chatSessionId": "sess_696a272c-3ccb-4801-a772-0f814a451e4a",
+        "timestamp": 1793554554300
+      },
+      {
+        "executionId": "f4dc0f3d-649f-4e0d-b9cf-df065490093a",
+        "chatSessionId": "sess_696a272c-3ccb-4801-a772-0f814a451e4a",
+        "timestamp": 1793565583877
+      },
+      {
+        "executionId": "f4dc0f3d-649f-4e0d-b9cf-df065490093a",
+        "chatSessionId": "sess_696a272c-3ccb-4801-a772-0f814a451e4a",
+        "timestamp": 1793565780291
+      }
+    ],
+    "1. Guardrail tests first (enforce the structure before any move)": [
+      {
+        "executionId": "f4dc0f3d-649f-4e0d-b9cf-df065490093a",
+        "chatSessionId": "sess_696a272c-3ccb-4801-a772-0f814a451e4a",
+        "timestamp": 1793555293855
+      }
+    ],
+    "2. Create the base package foundation": [
+      {
+        "executionId": "f4dc0f3d-649f-4e0d-b9cf-df065490093a",
+        "chatSessionId": "sess_696a272c-3ccb-4801-a772-0f814a451e4a",
+        "timestamp": 1793558043542
+      }
+    ],
+    "6. store component (Overlap B)": [
+      {
+        "executionId": "f4dc0f3d-649f-4e0d-b9cf-df065490093a",
+        "chatSessionId": "sess_696a272c-3ccb-4801-a772-0f814a451e4a",
+        "timestamp": 1793558441225
+      }
+    ],
+    "8. Declared-but-minimal packages": [
+      {
+        "executionId": "f4dc0f3d-649f-4e0d-b9cf-df065490093a",
+        "chatSessionId": "sess_696a272c-3ccb-4801-a772-0f814a451e4a",
+        "timestamp": 1793558444282
+      }
+    ],
+    "7. router / tools / prompts (services)": [
+      {
+        "executionId": "f4dc0f3d-649f-4e0d-b9cf-df065490093a",
+        "chatSessionId": "sess_696a272c-3ccb-4801-a772-0f814a451e4a",
+        "timestamp": 1793558736321
+      }
+    ],
+    "4.4* Stage the Google own-dialect adapter (formerly Vertex)": [
+      {
+        "executionId": "f4dc0f3d-649f-4e0d-b9cf-df065490093a",
+        "chatSessionId": "sess_696a272c-3ccb-4801-a772-0f814a451e4a",
+        "timestamp": 1793558883563
+      }
+    ],
+    "9. Overlap C consolidation (cost, error, token)": [
+      {
+        "executionId": "f4dc0f3d-649f-4e0d-b9cf-df065490093a",
+        "chatSessionId": "sess_696a272c-3ccb-4801-a772-0f814a451e4a",
+        "timestamp": 1793559870468
+      }
+    ],
+    "10. Curate the public API": [
+      {
+        "executionId": "f4dc0f3d-649f-4e0d-b9cf-df065490093a",
+        "chatSessionId": "sess_696a272c-3ccb-4801-a772-0f814a451e4a",
+        "timestamp": 1793562676489
+      }
+    ],
+    "11. extras / budgets fixes": [
+      {
+        "executionId": "f4dc0f3d-649f-4e0d-b9cf-df065490093a",
+        "chatSessionId": "sess_696a272c-3ccb-4801-a772-0f814a451e4a",
+        "timestamp": 1793565122108
+      }
+    ],
+    "12. Remove the temporary re-export shims": [
+      {
+        "executionId": "f4dc0f3d-649f-4e0d-b9cf-df065490093a",
+        "chatSessionId": "sess_696a272c-3ccb-4801-a772-0f814a451e4a",
+        "timestamp": 1793565578647
+      }
+    ],
+    "13. Final checkpoint - budgets green": [
+      {
+        "executionId": "f4dc0f3d-649f-4e0d-b9cf-df065490093a",
+        "chatSessionId": "sess_696a272c-3ccb-4801-a772-0f814a451e4a",
+        "timestamp": 1793565780341
+      }
+    ]
+  }
+}
