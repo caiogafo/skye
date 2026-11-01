@@ -10,13 +10,13 @@ def test_import_nimbus():
 
 def test_import_interfaces():
     """Test that interfaces module can be imported."""
-    import nimbus.interfaces
+    import nimbus.base.interfaces
 
-    assert nimbus.interfaces is not None
+    assert nimbus.base.interfaces is not None
 
 
 def test_import_providers():
     """Test that providers module can be imported."""
-    import nimbus.providers
+    import nimbus.models
 
-    assert nimbus.providers is not None
+    assert nimbus.models is not None

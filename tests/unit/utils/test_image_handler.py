@@ -4,8 +4,8 @@ import base64
 from pathlib import Path
 import pytest
 
-from nimbus.providers.multimodal import ImageHandler
-from nimbus.exceptions import ValidationError
+from nimbus.models.transport.multimodal import ImageHandler
+from nimbus.base.exceptions import ValidationError
 
 
 class TestImageHandler:

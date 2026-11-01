@@ -5,13 +5,13 @@ This version demonstrates:
 - Streaming responses
 - Async operations
 - Multi-turn conversations
-- Simple client creation: nimbus.provider("openai")
+- Simple client creation: create_provider("openai")
 """
 
 import asyncio
 import os
-import nimbus
-from nimbus.messages import UserMessage, SystemMessage
+from nimbus.models.registry import provider as create_provider
+from nimbus.base.messages import UserMessage, SystemMessage
 
 
 def basic_completion():
@@ -26,7 +26,7 @@ def basic_completion():
         print("   Set it with: export OPENAI_API_KEY='sk-...'")
         return
     
-    client = nimbus.provider("openai", api_key=api_key)
+    client = create_provider("openai", api_key=api_key)
     
     messages = [
         SystemMessage("You are a helpful assistant."),
@@ -55,7 +55,7 @@ def streaming_example():
         print("⚠️  OPENAI_API_KEY environment variable not set")
         return
     
-    client = nimbus.provider("openai", api_key=api_key)
+    client = create_provider("openai", api_key=api_key)
     
     messages = [UserMessage("Write a short poem about Python programming")]
     
@@ -79,7 +79,7 @@ async def async_completion():
         print("⚠️  OPENAI_API_KEY environment variable not set")
         return
     
-    client = nimbus.provider("openai", api_key=api_key)
+    client = create_provider("openai", api_key=api_key)
     
     messages = [UserMessage("Explain async/await in Python")]
     
@@ -101,7 +101,7 @@ def multi_turn_conversation():
         print("⚠️  OPENAI_API_KEY environment variable not set")
         return
     
-    client = nimbus.provider("openai", api_key=api_key)
+    client = create_provider("openai", api_key=api_key)
     
     # First turn
     print("\nTurn 1: User asks a question")
@@ -129,9 +129,9 @@ def router_example():
 Use RouterRegistry for load balancing across deployments:
 
 ```python
-import nimbus
-from nimbus import routes as rt
-from nimbus.messages import UserMessage
+from nimbus.models.registry import provider as create_provider
+import nimbus.router as rt
+from nimbus.base.messages import UserMessage
 
 # Define load balancing setup
 registry = rt.RouterRegistry([
@@ -162,7 +162,7 @@ registry = rt.RouterRegistry([
 ])
 
 # Create client with router
-client = nimbus.provider("openai", router=registry)
+client = create_provider("openai", router=registry)
 
 # Use alias - router handles selection
 response = client.complete(

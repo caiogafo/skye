@@ -63,7 +63,7 @@ pytest tests/unit/ -n auto
 
 ```python
 import pytest
-from nimbus.capabilities import CapabilityCall, CapabilityResult
+from nimbus.tools import CapabilityCall, CapabilityResult
 
 def test_capability_call_creation():
     """Test creating a capability call with valid data."""
@@ -87,7 +87,7 @@ def test_capability_call_validation():
 
 ```python
 import pytest
-from nimbus.routes import ModelRouter, ModelTarget
+from nimbus.router import ModelRouter, ModelTarget
 
 @pytest.fixture
 def sample_router():
@@ -118,7 +118,7 @@ def test_router_selection(sample_router):
 from unittest.mock import Mock, patch
 import pytest
 
-@patch('nimbus.providers.llm.openai_provider.OpenAI')
+@patch('nimbus.models.llm.openai_compatible.OpenAI')
 def test_openai_provider_completion(mock_openai):
     """Test OpenAI provider with mocked API."""
     # Setup mock

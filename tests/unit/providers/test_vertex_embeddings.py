@@ -11,7 +11,7 @@ from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 
-from nimbus.providers.embeddings.vertex_embeddings import VertexEmbeddingProvider
+from nimbus.models.embeddings.vertex_embeddings import VertexEmbeddingProvider
 
 
 class TestVertexEmbeddingProviderInitialization:
@@ -41,7 +41,7 @@ class TestVertexEmbeddingProviderInitialization:
         assert provider.location == "us-west1"
         assert provider.config["credentials_path"] == "/path/to/creds.json"
     
-    @patch("nimbus.providers.embeddings.vertex_embeddings.LazyImporter.import_module")
+    @patch("nimbus.models.embeddings.vertex_embeddings.LazyImporter.import_module")
     def test_lazy_client_initialization(self, mock_import: Mock) -> None:
         """Test that client is lazily initialized."""
         mock_aiplatform = MagicMock()
@@ -79,7 +79,7 @@ class TestVertexEmbeddingProviderInitialization:
 class TestVertexEmbeddingProviderBatchEncoding:
     """Test batch encoding functionality."""
     
-    @patch("nimbus.providers.embeddings.vertex_embeddings.LazyImporter.import_module")
+    @patch("nimbus.models.embeddings.vertex_embeddings.LazyImporter.import_module")
     def test_encode_batch(self, mock_import: Mock) -> None:
         """Test batch encoding."""
         # Setup mock
@@ -112,7 +112,7 @@ class TestVertexEmbeddingProviderBatchEncoding:
         
         mock_model.get_embeddings.assert_called_once_with(["text1", "text2"])
     
-    @patch("nimbus.providers.embeddings.vertex_embeddings.LazyImporter.import_module")
+    @patch("nimbus.models.embeddings.vertex_embeddings.LazyImporter.import_module")
     def test_encode_single_text(self, mock_import: Mock) -> None:
         """Test encoding single text."""
         # Setup mock

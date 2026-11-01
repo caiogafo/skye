@@ -64,7 +64,7 @@ type-check:
 # Type checking for providers specifically
 type-check-providers:
 	@echo "Type checking providers with mypy..."
-	uv run mypy src/nimbus/providers --strict
+	uv run mypy src/nimbus/models --strict
 	@echo "✓ Provider type checking complete"
 
 # Run all checks (for task completion validation)

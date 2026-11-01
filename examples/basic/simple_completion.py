@@ -13,10 +13,10 @@ Note: Set environment variables for API keys:
 """
 
 import os
-import nimbus
+from nimbus.models.registry import provider as create_provider
 from pydantic import BaseModel
 
-from nimbus.messages import UserMessage, AssistantMessage, SystemMessage
+from nimbus.base.messages import UserMessage, AssistantMessage, SystemMessage
 
 
 def basic_completion_example():
@@ -31,7 +31,7 @@ def basic_completion_example():
         return
     
     try:
-        provider = nimbus.provider("openai", api_key=api_key)
+        provider = create_provider("openai", api_key=api_key)
     except ImportError:
         print("⚠️  OpenAI provider not available")
         return
@@ -77,7 +77,7 @@ def conversation_example():
         return
     
     try:
-        provider = nimbus.provider("openai", api_key=api_key)
+        provider = create_provider("openai", api_key=api_key)
     except ImportError:
         print("⚠️  OpenAI provider not available")
         return
@@ -120,7 +120,7 @@ def structured_output_example():
         return
     
     try:
-        provider = nimbus.provider("openai", api_key=api_key)
+        provider = create_provider("openai", api_key=api_key)
     except ImportError:
         print("⚠️  OpenAI provider not available")
         return
@@ -184,7 +184,7 @@ def capability_message_example():
     print("Capability Message Example")
     print("=" * 60)
     
-    from nimbus.messages import CapabilityMessage
+    from nimbus.base.messages import CapabilityMessage
     
     # Assistant calls a capability
     assistant_msg = AssistantMessage(
@@ -227,7 +227,7 @@ def anthropic_example():
         return
     
     try:
-        provider = nimbus.provider("anthropic", api_key=api_key)
+        provider = create_provider("anthropic", api_key=api_key)
     except ImportError:
         print("⚠️  Anthropic provider not available")
         return
@@ -261,7 +261,7 @@ def bedrock_example():
         return
     
     try:
-        provider = nimbus.provider("bedrock", region="us-east-1")
+        provider = create_provider("bedrock", region="us-east-1")
     except ImportError:
         print("⚠️  Bedrock provider not available")
         return

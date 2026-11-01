@@ -11,8 +11,8 @@ Features shown:
 """
 
 import os
-from nimbus.messages import UserMessage
-from nimbus.routes import ModelRouter, ModelTarget, RouteConfig, RoutingStrategy
+from nimbus.base.messages import UserMessage
+from nimbus.router import ModelRouter, ModelTarget, RouteConfig, RoutingStrategy
 
 
 def basic_router_example():

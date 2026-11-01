@@ -5,12 +5,12 @@ This version demonstrates:
 - Streaming responses
 - System messages (Anthropic-specific)
 - Multi-turn conversations
-- Simple client creation: nimbus.provider("anthropic")
+- Simple client creation: create_provider("anthropic")
 """
 
 import os
-import nimbus
-from nimbus.messages import UserMessage, SystemMessage
+from nimbus.models.registry import provider as create_provider
+from nimbus.base.messages import UserMessage, SystemMessage
 
 
 def basic_completion():
@@ -26,7 +26,7 @@ def basic_completion():
         return
     
     try:
-        client = nimbus.provider("anthropic", api_key=api_key)
+        client = create_provider("anthropic", api_key=api_key)
     except ImportError as e:
         print(f"⚠️  Error: {e}")
         print("\nTo use Anthropic, install with: pip install nimbus[anthropic]")
@@ -63,7 +63,7 @@ def streaming_example():
         return
     
     try:
-        client = nimbus.provider("anthropic", api_key=api_key)
+        client = create_provider("anthropic", api_key=api_key)
     except ImportError:
         print("⚠️  Anthropic provider not available")
         return
@@ -91,7 +91,7 @@ def claude_models():
         return
     
     try:
-        client = nimbus.provider("anthropic", api_key=api_key)
+        client = create_provider("anthropic", api_key=api_key)
     except ImportError:
         print("⚠️  Anthropic provider not available")
         return
@@ -129,10 +129,10 @@ The system message is sent separately from the conversation messages.
 Example:
 
 ```python
-import nimbus
-from nimbus.messages import SystemMessage, UserMessage
+from nimbus.models.registry import provider as create_provider
+from nimbus.base.messages import SystemMessage, UserMessage
 
-client = nimbus.provider("anthropic", api_key="sk-ant-...")
+client = create_provider("anthropic", api_key="sk-ant-...")
 
 messages = [
     SystemMessage("You are a Python expert."),
@@ -158,7 +158,7 @@ def multi_turn_conversation():
         return
     
     try:
-        client = nimbus.provider("anthropic", api_key=api_key)
+        client = create_provider("anthropic", api_key=api_key)
     except ImportError:
         print("⚠️  Anthropic provider not available")
         return

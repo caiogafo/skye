@@ -25,10 +25,10 @@ Example:
     'Hello Alice!'
 """
 
-from nimbus.interfaces.prompt import PromptBuilderInterface
+from nimbus.base.interfaces.prompt import PromptBuilderInterface
 
 # Import base implementation
-from .base import BasePromptBuilder
+from .messages import BasePromptBuilder
 
 # Alias for backward compatibility and examples
 MockPromptBuilder = BasePromptBuilder

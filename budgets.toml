@@ -27,7 +27,7 @@ allowed_dependencies = ["jinja2", "pydantic", "pyyaml", "tenacity"]
 # Compiled (non pure-Python) distributions in the core install. Target: none.
 # The test fails if the set changes, in either direction.
 known_compiled = ["markupsafe", "pydantic-core", "pyyaml"]
-known_import_failures = ["nimbus.capabilities"]   # imports httpx, declared only in extra "tools"
+known_import_failures = []
 
 # Third-party libraries imported at module level in src/nimbus, with the number of
 # files that import them. Standard library and Lambda libraries are always allowed.
@@ -38,8 +38,6 @@ pydantic = 10
 yaml = 1
 jinja2 = 1
 tenacity = 1
-httpx = 1
-requests = 1
 
 [load]
 # `import nimbus` in a fresh interpreter. Module count, time and memory are measured
@@ -51,14 +49,13 @@ max_import_ms = 250                 # best of 5, now about 95 on a laptop (CI ru
 max_rss_delta_mb = 32               # now about 24
 # Importing nimbus must not import any provider SDK or optional dependency.
 # Known leaks: libraries that `import nimbus` still imports when they are installed.
-# nimbus/capabilities/remote_api.py imports httpx and requests at module level and
-# nimbus.providers.llm.anthropic_provider pulls it in. Fix it with LazyImporter and
-# remove the entries: the test fails if a listed library stops leaking.
-known_leaks = ["httpx", "requests"]
+# Empty: tools/remote_api.py now uses the stdlib transport (nimbus.base.http). The test
+# fails if a listed library stops leaking, so only add an entry for a real, known leak.
+known_leaks = []
 forbidden_at_import = [
   "openai", "anthropic", "boto3", "botocore", "google", "azure", "cohere",
   "redis", "psycopg2", "httpx", "requests", "tiktoken",
-  "opentelemetry", "prometheus_client", "numpy",
+  "opentelemetry", "prometheus_client", "numpy", "asyncpg", "fastmcp",
 ]
 
 [lambda]
@@ -76,14 +73,12 @@ max_compiled_over_core = 0
 max_over_core_mb = 1
 target_over_core_mb = 1
 
-[extras.observe]
-max_compiled_over_core = 0
-max_over_core_mb = 1
-target_over_core_mb = 1
-
-[extras.tools]
-max_compiled_over_core = 1
-max_over_core_mb = 4
+# The MCP client is its own extra because fastmcp is heavy: +43.4 MB, 7 compiled (caio, cffi,
+# cryptography, jsonref, rpds-py, watchfiles, websockets). Accepted for now by the owner
+# (2026-11-01); the plan is an MCP transport on the stdlib that brings this back to zero.
+[extras.mcp]
+max_compiled_over_core = 7
+max_over_core_mb = 48
 target_over_core_mb = 2
 
 [extras.anthropic]
@@ -95,11 +90,6 @@ target_over_core_mb = 3
 max_compiled_over_core = 1
 max_over_core_mb = 13
 target_over_core_mb = 4
-
-[extras.azure]
-max_compiled_over_core = 3
-max_over_core_mb = 18
-target_over_core_mb = 3
 
 [extras.openai]
 max_compiled_over_core = 4
@@ -120,6 +110,6 @@ target_over_core_mb = 10
 # from pyproject.toml and from this list. The test fails if an extra is empty and
 # not listed here, and if a listed extra stops being empty.
 [extras_policy]
-known_empty = ["agents", "guard", "prompts"]   # "prompts" only repeats jinja2, already a core dependency
+known_empty = ["agents", "guard", "observe", "prompts", "tools"]   # "prompts" only repeats jinja2, already a core dependency; "observe" has no telemetry import yet
 # Convenience bundles. They are not budgeted one by one: each member extra is.
 bundles = ["llm-providers", "embedding-providers", "all-providers", "providers", "all"]

@@ -6,11 +6,11 @@ This version demonstrates:
 - Streaming responses
 - AWS region/profile configuration
 - Lambda-friendly design
-- Boto3-like provider creation: nimbus.provider("bedrock")
+- Boto3-like provider creation: create_provider("bedrock")
 """
 
-import nimbus
-from nimbus.messages import UserMessage, SystemMessage
+from nimbus.models.registry import provider as create_provider
+from nimbus.base.messages import UserMessage, SystemMessage
 
 
 def basic_completion():
@@ -20,7 +20,7 @@ def basic_completion():
     print("=" * 60)
     
     try:
-        client = nimbus.provider(
+        client = create_provider(
             "bedrock",
             region="us-east-1",
             model="anthropic.claude-3-sonnet-20240229-v1:0"
@@ -50,7 +50,7 @@ def multiple_models():
     print("AWS Bedrock - Multiple Models")
     print("=" * 60)
     
-    client = nimbus.provider("bedrock", region="us-west-2")
+    client = create_provider("bedrock", region="us-west-2")
     
     models = [
         "anthropic.claude-3-sonnet-20240229-v1:0",
@@ -77,7 +77,7 @@ def streaming_example():
     print("AWS Bedrock - Streaming")
     print("=" * 60)
     
-    client = nimbus.provider("bedrock", region="us-east-1")
+    client = create_provider("bedrock", region="us-east-1")
     
     messages = [UserMessage("Write a short story about a robot learning to paint.")]
     
@@ -101,11 +101,11 @@ def lambda_deployment_example():
     print("\nExample AWS Lambda handler using Nimbus:")
     print("-" * 40)
     print("""
-import nimbus
-from nimbus.messages import UserMessage
+from nimbus.models.registry import provider as create_provider
+from nimbus.base.messages import UserMessage
 
 # Initialize client once (reused across invocations)
-client = nimbus.provider("bedrock", region="us-east-1")
+client = create_provider("bedrock", region="us-east-1")
 
 def lambda_handler(event, context):
     '''Handle Lambda invocation.'''
@@ -154,10 +154,10 @@ def aws_profile_example():
     print("\nMethod 1: Using AWS Profile in Code")
     print("-" * 40)
     print("""
-import nimbus
+from nimbus.models.registry import provider as create_provider
 
 # Use specific AWS profile
-client = nimbus.provider(
+client = create_provider(
     "bedrock",
     region="us-east-1",
     profile_name="my-profile"
@@ -177,9 +177,9 @@ export AWS_PROFILE=my-profile
 export AWS_REGION=us-east-1
 
 # Then in Python
-import nimbus
+from nimbus.models.registry import provider as create_provider
 
-client = nimbus.provider("bedrock", region="us-east-1")
+client = create_provider("bedrock", region="us-east-1")
 """)
     
     print("\nMethod 3: Using AWS Credentials")
@@ -191,9 +191,9 @@ export AWS_SECRET_ACCESS_KEY=your-secret-key
 export AWS_REGION=us-east-1
 
 # Then in Python
-import nimbus
+from nimbus.models.registry import provider as create_provider
 
-client = nimbus.provider("bedrock", region="us-east-1")
+client = create_provider("bedrock", region="us-east-1")
 """)
     
     print("\nProfile Configuration (~/.aws/config):")
@@ -216,8 +216,8 @@ def router_example():
     print("=" * 60)
     
     try:
-        from nimbus import ModelRouter, ModelTarget, RouteConfig
-        from nimbus.interfaces.router import RoutingStrategy
+        from nimbus.router import ModelRouter, ModelTarget, RouteConfig
+        from nimbus.base.interfaces.router import RoutingStrategy
         
         # Define multi-region setup with ModelRouter
         router = ModelRouter(

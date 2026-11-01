@@ -5,8 +5,8 @@ Tests cost calculation functionality for various models and scenarios.
 
 import pytest
 
-from nimbus.completion import TokenUsage
-from nimbus.providers.cost_calculator import CostCalculator
+from nimbus.base.completion import TokenUsage
+from nimbus.models.transport.cost import CostCalculator
 
 
 class TestCostCalculator:

@@ -4,12 +4,12 @@ This version demonstrates:
 - Basic completion with Vertex AI (Gemini models)
 - Streaming responses
 - GCP project and location configuration
-- Simple client creation: nimbus.provider("vertex")
+- Simple client creation: create_provider("vertex")
 """
 
 import os
-import nimbus
-from nimbus.messages import UserMessage, SystemMessage
+from nimbus.models.registry import provider as create_provider
+from nimbus.base.messages import UserMessage, SystemMessage
 
 
 def basic_completion():
@@ -27,7 +27,7 @@ def basic_completion():
         return
     
     try:
-        client = nimbus.provider(
+        client = create_provider(
             "vertex",
             project_id=project_id,
             location=location
@@ -69,7 +69,7 @@ def streaming_example():
         print("⚠️  GCP_PROJECT_ID environment variable not set")
         return
     
-    client = nimbus.provider(
+    client = create_provider(
         "vertex",
         project_id=project_id,
         location=location
@@ -99,7 +99,7 @@ def multiple_models():
         print("⚠️  GCP_PROJECT_ID environment variable not set")
         return
     
-    client = nimbus.provider(
+    client = create_provider(
         "vertex",
         project_id=project_id,
         location=location
@@ -134,14 +134,14 @@ def cloud_run_example():
 Example Cloud Run service using Nimbus with Vertex AI:
 
 ```python
-import nimbus
-from nimbus.messages import UserMessage
+from nimbus.models.registry import provider as create_provider
+from nimbus.base.messages import UserMessage
 from flask import Flask, request, jsonify
 
 app = Flask(__name__)
 
 # Initialize client (uses Application Default Credentials)
-client = nimbus.provider(
+client = create_provider(
     "vertex",
     project_id="your-project-id",
     location="us-central1"
@@ -184,17 +184,17 @@ def configuration_example():
 Vertex AI configuration options:
 
 ```python
-import nimbus
+from nimbus.models.registry import provider as create_provider
 
 # Basic configuration
-client = nimbus.provider(
+client = create_provider(
     "vertex",
     project_id="your-project-id",
     location="us-central1"  # or "europe-west1", "asia-northeast1", etc.
 )
 
 # With custom credentials
-client = nimbus.provider(
+client = create_provider(
     "vertex",
     project_id="your-project-id",
     location="us-central1",

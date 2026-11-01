@@ -118,10 +118,10 @@ python examples/advanced/streaming.py
 ### Basic Completion
 
 ```python
-import nimbus
-from nimbus.messages import UserMessage
+from nimbus.models.registry import provider as create_provider
+from nimbus.base.messages import UserMessage
 
-client = nimbus.provider("openai", api_key="sk-...")
+client = create_provider("openai", api_key="sk-...")
 
 response = client.complete(
     messages=[UserMessage(content="Hello, world!")],
@@ -134,10 +134,10 @@ print(response.content)
 ### With Capabilities
 
 ```python
-import nimbus
-from nimbus.messages import UserMessage
+from nimbus.models.registry import provider as create_provider
+from nimbus.base.messages import UserMessage
 
-client = nimbus.provider("openai", api_key="sk-...")
+client = create_provider("openai", api_key="sk-...")
 
 capabilities = [
     {
@@ -166,7 +166,7 @@ response = client.complete(
 ### With Routing
 
 ```python
-from nimbus.routes import ModelRouter, ModelTarget, RouteConfig
+from nimbus.router import ModelRouter, ModelTarget, RouteConfig
 
 router = ModelRouter(
     routes=[
@@ -208,7 +208,7 @@ routes:
 ```
 
 ```python
-from nimbus.routes import ModelRouter
+from nimbus.router import ModelRouter
 
 router = ModelRouter.from_yaml("router_config.yaml")
 response = router.complete(

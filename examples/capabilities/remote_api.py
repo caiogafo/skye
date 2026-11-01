@@ -18,10 +18,10 @@ Note: Set environment variables for API keys:
 import os
 import json
 import asyncio
-import nimbus
-from nimbus.messages import UserMessage, CapabilityMessage
-from nimbus.capabilities import RemoteAPICapability
-from nimbus.capabilities.schema import CapabilitySchema
+from nimbus.models.registry import provider as create_provider
+from nimbus.base.messages import UserMessage, CapabilityMessage
+from nimbus.tools import RemoteAPICapability
+from nimbus.tools.schema import CapabilitySchema
 
 
 def basic_remote_api_example():
@@ -36,7 +36,7 @@ def basic_remote_api_example():
         return
     
     try:
-        provider = nimbus.provider("openai", api_key=api_key)
+        provider = create_provider("openai", api_key=api_key)
     except ImportError:
         print("⚠️  OpenAI provider not available")
         return
@@ -114,7 +114,7 @@ async def execute_remote_api_example():
         return
     
     try:
-        provider = nimbus.provider("openai", api_key=api_key)
+        provider = create_provider("openai", api_key=api_key)
     except ImportError:
         print("⚠️  OpenAI provider not available")
         return

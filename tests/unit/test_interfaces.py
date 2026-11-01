@@ -9,21 +9,21 @@ from typing import Any
 
 import pytest
 
-from nimbus.completion import CompletionRequest, CompletionResponse, StreamChunk, TokenUsage
-from nimbus.interfaces.capability import CapabilityInterface, CapabilitySchema
-from nimbus.interfaces.content_reader import ContentReaderInterface
-from nimbus.interfaces.event_handler import EventHandlerInterface
-from nimbus.interfaces.memory import MemoryInterface
-from nimbus.interfaces.model import ModelInterface
-from nimbus.interfaces.observer import EventType, ObserverInterface
-from nimbus.interfaces.plugin import PluginInterface
-from nimbus.interfaces.prompt import PromptBuilderInterface
-from nimbus.interfaces.router import ModelRouterInterface, RoutingStrategy
-from nimbus.interfaces.safety import SafetyFilterInterface, SafetyResult
-from nimbus.interfaces.storage import StorageAdapterInterface
-from nimbus.interfaces.vector_encoder import VectorEncoderInterface
+from nimbus.base.completion import CompletionRequest, CompletionResponse, StreamChunk, TokenUsage
+from nimbus.base.interfaces.capability import CapabilityInterface, CapabilitySchema
+from nimbus.base.interfaces.content_reader import ContentReaderInterface
+from nimbus.base.interfaces.event_handler import EventHandlerInterface
+from nimbus.base.interfaces.memory import MemoryInterface
+from nimbus.base.interfaces.model import ModelInterface
+from nimbus.base.interfaces.observer import EventType, ObserverInterface
+from nimbus.base.interfaces.plugin import PluginInterface
+from nimbus.base.interfaces.prompt import PromptBuilderInterface
+from nimbus.base.interfaces.router import ModelRouterInterface, RoutingStrategy
+from nimbus.base.interfaces.safety import SafetyFilterInterface, SafetyResult
+from nimbus.base.interfaces.storage import StorageAdapterInterface
+from nimbus.base.interfaces.vector_encoder import VectorEncoderInterface
 from nimbus.memory import MemoryEntry
-from nimbus.messages import ContentChunk, NimbusMessage, UserMessage
+from nimbus.base.messages import ContentChunk, NimbusMessage, UserMessage
 
 
 class TestModelInterface:

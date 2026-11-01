@@ -28,7 +28,7 @@ pytest tests/unit/config/
 pytest tests/unit/config/test_env_var_substitution.py
 
 # Run with coverage
-pytest tests/unit/config/ --cov=src/nimbus/config
+pytest tests/unit/config/ --cov=src/nimbus/base/config
 ```
 
 ## Testing Approach

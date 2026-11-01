@@ -15,10 +15,10 @@ from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 
-from nimbus.completion import CompletionRequest, CompletionResponse, StreamChunk, TokenUsage
-from nimbus.exceptions import ProviderError
-from nimbus.messages import AssistantMessage, SystemMessage, UserMessage
-from nimbus.providers.llm.anthropic_provider import AnthropicProvider
+from nimbus.base.completion import CompletionRequest, CompletionResponse, StreamChunk, TokenUsage
+from nimbus.base.exceptions import ProviderError
+from nimbus.base.messages import AssistantMessage, SystemMessage, UserMessage
+from nimbus.models.llm.anthropic import AnthropicProvider
 
 
 class TestAnthropicProviderInitialization:
@@ -29,7 +29,7 @@ class TestAnthropicProviderInitialization:
         provider = AnthropicProvider(model="claude-3-opus-20240229", api_key="sk-ant-test")
         assert provider.api_key == "sk-ant-test"
     
-    @patch("nimbus.providers.llm.anthropic_provider.LazyImporter.import_module")
+    @patch("nimbus.models.llm.anthropic.LazyImporter.import_module")
     def test_lazy_client_initialization(self, mock_import: Mock) -> None:
         """Test that client is lazily initialized."""
         mock_anthropic = MagicMock()
@@ -367,7 +367,7 @@ class TestAnthropicStreamTransformation:
 class TestAnthropicProviderCalls:
     """Test actual provider API calls."""
     
-    @patch("nimbus.providers.llm.anthropic_provider.LazyImporter.import_module")
+    @patch("nimbus.models.llm.anthropic.LazyImporter.import_module")
     def test_complete_success(self, mock_import: Mock) -> None:
         """Test successful completion call."""
         # Setup mocks
@@ -411,7 +411,7 @@ class TestAnthropicProviderCalls:
         assert result.provider == "anthropic"
         mock_client.messages.create.assert_called_once()
     
-    @patch("nimbus.providers.llm.anthropic_provider.LazyImporter.import_module")
+    @patch("nimbus.models.llm.anthropic.LazyImporter.import_module")
     def test_complete_error_handling(self, mock_import: Mock) -> None:
         """Test error handling in complete."""
         # Setup mocks
@@ -437,7 +437,7 @@ class TestAnthropicProviderCalls:
         assert "Provider call failed" in str(exc_info.value)
         assert exc_info.value.details["provider"] == "anthropic"
     
-    @patch("nimbus.providers.llm.anthropic_provider.LazyImporter.import_module")
+    @patch("nimbus.models.llm.anthropic.LazyImporter.import_module")
     def test_stream_success(self, mock_import: Mock) -> None:
         """Test successful streaming call."""
         # Setup mocks
@@ -495,7 +495,7 @@ class TestAnthropicAsyncSupport:
     """Test async completion support."""
     
     @pytest.mark.asyncio
-    @patch("nimbus.providers.llm.anthropic_provider.LazyImporter.import_module")
+    @patch("nimbus.models.llm.anthropic.LazyImporter.import_module")
     async def test_acomplete_success(self, mock_import: Mock) -> None:
         """Test successful async completion."""
         # Setup mocks
@@ -804,7 +804,7 @@ class TestAnthropicToolCalling:
         assert result["tools"][0]["name"] == "get_weather"
         assert result["tools"][1]["name"] == "get_time"
     
-    @patch("nimbus.providers.llm.anthropic_provider.LazyImporter.import_module")
+    @patch("nimbus.models.llm.anthropic.LazyImporter.import_module")
     def test_complete_with_capability_calls(self, mock_import: Mock) -> None:
         """Test end-to-end completion with capability calls."""
         # Setup mocks

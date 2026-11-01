@@ -11,9 +11,9 @@ Features shown:
 
 import os
 from pydantic import BaseModel, Field
-from nimbus.completion import CompletionRequest
-from nimbus.messages import UserMessage
-from nimbus.providers import ProviderRegistry
+from nimbus.base.completion import CompletionRequest
+from nimbus.base.messages import UserMessage
+from nimbus.models import ProviderRegistry
 
 
 def basic_structured_output():

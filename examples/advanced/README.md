@@ -87,7 +87,7 @@ python examples/advanced/custom_providers.py
 ### Multimodal Processing
 
 ```python
-from nimbus.messages import UserMessage
+from nimbus.base.messages import UserMessage
 
 message = UserMessage(
     content=[
@@ -150,7 +150,7 @@ asyncio.run(main())
 ## Error Handling
 
 ```python
-from nimbus.exceptions import NimbusError, RateLimitError
+from nimbus.base.exceptions import NimbusError, RateLimitError
 
 try:
     response = provider.complete(request)

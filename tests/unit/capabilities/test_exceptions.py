@@ -5,14 +5,14 @@ Tests exception creation, messages, and error context preservation.
 
 import pytest
 
-from nimbus.capabilities.exceptions import (
+from nimbus.tools.exceptions import (
     CapabilityError,
     CapabilityExecutionError,
     CapabilityNotFoundError,
     CapabilityValidationError,
     CapabilityCallParsingError,
 )
-from nimbus.exceptions import NimbusError
+from nimbus.base.exceptions import NimbusError
 
 
 class TestCapabilityError:

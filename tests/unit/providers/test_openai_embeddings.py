@@ -12,7 +12,7 @@ from unittest.mock import AsyncMock, MagicMock, Mock, patch
 
 import pytest
 
-from nimbus.providers.embeddings.openai_embeddings import OpenAIEmbeddingProvider
+from nimbus.models.embeddings.openai_embeddings import OpenAIEmbeddingProvider
 
 
 class TestOpenAIEmbeddingProviderInitialization:
@@ -38,7 +38,7 @@ class TestOpenAIEmbeddingProviderInitialization:
         assert provider.api_key == "sk-test"
         assert provider.config["organization"] == "org-123"
     
-    @patch("nimbus.providers.embeddings.openai_embeddings.LazyImporter.import_module")
+    @patch("nimbus.models.embeddings.openai_embeddings.LazyImporter.import_module")
     def test_lazy_client_initialization(self, mock_import: Mock) -> None:
         """Test that client is lazily initialized."""
         mock_openai = MagicMock()
@@ -63,7 +63,7 @@ class TestOpenAIEmbeddingProviderInitialization:
 class TestOpenAIEmbeddingProviderBatchEncoding:
     """Test batch encoding functionality."""
     
-    @patch("nimbus.providers.embeddings.openai_embeddings.LazyImporter.import_module")
+    @patch("nimbus.models.embeddings.openai_embeddings.LazyImporter.import_module")
     def test_encode_batch(self, mock_import: Mock) -> None:
         """Test batch encoding."""
         # Setup mock
@@ -101,7 +101,7 @@ class TestOpenAIEmbeddingProviderBatchEncoding:
             input=["text1", "text2"]
         )
     
-    @patch("nimbus.providers.embeddings.openai_embeddings.LazyImporter.import_module")
+    @patch("nimbus.models.embeddings.openai_embeddings.LazyImporter.import_module")
     def test_encode_single_text(self, mock_import: Mock) -> None:
         """Test encoding single text."""
         # Setup mock
@@ -139,7 +139,7 @@ class TestOpenAIEmbeddingProviderBatchEncoding:
 class TestOpenAIEmbeddingProviderAsyncEncoding:
     """Test async encoding functionality."""
     
-    @patch("nimbus.providers.embeddings.openai_embeddings.LazyImporter.import_module")
+    @patch("nimbus.models.embeddings.openai_embeddings.LazyImporter.import_module")
     @pytest.mark.asyncio
     async def test_aencode_batch(self, mock_import: Mock) -> None:
         """Test async batch encoding."""
@@ -178,7 +178,7 @@ class TestOpenAIEmbeddingProviderAsyncEncoding:
             input=["text1", "text2"]
         )
     
-    @patch("nimbus.providers.embeddings.openai_embeddings.LazyImporter.import_module")
+    @patch("nimbus.models.embeddings.openai_embeddings.LazyImporter.import_module")
     @pytest.mark.asyncio
     async def test_aencode_single_text(self, mock_import: Mock) -> None:
         """Test async encoding single text."""

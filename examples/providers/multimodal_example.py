@@ -12,9 +12,9 @@ Features shown:
 import os
 import base64
 from pathlib import Path
-from nimbus.completion import CompletionRequest
-from nimbus.messages import UserMessage
-from nimbus.providers import ProviderRegistry
+from nimbus.base.completion import CompletionRequest
+from nimbus.base.messages import UserMessage
+from nimbus.models import ProviderRegistry
 
 
 def image_from_url():
@@ -237,7 +237,7 @@ Different providers support different vision models:
 Example with Anthropic:
 
 ```python
-from nimbus.providers import ProviderRegistry
+from nimbus.models import ProviderRegistry
 
 provider = ProviderRegistry.get_model_provider(
     "anthropic",
@@ -282,9 +282,9 @@ Complete workflow for image analysis:
 
 ```python
 from pathlib import Path
-from nimbus.completion import CompletionRequest
-from nimbus.messages import UserMessage
-from nimbus.providers import ProviderRegistry
+from nimbus.base.completion import CompletionRequest
+from nimbus.base.messages import UserMessage
+from nimbus.models import ProviderRegistry
 
 # Initialize provider
 provider = ProviderRegistry.get_model_provider(

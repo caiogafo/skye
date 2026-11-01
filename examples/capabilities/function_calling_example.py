@@ -17,9 +17,9 @@ Note: Set environment variables for API keys:
 import os
 import json
 import asyncio
-import nimbus
-from nimbus.messages import UserMessage, CapabilityMessage
-from nimbus.capabilities.registry import CapabilityRegistry
+from nimbus.models.registry import provider as create_provider
+from nimbus.base.messages import UserMessage, CapabilityMessage
+from nimbus.tools.registry import CapabilityRegistry
 
 
 def basic_function_calling():
@@ -34,7 +34,7 @@ def basic_function_calling():
         return
     
     try:
-        provider = nimbus.provider("openai", api_key=api_key)
+        provider = create_provider("openai", api_key=api_key)
     except ImportError:
         print("⚠️  OpenAI provider not available")
         return
@@ -106,7 +106,7 @@ async def function_execution_workflow():
         return
     
     try:
-        provider = nimbus.provider("openai", api_key=api_key)
+        provider = create_provider("openai", api_key=api_key)
     except ImportError:
         print("⚠️  OpenAI provider not available")
         return
@@ -191,7 +191,7 @@ def multiple_functions():
         return
     
     try:
-        provider = nimbus.provider("openai", api_key=api_key)
+        provider = create_provider("openai", api_key=api_key)
     except ImportError:
         print("⚠️  OpenAI provider not available")
         return
@@ -280,7 +280,7 @@ def anthropic_tool_use():
         return
     
     try:
-        provider = nimbus.provider("anthropic", api_key=api_key)
+        provider = create_provider("anthropic", api_key=api_key)
     except ImportError:
         print("⚠️  Anthropic provider not available")
         return
@@ -342,9 +342,9 @@ Nimbus provides a unified interface across all providers.
 Example:
 
 ```python
-import nimbus
+from nimbus.models.registry import provider as create_provider
 
-provider = nimbus.provider(
+provider = create_provider(
     "bedrock",
     region="us-east-1"
 )

@@ -11,8 +11,8 @@ from pathlib import Path
 import pytest
 import yaml
 
-from nimbus.config import RouterConfig, load_router_config
-from nimbus.exceptions import ConfigurationError
+from nimbus.base.config import RouterConfig, load_router_config
+from nimbus.base.exceptions import ConfigurationError
 
 
 class TestRouterConfig:

@@ -5,9 +5,9 @@ from typing import Any
 
 import pytest
 
-from nimbus.capabilities.exceptions import CapabilityValidationError
-from nimbus.capabilities.local_function import LocalFunctionCapability
-from nimbus.capabilities.schema import CapabilitySchema
+from nimbus.tools.exceptions import CapabilityValidationError
+from nimbus.tools.local_function import LocalFunctionCapability
+from nimbus.tools.schema import CapabilitySchema
 
 
 class TestLocalFunctionCapabilityCreation:

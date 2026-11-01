@@ -4,13 +4,13 @@ import json
 
 import pytest
 
-from nimbus.capabilities.exceptions import CapabilityCallParsingError
-from nimbus.capabilities.interface import CapabilityInterface
-from nimbus.capabilities.registry import CapabilityRegistry
-from nimbus.capabilities.schema import CapabilitySchema
-from nimbus.capabilities.capability_call_handler import CapabilityCallHandler
-from nimbus.capabilities.capability_models import CapabilityCall, CapabilityResult
-from nimbus.completion import CompletionResponse, TokenUsage
+from nimbus.tools.exceptions import CapabilityCallParsingError
+from nimbus.tools.interface import CapabilityInterface
+from nimbus.tools.registry import CapabilityRegistry
+from nimbus.tools.schema import CapabilitySchema
+from nimbus.tools.capability_call_handler import CapabilityCallHandler
+from nimbus.tools.capability_models import CapabilityCall, CapabilityResult
+from nimbus.base.completion import CompletionResponse, TokenUsage
 
 
 class MockCapability(CapabilityInterface):

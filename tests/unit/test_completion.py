@@ -5,13 +5,13 @@ from datetime import datetime
 import pytest
 from pydantic import BaseModel, ValidationError
 
-from nimbus.completion import (
+from nimbus.base.completion import (
     CompletionRequest,
     CompletionResponse,
     StreamChunk,
     TokenUsage,
 )
-from nimbus.messages import UserMessage
+from nimbus.base.messages import UserMessage
 
 
 class TestTokenUsage:

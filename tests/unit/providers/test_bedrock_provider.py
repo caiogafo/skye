@@ -14,9 +14,9 @@ from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 
-from nimbus.completion import CompletionRequest, CompletionResponse, StreamChunk, TokenUsage
-from nimbus.messages import AssistantMessage, SystemMessage, UserMessage
-from nimbus.providers.llm.bedrock_provider import BedrockProvider
+from nimbus.base.completion import CompletionRequest, CompletionResponse, StreamChunk, TokenUsage
+from nimbus.base.messages import AssistantMessage, SystemMessage, UserMessage
+from nimbus.models.llm.bedrock import BedrockProvider
 
 
 class TestBedrockProviderInitialization:
@@ -38,7 +38,7 @@ class TestBedrockProviderInitialization:
         provider = BedrockProvider(region_name="us-east-1", profile_name="my-profile")
         assert provider.profile_name == "my-profile"
     
-    @patch("nimbus.providers.llm.bedrock_provider.LazyImporter.import_module")
+    @patch("nimbus.models.llm.bedrock.LazyImporter.import_module")
     def test_initialize_client_with_lazy_import(self, mock_import):
         """Test client initialization with lazy boto3 import."""
         # Setup mock boto3
@@ -424,7 +424,7 @@ class TestBedrockStreamTransformation:
 class TestBedrockProviderCalls:
     """Test provider API calls."""
     
-    @patch("nimbus.providers.llm.bedrock_provider.LazyImporter.import_module")
+    @patch("nimbus.models.llm.bedrock.LazyImporter.import_module")
     def test_call_provider(self, mock_import):
         """Test synchronous provider call."""
         # Setup mock client
@@ -450,7 +450,7 @@ class TestBedrockProviderCalls:
         mock_client.converse.assert_called_once_with(**request)
         assert response == mock_response
     
-    @patch("nimbus.providers.llm.bedrock_provider.LazyImporter.import_module")
+    @patch("nimbus.models.llm.bedrock.LazyImporter.import_module")
     def test_call_provider_stream(self, mock_import):
         """Test streaming provider call."""
         # Setup mock client
@@ -774,7 +774,7 @@ class TestBedrockToolCalling:
         assert result["toolConfig"]["tools"][0]["toolSpec"]["name"] == "get_weather"
         assert result["toolConfig"]["tools"][1]["toolSpec"]["name"] == "get_time"
     
-    @patch("nimbus.providers.llm.bedrock_provider.LazyImporter.import_module")
+    @patch("nimbus.models.llm.bedrock.LazyImporter.import_module")
     def test_complete_with_tool_calls(self, mock_import):
         """Test end-to-end completion with tool calls."""
         # Setup mocks
@@ -859,7 +859,7 @@ class TestBedrockToolCalling:
 class TestBedrockIntegration:
     """Integration tests for complete request/response flow."""
     
-    @patch("nimbus.providers.llm.bedrock_provider.LazyImporter.import_module")
+    @patch("nimbus.models.llm.bedrock.LazyImporter.import_module")
     def test_complete_request_flow(self, mock_import):
         """Test complete request flow from CompletionRequest to CompletionResponse."""
         # Setup mock client

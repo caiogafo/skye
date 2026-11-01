@@ -30,7 +30,7 @@ pytest tests/unit/routes/
 pytest tests/unit/routes/test_model_router.py
 
 # Run with coverage
-pytest tests/unit/routes/ --cov=src/nimbus/routes
+pytest tests/unit/routes/ --cov=src/nimbus/router
 ```
 
 ## Testing Approach

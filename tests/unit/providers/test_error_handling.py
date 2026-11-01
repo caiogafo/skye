@@ -14,8 +14,8 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from nimbus.exceptions import ProviderError
-from nimbus.providers.error_handler import ErrorHandler
+from nimbus.base.exceptions import ProviderError
+from nimbus.models.transport.error_mapping import ErrorHandler
 
 
 class TestOpenAIErrorHandling:

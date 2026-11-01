@@ -2,7 +2,7 @@
 
 import pytest
 from nimbus.prompts import BasePromptBuilder
-from nimbus.messages import UserMessage, SystemMessage, AssistantMessage
+from nimbus.base.messages import UserMessage, SystemMessage, AssistantMessage
 
 # Import test data from the proper location
 import sys

@@ -94,10 +94,10 @@ class CapabilityTransformer:
 
 Core library modules use only Nimbus-native models:
 
-- **src/nimbus/routes/** - Router and routing logic
-- **src/nimbus/capabilities/** - Capability system
-- **src/nimbus/completion.py** - Completion models
-- **src/nimbus/messages.py** - Message models
+- **src/nimbus/router/** - Router and routing logic
+- **src/nimbus/tools/** - Capability system
+- **src/nimbus/base/completion.py** - Completion models
+- **src/nimbus/base/messages.py** - Message models
 
 These modules MUST NOT contain provider-specific code.
 
@@ -194,7 +194,7 @@ class NewProvider(BaseModelProvider):
 
 ### CapabilityCallHandler
 
-The `CapabilityCallHandler` class in `src/nimbus/capabilities/capability_call_handler.py` currently contains provider-specific parsing and formatting methods:
+The `CapabilityCallHandler` class in `src/nimbus/tools/capability_call_handler.py` currently contains provider-specific parsing and formatting methods:
 
 - `_parse_openai_capability_calls()`
 - `_parse_anthropic_capability_calls()`
@@ -323,8 +323,8 @@ class MessageTransformer:
 
 ## References
 
-- [BaseModelProvider](../src/nimbus/providers/base.py) - Base provider class with transformation methods
-- [OpenAIProvider](../src/nimbus/providers/llm/openai_provider.py) - Example provider implementation
-- [BedrockProvider](../src/nimbus/providers/llm/bedrock_provider.py) - Example provider implementation
-- [MessageTransformer](../src/nimbus/providers/transformers.py) - Thin delegation layer
-- [CapabilityTransformer](../src/nimbus/capabilities/capability_transformer.py) - Thin delegation layer
+- [BaseModelProvider](../src/nimbus/models/base.py) - Base provider class with transformation methods
+- [OpenAIProvider](../src/nimbus/models/llm/openai_compatible.py) - Example provider implementation
+- [BedrockProvider](../src/nimbus/models/llm/bedrock.py) - Example provider implementation
+- [MessageTransformer](../src/nimbus/models/transformers.py) - Thin delegation layer
+- [CapabilityTransformer](../src/nimbus/tools/capability_transformer.py) - Thin delegation layer

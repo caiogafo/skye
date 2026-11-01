@@ -14,7 +14,7 @@ from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 
-from nimbus.providers.embeddings.vertex_multimodal_embeddings import (
+from nimbus.models.embeddings.vertex_multimodal_embeddings import (
     VertexMultimodalEmbeddingProvider,
 )
 
@@ -44,7 +44,7 @@ class TestVertexMultimodalEmbeddingProviderInitialization:
         assert provider.location == "us-west1"
         assert provider.config["credentials_path"] == "/path/to/creds.json"
     
-    @patch("nimbus.providers.embeddings.vertex_multimodal_embeddings.LazyImporter.import_module")
+    @patch("nimbus.models.embeddings.vertex_multimodal_embeddings.LazyImporter.import_module")
     def test_lazy_client_initialization(self, mock_import: Mock) -> None:
         """Test that client is lazily initialized."""
         mock_aiplatform = MagicMock()
@@ -129,7 +129,7 @@ class TestVertexMultimodalEmbeddingProviderImageDetection:
 class TestVertexMultimodalEmbeddingProviderTextEncoding:
     """Test text encoding functionality."""
     
-    @patch("nimbus.providers.embeddings.vertex_multimodal_embeddings.LazyImporter.import_module")
+    @patch("nimbus.models.embeddings.vertex_multimodal_embeddings.LazyImporter.import_module")
     def test_encode_text(self, mock_import: Mock) -> None:
         """Test text encoding."""
         # Setup mock
@@ -160,7 +160,7 @@ class TestVertexMultimodalEmbeddingProviderTextEncoding:
 class TestVertexMultimodalEmbeddingProviderBatchEncoding:
     """Test batch encoding functionality."""
     
-    @patch("nimbus.providers.embeddings.vertex_multimodal_embeddings.LazyImporter.import_module")
+    @patch("nimbus.models.embeddings.vertex_multimodal_embeddings.LazyImporter.import_module")
     def test_encode_batch_text_only(self, mock_import: Mock) -> None:
         """Test batch encoding with text only."""
         # Setup mock
@@ -193,8 +193,8 @@ class TestVertexMultimodalEmbeddingProviderBatchEncoding:
         assert result[0] == [0.1, 0.2, 0.3]
         assert result[1] == [0.4, 0.5, 0.6]
     
-    @patch("nimbus.providers.embeddings.vertex_multimodal_embeddings.ImageHandler.process_image")
-    @patch("nimbus.providers.embeddings.vertex_multimodal_embeddings.LazyImporter.import_module")
+    @patch("nimbus.models.embeddings.vertex_multimodal_embeddings.ImageHandler.process_image")
+    @patch("nimbus.models.embeddings.vertex_multimodal_embeddings.LazyImporter.import_module")
     def test_encode_batch_mixed_content(self, mock_import: Mock, mock_process_image: Mock) -> None:
         """Test batch encoding with mixed text and images."""
         # Setup mock
@@ -233,7 +233,7 @@ class TestVertexMultimodalEmbeddingProviderBatchEncoding:
         assert result[0] == [0.1, 0.2, 0.3]
         assert result[1] == [0.4, 0.5, 0.6]
     
-    @patch("nimbus.providers.embeddings.vertex_multimodal_embeddings.LazyImporter.import_module")
+    @patch("nimbus.models.embeddings.vertex_multimodal_embeddings.LazyImporter.import_module")
     def test_encode_single_text(self, mock_import: Mock) -> None:
         """Test encoding single text."""
         # Setup mock

@@ -3,7 +3,7 @@
 import pytest
 from pydantic import ValidationError
 
-from nimbus.config import (
+from nimbus.base.config import (
     CooldownConfig,
     ModelConfig,
     NimbusConfig,

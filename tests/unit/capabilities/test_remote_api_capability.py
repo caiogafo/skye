@@ -3,13 +3,12 @@
 import asyncio
 from typing import Any
 
-import httpx
 import pytest
-import responses
 
-from nimbus.capabilities.exceptions import CapabilityValidationError
-from nimbus.capabilities.remote_api import RemoteAPICapability
-from nimbus.capabilities.schema import CapabilitySchema
+from nimbus.tools.exceptions import CapabilityValidationError
+from nimbus.tools.remote_api import RemoteAPICapability
+from nimbus.tools.schema import CapabilitySchema
+from tests.unit.capabilities import _urllib_responses as responses
 
 
 class TestRemoteAPICapabilityCreation:
@@ -467,7 +466,7 @@ class TestRemoteAPICapabilityExecution:
             method="GET",
         )
 
-        with pytest.raises(Exception):  # requests.HTTPError
+        with pytest.raises(Exception):  # ProviderError (HTTP 404)
             capability.execute()
 
     @responses.activate
@@ -496,11 +495,6 @@ class TestRemoteAPICapabilityAsyncExecution:
     @pytest.mark.asyncio
     async def test_aexecute_get_request(self) -> None:
         """Test async execution of a GET request."""
-        async with httpx.AsyncClient() as client:
-            # We'll use a real endpoint for this test
-            # In production, you'd mock this
-            pass
-
         # For testing, we'll create a mock response
         capability = RemoteAPICapability(
             name="test_api",
@@ -509,7 +503,7 @@ class TestRemoteAPICapabilityAsyncExecution:
             method="GET",
         )
 
-        # This test would require mocking httpx, which is complex
+        # Executing would need a mocked transport
         # We'll skip the actual execution test and focus on structure
         assert capability.method == "GET"
 
@@ -677,3 +671,16 @@ class TestRemoteAPICapabilityIntegration:
 
         result = capability.execute(id=123, name="updated")
         assert result["result"] == "success"
+
+
+class TestRemoteAPICapabilityAsyncTransport:
+    """aexecute goes through the same stdlib transport (in a worker thread)."""
+
+    @responses.activate
+    def test_aexecute_uses_stdlib_transport(self) -> None:
+        responses.add(responses.GET, "https://api.example.com/a", json={"ok": True}, status=200)
+        capability = RemoteAPICapability(
+            name="a", description="A", url="https://api.example.com/a", method="GET"
+        )
+        assert asyncio.run(capability.aexecute(q="x")) == {"ok": True}
+        assert "q=x" in responses.calls[0].request.url

@@ -5,8 +5,8 @@ Tests token counting functionality for various models and scenarios.
 
 import pytest
 
-from nimbus.messages import AssistantMessage, SystemMessage, UserMessage
-from nimbus.providers.token_counter import TokenCounter
+from nimbus.base.messages import AssistantMessage, SystemMessage, UserMessage
+from nimbus.models.transport.token_counter import TokenCounter
 
 
 class TestTokenCounter:

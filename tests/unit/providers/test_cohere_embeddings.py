@@ -11,7 +11,7 @@ from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 
-from nimbus.providers.embeddings.cohere_embeddings import CohereEmbeddingProvider
+from nimbus.models.embeddings.cohere_embeddings import CohereEmbeddingProvider
 
 
 class TestCohereEmbeddingProviderInitialization:
@@ -37,7 +37,7 @@ class TestCohereEmbeddingProviderInitialization:
         assert provider.api_key == "cohere-key"
         assert provider.config["timeout"] == 30
     
-    @patch("nimbus.providers.embeddings.cohere_embeddings.LazyImporter.import_module")
+    @patch("nimbus.models.embeddings.cohere_embeddings.LazyImporter.import_module")
     def test_lazy_client_initialization(self, mock_import: Mock) -> None:
         """Test that client is lazily initialized."""
         mock_cohere = MagicMock()
@@ -62,7 +62,7 @@ class TestCohereEmbeddingProviderInitialization:
 class TestCohereEmbeddingProviderBatchEncoding:
     """Test batch encoding functionality."""
     
-    @patch("nimbus.providers.embeddings.cohere_embeddings.LazyImporter.import_module")
+    @patch("nimbus.models.embeddings.cohere_embeddings.LazyImporter.import_module")
     def test_encode_batch(self, mock_import: Mock) -> None:
         """Test batch encoding."""
         # Setup mock
@@ -99,7 +99,7 @@ class TestCohereEmbeddingProviderBatchEncoding:
             input_type="search_document"
         )
     
-    @patch("nimbus.providers.embeddings.cohere_embeddings.LazyImporter.import_module")
+    @patch("nimbus.models.embeddings.cohere_embeddings.LazyImporter.import_module")
     def test_encode_single_text(self, mock_import: Mock) -> None:
         """Test encoding single text."""
         # Setup mock

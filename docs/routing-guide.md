@@ -22,20 +22,20 @@ Nimbus provides a unified, comprehensive routing solution with health tracking, 
 
 ```python
 import os
-import nimbus
-from nimbus import (
+from nimbus.models.registry import provider as create_provider
+from nimbus.router import (
     ModelRouter,
     FallbackConfig,
     RetryPolicyConfig,
     AllowedFailsPolicyConfig,
 )
-from nimbus.interfaces.router import RoutingStrategy
-from nimbus.messages import UserMessage
-from nimbus.completion import CompletionRequest
+from nimbus.base.interfaces.router import RoutingStrategy
+from nimbus.base.messages import UserMessage
+from nimbus.base.completion import CompletionRequest
 
 # Create provider instances
-gpt4 = nimbus.provider("openai", api_key=os.getenv("OPENAI_API_KEY"))
-gpt35 = nimbus.provider("openai", api_key=os.getenv("OPENAI_API_KEY"))
+gpt4 = create_provider("openai", api_key=os.getenv("OPENAI_API_KEY"))
+gpt35 = create_provider("openai", api_key=os.getenv("OPENAI_API_KEY"))
 
 # Create router with all configurations in constructor
 router = ModelRouter(
@@ -85,16 +85,16 @@ print(f"Response: {response.content}")
 
 ```python
 import os
-from nimbus import (
+from nimbus.router import (
     ModelRouter,
     ModelTarget,
     RouteConfig,
     FallbackConfig,
     RetryPolicyConfig,
 )
-from nimbus.interfaces.router import RoutingStrategy
-from nimbus.messages import UserMessage
-from nimbus.completion import CompletionRequest
+from nimbus.base.interfaces.router import RoutingStrategy
+from nimbus.base.messages import UserMessage
+from nimbus.base.completion import CompletionRequest
 
 # Create router with aliases - providers instantiated automatically
 # All policies configured in constructor
@@ -167,7 +167,7 @@ All configurations use Pydantic models for type safety:
 
 ```python
 import os
-from nimbus import ModelTarget
+from nimbus.router import ModelTarget
 
 # OpenAI target
 openai_target = ModelTarget(
@@ -208,8 +208,8 @@ anthropic_target = ModelTarget(
 ### RouteConfig
 
 ```python
-from nimbus import RouteConfig, ModelTarget
-from nimbus.interfaces.router import RoutingStrategy
+from nimbus.router import RouteConfig, ModelTarget
+from nimbus.base.interfaces.router import RoutingStrategy
 
 route = RouteConfig(
     alias="gpt-4",
@@ -222,7 +222,7 @@ route = RouteConfig(
 ### FallbackConfig
 
 ```python
-from nimbus import FallbackConfig
+from nimbus.router import FallbackConfig
 
 fallback = FallbackConfig(
     primary="gpt-4",
@@ -235,7 +235,7 @@ router.set_fallbacks([fallback])
 ### RetryPolicyConfig
 
 ```python
-from nimbus import RetryPolicyConfig
+from nimbus.router import RetryPolicyConfig
 
 policies = [
     RetryPolicyConfig(error_type="RateLimitError", max_retries=3),
@@ -250,7 +250,7 @@ router.set_retry_policy(policies)
 ### AllowedFailsPolicyConfig
 
 ```python
-from nimbus import AllowedFailsPolicyConfig
+from nimbus.router import AllowedFailsPolicyConfig
 
 policies = [
     AllowedFailsPolicyConfig(
@@ -314,7 +314,7 @@ for info in cooled_down:
 ## Routing Strategies
 
 ```python
-from nimbus.interfaces.router import RoutingStrategy
+from nimbus.base.interfaces.router import RoutingStrategy
 
 # Available strategies:
 RoutingStrategy.ROUND_ROBIN        # Rotate through models

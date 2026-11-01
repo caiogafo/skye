@@ -5,11 +5,11 @@ This directory contains examples demonstrating the simplified boto3-style API fo
 ## Quick Start
 
 ```python
-import nimbus
-from nimbus.messages import UserMessage, SystemMessage
+from nimbus.models.registry import provider as create_provider
+from nimbus.base.messages import UserMessage, SystemMessage
 
 # Create a client
-client = nimbus.provider("openai", api_key="sk-...")
+client = create_provider("openai", api_key="sk-...")
 
 # Simple completion
 response = client.complete(
@@ -26,7 +26,7 @@ print(response.usage.total_tokens)
 ### OpenAI
 
 ```python
-client = nimbus.provider("openai", api_key="sk-...")
+client = create_provider("openai", api_key="sk-...")
 response = client.complete(
     messages=[UserMessage("Hello")],
     model="gpt-4",
@@ -39,7 +39,7 @@ response = client.complete(
 ### AWS Bedrock
 
 ```python
-client = nimbus.provider("bedrock", region="us-east-1")
+client = create_provider("bedrock", region="us-east-1")
 response = client.complete(
     messages=[UserMessage("Hello")],
     model="anthropic.claude-3-sonnet-20240229-v1:0"
@@ -51,7 +51,7 @@ response = client.complete(
 ### Anthropic
 
 ```python
-client = nimbus.provider("anthropic", api_key="sk-ant-...")
+client = create_provider("anthropic", api_key="sk-ant-...")
 response = client.complete(
     messages=[UserMessage("Hello")],
     model="claude-3-sonnet-20240229"
@@ -63,7 +63,7 @@ response = client.complete(
 ### Azure OpenAI
 
 ```python
-client = nimbus.provider(
+client = create_provider(
     "azure",
     api_key="...",
     azure_endpoint="https://your-resource.openai.azure.com",
@@ -80,7 +80,7 @@ response = client.complete(
 ### Google Vertex AI
 
 ```python
-client = nimbus.provider(
+client = create_provider(
     "vertex",
     project_id="your-project-id",
     location="us-central1"
@@ -98,7 +98,7 @@ response = client.complete(
 ### Creating a Client
 
 ```python
-client = nimbus.provider(name, **config)
+client = create_provider(name, **config)
 ```
 
 - `name`: Provider name ("openai", "bedrock", "anthropic", "azure", "vertex")
@@ -146,7 +146,7 @@ response = await client.acomplete(
 ## Message Types
 
 ```python
-from nimbus.messages import UserMessage, SystemMessage, AssistantMessage
+from nimbus.base.messages import UserMessage, SystemMessage, AssistantMessage
 
 messages = [
     SystemMessage("You are a helpful assistant."),

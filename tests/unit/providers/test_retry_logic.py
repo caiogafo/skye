@@ -13,11 +13,11 @@ from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 
-from nimbus.completion import CompletionRequest, CompletionResponse, TokenUsage
-from nimbus.exceptions import ProviderError
-from nimbus.messages import UserMessage
-from nimbus.providers.base import BaseModelProvider
-from nimbus.providers.retry import with_retry
+from nimbus.base.completion import CompletionRequest, CompletionResponse, TokenUsage
+from nimbus.base.exceptions import ProviderError
+from nimbus.base.messages import UserMessage
+from nimbus.models.base import BaseModelProvider
+from nimbus.models.transport.retry import with_retry
 
 
 class MockProvider(BaseModelProvider):

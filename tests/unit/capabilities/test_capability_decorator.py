@@ -2,11 +2,11 @@
 
 import pytest
 
-from nimbus.capabilities.decorator import capability
-from nimbus.capabilities.exceptions import CapabilityValidationError
-from nimbus.capabilities.interface import CapabilityInterface
-from nimbus.capabilities.local_function import LocalFunctionCapability
-from nimbus.capabilities.schema import CapabilitySchema
+from nimbus.tools.decorator import capability
+from nimbus.tools.exceptions import CapabilityValidationError
+from nimbus.tools.interface import CapabilityInterface
+from nimbus.tools.local_function import LocalFunctionCapability
+from nimbus.tools.schema import CapabilitySchema
 
 
 class TestCapabilityDecorator:

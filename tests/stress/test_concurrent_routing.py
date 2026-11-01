@@ -20,12 +20,12 @@ from unittest.mock import Mock, patch
 
 import pytest
 
-from nimbus.completion import CompletionRequest, CompletionResponse, TokenUsage
-from nimbus.exceptions import ProviderError
-from nimbus.interfaces.model import ModelInterface
-from nimbus.interfaces.router import RoutingStrategy
-from nimbus.messages import AssistantMessage, UserMessage
-from nimbus.routes.model_router import ModelRouter, ModelTarget, RouteConfig
+from nimbus.base.completion import CompletionRequest, CompletionResponse, TokenUsage
+from nimbus.base.exceptions import ProviderError
+from nimbus.base.interfaces.model import ModelInterface
+from nimbus.base.interfaces.router import RoutingStrategy
+from nimbus.base.messages import AssistantMessage, UserMessage
+from nimbus.router.model_router import ModelRouter, ModelTarget, RouteConfig
 
 
 class MockModel(ModelInterface):
@@ -91,7 +91,7 @@ class MockModel(ModelInterface):
 
     def stream(self, request: CompletionRequest):
         """Stream completion (not implemented for mock)."""
-        from nimbus.completion import StreamChunk
+        from nimbus.base.completion import StreamChunk
 
         yield StreamChunk(delta="Test", model=self.model_id)
 
@@ -103,7 +103,7 @@ class MockModel(ModelInterface):
 
     async def astream(self, request: CompletionRequest):
         """Async stream completion (not implemented for mock)."""
-        from nimbus.completion import StreamChunk
+        from nimbus.base.completion import StreamChunk
 
         yield StreamChunk(delta="Test", model=self.model_id)
 

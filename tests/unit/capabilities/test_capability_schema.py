@@ -3,7 +3,7 @@
 import pytest
 from pydantic import ValidationError
 
-from nimbus.capabilities.schema import CapabilitySchema
+from nimbus.tools.schema import CapabilitySchema
 
 
 class TestCapabilitySchemaCreation:

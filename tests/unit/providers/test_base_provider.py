@@ -4,10 +4,10 @@ import pytest
 from typing import Any, Iterator
 from datetime import datetime, timezone
 
-from nimbus.providers.base import BaseModelProvider
-from nimbus.completion import CompletionRequest, CompletionResponse, StreamChunk, TokenUsage
-from nimbus.messages import UserMessage
-from nimbus.exceptions import ProviderError
+from nimbus.models.base import BaseModelProvider
+from nimbus.base.completion import CompletionRequest, CompletionResponse, StreamChunk, TokenUsage
+from nimbus.base.messages import UserMessage
+from nimbus.base.exceptions import ProviderError
 
 
 class MockProvider(BaseModelProvider):

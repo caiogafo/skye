@@ -6,11 +6,11 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from nimbus.capabilities.exceptions import (
+from nimbus.tools.exceptions import (
     CapabilityExecutionError,
     CapabilityValidationError,
 )
-from nimbus.capabilities.schema import CapabilitySchema
+from nimbus.tools.schema import CapabilitySchema
 
 
 # Mock fastmcp module globally for all tests
@@ -64,7 +64,7 @@ class TestMCPCapability:
 
     def test_import_without_fastmcp(self, sample_mcp_tool):
         """Test that importing MCPCapability without FastMCP raises helpful error."""
-        from nimbus.capabilities.mcp_capability import MCPCapability
+        from nimbus.tools.mcp_capability import MCPCapability
 
         # Temporarily remove fastmcp from sys.modules to simulate it not being installed
         fastmcp_backup = sys.modules.get("fastmcp")
@@ -87,7 +87,7 @@ class TestMCPCapability:
 
     def test_initialization_with_valid_tool(self, sample_mcp_tool):
         """Test MCPCapability initialization with valid tool definition."""
-        from nimbus.capabilities.mcp_capability import MCPCapability
+        from nimbus.tools.mcp_capability import MCPCapability
 
         capability = MCPCapability(sample_mcp_tool, server_name="weather_server")
 
@@ -97,7 +97,7 @@ class TestMCPCapability:
 
     def test_initialization_without_name(self):
         """Test that initialization fails without 'name' field."""
-        from nimbus.capabilities.mcp_capability import MCPCapability
+        from nimbus.tools.mcp_capability import MCPCapability
 
         invalid_tool = {"description": "Missing name"}
 
@@ -108,7 +108,7 @@ class TestMCPCapability:
 
     def test_initialization_without_description(self):
         """Test that initialization fails without 'description' field."""
-        from nimbus.capabilities.mcp_capability import MCPCapability
+        from nimbus.tools.mcp_capability import MCPCapability
 
         invalid_tool = {"name": "test_tool"}
 
@@ -119,7 +119,7 @@ class TestMCPCapability:
 
     def test_initialization_with_invalid_type(self):
         """Test that initialization fails with non-dict tool definition."""
-        from nimbus.capabilities.mcp_capability import MCPCapability
+        from nimbus.tools.mcp_capability import MCPCapability
 
         with pytest.raises(CapabilityValidationError) as exc_info:
             MCPCapability("not a dict")
@@ -128,7 +128,7 @@ class TestMCPCapability:
 
     def test_get_schema_basic(self, sample_mcp_tool):
         """Test schema conversion from MCP format."""
-        from nimbus.capabilities.mcp_capability import MCPCapability
+        from nimbus.tools.mcp_capability import MCPCapability
 
         capability = MCPCapability(sample_mcp_tool)
         schema = capability.get_schema()
@@ -141,7 +141,7 @@ class TestMCPCapability:
 
     def test_get_schema_with_caching(self, sample_mcp_tool):
         """Test that schema caching works correctly."""
-        from nimbus.capabilities.mcp_capability import MCPCapability
+        from nimbus.tools.mcp_capability import MCPCapability
 
         capability = MCPCapability(sample_mcp_tool, cache_schema=True)
 
@@ -155,7 +155,7 @@ class TestMCPCapability:
 
     def test_get_schema_without_caching(self, sample_mcp_tool):
         """Test schema conversion without caching."""
-        from nimbus.capabilities.mcp_capability import MCPCapability
+        from nimbus.tools.mcp_capability import MCPCapability
 
         capability = MCPCapability(sample_mcp_tool, cache_schema=False)
 
@@ -168,7 +168,7 @@ class TestMCPCapability:
 
     def test_get_schema_openapi_tool(self, openapi_mcp_tool):
         """Test schema conversion for OpenAPI-based MCP tool."""
-        from nimbus.capabilities.mcp_capability import MCPCapability
+        from nimbus.tools.mcp_capability import MCPCapability
 
         capability = MCPCapability(openapi_mcp_tool)
         schema = capability.get_schema()
@@ -181,7 +181,7 @@ class TestMCPCapability:
 
     def test_get_schema_without_input_schema(self):
         """Test schema conversion when inputSchema is missing."""
-        from nimbus.capabilities.mcp_capability import MCPCapability
+        from nimbus.tools.mcp_capability import MCPCapability
 
         tool_without_schema = {
             "name": "simple_tool",
@@ -197,7 +197,7 @@ class TestMCPCapability:
 
     def test_execute_raises_not_supported_error(self, sample_mcp_tool):
         """Test that execute() raises error indicating direct execution not supported."""
-        from nimbus.capabilities.mcp_capability import MCPCapability
+        from nimbus.tools.mcp_capability import MCPCapability
 
         capability = MCPCapability(sample_mcp_tool)
 
@@ -210,7 +210,7 @@ class TestMCPCapability:
     @pytest.mark.asyncio
     async def test_aexecute_raises_not_supported_error(self, sample_mcp_tool):
         """Test that aexecute() raises error indicating direct execution not supported."""
-        from nimbus.capabilities.mcp_capability import MCPCapability
+        from nimbus.tools.mcp_capability import MCPCapability
 
         capability = MCPCapability(sample_mcp_tool)
 
@@ -223,7 +223,7 @@ class TestMCPCapability:
     @pytest.mark.asyncio
     async def test_aexecute_without_fastmcp(self, sample_mcp_tool):
         """Test that aexecute() raises helpful error when FastMCP not available."""
-        from nimbus.capabilities.mcp_capability import MCPCapability
+        from nimbus.tools.mcp_capability import MCPCapability
 
         capability = MCPCapability(sample_mcp_tool)
 
@@ -236,7 +236,7 @@ class TestMCPCapability:
 
     def test_convert_mcp_to_schema_caching(self, sample_mcp_tool):
         """Test that _convert_mcp_to_schema uses LRU cache."""
-        from nimbus.capabilities.mcp_capability import MCPCapability
+        from nimbus.tools.mcp_capability import MCPCapability
 
         # Convert tool to JSON for caching
         tool_json = json.dumps(sample_mcp_tool, sort_keys=True)
@@ -252,7 +252,7 @@ class TestMCPCapability:
 
     def test_schema_conversion_with_complex_types(self):
         """Test schema conversion with complex parameter types."""
-        from nimbus.capabilities.mcp_capability import MCPCapability
+        from nimbus.tools.mcp_capability import MCPCapability
 
         complex_tool = {
             "name": "complex_tool",
@@ -286,7 +286,7 @@ class TestMCPCapability:
 
     def test_server_name_tracking(self, sample_mcp_tool):
         """Test that server name is properly tracked."""
-        from nimbus.capabilities.mcp_capability import MCPCapability
+        from nimbus.tools.mcp_capability import MCPCapability
 
         capability = MCPCapability(sample_mcp_tool, server_name="test_server")
 
@@ -294,7 +294,7 @@ class TestMCPCapability:
 
     def test_cache_schema_flag(self, sample_mcp_tool):
         """Test that cache_schema flag is respected."""
-        from nimbus.capabilities.mcp_capability import MCPCapability
+        from nimbus.tools.mcp_capability import MCPCapability
 
         # With caching enabled
         cap_with_cache = MCPCapability(sample_mcp_tool, cache_schema=True)

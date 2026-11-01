@@ -5,7 +5,7 @@ from unittest.mock import patch
 
 import pytest
 
-from nimbus.providers.lazy_import import LazyImporter
+from nimbus.models.lazy_import import LazyImporter
 
 
 class TestLazyImporter:

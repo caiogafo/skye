@@ -4,12 +4,12 @@ This version demonstrates:
 - Basic completion with Azure OpenAI
 - Streaming responses
 - Azure-specific configuration (endpoint, deployment)
-- Simple client creation: nimbus.provider("azure")
+- Simple client creation: create_provider("azure")
 """
 
 import os
-import nimbus
-from nimbus.messages import UserMessage, SystemMessage
+from nimbus.models.registry import provider as create_provider
+from nimbus.base.messages import UserMessage, SystemMessage
 
 
 def basic_completion():
@@ -29,7 +29,7 @@ def basic_completion():
         return
     
     try:
-        client = nimbus.provider(
+        client = create_provider(
             "azure",
             api_key=api_key,
             azure_endpoint=endpoint,
@@ -73,7 +73,7 @@ def streaming_example():
         print("⚠️  Azure OpenAI credentials not set")
         return
     
-    client = nimbus.provider(
+    client = create_provider(
         "azure",
         api_key=api_key,
         azure_endpoint=endpoint,
@@ -104,7 +104,7 @@ def multiple_deployments():
         print("⚠️  Azure OpenAI credentials not set")
         return
     
-    client = nimbus.provider(
+    client = create_provider(
         "azure",
         api_key=api_key,
         azure_endpoint=endpoint,
@@ -140,9 +140,9 @@ def configuration_example():
 Azure OpenAI requires specific configuration:
 
 ```python
-import nimbus
+from nimbus.models.registry import provider as create_provider
 
-client = nimbus.provider(
+client = create_provider(
     "azure",
     api_key="your-api-key",
     azure_endpoint="https://your-resource.openai.azure.com",

@@ -14,8 +14,8 @@ without hardcoding credentials or deployment details in your code.
 import os
 from pathlib import Path
 
-from nimbus.messages import UserMessage
-from nimbus.routes import ModelRouter
+from nimbus.base.messages import UserMessage
+from nimbus.router import ModelRouter
 
 
 def basic_yaml_config():

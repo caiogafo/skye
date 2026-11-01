@@ -10,10 +10,10 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from nimbus.completion import CompletionRequest, CompletionResponse, TokenUsage
-from nimbus.messages import UserMessage
-from nimbus.providers.base import BaseModelProvider, BaseEmbeddingProvider
-from nimbus.providers.health import HealthMetrics
+from nimbus.base.completion import CompletionRequest, CompletionResponse, TokenUsage
+from nimbus.base.messages import UserMessage
+from nimbus.models.base import BaseModelProvider, BaseEmbeddingProvider
+from nimbus.base.health import HealthMetrics
 
 
 class TestHealthMetrics:

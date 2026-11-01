@@ -30,7 +30,7 @@ pytest tests/unit/providers/
 pytest tests/unit/providers/test_openai_provider.py
 
 # Run with coverage
-pytest tests/unit/providers/ --cov=src/nimbus/providers
+pytest tests/unit/providers/ --cov=src/nimbus/models
 ```
 
 ## Testing Approach

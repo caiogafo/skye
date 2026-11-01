@@ -7,8 +7,8 @@ with environment variable substitution for API keys and other sensitive data.
 import os
 from pathlib import Path
 
-from nimbus.messages import UserMessage
-from nimbus.routes import ModelRouter
+from nimbus.base.messages import UserMessage
+from nimbus.router import ModelRouter
 
 # Set environment variables (in production, these would be set externally)
 os.environ["OPENAI_API_KEY"] = "your-api-key-here"

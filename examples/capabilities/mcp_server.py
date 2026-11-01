@@ -16,9 +16,9 @@ Example MCP servers you can use:
 
 import os
 import asyncio
-import nimbus
-from nimbus.messages import UserMessage
-from nimbus.capabilities import MCPCapability
+from nimbus.models.registry import provider as create_provider
+from nimbus.base.messages import UserMessage
+from nimbus.tools import MCPCapability
 
 
 # Configure your MCP server connection here
@@ -46,7 +46,7 @@ async def main():
     
     # Get provider
     try:
-        provider = nimbus.provider("openai", api_key=api_key)
+        provider = create_provider("openai", api_key=api_key)
     except ImportError:
         print("❌ OpenAI provider not available")
         return

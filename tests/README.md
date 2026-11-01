@@ -110,7 +110,7 @@ pytest tests/ -n auto
 ### Unit Test Example
 ```python
 import pytest
-from nimbus.capabilities import CapabilityCall
+from nimbus.tools import CapabilityCall
 
 def test_capability_call_creation():
     """Test creating a capability call."""
@@ -127,7 +127,7 @@ def test_capability_call_creation():
 ### Integration Test Example
 ```python
 import pytest
-from nimbus.routes import ModelRouter
+from nimbus.router import ModelRouter
 
 @pytest.mark.integration
 def test_router_with_yaml_config():
@@ -141,7 +141,7 @@ def test_router_with_yaml_config():
 ```python
 import pytest
 import asyncio
-from nimbus.routes import ModelRouter
+from nimbus.router import ModelRouter
 
 @pytest.mark.stress
 async def test_concurrent_routing():

@@ -12,7 +12,7 @@ src_path = Path(__file__).parent.parent.parent / "src"
 sys.path.insert(0, str(src_path))
 
 from nimbus.prompts import BasePromptBuilder
-import nimbus
+from nimbus.models.registry import provider as create_provider
 
 
 def complete_with_provider(messages, model="gpt-4", temperature=0.7, max_tokens=200, provider_name="openai"):
@@ -34,7 +34,7 @@ def complete_with_provider(messages, model="gpt-4", temperature=0.7, max_tokens=
         return None
     
     try:
-        provider = nimbus.provider(provider_name, api_key=api_key)
+        provider = create_provider(provider_name, api_key=api_key)
         response = provider.complete(
             messages=messages,
             model=model,

@@ -45,10 +45,10 @@ def _transform_messages(self, messages: list[NimbusMessage]) -> list[dict[str, A
 **Verified**: Core library modules contain no provider-specific code.
 
 Checked modules:
-- ✅ `src/nimbus/routes/` - Router and routing logic
-- ✅ `src/nimbus/capabilities/` - Capability system
-- ✅ `src/nimbus/completion.py` - Completion models
-- ✅ `src/nimbus/messages.py` - Message models
+- ✅ `src/nimbus/router/` - Router and routing logic
+- ✅ `src/nimbus/tools/` - Capability system
+- ✅ `src/nimbus/base/completion.py` - Completion models
+- ✅ `src/nimbus/base/messages.py` - Message models
 
 All provider references in these modules are in docstrings/examples only.
 
@@ -97,7 +97,7 @@ To add a new provider:
 
 ### CapabilityCallHandler ⚠️
 
-**File**: `src/nimbus/capabilities/capability_call_handler.py`
+**File**: `src/nimbus/tools/capability_call_handler.py`
 
 **Issue**: Contains provider-specific parsing and formatting methods.
 
@@ -113,7 +113,7 @@ To add a new provider:
 
 ### ImageHandler ⚠️
 
-**File**: `src/nimbus/providers/multimodal.py`
+**File**: `src/nimbus/models/transport/multimodal.py`
 
 **Issue**: Contains provider-specific image format methods.
 
@@ -162,7 +162,7 @@ uv run python scripts/validate_provider_architecture.py
 ## Code Comments Added
 
 ### BaseModelProvider
-Enhanced documentation in `src/nimbus/providers/base.py`:
+Enhanced documentation in `src/nimbus/models/base.py`:
 - Module-level docstring explaining transformation architecture
 - Detailed comments on transformation responsibilities
 - Examples of provider-specific implementations
@@ -287,6 +287,6 @@ The codebase is production-ready with a clean, maintainable architecture that ma
 - [Provider Transformation Architecture](./provider-transformation-architecture.md)
 - [Architecture Validation Report](./provider-architecture-validation.md)
 - [Validation Script](../scripts/validate_provider_architecture.py)
-- [BaseModelProvider](../src/nimbus/providers/base.py)
+- [BaseModelProvider](../src/nimbus/models/base.py)
 - [Requirements Document](../.kiro/specs/nimbus-consolidation/requirements.md)
 - [Design Document](../.kiro/specs/nimbus-consolidation/design.md)

@@ -16,10 +16,10 @@ from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 
-from nimbus.completion import CompletionRequest, CompletionResponse, StreamChunk, TokenUsage
-from nimbus.exceptions import ProviderError
-from nimbus.messages import AssistantMessage, SystemMessage, UserMessage
-from nimbus.providers.llm.vertex_provider import VertexAIProvider
+from nimbus.base.completion import CompletionRequest, CompletionResponse, StreamChunk, TokenUsage
+from nimbus.base.exceptions import ProviderError
+from nimbus.base.messages import AssistantMessage, SystemMessage, UserMessage
+from nimbus.models.llm.vertex_provider import VertexAIProvider
 
 
 class TestVertexAIProviderInitialization:
@@ -47,7 +47,7 @@ class TestVertexAIProviderInitialization:
         assert provider.location == "europe-west1"
         assert provider.credentials is mock_creds
 
-    @patch("nimbus.providers.llm.vertex_provider.LazyImporter.import_module")
+    @patch("nimbus.models.llm.vertex_provider.LazyImporter.import_module")
     def test_lazy_client_initialization(self, mock_import: Mock) -> None:
         """Test that client is lazily initialized."""
         mock_vertexai = MagicMock()
@@ -198,7 +198,7 @@ class TestVertexAIRequestTransformation:
         """Test transformation with function calling (legacy test - now handled by TestVertexAIToolCalling)."""
         # This test is now superseded by the more comprehensive TestVertexAIToolCalling tests
         # Keeping it for backwards compatibility but updating to use proper CapabilityInterface
-        from nimbus.capabilities import LocalFunctionCapability
+        from nimbus.tools import LocalFunctionCapability
 
         def get_weather(location: str) -> str:
             """Get weather for a location."""
@@ -436,7 +436,7 @@ class TestVertexAIStreamTransformation:
 class TestVertexAIProviderCalls:
     """Test actual provider API calls."""
 
-    @patch("nimbus.providers.llm.vertex_provider.LazyImporter.import_module")
+    @patch("nimbus.models.llm.vertex_provider.LazyImporter.import_module")
     def test_complete_success(self, mock_import: Mock) -> None:
         """Test successful completion call."""
         # Setup mocks
@@ -492,7 +492,7 @@ class TestVertexAIProviderCalls:
         assert result.provider == "vertex"
         mock_model.generate_content.assert_called_once()
 
-    @patch("nimbus.providers.llm.vertex_provider.LazyImporter.import_module")
+    @patch("nimbus.models.llm.vertex_provider.LazyImporter.import_module")
     def test_complete_error_handling(self, mock_import: Mock) -> None:
         """Test error handling in complete."""
         # Setup mocks
@@ -524,7 +524,7 @@ class TestVertexAIProviderCalls:
         assert "Provider call failed" in str(exc_info.value)
         assert exc_info.value.details["provider"] == "vertex"
 
-    @patch("nimbus.providers.llm.vertex_provider.LazyImporter.import_module")
+    @patch("nimbus.models.llm.vertex_provider.LazyImporter.import_module")
     def test_stream_success(self, mock_import: Mock) -> None:
         """Test successful streaming call."""
         # Setup mocks
@@ -582,7 +582,7 @@ class TestVertexAIAsyncSupport:
     """Test async completion support."""
 
     @pytest.mark.asyncio
-    @patch("nimbus.providers.llm.vertex_provider.LazyImporter.import_module")
+    @patch("nimbus.models.llm.vertex_provider.LazyImporter.import_module")
     async def test_acomplete_success(self, mock_import: Mock) -> None:
         """Test successful async completion."""
         # Setup mocks
@@ -663,7 +663,7 @@ class TestVertexAIToolCalling:
 
     def test_transform_capabilities_with_capability_interface(self) -> None:
         """Test _transform_capabilities() with CapabilityInterface objects."""
-        from nimbus.capabilities import LocalFunctionCapability
+        from nimbus.tools import LocalFunctionCapability
 
         def get_weather(location: str) -> str:
             """Get weather for a location."""
@@ -737,7 +737,7 @@ class TestVertexAIToolCalling:
 
     def test_transform_request_with_capabilities(self) -> None:
         """Test transformation of request with capabilities."""
-        from nimbus.capabilities import LocalFunctionCapability
+        from nimbus.tools import LocalFunctionCapability
 
         def get_weather(location: str) -> str:
             """Get weather for a location."""
@@ -770,7 +770,7 @@ class TestVertexAIToolCalling:
 
     def test_transform_request_with_tool_choice_auto(self) -> None:
         """Test transformation with capability_choice='auto'."""
-        from nimbus.capabilities import LocalFunctionCapability
+        from nimbus.tools import LocalFunctionCapability
 
         def get_weather(location: str) -> str:
             """Get weather for a location."""
@@ -797,7 +797,7 @@ class TestVertexAIToolCalling:
 
     def test_transform_request_with_tool_choice_required(self) -> None:
         """Test transformation with capability_choice='required'."""
-        from nimbus.capabilities import LocalFunctionCapability
+        from nimbus.tools import LocalFunctionCapability
 
         def get_weather(location: str) -> str:
             """Get weather for a location."""
@@ -824,7 +824,7 @@ class TestVertexAIToolCalling:
 
     def test_transform_request_with_specific_tool_choice(self) -> None:
         """Test transformation with specific tool name in capability_choice."""
-        from nimbus.capabilities import LocalFunctionCapability
+        from nimbus.tools import LocalFunctionCapability
 
         def get_weather(location: str) -> str:
             """Get weather for a location."""
@@ -956,10 +956,10 @@ class TestVertexAIToolCalling:
         assert result.capability_calls[1].name == "get_time"
         assert result.capability_calls[1].arguments == {"timezone": "EST"}
 
-    @patch("nimbus.providers.llm.vertex_provider.LazyImporter.import_module")
+    @patch("nimbus.models.llm.vertex_provider.LazyImporter.import_module")
     def test_complete_with_tool_calling(self, mock_import: Mock) -> None:
         """Test complete with tool calling end-to-end."""
-        from nimbus.capabilities import LocalFunctionCapability
+        from nimbus.tools import LocalFunctionCapability
 
         def get_weather(location: str) -> str:
             """Get weather for a location."""
@@ -1035,8 +1035,8 @@ class TestVertexAIToolCalling:
 
     def test_tool_call_parsing_with_handler(self) -> None:
         """Test that tool calls can be parsed by CapabilityCallHandler."""
-        from nimbus.capabilities import CapabilityRegistry, LocalFunctionCapability
-        from nimbus.capabilities.capability_call_handler import CapabilityCallHandler
+        from nimbus.tools import CapabilityRegistry, LocalFunctionCapability
+        from nimbus.tools.capability_call_handler import CapabilityCallHandler
 
         def get_weather(location: str) -> str:
             """Get weather for a location."""

@@ -19,12 +19,12 @@ from unittest.mock import Mock, patch
 
 import pytest
 
-from nimbus.completion import CompletionRequest, CompletionResponse, TokenUsage
-from nimbus.exceptions import ProviderError
-from nimbus.interfaces.model import ModelInterface
-from nimbus.interfaces.router import RoutingStrategy
-from nimbus.messages import UserMessage
-from nimbus.routes.model_router import (
+from nimbus.base.completion import CompletionRequest, CompletionResponse, TokenUsage
+from nimbus.base.exceptions import ProviderError
+from nimbus.base.interfaces.model import ModelInterface
+from nimbus.base.interfaces.router import RoutingStrategy
+from nimbus.base.messages import UserMessage
+from nimbus.router.model_router import (
     FallbackConfig,
     ModelRouter,
     ModelTarget,
@@ -90,7 +90,7 @@ class FailingMockModel(ModelInterface):
 
     def stream(self, request: CompletionRequest):
         """Stream completion (not implemented for mock)."""
-        from nimbus.completion import StreamChunk
+        from nimbus.base.completion import StreamChunk
 
         yield StreamChunk(delta="Test", model=self.model_id)
 
@@ -100,7 +100,7 @@ class FailingMockModel(ModelInterface):
 
     async def astream(self, request: CompletionRequest):
         """Async stream completion (not implemented for mock)."""
-        from nimbus.completion import StreamChunk
+        from nimbus.base.completion import StreamChunk
 
         yield StreamChunk(delta="Test", model=self.model_id)
 
@@ -236,7 +236,7 @@ class TestFailoverScenarios:
         router.set_fallbacks([FallbackConfig(primary="primary", fallbacks=["fallback"])])
 
         # Set allowed fails policy to trigger cooldown quickly
-        from nimbus.routes.model_router import AllowedFailsPolicyConfig
+        from nimbus.router.model_router import AllowedFailsPolicyConfig
 
         router.set_allowed_fails_policy(
             [AllowedFailsPolicyConfig(error_type="ProviderError", allowed_fails_per_minute=1)]
@@ -510,7 +510,7 @@ class TestFailoverScenarios:
         router.set_fallbacks([FallbackConfig(primary="primary", fallbacks=["fallback"])])
 
         # Set allowed fails policy to trigger cooldown quickly
-        from nimbus.routes.model_router import AllowedFailsPolicyConfig
+        from nimbus.router.model_router import AllowedFailsPolicyConfig
 
         router.set_allowed_fails_policy(
             [AllowedFailsPolicyConfig(error_type="ProviderError", allowed_fails_per_minute=1)]

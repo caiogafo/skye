@@ -1,7 +1,7 @@
 """Tests for capability package exports.
 
 This module verifies that all expected symbols are properly exported from
-the nimbus.capabilities package and that __all__ is correctly defined.
+the nimbus.tools package and that __all__ is correctly defined.
 """
 
 import pytest
@@ -9,7 +9,7 @@ import pytest
 
 def test_capability_interface_import():
     """Test that CapabilityInterface can be imported."""
-    from nimbus.capabilities import CapabilityInterface
+    from nimbus.tools import CapabilityInterface
     
     assert CapabilityInterface is not None
     assert hasattr(CapabilityInterface, "get_schema")
@@ -19,14 +19,14 @@ def test_capability_interface_import():
 
 def test_capability_schema_import():
     """Test that CapabilitySchema can be imported."""
-    from nimbus.capabilities import CapabilitySchema
+    from nimbus.tools import CapabilitySchema
     
     assert CapabilitySchema is not None
 
 
 def test_capability_registry_import():
     """Test that CapabilityRegistry can be imported."""
-    from nimbus.capabilities import CapabilityRegistry
+    from nimbus.tools import CapabilityRegistry
     
     assert CapabilityRegistry is not None
     assert hasattr(CapabilityRegistry, "register")
@@ -37,35 +37,35 @@ def test_capability_registry_import():
 
 def test_local_function_capability_import():
     """Test that LocalFunctionCapability can be imported."""
-    from nimbus.capabilities import LocalFunctionCapability
+    from nimbus.tools import LocalFunctionCapability
     
     assert LocalFunctionCapability is not None
 
 
 def test_remote_api_capability_import():
     """Test that RemoteAPICapability can be imported."""
-    from nimbus.capabilities import RemoteAPICapability
+    from nimbus.tools import RemoteAPICapability
     
     assert RemoteAPICapability is not None
 
 
 def test_capability_call_import():
     """Test that CapabilityCall can be imported."""
-    from nimbus.capabilities import CapabilityCall
+    from nimbus.tools import CapabilityCall
     
     assert CapabilityCall is not None
 
 
 def test_capability_result_import():
     """Test that CapabilityResult can be imported."""
-    from nimbus.capabilities import CapabilityResult
+    from nimbus.tools import CapabilityResult
     
     assert CapabilityResult is not None
 
 
 def test_exception_imports():
     """Test that all exception classes can be imported."""
-    from nimbus.capabilities import (
+    from nimbus.tools import (
         CapabilityError,
         CapabilityExecutionError,
         CapabilityNotFoundError,
@@ -88,15 +88,15 @@ def test_exception_imports():
 
 def test_capability_transformer_import():
     """Test that CapabilityTransformer is no longer exported (removed in consolidation)."""
-    import nimbus.capabilities
+    import nimbus.tools
     
     # CapabilityTransformer has been removed as part of provider consolidation
-    assert not hasattr(nimbus.capabilities, "CapabilityTransformer")
+    assert not hasattr(nimbus.tools, "CapabilityTransformer")
 
 
 def test_capability_call_handler_import():
     """Test that CapabilityCallHandler can be imported."""
-    from nimbus.capabilities import CapabilityCallHandler
+    from nimbus.tools import CapabilityCallHandler
     
     assert CapabilityCallHandler is not None
     assert hasattr(CapabilityCallHandler, "parse_capability_calls")
@@ -106,21 +106,21 @@ def test_capability_call_handler_import():
 
 def test_mcp_capability_import():
     """Test that MCPCapability can be imported."""
-    from nimbus.capabilities import MCPCapability
+    from nimbus.tools import MCPCapability
     
     assert MCPCapability is not None
 
 
 def test_mcp_server_client_import():
     """Test that MCPServerClient can be imported."""
-    from nimbus.capabilities import MCPServerClient
+    from nimbus.tools import MCPServerClient
     
     assert MCPServerClient is not None
 
 
 def test_capability_decorator_import():
     """Test that capability decorator can be imported."""
-    from nimbus.capabilities import capability
+    from nimbus.tools import capability
     
     assert capability is not None
     assert callable(capability)
@@ -128,16 +128,16 @@ def test_capability_decorator_import():
 
 def test_all_defined():
     """Test that __all__ is properly defined."""
-    import nimbus.capabilities
+    import nimbus.tools
     
-    assert hasattr(nimbus.capabilities, "__all__")
-    assert isinstance(nimbus.capabilities.__all__, list)
-    assert len(nimbus.capabilities.__all__) > 0
+    assert hasattr(nimbus.tools, "__all__")
+    assert isinstance(nimbus.tools.__all__, list)
+    assert len(nimbus.tools.__all__) > 0
 
 
 def test_all_contains_expected_symbols():
     """Test that __all__ contains all expected symbols."""
-    import nimbus.capabilities
+    import nimbus.tools
     
     expected_symbols = [
         "CapabilityInterface",
@@ -159,22 +159,22 @@ def test_all_contains_expected_symbols():
     ]
     
     for symbol in expected_symbols:
-        assert symbol in nimbus.capabilities.__all__, f"{symbol} not in __all__"
+        assert symbol in nimbus.tools.__all__, f"{symbol} not in __all__"
 
 
 def test_all_symbols_are_importable():
     """Test that all symbols in __all__ can be imported."""
-    import nimbus.capabilities
+    import nimbus.tools
     
-    for symbol in nimbus.capabilities.__all__:
-        assert hasattr(nimbus.capabilities, symbol), f"{symbol} not importable"
+    for symbol in nimbus.tools.__all__:
+        assert hasattr(nimbus.tools, symbol), f"{symbol} not importable"
 
 
 def test_star_import():
     """Test that star import works correctly."""
-    # This test verifies that 'from nimbus.capabilities import *' works
+    # This test verifies that 'from nimbus.tools import *' works
     namespace = {}
-    exec("from nimbus.capabilities import *", namespace)
+    exec("from nimbus.tools import *", namespace)
     
     expected_symbols = [
         "CapabilityInterface",
@@ -197,7 +197,7 @@ def test_star_import():
 
 def test_combined_import():
     """Test that multiple symbols can be imported together."""
-    from nimbus.capabilities import (
+    from nimbus.tools import (
         CapabilityInterface,
         CapabilityRegistry,
         CapabilitySchema,
@@ -218,16 +218,16 @@ def test_combined_import():
 
 def test_no_private_symbols_in_all():
     """Test that __all__ doesn't contain private symbols."""
-    import nimbus.capabilities
+    import nimbus.tools
     
-    for symbol in nimbus.capabilities.__all__:
+    for symbol in nimbus.tools.__all__:
         assert not symbol.startswith("_"), f"Private symbol {symbol} in __all__"
 
 
 def test_package_docstring():
     """Test that the package has a docstring."""
-    import nimbus.capabilities
+    import nimbus.tools
     
-    assert nimbus.capabilities.__doc__ is not None
-    assert len(nimbus.capabilities.__doc__) > 0
-    assert "capability" in nimbus.capabilities.__doc__.lower()
+    assert nimbus.tools.__doc__ is not None
+    assert len(nimbus.tools.__doc__) > 0
+    assert "capability" in nimbus.tools.__doc__.lower()

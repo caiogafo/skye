@@ -47,8 +47,6 @@ To make the check blocking, require the `budgets / fast checks` and `budgets / f
 |---|---|---|
 | Core depends on `pydantic`, `jinja2`, `pyyaml`, `tenacity` (none in Lambda, none in the standard library) | about 9 MB and 10 packages | standard library only |
 | Compiled in the core: `pydantic-core` (Rust), `pyyaml` and `markupsafe` (C) | needs a container build | none |
-| `import nimbus.capabilities` fails on a core-only install (imports `httpx`, declared only in extra `tools`) | the module is documented as part of the library | import on demand |
-| `import nimbus` imports `httpx` and `requests` when they are installed (`capabilities/remote_api.py`) | cold start pays for libraries it may not use | lazy |
 | Extras `agents`, `guard`, `prompts` have no dependencies of their own | they are modules, not extras | remove from `pyproject.toml` |
-| Extra sizes over the core: `vertex` 176 MB, `cohere` 33 MB, `openai` 18 MB, `azure` 17 MB, `memory` 12 MB, `anthropic` 10 MB | most come from provider SDKs | call the provider REST APIs with the standard library or `urllib3` |
+| Extra sizes over the core: `vertex` 176 MB, `cohere` 33 MB, `openai` 18 MB, `memory` 12 MB, `anthropic` 10 MB | most come from provider SDKs | call the provider REST APIs with the standard library or `urllib3` |
 | `nimbus[all]` is about 274 MB, over the Lambda limit | cannot be deployed | not advertised for Lambda |

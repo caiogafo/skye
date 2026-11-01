@@ -2,12 +2,12 @@
 
 import pytest
 
-from nimbus.completion import CompletionRequest, CompletionResponse, StreamChunk
-from nimbus.exceptions import ConfigurationError
-from nimbus.interfaces.model import ModelInterface
-from nimbus.interfaces.vector_encoder import VectorEncoderInterface
-from nimbus.messages import UserMessage
-from nimbus.providers.registry import ProviderRegistry
+from nimbus.base.completion import CompletionRequest, CompletionResponse, StreamChunk
+from nimbus.base.exceptions import ConfigurationError
+from nimbus.base.interfaces.model import ModelInterface
+from nimbus.base.interfaces.vector_encoder import VectorEncoderInterface
+from nimbus.base.messages import UserMessage
+from nimbus.models.registry import ProviderRegistry
 
 
 # Mock provider implementations for testing
@@ -19,7 +19,7 @@ class MockModelProvider(ModelInterface):
         self.config = kwargs
 
     def complete(self, request: CompletionRequest) -> CompletionResponse:
-        from nimbus.completion import TokenUsage
+        from nimbus.base.completion import TokenUsage
 
         return CompletionResponse(
             id="test-id",

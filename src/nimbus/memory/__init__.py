@@ -2,6 +2,10 @@
 
 This module provides persistent memory implementations for episodic, semantic,
 and persona memory. Available with nimbus[memory].
+
+Component: memory. Layer: services (2).
+
+Codename: dew.
 """
 
 from datetime import datetime, timezone

@@ -18,10 +18,10 @@ from unittest.mock import MagicMock, Mock, patch
 import pytest
 from pydantic import BaseModel
 
-from nimbus.completion import CompletionRequest, CompletionResponse, StreamChunk, TokenUsage
-from nimbus.exceptions import ProviderError
-from nimbus.messages import AssistantMessage, SystemMessage, UserMessage
-from nimbus.providers.llm.azure_provider import AzureOpenAIProvider
+from nimbus.base.completion import CompletionRequest, CompletionResponse, StreamChunk, TokenUsage
+from nimbus.base.exceptions import ProviderError
+from nimbus.base.messages import AssistantMessage, SystemMessage, UserMessage
+from nimbus.models.llm.openai_compatible import AzureOpenAIProvider
 
 
 class TestAzureOpenAIProviderInitialization:
@@ -51,7 +51,7 @@ class TestAzureOpenAIProviderInitialization:
         )
         assert provider.config["custom_param"] == "value"
     
-    @patch("nimbus.providers.llm.azure_provider.LazyImporter.import_module")
+    @patch("nimbus.models.llm.openai_compatible.LazyImporter.import_module")
     def test_lazy_client_initialization(self, mock_import: Mock) -> None:
         """Test that client is lazily initialized."""
         mock_openai = MagicMock()
@@ -440,7 +440,7 @@ class TestAzureOpenAIStreamTransformation:
 class TestAzureOpenAIProviderCalls:
     """Test actual provider API calls."""
     
-    @patch("nimbus.providers.llm.azure_provider.LazyImporter.import_module")
+    @patch("nimbus.models.llm.openai_compatible.LazyImporter.import_module")
     def test_complete_success(self, mock_import: Mock) -> None:
         """Test successful completion call."""
         # Setup mocks
@@ -492,7 +492,7 @@ class TestAzureOpenAIProviderCalls:
         assert result.provider == "azure"
         mock_client.chat.completions.create.assert_called_once()
     
-    @patch("nimbus.providers.llm.azure_provider.LazyImporter.import_module")
+    @patch("nimbus.models.llm.openai_compatible.LazyImporter.import_module")
     def test_complete_error_handling(self, mock_import: Mock) -> None:
         """Test error handling in complete."""
         # Setup mocks
@@ -523,7 +523,7 @@ class TestAzureOpenAIProviderCalls:
         assert "Provider call failed" in str(exc_info.value)
         assert exc_info.value.details["provider"] == "azure"
     
-    @patch("nimbus.providers.llm.azure_provider.LazyImporter.import_module")
+    @patch("nimbus.models.llm.openai_compatible.LazyImporter.import_module")
     def test_stream_success(self, mock_import: Mock) -> None:
         """Test successful streaming call."""
         # Setup mocks
@@ -575,7 +575,7 @@ class TestAzureOpenAIAsyncSupport:
     """Test async completion support."""
     
     @pytest.mark.asyncio
-    @patch("nimbus.providers.llm.azure_provider.LazyImporter.import_module")
+    @patch("nimbus.models.llm.openai_compatible.LazyImporter.import_module")
     async def test_acomplete_success(self, mock_import: Mock) -> None:
         """Test successful async completion."""
         # Setup mocks
@@ -933,7 +933,7 @@ class TestAzureOpenAIToolCalling:
         assert result["tools"][0]["function"]["name"] == "get_weather"
         assert result["tools"][1]["function"]["name"] == "get_time"
     
-    @patch("nimbus.providers.llm.azure_provider.LazyImporter.import_module")
+    @patch("nimbus.models.llm.openai_compatible.LazyImporter.import_module")
     def test_complete_with_tool_calls(self, mock_import: Mock) -> None:
         """Test end-to-end completion with tool calls."""
         # Setup mocks

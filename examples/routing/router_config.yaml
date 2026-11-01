@@ -396,7 +396,7 @@ enable_pre_call_checks: true
 # =============
 # Load this configuration in your Python code:
 #
-#   from nimbus.routes import ModelRouter
+#   from nimbus.router import ModelRouter
 #   
 #   router = ModelRouter.from_yaml("router_config.yaml")
 #   

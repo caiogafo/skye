@@ -11,9 +11,9 @@ Features shown:
 
 import os
 import json
-from nimbus.completion import CompletionRequest
-from nimbus.messages import UserMessage, CapabilityMessage
-from nimbus.providers import ProviderRegistry
+from nimbus.base.completion import CompletionRequest
+from nimbus.base.messages import UserMessage, CapabilityMessage
+from nimbus.models import ProviderRegistry
 
 
 def basic_function_calling():
@@ -358,7 +358,7 @@ Nimbus provides a unified interface across all providers.
 Example:
 
 ```python
-from nimbus.providers import ProviderRegistry
+from nimbus.models import ProviderRegistry
 
 provider = ProviderRegistry.get_model_provider(
     "bedrock",

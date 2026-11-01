@@ -4,8 +4,8 @@ from pathlib import Path
 
 import pytest
 
-from nimbus.config import ConfigLoader, ModelConfig, NimbusConfig
-from nimbus.exceptions import ConfigurationError
+from nimbus.base.config import ConfigLoader, ModelConfig, NimbusConfig
+from nimbus.base.exceptions import ConfigurationError
 
 
 def test_config_loader_from_yaml():

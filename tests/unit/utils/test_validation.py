@@ -5,10 +5,10 @@ from abc import ABC, abstractmethod
 import pytest
 from pydantic import BaseModel, Field
 
-from nimbus.completion import CompletionRequest
-from nimbus.exceptions import ValidationError
-from nimbus.interfaces import ModelInterface
-from nimbus.messages import AssistantMessage, ContentChunk, UserMessage
+from nimbus.base.completion import CompletionRequest
+from nimbus.base.exceptions import ValidationError
+from nimbus.base.interfaces import ModelInterface
+from nimbus.base.messages import AssistantMessage, ContentChunk, UserMessage
 from nimbus.utils.validation import generate_schema, validate_interface_compliance
 
 

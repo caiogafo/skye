@@ -12,12 +12,12 @@ from datetime import datetime, timezone
 
 import pytest
 
-from nimbus.exceptions import ConfigurationError
-from nimbus.interfaces.router import RoutingStrategy
-from nimbus.routes.model_router import ModelRouter
-from nimbus.providers.registry import ProviderRegistry
-from nimbus.providers.base import BaseModelProvider
-from nimbus.completion import CompletionRequest, CompletionResponse, StreamChunk, TokenUsage
+from nimbus.base.exceptions import ConfigurationError
+from nimbus.base.interfaces.router import RoutingStrategy
+from nimbus.router.model_router import ModelRouter
+from nimbus.models.registry import ProviderRegistry
+from nimbus.models.base import BaseModelProvider
+from nimbus.base.completion import CompletionRequest, CompletionResponse, StreamChunk, TokenUsage
 
 
 class MockProvider(BaseModelProvider):
@@ -447,8 +447,8 @@ class TestModelTargetEnvVarSubstitution:
 
     def test_model_target_env_var_substitution(self):
         """Test that ModelTarget substitutes environment variables."""
-        from nimbus.routes.model_router import ModelTarget
-        from nimbus.config import _env_var_cache
+        from nimbus.router.model_router import ModelTarget
+        from nimbus.base.config import _env_var_cache
 
         # Clear cache to avoid interference from other tests
         _env_var_cache.clear()
@@ -475,7 +475,7 @@ class TestModelTargetEnvVarSubstitution:
 
     def test_model_target_missing_env_var(self):
         """Test that missing environment variable raises ConfigurationError."""
-        from nimbus.routes.model_router import ModelTarget
+        from nimbus.router.model_router import ModelTarget
 
         with pytest.raises(ConfigurationError) as exc_info:
             ModelTarget(
@@ -486,7 +486,7 @@ class TestModelTargetEnvVarSubstitution:
 
     def test_model_target_no_env_var(self):
         """Test that ModelTarget works without environment variables."""
-        from nimbus.routes.model_router import ModelTarget
+        from nimbus.router.model_router import ModelTarget
 
         target = ModelTarget(
             model="gpt-4", provider="mock", api_key="sk-plain-key"
@@ -496,7 +496,7 @@ class TestModelTargetEnvVarSubstitution:
 
     def test_model_target_partial_env_var(self):
         """Test that partial environment variable patterns are not substituted."""
-        from nimbus.routes.model_router import ModelTarget
+        from nimbus.router.model_router import ModelTarget
 
         # This should not trigger substitution (missing closing brace)
         target = ModelTarget(

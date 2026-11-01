@@ -10,7 +10,7 @@ from typing import Any
 
 from pydantic import BaseModel
 
-from nimbus.exceptions import ValidationError
+from nimbus.base.exceptions import ValidationError
 
 
 def validate_interface_compliance(implementation: Any, interface: type[ABC]) -> None:
@@ -27,7 +27,7 @@ def validate_interface_compliance(implementation: Any, interface: type[ABC]) -> 
         ValidationError: If the implementation doesn't comply with the interface.
 
     Example:
-        >>> from nimbus.interfaces import ModelInterface
+        >>> from nimbus.base.interfaces import ModelInterface
         >>> class MyModel(ModelInterface):
         ...     def complete(self, request):
         ...         return None
@@ -87,7 +87,7 @@ def generate_schema(model: type[BaseModel]) -> dict[str, Any]:
         ValidationError: If the provided type is not a Pydantic model.
 
     Example:
-        >>> from nimbus.messages import UserMessage
+        >>> from nimbus.base.messages import UserMessage
         >>> schema = generate_schema(UserMessage)
         >>> schema['type']
         'object'

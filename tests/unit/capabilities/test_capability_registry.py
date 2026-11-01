@@ -5,14 +5,14 @@ from typing import Any
 
 import pytest
 
-from nimbus.capabilities import (
+from nimbus.tools import (
     CapabilityInterface,
     CapabilityNotFoundError,
     CapabilityRegistry,
     CapabilitySchema,
     CapabilityValidationError,
 )
-from nimbus.messages import CapabilityMessage
+from nimbus.base.messages import CapabilityMessage
 
 
 class MockCapability(CapabilityInterface):

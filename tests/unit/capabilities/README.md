@@ -28,5 +28,5 @@ pytest tests/unit/capabilities/
 pytest tests/unit/capabilities/test_capability_models.py
 
 # Run with coverage
-pytest tests/unit/capabilities/ --cov=src/nimbus/capabilities
+pytest tests/unit/capabilities/ --cov=src/nimbus/tools
 ```

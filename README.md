@@ -55,13 +55,13 @@ uv pip install nimbus[all]
 | `bedrock` | AWS Bedrock provider | boto3 |
 | `openai` | OpenAI provider | openai |
 | `anthropic` | Anthropic provider | anthropic |
-| `azure` | Azure OpenAI provider | azure-ai-inference |
 | `agents` | Agent runtime | - |
 | `prompts` | Prompt management | - |
-| `tools` | Capability/tool registry | - |
-| `memory` | Persistent memory | redis, psycopg2 |
+| `tools` | Capability/tool registry | none |
+| `mcp` | MCP client | fastmcp (heavy: about 43 MB, 7 compiled) |
+| `memory` | Persistent memory | redis, asyncpg |
 | `guard` | Safety filters | - |
-| `observe` | Observability | opentelemetry, prometheus |
+| `observe` | Observability | - (no telemetry library yet) |
 | `all` | All components | All of the above |
 
 ## Quick Start
@@ -69,11 +69,11 @@ uv pip install nimbus[all]
 ### Basic Usage
 
 ```python
-import nimbus
-from nimbus.messages import UserMessage
+from nimbus.models.registry import provider as create_provider
+from nimbus.base.messages import UserMessage
 
 # Create provider client (boto3-style)
-client = nimbus.provider("bedrock", region="us-east-1")
+client = create_provider("bedrock", region="us-east-1")
 
 # Make completion request
 response = client.complete(
@@ -89,11 +89,11 @@ print(response.content)
 
 ```python
 import asyncio
-import nimbus
-from nimbus.messages import UserMessage
+from nimbus.models.registry import provider as create_provider
+from nimbus.base.messages import UserMessage
 
 async def main():
-    client = nimbus.provider("openai", api_key="sk-...")
+    client = create_provider("openai", api_key="sk-...")
     
     response = await client.acomplete(
         messages=[UserMessage(content="Explain async/await")],
@@ -108,10 +108,10 @@ asyncio.run(main())
 ### Streaming
 
 ```python
-import nimbus
-from nimbus.messages import UserMessage
+from nimbus.models.registry import provider as create_provider
+from nimbus.base.messages import UserMessage
 
-client = nimbus.provider("openai", api_key="sk-...")
+client = create_provider("openai", api_key="sk-...")
 
 for chunk in client.stream(
     messages=[UserMessage(content="Write a story")],
@@ -124,15 +124,15 @@ for chunk in client.stream(
 
 ```python
 from pydantic import BaseModel
-import nimbus
-from nimbus.messages import UserMessage
+from nimbus.models.registry import provider as create_provider
+from nimbus.base.messages import UserMessage
 
 class Person(BaseModel):
     name: str
     age: int
     occupation: str
 
-client = nimbus.provider("openai", api_key="sk-...")
+client = create_provider("openai", api_key="sk-...")
 
 response = client.complete(
     messages=[UserMessage(content="Extract: John is 30 and works as an engineer")],
@@ -160,8 +160,8 @@ pip install nimbus[anthropic]
 # AWS Bedrock
 pip install nimbus[bedrock]
 
-# Azure OpenAI
-pip install nimbus[azure]
+# Azure OpenAI (served by the openai extra)
+pip install nimbus[openai]
 
 # Google Vertex AI
 pip install nimbus[vertex]
@@ -178,11 +178,11 @@ pip install nimbus[all-providers]
 #### OpenAI
 
 ```python
-import nimbus
-from nimbus.messages import UserMessage
+from nimbus.models.registry import provider as create_provider
+from nimbus.base.messages import UserMessage
 
 # Create provider client
-client = nimbus.provider("openai", api_key="sk-...")
+client = create_provider("openai", api_key="sk-...")
 
 # Make completion request
 response = client.complete(
@@ -196,10 +196,10 @@ print(response.content)
 #### Anthropic
 
 ```python
-import nimbus
-from nimbus.messages import UserMessage
+from nimbus.models.registry import provider as create_provider
+from nimbus.base.messages import UserMessage
 
-client = nimbus.provider("anthropic", api_key="sk-ant-...")
+client = create_provider("anthropic", api_key="sk-ant-...")
 
 response = client.complete(
     messages=[UserMessage(content="Hello!")],
@@ -210,12 +210,12 @@ response = client.complete(
 #### AWS Bedrock
 
 ```python
-import nimbus
-from nimbus.messages import UserMessage
+from nimbus.models.registry import provider as create_provider
+from nimbus.base.messages import UserMessage
 
 # Works with or without boto3 installed
 # In AWS Lambda, boto3 is pre-installed
-client = nimbus.provider("bedrock", region="us-east-1")
+client = create_provider("bedrock", region="us-east-1")
 
 response = client.complete(
     messages=[UserMessage(content="Hello!")],
@@ -226,10 +226,10 @@ response = client.complete(
 #### Azure OpenAI
 
 ```python
-import nimbus
-from nimbus.messages import UserMessage
+from nimbus.models.registry import provider as create_provider
+from nimbus.base.messages import UserMessage
 
-client = nimbus.provider(
+client = create_provider(
     "azure",
     azure_endpoint="https://your-resource.openai.azure.com/",
     api_key="your-api-key",
@@ -245,10 +245,10 @@ response = client.complete(
 #### Google Vertex AI
 
 ```python
-import nimbus
-from nimbus.messages import UserMessage
+from nimbus.models.registry import provider as create_provider
+from nimbus.base.messages import UserMessage
 
-client = nimbus.provider(
+client = create_provider(
     "vertex",
     project_id="your-project",
     location="us-central1"
@@ -263,10 +263,10 @@ response = client.complete(
 ### Embedding Providers
 
 ```python
-import nimbus
+from nimbus.models.registry import provider as create_provider
 
 # OpenAI embeddings
-embedder = nimbus.provider(
+embedder = create_provider(
     "openai",
     model="text-embedding-3-small",
     api_key="sk-...",
@@ -282,7 +282,7 @@ embeddings = embedder.encode_batch([
 print(f"Dimension: {embedder.get_vector_dimension()}")
 
 # Bedrock embeddings
-embedder = nimbus.provider(
+embedder = create_provider(
     "bedrock",
     model="amazon.titan-embed-text-v1",
     region="us-east-1",
@@ -292,7 +292,7 @@ embedder = nimbus.provider(
 embeddings = embedder.encode_batch(["Hello world"])
 
 # Vertex AI embeddings
-embedder = nimbus.provider(
+embedder = create_provider(
     "vertex",
     model="textembedding-gecko@003",
     project_id="my-project",
@@ -312,10 +312,10 @@ embeddings = await embedder.aencode_batch(["text1", "text2"])
 ### Multimodal Inputs
 
 ```python
-import nimbus
-from nimbus.messages import UserMessage
+from nimbus.models.registry import provider as create_provider
+from nimbus.base.messages import UserMessage
 
-client = nimbus.provider("openai", api_key="sk-...")
+client = create_provider("openai", api_key="sk-...")
 
 # Image from URL
 response = client.complete(
@@ -359,15 +359,15 @@ response = client.complete(
 
 ```python
 from pydantic import BaseModel
-import nimbus
-from nimbus.messages import UserMessage
+from nimbus.models.registry import provider as create_provider
+from nimbus.base.messages import UserMessage
 
 class Person(BaseModel):
     name: str
     age: int
     occupation: str
 
-client = nimbus.provider("openai", api_key="sk-...")
+client = create_provider("openai", api_key="sk-...")
 
 response = client.complete(
     messages=[
@@ -391,9 +391,9 @@ Nimbus supports two ways to provide capabilities to the LLM:
 #### Option 1: Direct Capabilities (Recommended)
 
 ```python
-import nimbus
-from nimbus.messages import UserMessage
-from nimbus.capabilities import capability
+from nimbus.models.registry import provider as create_provider
+from nimbus.base.messages import UserMessage
+from nimbus.tools import capability
 
 # Define capability using decorator
 @capability
@@ -405,7 +405,7 @@ def get_weather(location: str) -> str:
     """
     return f"Weather in {location}: Sunny, 72°F"
 
-client = nimbus.provider("openai", api_key="sk-...")
+client = create_provider("openai", api_key="sk-...")
 
 # Pass capabilities directly - no registry needed!
 response = client.complete(
@@ -456,7 +456,7 @@ if response.has_capability_calls():
 Search for relevant tools and pass the results:
 
 ```python
-from nimbus.capabilities import capability, CapabilityRegistry
+from nimbus.tools import capability, CapabilityRegistry
 
 # Define multiple capabilities
 @capability
@@ -514,10 +514,10 @@ if response.has_capability_calls():
 ### Streaming
 
 ```python
-import nimbus
-from nimbus.messages import UserMessage
+from nimbus.models.registry import provider as create_provider
+from nimbus.base.messages import UserMessage
 
-client = nimbus.provider("openai", api_key="sk-...")
+client = create_provider("openai", api_key="sk-...")
 
 for chunk in client.stream(
     messages=[UserMessage(content="Write a story")],
@@ -530,11 +530,11 @@ for chunk in client.stream(
 
 ```python
 import asyncio
-import nimbus
-from nimbus.messages import UserMessage
+from nimbus.models.registry import provider as create_provider
+from nimbus.base.messages import UserMessage
 
 async def main():
-    client = nimbus.provider("openai", api_key="sk-...")
+    client = create_provider("openai", api_key="sk-...")
     
     response = await client.acomplete(
         messages=[UserMessage(content="Hello!")],
@@ -555,10 +555,10 @@ Nimbus uses lazy loading to defer importing provider SDKs until they're actually
 3. **Lambda-friendly**: Bedrock works in AWS Lambda without boto3 as a dependency (it's pre-installed)
 
 ```python
-import nimbus
+from nimbus.models.registry import provider as create_provider
 
 # This doesn't import OpenAI SDK until you actually use it
-client = nimbus.provider("openai", api_key="sk-...")
+client = create_provider("openai", api_key="sk-...")
 
 # SDK is imported here when complete() is called
 response = client.complete(
@@ -574,12 +574,12 @@ Nimbus is Lambda-friendly:
 ```python
 # In AWS Lambda, boto3 is pre-installed
 # No need to include it in your deployment package
-import nimbus
-from nimbus.messages import UserMessage
+from nimbus.models.registry import provider as create_provider
+from nimbus.base.messages import UserMessage
 
 def lambda_handler(event, context):
     # Bedrock provider works without boto3 in dependencies
-    client = nimbus.provider("bedrock", region="us-east-1")
+    client = create_provider("bedrock", region="us-east-1")
     
     response = client.complete(
         messages=[UserMessage(content=event['prompt'])],
@@ -623,7 +623,7 @@ models:
 
 ```python
 from pathlib import Path
-from nimbus import ConfigLoader
+from nimbus.base.config import ConfigLoader
 
 config = ConfigLoader.load(
     config_path=Path("nimbus.yaml"),
@@ -675,8 +675,8 @@ Unified interface for all LLM providers:
 ```python
 from abc import ABC, abstractmethod
 from typing import Iterator
-from nimbus import CompletionResponse, StreamChunk
-from nimbus.messages import NimbusMessage
+from nimbus.base.completion import CompletionResponse, StreamChunk
+from nimbus.base.messages import NimbusMessage
 
 class ModelInterface(ABC):
     @abstractmethod
@@ -715,7 +715,7 @@ class ModelInterface(ABC):
 Define tools/functions that agents can use:
 
 ```python
-from nimbus import CapabilityInterface, CapabilitySchema
+from nimbus.base.interfaces import CapabilityInterface, CapabilitySchema
 
 class WebSearchCapability(CapabilityInterface):
     def get_schema(self) -> CapabilitySchema:
@@ -741,7 +741,8 @@ class WebSearchCapability(CapabilityInterface):
 Store and retrieve agent memories:
 
 ```python
-from nimbus import MemoryInterface, MemoryEntry
+from nimbus.base.interfaces import MemoryInterface
+from nimbus.memory import MemoryEntry
 
 class MyMemory(MemoryInterface):
     def store(self, entry: MemoryEntry) -> str:
@@ -760,9 +761,9 @@ class MyMemory(MemoryInterface):
 The router is the main entry point for load balancing across multiple providers and deployments:
 
 ```python
-from nimbus.messages import UserMessage
-from nimbus.routes import ModelRouter, ModelTarget, RouteConfig
-from nimbus.interfaces.router import RoutingStrategy
+from nimbus.base.messages import UserMessage
+from nimbus.router import ModelRouter, ModelTarget, RouteConfig
+from nimbus.base.interfaces.router import RoutingStrategy
 
 # Create router with multiple targets for an alias
 router = ModelRouter(routes=[
@@ -814,7 +815,7 @@ response = router.complete(
 ### Router Configuration from YAML
 
 ```python
-from nimbus.routes import ModelRouter
+from nimbus.router import ModelRouter
 
 # Load router from YAML file with environment variable substitution
 router = ModelRouter.from_yaml("router_config.yaml")
@@ -926,7 +927,7 @@ for info in cooled_down:
 ### Fallbacks and Retry Policies
 
 ```python
-from nimbus.routes import ModelRouter, FallbackConfig, RetryPolicyConfig
+from nimbus.router import ModelRouter, FallbackConfig, RetryPolicyConfig
 
 router = ModelRouter(
     routes=[...],
@@ -948,8 +949,8 @@ router = ModelRouter(
 For serverless environments, use external storage backends:
 
 ```python
-from nimbus.routes import ModelRouter
-from nimbus.routes.storage_backends import RedisBackend, DynamoDBBackend
+from nimbus.router import ModelRouter
+from nimbus.store import RedisBackend, DynamoDBBackend
 
 # Redis backend for persistent state
 redis_storage = RedisBackend("redis://localhost:6379")

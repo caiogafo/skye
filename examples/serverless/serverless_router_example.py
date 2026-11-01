@@ -7,8 +7,8 @@ to maintain state across serverless function invocations.
 """
 
 import asyncio
-from nimbus.routes import ModelRouter, ModelTarget, RouteConfig
-from nimbus.routes.storage_backends import (
+from nimbus.router import ModelRouter, ModelTarget, RouteConfig
+from nimbus.store import (
     InMemoryBackend,
     RedisBackend,
     DynamoDBBackend,
@@ -16,9 +16,9 @@ from nimbus.routes.storage_backends import (
     FileSystemBackend,
     DurableFunctionBackend,
 )
-from nimbus.interfaces.router import RoutingStrategy
-from nimbus.completion import CompletionRequest
-from nimbus.messages import UserMessage
+from nimbus.base.interfaces.router import RoutingStrategy
+from nimbus.base.completion import CompletionRequest
+from nimbus.base.messages import UserMessage
 
 
 def example_in_memory_storage():

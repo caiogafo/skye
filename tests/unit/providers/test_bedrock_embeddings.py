@@ -14,7 +14,7 @@ from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 
-from nimbus.providers.embeddings.bedrock_embeddings import BedrockEmbeddingProvider
+from nimbus.models.embeddings.bedrock_embeddings import BedrockEmbeddingProvider
 
 
 class TestBedrockEmbeddingProviderInitialization:
@@ -40,8 +40,8 @@ class TestBedrockEmbeddingProviderInitialization:
         assert provider.region_name == "us-west-2"
         assert provider.config["profile_name"] == "custom-profile"
     
-    @patch("nimbus.providers.embeddings.bedrock_embeddings.LazyImporter.is_available")
-    @patch("nimbus.providers.embeddings.bedrock_embeddings.LazyImporter.import_module")
+    @patch("nimbus.models.embeddings.bedrock_embeddings.LazyImporter.is_available")
+    @patch("nimbus.models.embeddings.bedrock_embeddings.LazyImporter.import_module")
     def test_lazy_client_initialization_with_lazy_import(
         self, mock_import: Mock, mock_is_available: Mock
     ) -> None:
@@ -70,8 +70,8 @@ class TestBedrockEmbeddingProviderInitialization:
             region_name="us-east-1"
         )
     
-    @patch("nimbus.providers.embeddings.bedrock_embeddings.LazyImporter.is_available")
-    @patch("nimbus.providers.embeddings.bedrock_embeddings.LazyImporter.import_module")
+    @patch("nimbus.models.embeddings.bedrock_embeddings.LazyImporter.is_available")
+    @patch("nimbus.models.embeddings.bedrock_embeddings.LazyImporter.import_module")
     def test_lazy_client_initialization_with_preinstalled_boto3(
         self, mock_import: Mock, mock_is_available: Mock
     ) -> None:
@@ -105,8 +105,8 @@ class TestBedrockEmbeddingProviderInitialization:
 class TestBedrockEmbeddingProviderBatchEncoding:
     """Test batch encoding functionality."""
     
-    @patch("nimbus.providers.embeddings.bedrock_embeddings.LazyImporter.is_available")
-    @patch("nimbus.providers.embeddings.bedrock_embeddings.LazyImporter.import_module")
+    @patch("nimbus.models.embeddings.bedrock_embeddings.LazyImporter.is_available")
+    @patch("nimbus.models.embeddings.bedrock_embeddings.LazyImporter.import_module")
     def test_encode_batch(self, mock_import: Mock, mock_is_available: Mock) -> None:
         """Test batch encoding."""
         mock_is_available.return_value = False
@@ -141,8 +141,8 @@ class TestBedrockEmbeddingProviderBatchEncoding:
         
         assert mock_client.invoke_model.call_count == 2
     
-    @patch("nimbus.providers.embeddings.bedrock_embeddings.LazyImporter.is_available")
-    @patch("nimbus.providers.embeddings.bedrock_embeddings.LazyImporter.import_module")
+    @patch("nimbus.models.embeddings.bedrock_embeddings.LazyImporter.is_available")
+    @patch("nimbus.models.embeddings.bedrock_embeddings.LazyImporter.import_module")
     def test_encode_single_text(self, mock_import: Mock, mock_is_available: Mock) -> None:
         """Test encoding single text."""
         mock_is_available.return_value = False

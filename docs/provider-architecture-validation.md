@@ -14,10 +14,10 @@ The provider transformation architecture has been validated and meets all encaps
 **Status**: PASSED
 
 All core library modules are provider-agnostic:
-- `src/nimbus/routes/` - Router and routing logic
-- `src/nimbus/capabilities/` - Capability system (except documented debt)
-- `src/nimbus/completion.py` - Completion models
-- `src/nimbus/messages.py` - Message models
+- `src/nimbus/router/` - Router and routing logic
+- `src/nimbus/tools/` - Capability system (except documented debt)
+- `src/nimbus/base/completion.py` - Completion models
+- `src/nimbus/base/messages.py` - Message models
 
 No provider-specific code found in core library modules (except documented architectural debt).
 
@@ -28,13 +28,13 @@ No provider-specific code found in core library modules (except documented archi
 Both transformers properly use the delegation pattern:
 
 #### MessageTransformer
-- Location: `src/nimbus/providers/transformers.py`
+- Location: `src/nimbus/models/transformers.py`
 - Pattern: Thin delegation layer
 - Method: `transform_for_provider(messages, provider)` delegates to `provider._transform_messages()`
 - No provider-specific methods
 
 #### CapabilityTransformer
-- Location: `src/nimbus/capabilities/capability_transformer.py`
+- Location: `src/nimbus/tools/capability_transformer.py`
 - Pattern: Thin delegation layer
 - Method: `transform_for_provider(capabilities, provider)` delegates to `provider._transform_capabilities()`
 - No provider-specific methods
@@ -68,7 +68,7 @@ All provider implementations properly encapsulate transformations:
 
 #### CapabilityCallHandler
 
-**File**: `src/nimbus/capabilities/capability_call_handler.py`
+**File**: `src/nimbus/tools/capability_call_handler.py`
 
 **Issue**: Contains provider-specific parsing and formatting methods:
 - `_parse_openai_capability_calls()`
@@ -216,7 +216,7 @@ The architecture is production-ready and maintainable. The single instance of do
 ## References
 
 - [Provider Transformation Architecture](./provider-transformation-architecture.md) - Complete architecture documentation
-- [BaseModelProvider](../src/nimbus/providers/base.py) - Base provider class
-- [OpenAIProvider](../src/nimbus/providers/llm/openai_provider.py) - Example implementation
-- [BedrockProvider](../src/nimbus/providers/llm/bedrock_provider.py) - Example implementation
+- [BaseModelProvider](../src/nimbus/models/base.py) - Base provider class
+- [OpenAIProvider](../src/nimbus/models/llm/openai_compatible.py) - Example implementation
+- [BedrockProvider](../src/nimbus/models/llm/bedrock.py) - Example implementation
 - [Validation Script](../scripts/validate_provider_architecture.py) - Automated validation tool

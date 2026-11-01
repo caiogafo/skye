@@ -24,7 +24,7 @@ import asyncio
 import math
 import os
 
-import nimbus
+from nimbus.models.registry import provider as create_provider
 
 
 def openai_embeddings():
@@ -39,8 +39,8 @@ def openai_embeddings():
         return
     
     try:
-        # Use the modern nimbus.provider() interface
-        embedder = nimbus.provider(
+        # Use the modern create_provider() interface
+        embedder = create_provider(
             "openai",
             model="text-embedding-3-small",
             api_key=api_key,
@@ -82,7 +82,7 @@ def bedrock_embeddings():
     print("=" * 60)
     
     try:
-        embedder = nimbus.provider(
+        embedder = create_provider(
             "bedrock",
             model="amazon.titan-embed-text-v1",
             region_name="us-east-1",
@@ -127,7 +127,7 @@ def vertex_embeddings():
         return
     
     try:
-        embedder = nimbus.provider(
+        embedder = create_provider(
             "vertex",
             model="textembedding-gecko@003",
             project_id=project_id,
@@ -181,7 +181,7 @@ def single_text_encoding():
         return
     
     try:
-        embedder = nimbus.provider(
+        embedder = create_provider(
             "openai",
             model="text-embedding-3-small",
             api_key=api_key,
@@ -219,7 +219,7 @@ async def async_encoding():
         return
     
     try:
-        embedder = nimbus.provider(
+        embedder = create_provider(
             "openai",
             model="text-embedding-3-small",
             api_key=api_key,
@@ -259,7 +259,7 @@ def batch_processing():
         return
     
     try:
-        embedder = nimbus.provider(
+        embedder = create_provider(
             "openai",
             model="text-embedding-3-small",
             api_key=api_key,

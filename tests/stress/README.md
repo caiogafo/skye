@@ -55,9 +55,9 @@ Stress tests track and report:
 import pytest
 import asyncio
 import time
-from nimbus.routes import ModelRouter
-from nimbus.completion import CompletionRequest
-from nimbus.messages import UserMessage
+from nimbus.router import ModelRouter
+from nimbus.base.completion import CompletionRequest
+from nimbus.base.messages import UserMessage
 
 @pytest.mark.stress
 @pytest.mark.asyncio
@@ -129,7 +129,7 @@ async def test_concurrent_routing_100_requests():
 import pytest
 import asyncio
 import time
-from nimbus.routes import ModelRouter
+from nimbus.router import ModelRouter
 
 @pytest.mark.stress
 @pytest.mark.asyncio
@@ -182,7 +182,7 @@ async def test_rate_limiting_enforcement():
 ```python
 import pytest
 import asyncio
-from nimbus.capabilities import CapabilityRegistry, capability
+from nimbus.tools import CapabilityRegistry, capability
 
 @pytest.mark.stress
 @pytest.mark.asyncio
@@ -232,7 +232,7 @@ async def test_capability_concurrent_execution():
 ```python
 import pytest
 import asyncio
-from nimbus.routes import ModelRouter
+from nimbus.router import ModelRouter
 from unittest.mock import patch
 
 @pytest.mark.stress
