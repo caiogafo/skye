@@ -256,8 +256,18 @@ async def test_fastmcp_returns_identical_nimbus_types(server, monkeypatch):
 
 def test_fastmcp_missing_raises_without_fallback(monkeypatch):
     monkeypatch.setitem(sys.modules, "fastmcp", None)
-    with pytest.raises(MissingExtraError):
+    with pytest.raises(MissingExtraError) as exc:
         create_mcp_client("http://x", impl="fastmcp")
+    assert exc.value.extra == "mcp"
+
+
+def test_impl_is_an_argument_only(monkeypatch):
+    """Req 25: no environment variable or config entry selects the client."""
+    monkeypatch.setenv("NIMBUS_MCP_IMPL", "sdk")
+    monkeypatch.setenv("NIMBUS_IMPL", "sdk")
+    assert isinstance(create_mcp_client("http://x"), BuiltinMCPClient)
+    with pytest.raises(ConfigurationError):
+        create_mcp_client("http://x", impl="sdk")
 
 
 def test_fastmcp_not_imported_with_nimbus_or_tools():

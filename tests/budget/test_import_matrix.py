@@ -17,6 +17,7 @@ SRC = Path(__file__).resolve().parents[2] / "src" / "nimbus"
 LAYERS = {"base": 0, "adapters": 1, "services": 2, "runtime": 3}
 COMPONENT_LAYER = {
     "base": "base",
+    "auth": "base",
     "models": "adapters",
     "store": "adapters",
     "router": "services",
@@ -25,7 +26,7 @@ COMPONENT_LAYER = {
     "memory": "services",
     "guard": "services",
     "observe": "services",
-    "policy": "runtime",
+    "policy": "services",
     "gateway": "runtime",
     "agents": "runtime",
     "teams": "runtime",
@@ -35,20 +36,27 @@ COMPONENT_LAYER = {
 # Maximum set each Component may import (required + optional entries of the design table).
 ALLOWED: dict[str, set[str]] = {
     "base": set(),
-    "models": {"base"},
-    "store": {"base"},
+    # auth does I/O and needs `rsa`; the Layer-0 Components may import only `base`.
+    "auth": {"base"},
+    "models": {"base", "auth"},
+    "store": {"base", "auth"},
     "router": {"base", "models", "store"},
-    "tools": {"base"},  # the MCP prompt facet uses the message types and Port in base, not the prompts component
+    # The MCP prompt facet uses the message types and Port in base, not the prompts component.
+    "tools": {"base", "auth"},
     "prompts": {"base"},
-    "memory": {"base", "store"},
+    "memory": {"base", "store", "auth"},
     "guard": {"base", "models"},
     "observe": {"base"},
     "policy": {"base", "models"},
-    "gateway": {"base", "tools", "models", "policy"},
-    "agents": {"base", "models", "tools", "prompts", "memory", "guard", "observe", "policy"},
-    "teams": {"base", "prompts", "memory", "guard", "observe", "policy"},
-    "flows": {"base", "prompts", "memory", "guard", "observe", "policy"},
+    # The runtime receives the optional services (policy, guard, observe, memory) through
+    # base Ports and hooks, never by import.
+    "gateway": {"base", "tools", "models", "auth"},
+    "agents": {"base", "models"},
+    "teams": {"base"},
+    "flows": {"base"},
 }
+OPTIONAL_SERVICES = {"policy", "guard", "observe", "memory"}
+RUNTIME = {"gateway", "agents", "teams", "flows"}
 ORCHESTRATORS = {"agents", "teams", "flows"}
 
 # Top-level modules that are not Components: they belong to the Layer 0 foundation.
@@ -143,6 +151,28 @@ def test_matrix_is_well_formed() -> None:
         assert comp not in allowed
         assert allowed <= set(COMPONENT_LAYER)
     assert not (ALLOWED["teams"] | ALLOWED["flows"]) & ({"models"} | ORCHESTRATORS)
+    # Layer 0 Components import only `base`: the single same-Layer import allowed.
+    layer0 = {c for c, layer in COMPONENT_LAYER.items() if layer == "base"}
+    for comp in layer0 - {"base"}:
+        assert ALLOWED[comp] == {"base"}
+    for comp, allowed in ALLOWED.items():
+        same = {a for a in allowed if COMPONENT_LAYER[a] == COMPONENT_LAYER[comp]}
+        assert same <= {"base"}, f"{comp} may not import same-Layer peers {same}"
+
+
+def test_policy_is_a_service_and_runtime_never_imports_optional_services() -> None:
+    assert COMPONENT_LAYER["policy"] == "services"
+    assert {c for c, layer in COMPONENT_LAYER.items() if layer == "services"} == {
+        "router", "tools", "prompts", "memory", "guard", "observe", "policy",
+    }
+    assert {c for c, layer in COMPONENT_LAYER.items() if layer == "runtime"} == RUNTIME
+    for comp in RUNTIME:
+        assert not ALLOWED[comp] & OPTIONAL_SERVICES, comp
+
+
+def test_tools_does_not_import_prompts() -> None:
+    assert "prompts" not in ALLOWED["tools"]
+    assert ALLOWED["tools"] <= {"base", "auth"}
 
 
 def test_every_module_resolves_to_a_component() -> None:

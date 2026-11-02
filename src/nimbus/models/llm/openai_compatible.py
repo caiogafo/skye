@@ -55,7 +55,6 @@ class OpenAICompatibleProvider(BaseModelProvider):
         >>> response = provider.complete(request)
     """
 
-    impl_backend = "openai"  # SDK-only today: no REST adapter yet (Req 17)
     
     #: Provider label reported in responses / model info.
     provider_name = "openai"

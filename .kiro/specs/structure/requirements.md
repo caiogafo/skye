@@ -2,50 +2,50 @@
 
 ## Introduction
 
-This specification defines the target module and folder structure of the Nimbus library. It is a cross-cutting, structure-only spec: it establishes package boundaries, layer dependency rules, naming rules, codename (watermark) rules, optional-module packaging rules, and the resolution targets for known overlaps. It does NOT move code and does NOT change any source in this phase; those actions belong to later phases and to the design and tasks documents.
+This specification defines the target module and folder structure of the Nimbus library. It is a cross-cutting, structure-only spec: it establishes package boundaries, layer dependency rules, naming rules, codename (watermark) rules, optional-module packaging rules, and the resolution targets for known overlaps. Each requirement is a declaration of target state; code is moved and changed only by the task groups in `tasks.md`, following `design.md`.
 
 The structure is driven by binding product constraints: a serverless-first deployment packaged as a zip-based runtime, a strong size/weight budget enforced by `budgets.toml` and the budget tests, strict modularity with lazy imports, and provider adapters that prefer the standard library over heavy SDKs. Nimbus is at version 0.1.0 with almost no users, so a breaking rename is acceptable when the migration is documented.
 
+This document describes the **current, decided state**. Decisions that replaced earlier ones are listed once in the Decision log at the end; the full history is in git.
+
 ### Assumptions (explicitly flagged)
 
-- **Assumption A1 (pydantic vs dataclasses tension):** Product constraint 6 requires that the structure NOT depend on pydantic, because core models are planned to move from pydantic to dataclasses in a later step. This conflicts with the workspace `python-standards` steering, which mandates Pydantic v2 for data structures. This spec assumes the structure constraint wins **for structural/boundary purposes only** (the `base` package must not require pydantic to import), and that the pydantic-to-dataclasses migration is handled in a separate later spec. This tension is recorded here and must not be silently resolved.
-- **Assumption A2 (one distribution):** Based on owner-confirmed decision 3, this spec assumes one distribution with extras for now; splitting into multiple distributions is explicitly out of scope and revisited later.
-- **Assumption A3 (declared-but-minimal packages):** Based on owner-confirmed decision 4, this spec assumes `memory`, `guard`, `observe`, `policy`, `gateway`, and `agents` remain as declared packages with minimal content in this step; only `base`, `models`, `store`, `router`, `tools`, and `prompts` receive real structural content now. *(EXTENDED: the runtime Components `teams` and `flows` (Requirement 14) and the Layer-0 Component `auth` (Requirement 22) are likewise declared with minimal content in this step; `auth` is declared as a package with an empty `__init__` per Requirement 22's task group, and `policy` moves to the services Layer per Requirement 21 while still remaining minimal here.)*
-- **Assumption A4 (codename theme):** The codename-to-component mapping (cloud/weather words) is taken as given by the owner and treated as fixed input, not derived.
-- **Assumption A5 (no execution):** All rename, move, merge, split, and overlap-resolution requirements in this document are DECLARATIONS of target state to be executed in later phases; no requirement in this document authorizes changing source code, moving files, or editing other specs during this requirements phase.
-- **Assumption A6 (provider rename vertex → google):** The provider formerly named `vertex` is renamed `google` (Google renamed Vertex AI to the Gemini Enterprise Agent Platform in April 2026). Throughout this spec, read every `vertex`/`Vertex` as `google`: `models/llm/google_provider.py`, `models/embeddings/google_*.py`, class `GoogleProvider`, registered name `"google"`, and the extra `google`. The SDK package remains `google-cloud-aiplatform`.
+- **Assumption A1 (pydantic vs dataclasses tension):** The structure constraint is that `base` must not require pydantic to import, because core models are planned to move from pydantic to dataclasses. This conflicts with the workspace `python-standards` steering, which mandates Pydantic v2. This spec assumes the structure constraint wins **for structural/boundary purposes only**; the migration is handled in a separate later spec. The tension is recorded here and must not be silently resolved.
+- **Assumption A2 (one distribution):** One distribution with extras for now; splitting into multiple distributions is out of scope and revisited later.
+- **Assumption A3 (declared-but-minimal packages):** `memory`, `guard`, `observe`, `policy`, `gateway`, `agents`, `teams`, `flows`, and `auth` are declared packages with minimal content in this step (`auth` has an empty `__init__`; its strategies and sources belong to the `auth` and `models` specs). Only `base`, `models`, `store`, `router`, `tools`, and `prompts` receive real structural content now.
+- **Assumption A4 (codename theme):** The codename-to-component mapping (cloud/weather words) is given by the owner and treated as fixed input.
+- **Assumption A5 (declarations, not execution):** Rename, move, merge, split, and overlap-resolution requirements declare target state; they are executed by the task groups, never implicitly.
+- **Assumption A6 (provider rename vertex → google):** The provider formerly named `vertex` is renamed `google`: `models/llm/google_provider.py`, `models/embeddings/google_*.py`, class `GoogleProvider`, registered name `"google"`, extra `google`. The SDK package remains `google-cloud-aiplatform`.
 
 ## Glossary
 
-- **Nimbus**: The Python library whose structure this spec defines. Also the importable top-level package `nimbus`.
-- **Structure_Spec**: This specification and the artifacts it governs (the target tree, boundary rules, naming rules).
+- **Nimbus**: The Python library whose structure this spec defines; also the importable top-level package `nimbus`.
+- **Structure_Spec**: This specification and the artifacts it governs (target tree, boundary rules, naming rules).
 - **Component**: A named top-level unit of the library (for example `base`, `models`, `store`). Each Component maps to one package folder, one spec folder, and one documentation section that share the same short name.
 - **Layer**: A horizontal grouping of Components with a defined import direction. The four Layers are `base`, `adapters`, `services`, and `runtime`.
-- **Base_Package**: The `nimbus/base/` package holding models, errors, config, and ports. It is the `base` Layer realized as a real package.
-- **Port**: An interface (abstract contract) defined in `Base_Package`, with no I/O and no dependency on any Layer below `base`.
+- **Base_Package**: The `nimbus/base/` package holding models, errors, config, and Ports. It is the `base` Component, in Layer 0.
+- **Port**: An interface (abstract contract) defined in `Base_Package`, with no I/O and no dependency on any other Component.
 - **Adapter**: A concrete implementation of a Port, living in the `adapters` Layer (`models`, `store`).
-- **Decision_Model**: A model kind that returns a constrained choice with calibrated probabilities rather than free text (codenamed "Jev"), implemented in `models` and governed by a `DecisionModel` Port in `Base_Package`.
-- **LazyImporter**: The existing mechanism that defers importing an optional dependency until first use, so that importing a package does not import optional or provider libraries.
-- **Extra**: A `pyproject.toml` optional-dependencies group (for example `[project.optional-dependencies].bedrock`) that installs the libraries required by an optional Component.
-- **MissingExtraError**: A custom Nimbus exception in the NimbusError hierarchy, raised when code uses an optional Component whose Extra is not installed; it wraps the underlying ImportError or ModuleNotFoundError and names the missing Extra.
-- **Codename**: A single cloud/weather word (at most 7 letters) assigned to each Component as a watermark. A Codename is never used as an identifier anywhere in code, imports, config, logs, or spec folders.
-- **Budget_Tests**: The tests under `tests/budget` and the GitHub "budgets" workflow that enforce the limits in `budgets.toml`.
-- **Allowed_Imports_Matrix**: The declared, testable set of permitted import directions between Layers and Components.
-- **Overlap**: A place in the current codebase where two constructs serve the same role (for example two registries) and must be unified by the target structure.
-- **teams**: The runtime Component that coordinates multiple units (for example multiple agents) toward a shared objective; codenamed "front". The role of a member within a team (including a possible `supervisor` role) is a concept owned by `teams`, distinct from a unit's own identity; the detailed member/role model is deferred to the `teams` spec.
-- **flows**: The runtime Component that sequences units into a defined order of steps (shortened from "workflows" to satisfy the 7-letter Component-name limit); codenamed "stream".
-- **Runnable**: The universal composition contract (one input → one output) implemented by model adapters (`models`), `agents`, `teams`, and `flows` (and optionally `tools`); composition always holds other units as `Runnable` references rather than importing their implementation modules. Its conceptual codename is `vapor`, a documentation-only watermark that is not a Component Codename and is not counted among the Component Codenames (14 originally, now 15 including `auth` per Requirement 22.14).
-- **mcp (Extra)**: the optional Extra providing the MCP client dependency (`fastmcp` today); the future target is a standard-library JSON-RPC-over-HTTP client that returns the Extra to zero third-party libraries.
-- **MCP resource Port (hypothesis)** *(RESOLVED and SUPERSEDED by Requirement 19.3; retained for history)*: a proposed small `base` Port to list and read a resource by URI (MIME type + text or bytes), implemented by the MCP client and consumed by `prompts` and `memory`; originally recorded as an open question. Resolution: no resource Port is defined in `base`; the `Resource` type is internal to the `tools` Component (see the "MCP Resource (type)" entry and Requirement 19.3), and no new Component is introduced.
-- **Backend selection (auto-detect with explicit preference)** *(SUPERSEDED by Requirement 24; retained for history)*: the rule that Nimbus defaults to its built-in standard-library implementation and uses a vendor SDK only when the SDK is installed and explicitly requested via configuration or the registry; a missing or out-of-range SDK falls back to the built-in implementation with a warning, and an unselected SDK is never imported. Per Requirement 24 there is no backend-selection machinery for model providers (no environment variable, no `impl` block, no version table, no warning, no SDK fallback): each provider has exactly one active implementation, the built-in one. MCP implementation choice is the only remaining explicit selection, governed by Requirement 25 (`create_mcp_client(target, impl="builtin")`).
-- **Differential test**: a test that runs identical input through Nimbus's built-in standard-library implementation and the official vendor SDK implementation of the same backend and asserts their observable results match within a declared tolerance; it runs only where the SDK is installed (development or CI), never in the core-only budget environment.
-- **MCP Resource (type)**: a type internal to the `tools` Component representing an MCP resource (listed and read by URI, with a MIME type and text or bytes), returned by the MCP client; it is not a `base` Port and introduces no new Component.
-- **Boundary adapter (built-in vs external library)**: the general rule that a Component offering both a built-in and an external-library implementation places them behind one Port returning identical Nimbus types, converting the external library's types to Nimbus types at a single boundary point so those types never leak outside the Component.
-- **Authorizer Port**: a Port defined in `base`, implemented by the `policy` Component, that decides whether a given principal may perform a given action on a given resource and returns a decision; runtime Components receive it by injection rather than importing `policy`.
-- **auth (Component)**: the Layer-0 Component for authentication and credentials (strategies, credential sources, token cache); distinct from `base` because it performs I/O and needs `rsa`. Contrast with `policy` (authorization). The authentication Port lives in `base`; `auth` supplies the implementations.
-- **Interactive login (out of scope for auth)**: an authentication step requiring a person to act at authentication time (browser login, device code, multi-factor prompt); `auth` never performs it and instead reads caches written by vendor command-line tools where applicable.
-- **Skye (planned rename)**: the project's planned new name (import package `skye`, PyPI distribution `skyeai`); documented in Requirement 23 and executed as the final task group, not in this phase.
-- **Bring-your-own adapter**: a small user-written implementation that satisfies the `Runnable` Port (optionally wrapping a vendor SDK) and is passed where a model is expected; the single configuration-free escape hatch for vendor-SDK use on the runtime path.
+- **Decision_Model**: A model kind that returns a constrained choice with calibrated probabilities rather than free text (codenamed "Jev"), implemented in `models` and governed by the `DecisionModel` Port in `Base_Package`.
+- **LazyImporter**: The mechanism that defers importing an optional dependency until first use.
+- **Extra**: A `pyproject.toml` optional-dependencies group that installs the libraries required by an optional Component.
+- **MissingExtraError**: A Nimbus exception raised when code uses an optional Component whose Extra is not installed; it wraps the underlying ImportError and names the missing Extra.
+- **Codename**: A single cloud/weather word (at most 7 letters) assigned to each Component as a watermark; never used as an identifier in code, imports, config, logs, or spec folders.
+- **Budget_Tests**: The tests under `tests/budget` and the GitHub "budgets" workflow that enforce `budgets.toml`.
+- **Allowed_Imports_Matrix**: The declared, testable set of permitted import directions between Layers and Components, enforced by `tests/budget/test_import_matrix.py` (`LAYER` and `ALLOWED`).
+- **Overlap**: A place in the codebase where two constructs serve the same role and must be unified by the target structure.
+- **teams**: The runtime Component that coordinates multiple units (for example agents) toward a shared objective; codenamed "front". The role of a member within a team (for example `supervisor`) is owned by `teams`, distinct from a unit's identity; the member/role model is deferred to the `teams` spec.
+- **flows**: The runtime Component that sequences units into steps (shortened from "workflows" for the 7-letter limit); codenamed "stream".
+- **Runnable**: The universal composition contract (one input → one output) implemented by model adapters, `agents`, `teams`, `flows` (and optionally `tools`); composition holds units as `Runnable` references, never by importing their modules. Its conceptual codename `vapor` is a documentation-only watermark, not a Component Codename.
+- **Authorizer Port**: A `base` Port, implemented by `policy`, that decides whether a principal may perform an action on a resource and returns `permit` or `forbid`; runtime Components receive it by injection.
+- **Authentication Port**: A `base` Port (an object that applies authentication to a request by adding headers or signing it), implemented by `auth`.
+- **auth (Component)**: The Layer-0 Component for authentication and credentials (strategies, credential sources, token cache); distinct from `base` because it performs I/O and needs `rsa`. Contrast with `policy` (authorization).
+- **Interactive login**: An authentication step requiring a person to act at authentication time (browser, device code, multi-factor); `auth` never performs it.
+- **MCP Resource (type)**: A type internal to `tools` representing an MCP resource (listed and read by URI, with a MIME type and text or bytes), returned by the MCP client; not a `base` Port.
+- **Differential test**: A test that runs identical input through Nimbus's built-in implementation and the official vendor SDK of the same backend and asserts the observable results match within a declared tolerance; it runs only where the SDK is installed (development or CI).
+- **Boundary adapter**: The rule that a Component offering both a built-in and an external-library implementation places them behind one Port returning identical Nimbus types, converting external types at a single boundary point.
+- **Bring-your-own adapter**: A small user-written implementation satisfying the `Runnable` Port (optionally wrapping a vendor SDK) and passed where a model is expected; the only vendor-SDK path on the runtime path.
+- **Skye (planned rename)**: The project's planned new name (import package `skye`, PyPI distribution `skyeai`); see Requirement 19.
 
 ## Requirements
 
@@ -55,12 +55,12 @@ The structure is driven by binding product constraints: a serverless-first deplo
 
 #### Acceptance Criteria
 
-1. THE Structure_Spec SHALL define each Component with a single name that is between 3 and 7 lowercase ASCII letters (a-z) inclusive, contains no digits, spaces, hyphens, or underscores, and matches the pattern ^[a-z]{3,7}$.
-2. THE Structure_Spec SHALL use a single identical Component name string for that Component's package folder, its spec folder, its module package, and its documentation section heading.
-3. THE Structure_Spec SHALL define the Component set as exactly these 14 names and no others: base, models, store, router, tools, prompts, memory, guard, policy, observe, gateway, agents, teams, flows. *(SUPERSEDED by Requirement 22.14: the Component set now contains exactly 15 names, adding `auth`; see Requirement 22.1–22.2 for the updated layer assignment.)*
+1. THE Structure_Spec SHALL define each Component with a single name matching `^[a-z]{3,7}$` (3 to 7 lowercase ASCII letters; no digits, spaces, hyphens, or underscores).
+2. THE Structure_Spec SHALL use one identical name string for a Component's package folder, spec folder, module package, `budgets.toml` entry, and documentation section heading.
+3. THE Structure_Spec SHALL define the Component set as exactly these 15 names and no others: base, auth, models, store, router, tools, prompts, memory, guard, policy, observe, gateway, agents, teams, flows.
 4. THE Structure_Spec SHALL define the cross-cutting spec set as exactly these 3 names and no others: structure, wiki, budgets.
-5. WHERE a Component name is used at the class or function level, THE Structure_Spec SHALL allow descriptive identifiers (for example ModelRouter, CapabilityRegistry) while keeping the Component folder name constrained to the pattern ^[a-z]{3,7}$.
-6. IF a proposed Component name exceeds 7 letters, contains fewer than 3 letters, contains any character outside a-z, OR exactly matches an existing name already present in the Component set or the cross-cutting spec set, THEN THE Structure_Spec SHALL reject that name, retain the existing name set unchanged, and record a conflict entry identifying the rejected name and the violated rule.
+5. WHERE a name is used at class or function level, THE Structure_Spec SHALL allow descriptive identifiers (for example ModelRouter, CapabilityRegistry) while keeping Component folder names constrained to `^[a-z]{3,7}$`.
+6. IF a proposed Component name exceeds 7 letters, has fewer than 3 letters, contains a character outside a-z, OR matches an existing Component or cross-cutting spec name, THEN THE Structure_Spec SHALL reject it, keep the existing set unchanged, and record a conflict entry naming the rejected name and the violated rule.
 
 ### Requirement 2: Layer dependency rules (allowed-import direction)
 
@@ -68,13 +68,21 @@ The structure is driven by binding product constraints: a serverless-first deplo
 
 #### Acceptance Criteria
 
-1. THE Structure_Spec SHALL define exactly four Layers and SHALL assign each Layer an ordinal from most foundational to most dependent: base=0, adapters=1, services=2, runtime=3.
-2. THE Structure_Spec SHALL assign Components to Layers as: base Layer = {base}; adapters Layer = {models, store}; services Layer = {router, tools, prompts, memory, guard, observe}; runtime Layer = {policy, gateway, agents, teams, flows}. *(SUPERSEDED: `policy` moves from the runtime Layer to the services Layer per Requirement 21.1–21.2, and Requirement 22.2 adds `auth` to Layer 0, giving the current assignment: Layer 0 = {base, auth}; Layer 1 = {models, store}; Layer 2 = {router, tools, prompts, memory, guard, observe, policy}; Layer 3 = {gateway, agents, teams, flows}.)*
-3. THE Structure_Spec SHALL require that a Component in the Layer with ordinal N import only from Components in a Layer with ordinal strictly less than N, with the single exception that every Component MAY import `base` (the Layer-0 foundation). *(CLARIFIED, standing rule: no horizontal (same-Layer) import between two non-`base` Components is permitted; when a Component needs to consume another Component in the same Layer, the contract SHALL be expressed as a Port defined in `base` and the consuming Component SHALL depend on that `base` Port, not on the other Component. The only same-Layer import allowed is importing `base` itself (per Requirement 22.6), because `base` is the Layer-0 foundation that introduces no upward dependency; `base` itself never imports another Component, including `auth`, and instead exposes Ports that `auth` and others implement.)*
-4. THE Base_Package SHALL import only the Python standard library and SHALL perform no file-system, network, or process I/O. *(CLARIFIED by Requirement 22.3: this no-I/O, standard-library-only rule applies to the `base` Component specifically and NOT to the whole Layer 0; the Layer-0 Component `auth` is exempt because it performs I/O and needs the pure-Python package `rsa`.)* *(RESOLVED open question: `base/http.py` STAYS inside `base` as the single, explicit, standard-library-only HTTP transport exception to the network-I/O prohibition of this clause; it uses only the standard library (for example `urllib`/`http.client`), imports no third-party package, and is the shared transport that `auth` and the adapters build upon.)*
-5. IF a Component in a Layer with ordinal N imports from a Component in a Layer with ordinal greater than N, THEN THE Allowed_Imports_Matrix check SHALL report the import as a violation and SHALL identify the importing Component and its Layer and the imported Component and its Layer.
-6. THE Structure_Spec SHALL require a deterministic test, implemented with static analysis of the abstract syntax tree in the manner of `tests/budget/test_policy.py`, that enforces the Allowed_Imports_Matrix, produces the same result for the same input, and exits with a non-zero status when a violation is present.
-7. THE Structure_Spec SHALL record the following known import violations to be removed by the target structure: `completion.py` imports `capabilities`; `providers` imports `capabilities`; and `interfaces` imports `memory`.
+1. THE Structure_Spec SHALL define exactly four Layers with ordinals: base=0, adapters=1, services=2, runtime=3.
+2. THE Structure_Spec SHALL assign Components to Layers as: Layer 0 = {base, auth}; Layer 1 = {models, store}; Layer 2 = {router, tools, prompts, memory, guard, observe, policy}; Layer 3 = {gateway, agents, teams, flows}.
+3. THE Structure_Spec SHALL require that a Component in Layer N import only from Components in Layers with ordinal strictly less than N, with the single exception that every Component MAY import `base`. No horizontal (same-Layer) import between two non-`base` Components is permitted; when a Component needs to consume another Component of its Layer, the contract SHALL be a Port in `base` and the consumer SHALL depend on that Port. The only same-Layer imports are Layer-0 Components importing `base` (`auth → base`). `base` never imports another Component.
+4. THE Base_Package SHALL import only the Python standard library and SHALL perform no file-system, network, or process I/O, with one explicit exception: `base/http.py` stays inside `base` as the single standard-library-only HTTP transport (using only `urllib`/`http.client`), shared by `auth` and the adapters. This rule applies to the `base` Component, not to all of Layer 0: `auth` performs I/O (metadata and token endpoints, credential files, possibly a subprocess) and needs the pure-Python package `rsa`.
+5. THE Structure_Spec SHALL set these Component-level allowed imports (the Allowed_Imports_Matrix; every unlisted row follows Layer rule 3):
+   - `auth` imports only `base`.
+   - `models` and `store` may import `base` and `auth`.
+   - `tools` imports `base` and `auth` and NOT `prompts` (see Requirement 15.2).
+   - `policy` imports `base` and `models`.
+   - `memory` may also import `auth`.
+   - `gateway` may import `base`, `tools`, `models`, and `auth`.
+   - Runtime Components (`gateway`, `agents`, `teams`, `flows`) never import `policy`, `guard`, `observe`, or `memory` (Requirement 17.3).
+6. IF a Component imports from a Component of a higher Layer, or violates the Component-level rows of criterion 5, THEN THE Allowed_Imports_Matrix check SHALL report a violation identifying the importing Component and its Layer and the imported Component and its Layer.
+7. THE Structure_Spec SHALL require a deterministic test, using static analysis of the abstract syntax tree in the manner of `tests/budget/test_policy.py`, that enforces the Allowed_Imports_Matrix, gives the same result for the same input, and exits non-zero when a violation is present.
+8. THE Structure_Spec SHALL record these known import violations to be removed: `completion.py` imports `capabilities`; `providers` imports `capabilities`; and `interfaces` imports `memory`.
 
 ### Requirement 3: Base package contents and ports
 
@@ -82,12 +90,12 @@ The structure is driven by binding product constraints: a serverless-first deplo
 
 #### Acceptance Criteria
 
-1. THE Structure_Spec SHALL define `base` as a real importable package located at `nimbus/base/` containing an `__init__.py`, not only a conceptual layer.
-2. THE Base_Package SHALL contain all four of the following module groups: the core models (messages, completion, capability schema), the error hierarchy, configuration loading, and the Ports (interfaces). *(EXTENDED: the Ports group now also includes the authorizer Port implemented by `policy` (Requirement 21.4) and the authentication Port implemented by `auth` (Requirement 22.4), alongside the existing guard Port (`interfaces/safety.py`), observe Port (`interfaces/observer.py`), and memory Port (`interfaces/memory.py`).)*
-3. THE Base_Package SHALL define each Port as an interface that performs no I/O operations (no network, filesystem, or database access) and contains no import statement referencing the adapters, services, or runtime Layers.
-4. IF any module in the Base_Package declares an import of a package outside the Python standard library other than the Ports contract, THEN THE Structure_Spec SHALL treat this as a violation and reject the Base_Package as non-compliant.
+1. THE Structure_Spec SHALL define `base` as a real importable package at `nimbus/base/` containing an `__init__.py`.
+2. THE Base_Package SHALL contain: the core models (messages, completion, capability schema), the error hierarchy, configuration loading, and the Ports. The Ports include the guard Port (`interfaces/safety.py`), the observe Port (`interfaces/observer.py`), the memory Port (`interfaces/memory.py`), the authorizer Port (Requirement 17.4), and the authentication Port (Requirement 18.4).
+3. THE Base_Package SHALL define each Port as an interface that performs no I/O and contains no import of any other Component.
+4. IF any `base` module imports a package outside the Python standard library, THEN THE Structure_Spec SHALL treat this as a violation and reject the Base_Package as non-compliant.
 5. THE Structure_Spec SHALL NOT require pydantic as an import dependency of the Base_Package.
-6. THE Structure_Spec SHALL record Assumption A1 (the pydantic-versus-dataclasses tension with the python-standards steering) as an entry explicitly labeled as an open, unresolved tension whose scope is limited to this spec.
+6. THE Structure_Spec SHALL record Assumption A1 as an open, unresolved tension whose scope is limited to this spec.
 
 ### Requirement 4: Models component and the DecisionModel port
 
@@ -95,14 +103,14 @@ The structure is driven by binding product constraints: a serverless-first deplo
 
 #### Acceptance Criteria
 
-1. THE Structure_Spec SHALL define `models` as the Component that holds adapters to every model API kind: large language models, embedding models, and Decision_Models.
-2. THE Structure_Spec SHALL place one shared HTTP transport, retry policy, error mapping, and token counting inside the `models` Component such that every adapter reuses the same instances and no adapter defines its own transport, retry policy, error mapping, or token counter.
-3. WHEN an adapter issues a request through the shared HTTP transport and the request fails with a transient error, THE models Component SHALL retry the request up to a configurable maximum of 3 retries after the initial request (4 total attempts) before mapping the failure to a Nimbus error.
-4. THE Base_Package SHALL define exactly one `DecisionModel` Port whose response returns a single choice selected from a caller-supplied finite set of allowed options together with a probability for each allowed option, where every probability is in the range 0.0 to 1.0 and the probabilities sum to 1.0.
-5. IF a `DecisionModel` Port call receives an empty set of allowed options, THEN THE models Component SHALL reject the call with a Nimbus error indicating that at least one option is required and SHALL NOT return a choice.
-6. THE Structure_Spec SHALL place the Decision_Model implementation (codenamed Jev) inside `models` as a third model kind alongside large language models and embeddings.
+1. THE Structure_Spec SHALL define `models` as the Component holding adapters for every model API kind: large language models, embedding models, and Decision_Models.
+2. THE `models` Component SHALL contain one shared HTTP transport, retry policy, error mapping, and token counter, reused by every adapter; no adapter defines its own.
+3. WHEN an adapter's request fails with a transient error, THE `models` Component SHALL retry up to a configurable maximum of 3 retries after the initial request (4 total attempts) before mapping the failure to a Nimbus error.
+4. THE Base_Package SHALL define exactly one `DecisionModel` Port whose response returns one choice from a caller-supplied finite set of options together with a probability for each option, each in 0.0–1.0 and summing to 1.0.
+5. IF a `DecisionModel` call receives an empty option set, THEN THE `models` Component SHALL reject it with a Nimbus error stating that at least one option is required and SHALL NOT return a choice.
+6. THE Structure_Spec SHALL place the Decision_Model implementation (Jev) inside `models` as a third model kind.
 7. THE Structure_Spec SHALL record that the `DecisionModel` Port is consumed by `gateway` for tool selection, by `router` for selecting the cheapest capable model, and by `guard` for pre-flight checks.
-8. WHERE a provider offers a REST API reachable with the Python standard library, THE Structure_Spec SHALL prefer a thin standard-library adapter over the provider software development kit.
+8. WHERE a provider offers a REST API reachable with the standard library, THE Structure_Spec SHALL prefer a thin standard-library adapter over the provider SDK.
 
 ### Requirement 5: Shared store component
 
@@ -110,12 +118,12 @@ The structure is driven by binding product constraints: a serverless-first deplo
 
 #### Acceptance Criteria
 
-1. THE Structure_Spec SHALL define `store` as exactly one shared Component containing the in-memory, file, DynamoDB, and Redis state backends, with each backend exposed as a distinct module within that single `store` Component.
-2. WHERE a Port for a store backend exists in the Base_Package, THE Structure_Spec SHALL require that services consume that backend only through the Base_Package Port and SHALL prohibit services from importing the backend implementation directly.
-3. IF a service requires a store backend for which no Base_Package Port exists, THEN THE Structure_Spec SHALL require that a Port be defined in the Base_Package before the backend is consumed, so that no service imports a backend implementation without an intervening Port.
-4. THE Structure_Spec SHALL require that DynamoDB be designated the first-choice durable backend, and SHALL require that any durable-state requirement default to DynamoDB unless an alternative backend is explicitly declared.
-5. THE Structure_Spec SHALL NOT place a copy or re-implementation of any storage backend inside any service Component, such that each of the in-memory, file, DynamoDB, and Redis backends appears in exactly one location, the shared `store` Component.
-6. WHERE a store backend offers both a pure-Python driver and a compiled driver, THE Structure_Spec SHALL require selection of the pure-Python driver as the default, and SHALL permit the compiled driver only when the selection is explicitly declared.
+1. THE Structure_Spec SHALL define `store` as exactly one shared Component containing the in-memory, file, DynamoDB, and Redis backends, each a distinct module.
+2. WHERE a Port for a store backend exists in `base`, services SHALL consume the backend only through that Port and SHALL NOT import the implementation.
+3. IF a service needs a store backend with no `base` Port, THEN a Port SHALL be defined in `base` before the backend is consumed.
+4. THE Structure_Spec SHALL designate DynamoDB the first-choice durable backend; any durable-state requirement defaults to DynamoDB unless an alternative is explicitly declared.
+5. THE Structure_Spec SHALL NOT place a copy of any storage backend inside a service Component; each backend appears exactly once, in `store`.
+6. WHERE a backend offers a pure-Python and a compiled driver, THE Structure_Spec SHALL default to the pure-Python driver and permit the compiled one only when explicitly declared.
 
 ### Requirement 6: Optional-module packaging and lazy import
 
@@ -123,13 +131,13 @@ The structure is driven by binding product constraints: a serverless-first deplo
 
 #### Acceptance Criteria
 
-1. THE Structure_Spec SHALL classify each of the 14 Components defined in Requirement 1 as exactly one of always-present (installed by the core, no Extra) or optional (installed by an Extra), such that the classification forms a complete partition of the 14-Component set. *(UPDATED by Requirement 22.14: the partition now covers all 15 Components, classifying `auth` as optional with the `auth` Extra per Requirement 22.9.)*
-2. WHERE a Component is optional, THE Structure_Spec SHALL require that importing that Component's package does not import the Component's optional library at module import time, and SHALL require that the optional library be imported only through the LazyImporter at first use.
-3. IF code uses an optional Component whose Extra is not installed, THEN THE Nimbus package SHALL raise a custom Nimbus exception named MissingExtraError that wraps the underlying ImportError or ModuleNotFoundError and identifies the missing Extra by name.
-4. THE Structure_Spec SHALL keep one distribution with Extras, consistent with Assumption A2.
-5. THE Structure_Spec SHALL limit the `nimbus/__init__.py` re-export set to exactly messages, completion, exceptions, and config, and SHALL require that this set be testable against the `forbidden_at_import` set in `budgets.toml`.
-6. THE Structure_Spec SHALL remove from `nimbus/__init__.py` any re-export that would cause an optional or provider library to be imported.
-7. THE Structure_Spec SHALL retain `memory`, `guard`, `observe`, `policy`, `gateway`, and `agents` as declared packages with minimal content in this step, consistent with Assumption A3.
+1. THE Structure_Spec SHALL classify each of the 15 Components as exactly one of always-present (core, no Extra) or optional (installed by an Extra), forming a complete partition. `auth` is optional with the `auth` Extra (Requirement 18.9).
+2. WHERE a Component is optional, importing its package SHALL NOT import its optional library at module import time; the library SHALL be imported only through the LazyImporter at first use.
+3. IF code uses an optional Component whose Extra is not installed, THEN Nimbus SHALL raise `MissingExtraError` wrapping the underlying ImportError and naming the missing Extra.
+4. THE Structure_Spec SHALL keep one distribution with Extras (Assumption A2).
+5. THE Structure_Spec SHALL limit the `nimbus/__init__.py` re-export set to exactly messages, completion, exceptions, and config, testable against `forbidden_at_import` in `budgets.toml`.
+6. THE Structure_Spec SHALL remove from `nimbus/__init__.py` any re-export that would import an optional or provider library.
+7. THE Structure_Spec SHALL retain the declared-but-minimal packages of Assumption A3.
 
 ### Requirement 7: Clean import of the top-level package
 
@@ -137,12 +145,11 @@ The structure is driven by binding product constraints: a serverless-first deplo
 
 #### Acceptance Criteria
 
-1. WHEN a fresh interpreter executes `import nimbus` in a core-only install, THE Nimbus package SHALL NOT import any library listed in the `forbidden_at_import` set of `budgets.toml`, which covers provider software development kits and optional-Extra libraries.
-2. WHEN a library listed in the `forbidden_at_import` set of `budgets.toml` is present in the environment and a fresh interpreter executes `import nimbus`, THE Nimbus package SHALL NOT import that library as a side effect.
-3. WHEN a fresh interpreter executes `import nimbus` in a core-only install, THE number of modules loaded SHALL NOT exceed the `max_modules_loaded` value of 340 recorded in `budgets.toml`, and the import time SHALL NOT exceed the `max_import_ms` value of 250 milliseconds, measured as the best of 5 runs.
-4. THE Structure_Spec SHALL record that `nimbus/capabilities/remote_api.py` currently imports httpx and requests at module level as the `known_leaks` entries in `budgets.toml`, and that both imports are to be moved behind the LazyImporter.
-5. WHEN a known import leak is resolved, THE Structure_Spec SHALL require that the corresponding entry be deleted from the `known_leaks` list in `budgets.toml`; and WHILE a `known_leaks` entry remains tracked, THE Budget_Tests SHALL emit a non-failing warning that identifies the tracked `known_leaks` entry rather than failing the build.
-6. IF `import nimbus` imports a library listed in the `forbidden_at_import` set of `budgets.toml` that is not an expected `known_leaks` entry, THEN THE Budget_Tests SHALL report a failure and identify the offending library.
+1. WHEN a fresh interpreter runs `import nimbus` in a core-only install, THE package SHALL NOT import any library in `forbidden_at_import` of `budgets.toml`, even if present in the environment.
+2. WHEN a fresh interpreter runs `import nimbus` in a core-only install, THE modules loaded SHALL NOT exceed `max_modules_loaded` (340) and the import time SHALL NOT exceed `max_import_ms` (250 ms), best of 5 runs.
+3. THE Structure_Spec SHALL record that `nimbus/capabilities/remote_api.py` currently imports httpx and requests at module level (the `known_leaks` entries) and that both are to move behind the LazyImporter.
+4. WHEN a known leak is resolved, its `known_leaks` entry SHALL be deleted; WHILE an entry remains, THE Budget_Tests SHALL emit a non-failing warning naming it.
+5. IF `import nimbus` imports a `forbidden_at_import` library that is not an expected `known_leaks` entry, THEN THE Budget_Tests SHALL fail and identify the library.
 
 ### Requirement 8: Extras declare exactly the imported libraries
 
@@ -150,12 +157,11 @@ The structure is driven by binding product constraints: a serverless-first deplo
 
 #### Acceptance Criteria
 
-1. THE Structure_Spec SHALL require that each Extra declare exactly the set of libraries that the corresponding Component's code imports, with no missing declaration and no unused declaration.
-2. THE Structure_Spec SHALL record that the `memory` Extra currently declares psycopg2-binary, that psycopg2-binary is unused and LGPL-licensed, and that it is to be removed.
-3. THE Structure_Spec SHALL record that the `memory` Component's code uses `redis.asyncio` and `asyncpg`, that `asyncpg` is currently undeclared, and that `asyncpg` is to be declared by the `memory` Extra.
-4. THE Structure_Spec SHALL require that the corrected `memory` Extra declarations match exactly the libraries the `memory` code imports.
-5. THE Structure_Spec SHALL require that Extra declarations respect the dependency preference order recorded in `budgets.toml`: standard library first, then libraries already present in the target serverless runtime, then pure-Python packages, and compiled packages last.
-6. IF an Extra declares a library the corresponding Component does not import OR omits a library the corresponding Component does import, THEN THE Budget_Tests SHALL report the specific mismatch.
+1. THE Structure_Spec SHALL require that each Extra declare exactly the third-party libraries its Component's code imports: none missing, none unused.
+2. THE Structure_Spec SHALL record that the `memory` Extra declares `psycopg2-binary`, which is unused and LGPL-licensed, and is to be removed.
+3. THE Structure_Spec SHALL record that `memory` imports `redis.asyncio` and `asyncpg`, that `asyncpg` is undeclared, and that the `memory` Extra is to declare exactly those libraries.
+4. THE Structure_Spec SHALL require that Extra declarations follow the dependency preference order in `budgets.toml`: standard library, then libraries in the target serverless runtime, then pure-Python packages, compiled packages last.
+5. IF an Extra declares a library its Component does not import OR omits one it does, THEN THE Budget_Tests SHALL report the specific mismatch.
 
 ### Requirement 9: Codename watermark rules
 
@@ -163,293 +169,218 @@ The structure is driven by binding product constraints: a serverless-first deplo
 
 #### Acceptance Criteria
 
-1. THE Structure_Spec SHALL assign each Component exactly one Codename from the fixed mapping: base=stratus, models=zephyr, store=lake, router=jet, tools=updraft, prompts=cirrus, memory=dew, guard=halo, policy=isobar, observe=radar, gateway=horizon, agents=cyclone, teams=front, flows=stream, auth=ozone. *(EXTENDED by Requirement 22.15, resolved: the owner chose `ozone` as the Codename of the fifteenth Component `auth`; the mapping now contains exactly 15 entries, all unique.)*
-2. THE Structure_Spec SHALL require that each Codename be between 3 and 7 lowercase ASCII letters matching the pattern ^[a-z]{3,7}$.
-3. THE Structure_Spec SHALL require that the Codename mapping contain exactly 14 entries, one per Component, and that all Codenames be unique. *(SUPERSEDED by Requirement 22.14: the Codename mapping now contains exactly 15 entries, one per Component including `auth`; uniqueness is unchanged.)*
-4. THE Structure_Spec SHALL restrict Codename appearance to exactly these four places and no others: the `codename` front-matter field of the Component's spec and docs section; one italic line under each docs section index; the last line of the package `__init__.py` module docstring; and one glossary page in the documentation wiki.
-5. THE Structure_Spec SHALL prohibit a Codename from appearing anywhere else, including any import path, folder name, file name, class name, function name, configuration key, log field, or spec folder name.
-6. THE Structure_Spec SHALL require a deterministic test that verifies every Codename matches the pattern ^[a-z]{3,7}$, that all Codenames are unique, that the mapping contains exactly 14 entries, and that no Codename appears in a package name, a file name, or an import. *(SUPERSEDED by Requirement 22.14 and 22.17: the deterministic Codename test asserts exactly 15 entries once the `auth` Codename is chosen; pattern, uniqueness, and no-leak checks are unchanged.)*
-7. IF a Codename appears in a package name, a file name, or an import, THEN the deterministic Codename test SHALL report a failure and identify the offending Codename and location.
-8. THE Structure_Spec SHALL assign the `Runnable` Port the conceptual Codename `vapor` as a documentation-only watermark, distinct from the 14 Component Codenames; this watermark SHALL appear only in documentation (the glossary or wiki and the Port's module docstring) and SHALL NOT be counted among the 14 Component Codenames nor appear in any import path, folder name, file name, class name, function name, configuration key, or spec folder name. *(UPDATED by Requirement 22.14: read "the 14 Component Codenames" as "the Component Codenames" (now 15 including `auth`); `vapor` remains a documentation-only watermark that is not counted among the Component Codenames.)*
-9. THE Structure_Spec SHALL require that `vapor` be unique with respect to the 14 Component Codenames and match the pattern ^[a-z]{3,7}$. *(UPDATED by Requirement 22.14: `vapor` SHALL be unique with respect to the Component Codenames (now 15 including `auth`) and against `nimbus` per Requirement 23.7; pattern unchanged.)*
+1. THE Structure_Spec SHALL assign each Component exactly one Codename: base=stratus, auth=ozone, models=zephyr, store=lake, router=jet, tools=updraft, prompts=cirrus, memory=dew, guard=halo, policy=isobar, observe=radar, gateway=horizon, agents=cyclone, teams=front, flows=stream.
+2. THE Structure_Spec SHALL require that each Codename match `^[a-z]{3,7}$`, that the mapping contain exactly 15 entries, and that all Codenames be unique.
+3. THE Structure_Spec SHALL restrict Codename appearance to exactly four places: the `codename` front-matter field of the Component's spec and docs section; one italic line under each docs section index; the last line of the package `__init__.py` module docstring; and one glossary page in the documentation wiki.
+4. THE Structure_Spec SHALL prohibit a Codename from appearing anywhere else, including any import path, folder name, file name, class name, function name, configuration key, log field, or spec folder name.
+5. THE Structure_Spec SHALL require a deterministic test asserting pattern, uniqueness, exactly 15 entries, and no Codename in a package name, file name, or import; IF one appears there, THEN the test SHALL fail and identify the Codename and location.
+6. THE Structure_Spec SHALL assign `vapor` to the `Runnable` Port and `nimbus` to the whole project as documentation-only watermarks: unique against the 15 Component Codenames, matching `^[a-z]{3,7}$`, not counted among the 15, and never appearing in any import path, folder, file, class, function, configuration key, or spec folder name. `vapor` appears only in documentation (glossary or wiki, and the Port's module docstring). `nimbus` becomes the umbrella watermark after the rename (Requirement 19.6); until then it is the project's name and no codename test applies to it.
 
 ### Requirement 10: Overlaps to be resolved by the structure
 
-**User Story:** As a Nimbus maintainer, I want the known duplications recorded as resolution targets, so that the design unifies them without this phase executing any change.
+**User Story:** As a Nimbus maintainer, I want the known duplications recorded as resolution targets, so that the design unifies them.
 
 #### Acceptance Criteria
 
-1. THE Structure_Spec SHALL record the two registries (`interfaces/route_registry.py` and `providers/registry.py`) as a single Overlap entry that names both source paths and the one target structure location into which they are to be unified.
-2. THE Structure_Spec SHALL record the two storage concepts (`interfaces/storage.py` and `routes/storage_backends.py`) as a single Overlap entry that names both source paths and identifies the `store` Component as the one unification target.
-3. THE Structure_Spec SHALL record the scattered cost, error, and token interfaces-and-implementations as an Overlap entry that lists, for each of the three concepts, its interface placement in `base` as a Port and its implementation placement in the responsible Component.
-4. THE Structure_Spec SHALL list every Overlap entry with exactly one intended resolution location per entry, and each entry SHALL be expressed as a recorded target only.
-5. IF an Overlap entry or a planned spec rename references code, THEN THE Structure_Spec SHALL record it as a future action and SHALL NOT move, edit, delete, or rewrite any existing code or spec in this phase; WHERE no such reference exists, this prohibition does not apply.
-6. THE Structure_Spec SHALL record the planned spec renames as the exact set of eight mappings (nimbus to base, model-providers to models, capability-support to tools, prompts-support to prompts, policy-engine to policy, agent-runtime to agents, gateway unchanged, and nimbus-consolidation folded into structure), with each mapping stated as a future action.
+1. THE Structure_Spec SHALL record the two registries (`interfaces/route_registry.py` and `providers/registry.py`) as one Overlap entry naming both sources and one target location.
+2. THE Structure_Spec SHALL record the two storage concepts (`interfaces/storage.py` and `routes/storage_backends.py`) as one Overlap entry with `store` as the unification target.
+3. THE Structure_Spec SHALL record the scattered cost, error, and token interfaces-and-implementations as an Overlap entry listing, per concept, its Port placement in `base` and its implementation placement in the responsible Component.
+4. THE Structure_Spec SHALL list every Overlap entry with exactly one intended resolution location.
+5. THE Structure_Spec SHALL record the planned spec renames as exactly eight mappings: nimbus → base, model-providers → models, capability-support → tools, prompts-support → prompts, policy-engine → policy, agent-runtime → agents, gateway unchanged, nimbus-consolidation folded into structure.
 
-### Requirement 11: Scope guard for this phase
-
-**User Story:** As the Nimbus owner, I want this phase to produce requirements only, so that no code or other spec is changed before design is agreed.
-
-#### Acceptance Criteria
-
-1. THE Structure_Spec SHALL confine all output of this phase to a single file at `.kiro/specs/structure/requirements.md`.
-2. WHEN an operation in this phase would otherwise create, modify, or delete a file whose path matches `src/nimbus` (including any subpath), THE Structure_Spec SHALL NOT perform that operation and SHALL record the blocked path as an out-of-scope item; THE Structure_Spec SHALL NOT be required to record paths for operations that were never attempted.
-3. IF any operation in this phase would delete, rewrite, or overwrite an existing file under `.kiro/specs` other than `.kiro/specs/structure/requirements.md`, THEN THE Structure_Spec SHALL NOT perform that operation and SHALL record the protected path as an out-of-scope item.
-4. THE Structure_Spec SHALL NOT create `.kiro/specs/structure/design.md` or `.kiro/specs/structure/tasks.md` in this phase.
-5. THE Structure_Spec SHALL express every boundary, naming, codename, packaging, and overlap-resolution item as a declaration of target state, each stated as a single testable condition to be executed in a later phase.
-6. WHERE an item is not grounded in an explicit source statement, THE Structure_Spec SHALL label that item as an assumption consistent with Assumption A5, and SHALL leave every source-grounded item unlabeled.
-
-### Requirement 12: Composition abstraction for orchestrators
+### Requirement 11: Composition abstraction for orchestrators
 
 **User Story:** As a Nimbus maintainer, I want agents, teams, and flows to compose each other through a single abstraction, so that orchestration is uniform and no import cycle is introduced.
 
 #### Acceptance Criteria
 
-1. THE Base_Package SHALL define a single `Runnable` Port that declares one invocation operation accepting exactly one input argument and returning exactly one output value.
-2. THE Structure_Spec SHALL require that the `agents`, `teams`, and `flows` implementation modules each declare a type that conforms to the `Runnable` Port invocation operation.
-3. THE Structure_Spec SHALL require that the `teams` and `flows` implementation modules reference composed units only through the `Runnable` Port type defined in `base` and SHALL NOT contain any import statement targeting the `agents`, `teams`, or `flows` implementation modules.
-4. WHEN a `teams` or `flows` unit composes another unit, THE composing unit SHALL hold the composed unit as a `Runnable` Port reference such that no import edge is created between orchestrator implementation modules.
-5. IF a composition nests a unit within itself at runtime, whether directly or transitively, THEN THE composing unit SHALL detect the cycle using a visited-set of unit identities for correctness AND SHALL also enforce a hard maximum nesting depth with a default of 100 levels as a safety net, SHALL stop traversal at the detection point reached either by the visited-set or by reaching the depth cap, and SHALL raise a Nimbus error indicating the cyclic composition without recursing beyond the depth bound.
-6. WHEN the deterministic abstract-syntax-tree import test runs, THE Structure_Spec SHALL require that test to report any direct import among the `agents`, `teams`, and `flows` implementation modules as a violation and SHALL require the test to fail with a non-zero exit status when at least one such violation is detected.
-7. THE Structure_Spec SHALL require that the `models` Component implement the `Runnable` Port for its model adapters, so that a model adapter is usable anywhere a `Runnable` is accepted, including as a step in a `flows` unit or a member of a `teams` unit.
-8. WHEN a `teams` or `flows` unit uses a model, an agent, a team, or a flow as a composed unit, THE composing unit SHALL reference that unit through the `Runnable` Port and SHALL NOT import the `models`, `agents`, `teams`, or `flows` implementation modules.
-9. THE Structure_Spec SHALL require that the `teams` and `flows` implementation modules import at most the `base` Component plus their optional feature consumers (`prompts`, `memory`, `guard`, `observe`, `policy`), and SHALL NOT import the `models`, `agents`, `teams`, or `flows` implementation modules.
-10. THE Structure_Spec SHALL require that the concept of a unit's role within a team (for example a `supervisor` role) be owned by the `teams` Component and SHALL NOT be defined in the `base` Component or the `agents` Component.
-11. THE Structure_Spec SHALL require that the `Runnable` Port remain a pure input-to-output contract with no notion of team role, such that a `teams` unit associates a role with a composed unit through membership metadata defined in `teams` rather than through the `Runnable` Port.
-12. THE Structure_Spec SHALL record that a unit's role within a team is distinct from the unit's own identity, so that the same `Runnable` may hold different roles in different teams; this is a boundary-level statement only, and the concrete TeamMember shape, the role set, and supervisor routing logic are out of scope for this spec and belong to the future `teams` spec.
+1. THE Base_Package SHALL define a single `Runnable` Port declaring one invocation operation that accepts exactly one input and returns exactly one output.
+2. THE `agents`, `teams`, and `flows` implementation modules SHALL each declare a type conforming to `Runnable`.
+3. THE `models` Component SHALL implement `Runnable` for its model adapters, so a model is usable anywhere a `Runnable` is accepted, including as a `flows` step or a `teams` member.
+4. THE `teams` and `flows` modules SHALL reference composed units (models, agents, teams, flows) only as `Runnable` references, SHALL NOT import the `models`, `agents`, `teams`, or `flows` implementation modules, and SHALL NOT import `policy`, `guard`, `observe`, or `memory` (Requirement 17.3); any other import they hold must be a downward import allowed by the Allowed_Imports_Matrix.
+5. IF a composition nests a unit within itself, directly or transitively, THEN THE composing unit SHALL detect the cycle with a visited-set of unit identities, SHALL also enforce a hard maximum nesting depth (default 100) as a safety net, SHALL stop traversal at the detection point, and SHALL raise a Nimbus error indicating the cyclic composition.
+6. WHEN the AST import test runs, it SHALL report any direct import among the `agents`, `teams`, and `flows` modules as a violation and fail with a non-zero exit status.
+7. THE role of a unit within a team (for example `supervisor`) SHALL be owned by `teams`, not defined in `base` or `agents`. `Runnable` SHALL remain a pure input-to-output contract with no notion of role; a `teams` unit associates a role with a member through membership metadata defined in `teams`. A role is distinct from the unit's identity, so the same `Runnable` may hold different roles in different teams. The concrete TeamMember shape, role set, and supervisor routing belong to the future `teams` spec.
 
-### Requirement 13: Single extension point per integration kind
+### Requirement 12: Single extension point per integration kind
 
 **User Story:** As a Nimbus maintainer, I want every external integration to enter through one extensible point, so that adding an integration never requires edits scattered across the core.
 
 #### Acceptance Criteria
 
-1. THE Structure_Spec SHALL require that each integration kind (model provider, store backend, tool or capability, observability exporter) be added through exactly one extension point consisting of a Port defined in `base` plus a registry, with the concrete implementation placed in the owning Component (models, store, tools, observe respectively). *(EXTENDED by Requirement 22.10: credential providers are an additional integration kind, added through the extension point where user code registers its own credential provider, with the implementation placed in the owning Component `auth`.)*
-2. WHERE a new model provider is added, THE Structure_Spec SHALL require that the provider be added as configuration or a thin dialect within `models` without modifying any file outside the `models` Component, consistent with provider-agnosticism.
-3. WHERE a new store backend is added, THE Structure_Spec SHALL require that the backend be exactly one new module in the `store` Component that implements the storage Port, with no modification to any file outside the `store` Component.
-4. THE Structure_Spec SHALL require that adding any integration described in this requirement introduce no import that violates the Allowed_Imports_Matrix.
-5. IF adding an integration described in this requirement requires modifying any file in the `base` Component or in any Component other than the single owning Component, THEN THE Structure_Spec SHALL require that the integration be rejected automatically by a structural tooling check (in continuous integration or the abstract-syntax-tree import-matrix and boundary tooling) that scans the modified files against the owning Component's scope and blocks the change with an automated message identifying the out-of-scope Component that was modified, without relying on manual review. In addition, a mandatory merge gate SHALL independently block the change if the owning-Component scope is violated, so that a merge is blocked even if the primary structural check fails to flag the violation.
-6. WHERE a new tool or capability, or a new observability exporter, is added, THE Structure_Spec SHALL require that it be registered through the registry of its single owning Component (tools or observe respectively) without modifying any file outside that Component.
-### Requirement 14: Extras for teams and flows
+1. THE Structure_Spec SHALL require that each integration kind be added through exactly one extension point (a Port in `base` plus a registry) with the implementation in the owning Component: model provider → `models`; store backend → `store`; tool or capability → `tools`; observability exporter → `observe`; credential provider → `auth` (Requirement 18.10).
+2. WHERE a new model provider is added, it SHALL be configuration or a thin dialect within `models`, with no change to any file outside `models`.
+3. WHERE a new store backend is added, it SHALL be exactly one new module in `store` implementing the storage Port, with no change outside `store`.
+4. WHERE a new tool, capability, or observability exporter is added, it SHALL be registered through the registry of its owning Component (`tools` or `observe`) without modifying any file outside that Component.
+5. THE Structure_Spec SHALL require that adding any such integration introduce no import violating the Allowed_Imports_Matrix.
+6. IF adding an integration requires modifying a file in `base` or any Component other than the owner, THEN a structural tooling check (CI or the AST import-matrix and boundary tooling) SHALL reject the change automatically with a message naming the out-of-scope Component, and a mandatory merge gate SHALL independently block it even if the primary check fails to flag it.
+
+### Requirement 13: Extras for teams and flows
 
 **User Story:** As a Nimbus maintainer, I want `teams` and `flows` to each have their own extra under the same rules as every other optional component, so that any library they later need is declared exactly and budgeted.
 
 #### Acceptance Criteria
 
-1. THE Structure_Spec SHALL define exactly one Extra named `teams` and exactly one Extra named `flows`, each governed by the same rules as every other Extra: it declares exactly the set of third-party libraries that its code imports with no library omitted and no library included that the code does not import, it lists standard library imports before third-party imports, it declares no compiled package (no package requiring a build step or distributing platform-specific binaries), and it is recorded as an entry in `budgets.toml`.
-2. THE Structure_Spec SHALL record that `teams` and `flows` each declare zero third-party libraries at creation, and SHALL list both `teams` and `flows` as entries in the `known_empty` set of `budgets.toml`.
-3. WHERE `teams` or `flows` later requires one or more third-party libraries, THE Structure_Spec SHALL require that each such library be declared by the spec that introduces it as an exact match to the import present in that component's code, and that the affected Extra be removed from the `known_empty` set of `budgets.toml` in the same change.
-4. IF an attempt is made to install the `teams` Extra, THEN THE Structure_Spec SHALL require that the resolved dependency set exclude every library unique to the `flows` Extra.
-5. IF an attempt is made to install the `flows` Extra, THEN THE Structure_Spec SHALL require that the resolved dependency set exclude every library unique to the `teams` Extra.
-6. THE Structure_Spec SHALL require that the `teams` Extra and the `flows` Extra each be declared as an optional-dependencies group in `pyproject.toml`, appear as a row in the design's extras table, and be covered by the optional-module packaging requirements (Requirement 6), consistent with how every other Extra is declared and packaged.
-7. THE Structure_Spec SHALL require that core code continue to function with neither the `teams` nor the `flows` Extra installed, such that `import nimbus` never imports the `teams` or `flows` implementation modules and the clean-import and import-matrix tests pass with neither Extra present.
+1. THE Structure_Spec SHALL define exactly one Extra named `teams` and one named `flows`, each declared as an optional-dependencies group in `pyproject.toml`, recorded in `budgets.toml`, listed as a row in the design's extras table, listing standard-library imports before third-party ones, and declaring no compiled package.
+2. THE Structure_Spec SHALL record that `teams` and `flows` each declare zero third-party libraries at creation, and list both in the `known_empty` set of `budgets.toml`.
+3. WHERE `teams` or `flows` later needs a third-party library, the spec introducing it SHALL declare it as an exact match to the import in that Component's code, and the affected Extra SHALL leave `known_empty` in the same change.
+4. Installing the `teams` Extra SHALL exclude every library unique to `flows`, and vice versa.
+5. Core code SHALL work with neither Extra installed: `import nimbus` never imports `teams` or `flows`, and the clean-import and import-matrix tests pass with neither present.
 
-### Requirement 15: MCP is a client only, for tools, resources, and prompts (SUPERSEDED by Requirements 19 and 25)
-
-*This requirement is superseded by Requirement 19 (MCP client lives in `tools`, tri-faceted) and Requirement 25 (MCP implementation chosen by an explicit `impl` argument; separate `mcp` extra); it is retained for history, and where its text conflicts with 19 and 25 the later requirements govern.*
-
-**User Story:** As a Nimbus maintainer, I want MCP reimplemented as a client only (tools, resources, prompts), with the server side out of scope, so that Nimbus consumes MCP without adding a second prompt abstraction and the gateway remains the only MCP-server concern.
-
-#### Acceptance Criteria
-
-1. THE Structure_Spec SHALL require that the MCP implementation expose client-side capabilities only, covering exactly three MCP concern types (MCP tools, MCP resources, MCP prompts), and SHALL place every MCP server-side concern out of scope for this spec, delegating Nimbus-acts-as-MCP-server behavior to the `gateway` Component.
-2. THE Structure_Spec SHALL require that MCP tools reuse the existing capability interfaces defined in the `tools` Component and SHALL NOT define any additional tool or capability interface, base class, or registry outside the `tools` Component.
-3. THE Structure_Spec SHALL require that MCP prompts reuse the existing prompt interfaces defined in the `prompts` Component and SHALL NOT define any additional prompt interface, base class, or template abstraction outside the `prompts` Component.
-4. THE Structure_Spec SHALL require that MCP remain the Extra named `mcp`, depending on `fastmcp` and retaining its existing entry in `budgets.toml`, and SHALL record as a future target (not a current requirement) a standard-library MCP client using JSON-RPC over stateless HTTP on top of `base`'s HTTP transport that reduces the `mcp` Extra to zero third-party runtime dependencies.
-5. THE Structure_Spec SHALL record, as OPEN QUESTIONS explicitly flagged as undecided and to be resolved in the design, exactly two items: (a) where MCP resources live, and (b) whether the MCP client code lives inside the `tools` Component or in its own Component.
-6. THE Structure_Spec SHALL add import-matrix rules only for the already-decided placements, namely MCP tools residing in the `tools` Component and MCP prompts reusing the `prompts` Component, and SHALL NOT add any import-matrix rule for the two placements recorded as OPEN QUESTIONS in criterion 5.
-7. WHERE the open MCP-resource hypothesis is adopted, THE Structure_Spec SHALL record, as an explicitly-flagged hypothesis and not a decision, a resource Port in `base` that lists resources and reads a resource by URI returning a MIME type and either text or bytes, implemented by the MCP client, consumed by `prompts` as a context source and by `memory` as a retrieval source, introducing no new Component.
-8. WHERE the open MCP-resource hypothesis is recorded, THE Structure_Spec SHALL document in the design the comparison of that hypothesis against placing the resource Port in `tools` as a read-only capability and against placing it in `store`, recording `store` as rejected on the stated ground that `store` covers only what the framework writes.
-### Requirement 16: MCP client lives in gateway; mcp folded into the gateway extra (SUPERSEDED by Requirement 19)
-
-*This requirement is superseded by Requirement 19 (MCP client lives in `tools`); it is retained for history and its acceptance criteria no longer apply.*
-
-**User Story:** As a Nimbus maintainer, I want the MCP client implemented inside the `gateway` Component reusing the tools and prompts interfaces, so that MCP needs no new Component, no resource Port in base, and installing `gateway` is enough to use MCP.
-
-#### Acceptance Criteria
-
-1. THE Structure_Spec SHALL place the MCP client code inside the `gateway` Component, resolving the open question of client-code location (Requirement 15.5(b)), and SHALL NOT define any separate MCP Component.
-2. THE Structure_Spec SHALL implement MCP resources inside the `gateway` Component as a gateway-internal concept, resolving the open question of resource location (Requirement 15.5(a)).
-3. THE Structure_Spec SHALL NOT define an MCP-resource Port in the `base` Component and SHALL NOT introduce any new Component for MCP resources, recording that the base-resource-Port hypothesis of Requirement 15.7 is rejected.
-4. THE Structure_Spec SHALL require that the `gateway` MCP client implement MCP tools by reusing exactly the capability interfaces defined in the `tools` Component and implement MCP prompts by reusing exactly the prompt interfaces defined in the `prompts` Component, and SHALL NOT define any second tool/capability or prompt abstraction.
-5. THE Structure_Spec SHALL extend the Allowed_Imports_Matrix so that the `gateway` Component may import exactly the `base`, `tools`, and `prompts` Components in addition to its existing allowed imports, and SHALL record that these three imports are downward imports that introduce no import cycle.
-6. THE Structure_Spec SHALL associate the `fastmcp` dependency with the `gateway` Extra as an optional dependency and SHALL NOT define a separate `mcp` Extra, such that installing `nimbus[gateway]` is sufficient to use MCP.
-7. WHERE `fastmcp` is installed, THE gateway SHALL use `fastmcp` in place of the built-in client.
-8. WHERE `fastmcp` is not installed, THE gateway SHALL use the built-in standard-library MCP client, and executing `import nimbus` SHALL NOT trigger an import of `fastmcp`.
-9. THE Structure_Spec SHALL record that the future target built-in MCP client is a standard-library client using JSON-RPC over stateless HTTP on top of the shared HTTP transport, SHALL require that the built-in path depend on no third-party library, and SHALL record `fastmcp` as the optional full-capability alternative.
-
-### Requirement 17: Interchangeable official SDK vs built-in implementation (auto-detect with explicit preference) (SUPERSEDED by Requirement 24)
-
-*This requirement is superseded by Requirement 24 (one implementation per model provider, no selection machinery) and, for MCP, by Requirement 25; it is retained for history and its acceptance criteria no longer apply.*
-
-**User Story:** As a Nimbus user, I want to swap Nimbus's built-in standard-library implementation for an official vendor SDK interchangeably, so that I can opt into an SDK when I need it without the SDK ever being imported when I do not.
-
-#### Acceptance Criteria
-
-1. THE Structure_Spec SHALL treat this requirement as superseded and non-operative: model-provider implementation selection is governed by Requirement 24 (one implementation per model provider, the built-in standard-library implementation, no selection machinery and no SDK fallback) and MCP implementation selection is governed by Requirement 25; no acceptance criterion of this requirement applies, and in particular there is no SDK auto-detection, no version range, no version-mismatch warning, and no fallback to a vendor SDK.
-
-### Requirement 18: Official SDKs are dev/test-only, used as differential-test oracles
+### Requirement 14: Official SDKs are dev/test-only, used as differential-test oracles
 
 **User Story:** As a Nimbus maintainer, I want the official vendor SDKs installed only in development and CI as validation oracles, never in production, so that I can prove the built-in standard-library implementations are equivalent without shipping any SDK.
 
 #### Acceptance Criteria
 
-1. THE Structure_Spec SHALL declare every official vendor SDK used for validation in a development/test dependency group (for example `[dependency-groups].dev`), and SHALL NOT declare any such SDK in `[project.optional-dependencies]` for that validation purpose, so that no production or end-user install (`nimbus` or `nimbus[...]`) installs an SDK for validation.
-2. THE Structure_Spec SHALL provide differential tests that, for each backend having both a built-in standard-library implementation and an official SDK implementation, run the same input through both and assert 100% compatibility on the subset of fields and behaviors that Nimbus actually consumes rather than one-to-one equivalence with the full SDK surface, where for that subset the structured fields match exactly by field-subset comparison, each numeric or timing value matches within a declared numeric epsilon, and error mapping matches at the error-category level (an equivalent category, not an exact error type or code), treating the SDK as the oracle only for what Nimbus uses.
-3. THE Structure_Spec SHALL require that the differential tests run only in an environment where the official SDKs are installed (development or CI), and SHALL require that the core-only footprint and clean-import tests continue to run in a separate core-only environment where no SDK is installed.
-4. WHEN the official SDKs are installed in a development or CI environment, THE presence of those SDKs SHALL NOT cause the `forbidden_at_import` or clean-import checks to fail, because those checks run in the separate core-only environment; `import nimbus` SHALL still import no SDK.
-5. THE Structure_Spec SHALL NOT ship, declare as a runtime dependency, or require any official vendor SDK in a production install; the production default remains the built-in standard-library implementation.
-6. THE Structure_Spec SHALL record that Requirement 18 (SDKs as dev/test validation oracles, pinned in the dev/test dependency group) is independent of the runtime path: per Requirement 24 no vendor SDK is on the runtime path and there is no SDK selection or version-mismatch warning, so the dev/test-validated SDK version is used only as the differential-test oracle and never as a runtime fallback.
-7. WHERE a differential test for a backend requires live credentials or network access that are unavailable, THE Structure_Spec SHALL allow that differential test to be skipped without failing the suite, while still running every differential test whose prerequisites are present.
+1. THE Structure_Spec SHALL declare every official vendor SDK used for validation in a development/test dependency group (for example `[dependency-groups].dev`) and SHALL NOT declare any in `[project.optional-dependencies]` for that purpose, so no production install (`nimbus` or `nimbus[...]`) installs an SDK for validation.
+2. THE Structure_Spec SHALL provide differential tests that, for each backend with both a built-in and an official SDK implementation, run the same input through both and assert 100% compatibility on the fields and behaviors Nimbus consumes (not the full SDK surface): structured fields match by field-subset comparison, numeric or timing values match within a declared epsilon, and error mapping matches at the error-category level.
+3. THE differential tests SHALL run only where the SDKs are installed (development or CI); the core-only footprint and clean-import tests SHALL run in a separate core-only environment with no SDK, so SDKs present in dev/CI never cause `forbidden_at_import` or clean-import checks to fail.
+4. THE Structure_Spec SHALL NOT ship, declare as a runtime dependency, or require any official vendor SDK in a production install. The SDK version validated in dev/test is used only as the differential-test oracle, never as a runtime fallback.
+5. WHERE a differential test requires live credentials or network access that are unavailable, it MAY be skipped without failing the suite, while every test whose prerequisites are present still runs.
 
-### Requirement 19: MCP client lives in tools, tri-faceted, built-in and fastmcp behind one Port
+### Requirement 15: MCP client lives in tools, tri-faceted, built-in and fastmcp behind one Port
 
 **User Story:** As a Nimbus maintainer, I want the MCP client in the `tools` Component returning Nimbus types, with the built-in client and fastmcp interchangeable behind one Port, so that MCP tools/prompts/resources are consumed uniformly and swapping implementations needs no user code change.
 
 #### Acceptance Criteria
 
-1. THE Structure_Spec SHALL place the MCP client code inside the `tools` Component, and SHALL record that this supersedes Requirement 16 (which had placed the MCP client in `gateway`): the MCP client is in `tools`, not `gateway`, and MCP is not folded into the `gateway` Extra.
-2. THE Structure_Spec SHALL require that the MCP client be tri-faceted, exposing MCP tools, MCP prompts, and MCP resources, such that it returns Nimbus `Capability` objects for tools (the `tools` capability type), Nimbus prompt objects for prompts (the `prompts` prompt type), and `Resource` objects for resources. *(SUPERSEDED in part by Requirement 28: the MCP prompt facet does NOT import the `prompts` Component; it returns the message types defined in `base` (`NimbusMessage`, `UserMessage`, `AssistantMessage`) via the `MCPPrompt` descriptor defined in `tools`. The allowed-imports set of `tools` is {base}, not {base, prompts}.)*
-3. THE Structure_Spec SHALL define the `Resource` type internal to the `tools` Component, and SHALL NOT define a resource Port in `base` and SHALL NOT introduce a new Component for resources. *(SCOPED, standing rule per Requirement 2.3: this clause holds while no other same-Layer Component consumes MCP resources. The `Resource` type stays internal to `tools` and is sufficient for the MCP client alone. WHEN `prompts` (as a context source) or `memory` (as a retrieval source) — both same-Layer peers of `tools` — need to consume MCP resources, a resource Port SHALL be defined in `base` (list and read a resource by URI, returning a MIME type and text or bytes), implemented by the `tools` MCP client and consumed through that `base` Port, and that addition SHALL supersede this clause's "SHALL NOT define a resource Port in `base`". Until then this is a design open question with the resolution already fixed; no new Component is introduced in either case.)*
-4. THE Structure_Spec SHALL require that the built-in MCP client (a standard-library JSON-RPC-over-HTTP client) and the official `fastmcp` client both implement the same Port and both return the identical Nimbus types for tools, prompts, and resources, so that selecting one or the other requires no change to user application code.
-5. THE Structure_Spec SHALL require that any official MCP/`fastmcp` protocol type (for example `mcp.types.Tool`, `mcp.types.Prompt`, `mcp.types.Resource`) be converted to the corresponding Nimbus type at exactly one boundary point within the `tools` MCP client, such that no official protocol type is returned from or leaks outside the `tools` Component.
-6. THE Structure_Spec SHALL require that the conversion from official MCP/`fastmcp` types to Nimbus types cover 100 percent of the fields and behaviors that Nimbus consumes (consistent with Requirement 18.2), and SHALL NOT require coverage of the full official SDK surface.
-7. THE Structure_Spec SHALL associate the MCP client dependency (`fastmcp`) with the separate `mcp` Extra and SHALL require that the `tools` Component carry no third-party library; this is governed by Requirement 25.5 and supersedes any earlier association of `fastmcp` with the `tools` Extra or with the `gateway` Extra.
-8. THE Structure_Spec SHALL require that selection between the built-in MCP client and `fastmcp` follow Requirement 25 (explicit `impl` argument to `create_mcp_client`, default `"builtin"`, no environment variable, no configuration entry, no fallback), such that `import nimbus` imports neither the built-in MCP client's optional dependency nor `fastmcp` unless explicitly selected.
-9. IF the `tools` MCP client receives an official MCP/`fastmcp` protocol type whose fields required by the Nimbus conversion (per criterion 6) are absent or malformed, THEN THE Structure_Spec SHALL require the conversion boundary to reject the input with an error indicating the failing type and field, and SHALL NOT return a partially populated Nimbus type.
-10. IF the MCP client implementation selected at import time (per criterion 8) is unavailable because its optional dependency is not installed, THEN THE Structure_Spec SHALL require that `import nimbus` surface an error indicating the missing dependency and the selected implementation, and SHALL NOT silently fall back to the other implementation.
+1. THE Structure_Spec SHALL place the MCP client inside the `tools` Component; it is not in `gateway`, MCP is not folded into the `gateway` Extra, and no separate MCP Component exists. MCP server-side behavior (Nimbus acting as an MCP server) is out of scope and belongs to `gateway`.
+2. THE MCP client SHALL be tri-faceted: tools as Nimbus `Capability` objects (reusing the `tools` capability interfaces, defining no second tool abstraction), prompts as messages, and resources as `Resource` objects. The prompt facet SHALL NOT import the `prompts` Component: it returns the message types defined in `base` (`NimbusMessage`, `UserMessage`, `AssistantMessage` in `base/messages.py`, which `prompts/messages.py` merely re-exports) via the `MCPPrompt` descriptor defined in `tools`. "Reusing the prompt abstraction" means reusing the `PromptBuilderInterface` Port and the message types in `base`. The allowed imports of `tools` are therefore {base, auth}, and `tests/budget/test_import_matrix.py` SHALL report any `tools → prompts` import as a violation.
+3. THE `Resource` type SHALL be internal to `tools`; no resource Port is defined in `base` and no Component is introduced for resources. This holds while no other same-Layer Component consumes MCP resources: WHEN `prompts` (as a context source) or `memory` (as a retrieval source) needs MCP resources, a resource Port SHALL be defined in `base` (list and read by URI, returning a MIME type and text or bytes), implemented by the `tools` MCP client and consumed through that Port, and that addition SHALL replace this clause.
+4. THE built-in MCP client (a standard-library JSON-RPC-over-HTTP client) and the official `fastmcp` client SHALL implement the same Port and return identical Nimbus types for tools, prompts, and resources, so choosing one needs no change to user code (Requirement 16).
+5. ANY official MCP/`fastmcp` protocol type (for example `mcp.types.Tool`, `mcp.types.Prompt`, `mcp.types.Resource`) SHALL be converted to the corresponding Nimbus type at exactly one boundary point within the `tools` MCP client, so no official protocol type is returned from or leaks outside `tools`.
+6. THE conversion SHALL cover 100 percent of the fields and behaviors Nimbus consumes (Requirement 14.2), not the full SDK surface.
+7. IF the conversion receives an official type whose required fields are absent or malformed, THEN THE boundary SHALL reject it with an error naming the failing type and field, and SHALL NOT return a partially populated Nimbus type.
+8. THE implementation choice and the `mcp` Extra are governed by Requirement 21; `tools` SHALL carry no third-party library.
 
-### Requirement 20: Built-in vs external-library adapter is a general boundary rule
+*(Design open question, no task: whether the MCP prompt facet should implement `PromptBuilderInterface` — `render(template_name, variables) -> list[NimbusMessage]` — so the agent has one prompt shape; today `get_prompt` returns the messages directly.)*
+
+### Requirement 16: Built-in vs external-library adapter is a general boundary rule
 
 **User Story:** As a Nimbus maintainer, I want one general rule for any component that offers a built-in implementation and an external-library implementation behind the same Port, so that external libraries are adapted at the boundary without changing user code or leaking their types.
 
 #### Acceptance Criteria
 
-1. WHERE a Component offers both a built-in standard-library implementation and an implementation backed by an external library, THE Structure_Spec SHALL require both implementations to sit behind the same Port and return values of identical Nimbus types (same declared return type and Port method signatures), such that user application code requires zero source changes regardless of which implementation is selected. This boundary property holds only when all of its sub-properties hold together (same Port, identical Nimbus return types, and no external-library type exposed); the conjunction of all sub-properties is required for the property to be satisfied.
-2. THE Structure_Spec SHALL require that the external-library implementation be an adapter that converts every external-library input and output type into a Nimbus type at exactly one boundary point within the owning Component, such that no symbol, class, or instance originating from the external library is exposed in any Port return value, Port parameter, or public API of that Component.
-3. IF any external-library type is exposed outside the owning Component through a Port return value, Port parameter, or public API, THEN THE Structure_Spec SHALL mark the Component as non-conformant with this boundary rule and SHALL require the leak to be adapted to a Nimbus type before the Component is accepted.
-4. THE Structure_Spec SHALL require that where a Component has only a single active implementation (per Requirement 24 for model providers) no selection occurs, and where an explicit choice exists (per Requirement 25 for the MCP client) it is made by an explicit code argument; and SHALL require that any external library used only for validation follow Requirement 18 (dev/test differential-test oracle, not shipped to production).
-5. THE Structure_Spec SHALL record that this general rule already governs the `models` Component (standard-library REST adapters versus official provider SDKs, Requirement 17) and the `tools` MCP client (built-in versus `fastmcp`, Requirement 19), and SHALL require that any future external-library backend for `observe`, `store`, `prompts`, or `agents` apply this same rule without introducing a new Component or a new Port beyond the owning Component's existing Port.
-6. THE Structure_Spec SHALL require that the `agents` Component expose its multiple agent types (for example a ReAct agent) through the `agents` registry behind the `Runnable`/agent Port, extensible per Requirement 13, while the concrete agent-type implementations are defined in the future `agents` spec and are out of scope for this structure spec.
+1. WHERE a Component offers both a built-in standard-library implementation and an external-library implementation, both SHALL sit behind the same Port and return identical Nimbus types (same declared return type and Port method signatures), so user code needs zero changes whichever is selected. The property holds only when all sub-properties hold together: same Port, identical Nimbus return types, and no external-library type exposed.
+2. THE external-library implementation SHALL convert every external input and output type into a Nimbus type at exactly one boundary point within the owning Component; no symbol, class, or instance from the external library appears in any Port return value, Port parameter, or public API of that Component.
+3. IF an external-library type is exposed outside the owning Component, THEN THE Component SHALL be marked non-conformant and the leak SHALL be adapted to a Nimbus type before acceptance.
+4. WHERE a Component has a single active implementation (model providers, Requirement 20) no selection occurs; WHERE an explicit choice exists (the MCP client, Requirement 21) it is an explicit code argument; any library used only for validation follows Requirement 14.
+5. THE rule governs the `models` Component (standard-library REST adapters, no SDK on the runtime path) and the `tools` MCP client (built-in vs `fastmcp`), and SHALL apply to any future external-library backend for `observe`, `store`, `prompts`, or `agents` without a new Component or a new Port beyond the owner's existing Port.
+6. THE `agents` Component SHALL expose its multiple agent types (for example a ReAct agent) through the `agents` registry behind the `Runnable`/agent Port, extensible per Requirement 12; concrete agent types belong to the future `agents` spec.
 
-### Requirement 21: Policy is a service; runtime never imports optional services
+### Requirement 17: Policy is a service; runtime never imports optional services
 
 **User Story:** As a Nimbus maintainer, I want `policy` treated as a decision service alongside `guard`, and the runtime components to receive optional services only through base Ports, so that no runtime component requires an optional service to be installed.
 
 #### Acceptance Criteria
 
-1. THE Structure_Spec SHALL record the `policy` Component in the services Layer (Layer 2) alongside `guard`, and SHALL NOT record `policy` in the runtime Layer, superseding any prior Layer-2.2 placement of `policy` in the runtime Layer.
-2. THE Structure_Spec SHALL record the Layer assignment exactly as: services Layer = {router, tools, prompts, memory, guard, observe, policy}; runtime Layer = {gateway, agents, teams, flows}; and SHALL record the allowed imports of `policy` as exactly {base, models}.
-3. THE Structure_Spec SHALL require that each runtime Component (`gateway`, `agents`, `teams`, `flows`) have an allowed-imports set that excludes `policy`, `guard`, `observe`, and `memory`, and SHALL require that these four optional services be supplied to runtime Components only through Ports defined in `base` via injection or hooks.
-4. THE Structure_Spec SHALL record in the contents of `base` (per Requirement 3) an authorizer Port that accepts a principal identifier, an action identifier, and a resource identifier and returns a decision of exactly one of {permit, forbid}, and SHALL record `policy` as the Component that implements this authorizer Port.
-5. THE Structure_Spec SHALL record the Allowed_Imports_Matrix such that the rows for `gateway`, `agents`, `teams`, and `flows` each exclude `policy`, `guard`, `observe`, and `memory`, every other matrix row remains unchanged, and `base` provides the guard Port (`interfaces/safety.py`), the observe Port (`interfaces/observer.py`), the memory Port (`interfaces/memory.py`), and the authorizer Port from criterion 4.
-6. WHEN an authorizer Port is provided to the `gateway`, THE Structure_Spec SHALL require that every capability listing and every capability call be checked by that authorizer; and WHEN no authorizer Port is provided, THE Structure_Spec SHALL defer the behavior to the `gateway` spec.
-7. THE Structure_Spec SHALL require that `tests/budget/test_import_matrix.py` have its `LAYER` and `ALLOWED` data place `policy` in the services Layer and remove `policy`, `guard`, `observe`, and `memory` from the `gateway`, `agents`, `teams`, and `flows` rows.
-8. IF any runtime package (`gateway`, `agents`, `teams`, or `flows`) imports `policy`, `guard`, `observe`, or `memory`, THEN THE Structure_Spec SHALL require that `tests/budget/test_import_matrix.py` fail and report the offending runtime package and the offending imported service.
+1. THE Structure_Spec SHALL place `policy` in the services Layer (Layer 2) alongside `guard`, with allowed imports exactly {base, models}; the full Layer assignment is Requirement 2.2.
+2. THE runtime Components (`gateway`, `agents`, `teams`, `flows`) SHALL have allowed-import sets that exclude `policy`, `guard`, `observe`, and `memory`.
+3. THE four optional services SHALL be supplied to runtime Components only through Ports defined in `base`, by injection or hooks. `base` provides the guard Port (`interfaces/safety.py`), the observe Port (`interfaces/observer.py`), the memory Port (`interfaces/memory.py`), and the authorizer Port.
+4. THE Base_Package SHALL define an authorizer Port that accepts a principal identifier, an action identifier, and a resource identifier and returns exactly one of {permit, forbid}; `policy` implements it.
+5. WHEN an authorizer Port is provided to the `gateway`, every capability listing and every capability call SHALL be checked by it; WHEN none is provided, the behavior is deferred to the `gateway` spec.
+6. `tests/budget/test_import_matrix.py` SHALL have its `LAYER` and `ALLOWED` data place `policy` in the services Layer and remove `policy`, `guard`, `observe`, and `memory` from the `gateway`, `agents`, `teams`, and `flows` rows.
+7. IF any runtime package imports `policy`, `guard`, `observe`, or `memory`, THEN the import-matrix test SHALL fail and report the offending runtime package and imported service.
 
-### Requirement 22: Auth component (authentication and credentials)
+### Requirement 18: Auth component (authentication and credentials)
 
 **User Story:** As a Nimbus maintainer, I want a dedicated `auth` component in the foundation layer that provides authentication strategies and credential sources behind a base Port, so that every component authenticates outbound requests the same way without `base` doing I/O.
 
 #### Acceptance Criteria
 
-1. THE Structure_Spec SHALL define a new Component `auth` (authentication and credentials) as the fifteenth Component, placed in Layer 0 next to `base`, separate from `base` and not a part of it.
-2. THE Structure_Spec SHALL set the Layer assignment (together with the Requirement 21 policy move) to: Layer 0 = {base, auth}; Layer 1 = {models, store}; Layer 2 = {router, tools, prompts, memory, guard, observe, policy}; Layer 3 = {gateway, agents, teams, flows}.
-3. THE Structure_Spec SHALL narrow the no-I/O rule so that Requirement 2.4 (no file-system, network, or process I/O) and Requirement 3.4 (standard library only) apply to the `base` Component specifically and NOT to the whole Layer 0, because `auth` calls metadata and token endpoints, reads credential files, may run a subprocess, and needs the pure-Python package `rsa` for RS256 signing.
-4. THE Structure_Spec SHALL define the authentication Port in `base` (an object that applies authentication to a request by adding headers or signing it), with the implementations supplied by the `auth` Component.
-5. THE Structure_Spec SHALL set the allowed imports as: `auth` imports only `base`; `models` and `store` may import `base` and `auth`; `tools` may import `base` and `auth`; `gateway` may import `base`, `tools`, `models`, and `auth`; `memory` may also import `auth`; every other matrix row stays as it is.
-6. THE Structure_Spec SHALL record that the only same-Layer imports permitted are the Layer-0 Components importing `base` (which every Component may import), stated as the single exception to the no-same-Layer-import rule.
-7. THE Structure_Spec SHALL place in `auth` the authentication strategies (API key and bearer, SigV4, OAuth2), the credential sources (environment, files, container credentials, instance metadata, token exchange services, metadata server), and a token cache; and SHALL record that `auth` serves `models`, `store`, `tools`, and `gateway`. *(EXTENDED, resolved: the credential sources of `auth` SHALL include native support for the principal cloud secret managers (AWS Secrets Manager, AWS SSM Parameter Store, Azure Key Vault, Google Secret Manager) as built-in sources, AND `auth` SHALL define an extensible credential-source Port through which user code registers additional secret-manager or custom sources (consistent with the extension point of Requirement 22.10). A secret-manager source performs a network call through `base/http.py`, signed or authenticated with the `auth` strategies, so these sources are within scope of `auth`, not out of scope.)*
-8. THE Structure_Spec SHALL move the SigV4 signer currently at `models/transport/sigv4.py` into the `auth` Component.
-9. THE Structure_Spec SHALL declare an `auth` Extra whose only third-party library is `rsa`, and SHALL require that the `google` Extra declare only the provider SDK (not `rsa`).
-10. THE Structure_Spec SHALL scope `auth` to support only the documented, non-deprecated, non-interactive authentication modes of each provider at a stated date, SHALL require that `auth` never run an interactive login (where a person must act at authentication time: opening a browser, typing a code on another device, or answering a multi-factor prompt), and SHALL provide an extension point where user code registers its own credential provider for anything else.
-11. WHERE an authentication mode depends on an interactive login performed earlier with a vendor command-line tool (for example AWS IAM Identity Center SSO, `az login`, `gcloud auth login`, or the application-default-credentials login), THE `auth` Component SHALL only read the cache that the command-line tool wrote and obtain credentials from it without prompting; IF that cache is missing or expired, THEN `auth` SHALL raise a clear error instructing the user to log in again with the command-line tool.
-12. THE Structure_Spec SHALL name, as supported non-interactive modes to verify against each provider's current documentation in the design, at least: the serverless execution role (environment variables, the container-credentials endpoint, instance metadata IMDSv2); AWS assume-role including cross-account via a signed STS call; web identity (an OIDC token read from a file, for example a CI runner or a managed Kubernetes workload); Bedrock API keys; Google service-account files (RS256 with `rsa`) and service-account impersonation, the Google metadata server, the authorized-user refresh token, Workload Identity Federation, and API key or access token from the environment; Microsoft Entra ID for Azure OpenAI through managed identity, client secret, certificate (RSA with `rsa`), federated token file, and API key; and API key or bearer for OpenAI-compatible providers, Anthropic, and Cohere.
-13. THE Structure_Spec SHALL record as out of scope for `auth`: on-premises Active Directory (Kerberos, NTLM, ADFS), SAML, hardware security modules (PKCS#11), and signing with non-RSA keys (the `rsa` package signs RSA only).
-14. THE Structure_Spec SHALL increase the Component count to 15 and SHALL supersede the "exactly 14" clauses (Requirements 1.3, 9.3, and the codename test): the Component set and the codename mapping SHALL contain exactly 15 entries, with the fifteenth Component being `auth`.
-15. THE Structure_Spec SHALL assign `auth` a fifteenth Codename (a cloud or weather word, at most 7 letters, unique among the 14 Codenames, `vapor`, and `nimbus`); *(RESOLVED: the owner chose `ozone`. The `auth` Codename is `ozone`, and Requirement 9.1 is updated to include `auth=ozone`.)*
-16. THE Structure_Spec SHALL require that the `auth` package, the spec folder `.kiro/specs/auth`, the documentation section, and the `budgets.toml` entry all share the single name `auth` (consistent with Requirement 1.2), and SHALL update the Layer table (Requirement 2.2) and the extras table accordingly.
-17. THE Structure_Spec SHALL update `tests/budget/test_import_matrix.py` (`LAYER` and `ALLOWED`) and the codename test (15 entries) to reflect the `auth` Component, and SHALL record that implementing the authentication strategies and sources belongs to the `auth` and `models` specs, not to this structure phase.
+1. THE Structure_Spec SHALL define `auth` as the fifteenth Component, in Layer 0 next to `base`, separate from it.
+2. THE allowed imports of `auth` SHALL be `base` only; `auth` serves `models`, `store`, `tools`, `gateway`, and `memory` (Requirement 2.5).
+3. THE no-I/O and standard-library-only rules apply to `base`, not to `auth` (Requirement 2.4).
+4. THE authentication Port SHALL be defined in `base`; the implementations are supplied by `auth`.
+5. THE `auth` package, the spec folder `.kiro/specs/auth`, the documentation section, and the `budgets.toml` entry SHALL share the single name `auth` (Requirement 1.2); its Codename is `ozone` (Requirement 9.1).
+6. THE `auth` Component SHALL contain: the authentication strategies (API key and bearer, SigV4, OAuth2); the credential sources (environment, files, container credentials, instance metadata, token exchange services, metadata server); and a token cache.
+7. THE credential sources SHALL include native support for the principal cloud secret managers (AWS Secrets Manager, AWS SSM Parameter Store, Azure Key Vault, Google Secret Manager) as built-in sources; such a source calls over `base/http.py`, authenticated with the `auth` strategies.
+8. THE SigV4 signer currently at `models/transport/sigv4.py` SHALL move into `auth`.
+9. THE Structure_Spec SHALL declare an `auth` Extra whose only third-party library is `rsa` (own budget in `budgets.toml`), and the `google` Extra SHALL declare only the provider SDK, not `rsa`.
+10. THE `auth` Component SHALL support only the documented, non-deprecated, non-interactive authentication modes of each provider at a stated date, SHALL never run an interactive login, and SHALL define an extensible credential-source Port through which user code registers its own credential provider (secret-manager or custom).
+11. WHERE an authentication mode depends on an interactive login done earlier with a vendor command-line tool (for example AWS IAM Identity Center SSO, `az login`, `gcloud auth login`, application-default-credentials login), `auth` SHALL only read the cache the tool wrote, without prompting; IF the cache is missing or expired, THEN it SHALL raise a clear error telling the user to log in again with the tool.
+12. THE design SHALL verify against each provider's current documentation at least these non-interactive modes: serverless execution role (environment variables, container-credentials endpoint, instance metadata IMDSv2); AWS assume-role including cross-account via signed STS; web identity (OIDC token from a file); Bedrock API keys; Google service-account files (RS256 with `rsa`), service-account impersonation, metadata server, authorized-user refresh token, Workload Identity Federation, and API key or access token from the environment; Microsoft Entra ID for Azure OpenAI through managed identity, client secret, certificate (RSA with `rsa`), federated token file, and API key; and API key or bearer for OpenAI-compatible providers, Anthropic, and Cohere.
+13. OUT OF SCOPE for `auth`: on-premises Active Directory (Kerberos, NTLM, ADFS), SAML, hardware security modules (PKCS#11), and signing with non-RSA keys.
+14. `tests/budget/test_import_matrix.py` and the codename test (15 entries) SHALL reflect `auth`. Implementing the strategies and sources belongs to the `auth` and `models` specs, not to this structure phase.
 
-### Requirement 23: Planned project rename Nimbus to Skye (documented, executed last)
+### Requirement 19: Planned project rename Nimbus to Skye (documented, executed last)
 
 **User Story:** As the Nimbus owner, I want the planned rename of the project to Skye recorded in the spec and scheduled as the final step, so that the migration is agreed and documented before any code or spec text is renamed.
 
 #### Acceptance Criteria
 
-1. THE Structure_Spec SHALL record that the project is renamed from Nimbus to Skye: the project name is Skye, the Python import package is `skye`, and the PyPI distribution is `skyeai` (chosen because `skye` belongs to an unrelated package and `skyai` is taken).
-2. THE Structure_Spec SHALL require that the rename be executed last and that no rename occur in this phase (no file, class, variable, or text in the code or the specs is renamed now); the closure of all other task groups is a separate precondition handled by Requirement 23.5 and is not restated here.
-3. THE Structure_Spec SHALL define the rename as a mechanical substitution covering: `src/nimbus` to `src/skye` and every import; the classes `NimbusMessage`, `NimbusError`, `NimbusConfig`, and any other `Nimbus*` name, to `Skye*`; the environment variables `NIMBUS_*` (including `NIMBUS_<BACKEND>_IMPL`, `NIMBUS_IMPL`, `NIMBUS_CONFIG`) to `SKYE_*`; `nimbus.yaml` to `skye.yaml`; the project name in `pyproject.toml` to `skyeai`; and the corresponding occurrences in `budgets.toml`, continuous integration, CODEOWNERS, the Makefile, the specs, the steering, the wiki, the examples, and the README.
-4. THE Structure_Spec SHALL record that the GitHub repository rename is performed by the owner (with the platform redirecting the old address), and is not part of the automated rename.
-5. THE Structure_Spec SHALL require, as the precondition of the rename group (a non-coding first task), that all previous task groups be closed, that the owner has checked the trademark of "Skye" in software, and that the owner has reserved `skyeai` (and `skye-ai`) on PyPI.
-6. THE Structure_Spec SHALL set the definition of done for the rename as: `make budget-fast`, `make budget`, `make differential`, and the guardrail tests give the same results as before the rename, with the codename test adapted to the new names.
-7. THE Structure_Spec SHALL record that, after the rename, `nimbus` (six letters, unique, cloud theme) becomes the umbrella watermark of the whole project, outside the component Codenames, analogous to `vapor` for `Runnable`. *(RESOLVED: the owner decided to adopt `nimbus` as the project-wide umbrella watermark; it is documentation-only, is not one of the 15 component Codenames, and SHALL NOT appear in any import path, folder name, file name, class name, function name, configuration key, or spec folder name; Requirement 9.1 is unchanged as `nimbus` is not a component Codename.)*
+1. THE Structure_Spec SHALL record that the project is renamed from Nimbus to Skye: import package `skye`, PyPI distribution `skyeai` (`skye` belongs to an unrelated package and `skyai` is taken).
+2. THE rename SHALL be executed last as its own task group, never implicitly before.
+3. THE rename SHALL be a mechanical substitution covering: `src/nimbus` → `src/skye` and every import; the classes `NimbusMessage`, `NimbusError`, `NimbusConfig`, and any other `Nimbus*` name → `Skye*`; exactly the three environment variables of Requirement 23.3 → `SKYE_*`; `nimbus.yaml` → `skye.yaml`; the project name in `pyproject.toml` → `skyeai`; and the corresponding occurrences in `budgets.toml`, CI, CODEOWNERS, the Makefile, the specs, the steering, the wiki, the examples, and the README.
+4. THE GitHub repository rename SHALL be performed by the owner (the platform redirects the old address) and is not part of the automated rename.
+5. THE rename group's non-coding first task SHALL gate it: all previous task groups closed, the owner has checked the trademark of "Skye" in software, and the owner has reserved `skyeai` (and `skye-ai`) on PyPI.
+6. THE definition of done SHALL be: `make budget-fast`, `make budget`, `make differential`, and the guardrail tests give the same results as before the rename, with the codename test adapted to the new names. After the rename, `nimbus` becomes the project-wide umbrella watermark (documentation-only, one of the two watermarks of Requirement 9.6).
 
-### Requirement 24: One implementation per model provider (no selection machinery)
+### Requirement 20: One implementation per model provider (no selection machinery)
 
 **User Story:** As a Nimbus maintainer, I want each model provider to have exactly one implementation at a time, so that there is no selection machinery, no version negotiation, and no SDK on the runtime path.
 
 #### Acceptance Criteria
 
-1. THE Structure_Spec SHALL supersede Requirement 17 (import-time backend selection via environment variables and a configuration file) for model providers, such that there is no selection environment variable (for example `NIMBUS_IMPL`, `NIMBUS_<BACKEND>_IMPL`), no `impl` block in the configuration file, no global default implementation, no SDK version table, no version warning, no fallback to an SDK when an import fails, and no automatic discovery of an installed SDK.
-2. THE Structure_Spec SHALL require that each model provider have exactly one active implementation at any point in time.
-3. THE Structure_Spec SHALL record that the single active implementation of each model provider is Nimbus's built-in standard-library implementation, not the vendor SDK, and SHALL require that no vendor SDK is on the runtime path.
-4. WHERE a provider's built-in standard-library REST adapter does not yet exist, THE Structure_Spec SHALL require that the provider be implemented by the built-in standard-library implementation as it lands, with exactly one active implementation per provider at all times and never a vendor SDK as the active runtime implementation.
-5. THE Structure_Spec SHALL require that any vendor SDK adapter be either deleted or retained only as a bring-your-own example in the documentation, and never registered as a provider's active runtime implementation.
-6. THE Structure_Spec SHALL require that vendor SDKs remain only as references, namely as development or test dependencies and as the differential tests of Requirement 18 (which stays, limited to this purpose), and never on a runtime path.
-7. THE Structure_Spec SHALL require the removal, in a later task, of the model-provider selection machinery from the code, namely `base/backend_select.py`, `base/sdk_versions.py`, the `load_impl_config` function and the `impl` handling in `base/config.py`, the `impl_backend` handling and the selection in `models/base.py` and the adapters, and `tests/unit/test_backend_select.py`.
+1. THE Structure_Spec SHALL require that each model provider have exactly one active implementation: Nimbus's built-in standard-library implementation. No vendor SDK is on the runtime path.
+2. THERE SHALL be no selection environment variable (for example `NIMBUS_IMPL`, `NIMBUS_<BACKEND>_IMPL`), no `impl` block in the configuration file, no global default implementation, no SDK version table, no version warning, no fallback to an SDK when an import fails, and no automatic discovery of an installed SDK.
+3. WHERE a provider's built-in standard-library adapter does not yet exist, the provider SHALL be implemented by the built-in implementation as it lands, never by a vendor SDK as the active runtime implementation.
+4. ANY vendor SDK adapter SHALL be either deleted or kept only as a bring-your-own example in the documentation, and never registered as a provider's active runtime implementation.
+5. VENDOR SDKs SHALL remain only as development/test dependencies and as the differential tests of Requirement 14, never on a runtime path.
+6. THE selection machinery SHALL be removed in a later task: `base/backend_select.py`, `base/sdk_versions.py`, the `load_impl_config` function and the `impl` handling in `base/config.py`, the `impl_backend` handling and selection in `models/base.py` and the adapters, and `tests/unit/test_backend_select.py`.
 
-### Requirement 25: MCP implementation chosen only by an explicit code argument
+### Requirement 21: MCP implementation chosen only by an explicit code argument
 
 **User Story:** As a Nimbus user, I want the MCP client to default to the built-in implementation and to switch to fastmcp only through an explicit code argument, so that there is no environment or configuration machinery for it.
 
 #### Acceptance Criteria
 
-1. THE Structure_Spec SHALL require that the built-in MCP client be the default and that `fastmcp` be an optional substitute chosen only by an explicit code argument, through a factory `create_mcp_client(target, impl="builtin")` where `impl` is a string defaulting to `"builtin"`.
-2. WHEN `create_mcp_client` is called without the `impl` argument, THE factory SHALL return the built-in MCP client.
-3. WHEN `create_mcp_client` is called with `impl="fastmcp"` and `fastmcp` is installed, THE factory SHALL return the `fastmcp` MCP client.
-4. IF `create_mcp_client` is called with an `impl` value other than `"builtin"` or `"fastmcp"`, THEN THE factory SHALL raise an error indicating the `impl` value is not accepted and SHALL NOT return an MCP client.
-5. THE Structure_Spec SHALL require that MCP implementation selection use no environment variable, no configuration entry, and no fallback.
-6. IF `create_mcp_client` is called with `impl="fastmcp"` and `fastmcp` is not installed, THEN THE factory SHALL raise `MissingExtraError` naming the extra `mcp` and SHALL NOT return an MCP client.
-7. THE Structure_Spec SHALL keep the `mcp` Extra (providing `fastmcp`, with its own budget in `budgets.toml`) as a separate Extra, and SHALL require that the `tools` Component carry no third-party library; this supersedes the clause of Requirement 19.7 that associated `fastmcp` with the `tools` Extra and stated there is no separate `mcp` Extra.
-8. THE Structure_Spec SHALL keep the differential tests between the built-in MCP client and the `fastmcp` client as the contract that the two are interchangeable.
-9. THE Structure_Spec SHALL require the removal of the `NIMBUS_MCP_IMPL` environment-variable reading from `tools/mcp_client.py` in a later task, keeping the explicit `impl` argument with its default `"builtin"`.
-10. THE Structure_Spec SHALL scope the built-in MCP client to a consume-only client over HTTP transport and SHALL NOT give it a stdio transport that starts a local MCP server as a subprocess. *(RESOLVED open question: the owner decided that the project consumes MCP servers and never starts one; the built-in client therefore has no stdio/subprocess transport. This is consistent with Requirement 15.1 (MCP server-side concerns are out of scope and delegated to `gateway`) and with the serverless, no-subprocess product constraint. If the optional `fastmcp` substitute provides a stdio transport, that transport is a `fastmcp`-only capability and is not part of the built-in client's contract, so it is not covered by the differential tests of criterion 8.)*
+1. THE built-in MCP client SHALL be the default and `fastmcp` an optional substitute chosen only by an explicit code argument, through `create_mcp_client(target, impl="builtin")`.
+2. WHEN `impl` is omitted, THE factory SHALL return the built-in client; WHEN `impl="fastmcp"` and `fastmcp` is installed, it SHALL return the `fastmcp` client.
+3. IF `impl` is neither `"builtin"` nor `"fastmcp"`, THEN THE factory SHALL raise an error saying the value is not accepted and SHALL NOT return a client.
+4. IF `impl="fastmcp"` and `fastmcp` is not installed, THEN THE factory SHALL raise `MissingExtraError` naming the extra `mcp` and SHALL NOT return a client.
+5. SELECTION SHALL use no environment variable, no configuration entry, and no fallback; the reading of `NIMBUS_MCP_IMPL` in `tools/mcp_client.py` SHALL be removed in a later task. `import nimbus` imports neither `fastmcp` nor any optional MCP dependency unless explicitly selected.
+6. THE `mcp` Extra (providing `fastmcp`, own budget in `budgets.toml`) SHALL be a separate Extra; `tools` carries no third-party library.
+7. THE differential tests between the built-in MCP client and the `fastmcp` client SHALL stay as the contract that the two are interchangeable.
+8. THE built-in MCP client SHALL be a consume-only client over HTTP transport with no stdio transport and no subprocess, and SHALL never start an MCP server (consistent with the serverless, no-subprocess product constraint). A stdio transport offered by the `fastmcp` substitute is a `fastmcp`-only capability, outside the built-in contract and the differential tests.
 
-### Requirement 26: SDK compatibility is at the data level, with a bring-your-own escape hatch
+### Requirement 22: SDK compatibility is at the data level, with a bring-your-own escape hatch
 
 **User Story:** As a Nimbus user, I want Nimbus to interoperate with vendor SDKs at the level of data shapes rather than classes, so that I can bring my own SDK-backed implementation without configuration.
 
 #### Acceptance Criteria
 
-1. WHEN Nimbus receives messages or tool definitions expressed in the OpenAI data shape, THE Structure_Spec SHALL require that Nimbus accept them and return results as Nimbus types.
-2. THE Structure_Spec SHALL require that Nimbus data shapes NOT mirror, subclass, or re-export the classes of any vendor SDK client.
-3. IF an input does not conform to the OpenAI data shape, THEN THE Structure_Spec SHALL require that Nimbus reject the input and return an error indicating which required field or shape is invalid, while retaining the original input unchanged.
-4. WHERE a user brings a vendor SDK, THE Structure_Spec SHALL provide a path in which the user writes an adapter that satisfies the `Runnable` Port and passes it where a model is expected, requiring zero configuration entries, zero environment variables, and zero registration steps.
-5. THE Structure_Spec SHALL define the user-written bring-your-own `Runnable` adapter as the only valid path for vendor-SDK use on the runtime path; any other vendor-SDK integration path is invalid and SHALL NOT be exposed.
+1. WHEN Nimbus receives messages or tool definitions in the OpenAI data shape, it SHALL accept them and return results as Nimbus types.
+2. NIMBUS data shapes SHALL NOT mirror, subclass, or re-export the classes of any vendor SDK client.
+3. IF an input does not conform to the OpenAI data shape, THEN Nimbus SHALL reject it with an error indicating the invalid field or shape, retaining the original input unchanged.
+4. WHERE a user brings a vendor SDK, they write an adapter satisfying `Runnable` and pass it where a model is expected, with zero configuration entries, zero environment variables, and zero registration steps. This is the only valid vendor-SDK path on the runtime path; any other SHALL NOT be exposed.
 
-### Requirement 27: Environment-variable scope (provider-standard credentials; few Nimbus-prefixed variables)
+### Requirement 23: Environment-variable scope (provider-standard credentials; few Nimbus-prefixed variables)
 
 **User Story:** As a Nimbus user, I want provider credentials to come from each provider's standard environment variables and only a few Nimbus-prefixed variables to remain, so that configuration is predictable and the planned rename has a bounded scope.
 
 #### Acceptance Criteria
 
-1. THE Structure_Spec SHALL require that provider credentials be read from each provider's standard environment-variable names (`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, and the `AWS_*`, `GOOGLE_*`, and `AZURE_*` variables) exclusively through the credential sources of the `auth` Component.
-2. THE Structure_Spec SHALL prohibit reading provider credentials from any Nimbus-prefixed environment variable.
-3. THE Structure_Spec SHALL limit the Nimbus-prefixed environment variables to exactly three: the log level (`NIMBUS_LOG_LEVEL`), the configuration-file path (`NIMBUS_CONFIG`), and the telemetry flag (`NIMBUS_ENABLE_TELEMETRY`).
-4. IF a Nimbus-prefixed environment variable outside the three permitted variables (`NIMBUS_LOG_LEVEL`, `NIMBUS_CONFIG`, `NIMBUS_ENABLE_TELEMETRY`) is referenced by the Structure_Spec, THEN THE Structure_Spec SHALL be treated as non-compliant with this requirement.
-5. THE Structure_Spec SHALL record that the bounded set of exactly three Nimbus-prefixed variables fixes the scope of the planned rename (Requirement 23), so that exactly these three variables, and no others, are renamed to the `SKYE_` prefix.
-6. THE Structure_Spec SHALL record that Requirement 20 (no vendor SDK or `mcp`/`fastmcp` type outside its owning Component) remains unchanged.
+1. THE Structure_Spec SHALL require that provider credentials be read from each provider's standard variables (`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, and the `AWS_*`, `GOOGLE_*`, `AZURE_*` variables) exclusively through the credential sources of `auth`.
+2. THE Structure_Spec SHALL prohibit reading provider credentials from any Nimbus-prefixed variable.
+3. THE Nimbus-prefixed environment variables SHALL be exactly three: `NIMBUS_LOG_LEVEL`, `NIMBUS_CONFIG`, `NIMBUS_ENABLE_TELEMETRY`.
+4. IF this spec references any other Nimbus-prefixed variable, THEN it SHALL be treated as non-compliant with this requirement.
+5. THE bounded set fixes the scope of the rename (Requirement 19): exactly these three are renamed to `SKYE_*`.
+6. THE rule of Requirement 16 (no vendor SDK or `mcp`/`fastmcp` type outside its owning Component) remains unchanged.
 
-### Requirement 28: The tools Component does not import the prompts Component
+## Decision log
 
-**User Story:** As a Nimbus maintainer, I want the MCP prompt facet to reuse the message types and the prompt Port from `base` rather than import the `prompts` Component, so that `tools` and `prompts` stay independent.
+Decisions that replaced earlier ones (full text in git history before this consolidation):
 
-#### Acceptance Criteria
+- **MCP placement:** first in `gateway` and folded into the `gateway` Extra, then moved to `tools` (Requirement 15.1) with a separate `mcp` Extra (Requirement 21.6). The base resource Port was proposed and rejected for now (15.3).
+- **Backend selection:** an auto-detect/environment/config mechanism for SDK vs built-in was replaced by one implementation per model provider (Requirement 20) and an explicit `impl` argument for MCP only (Requirement 21).
+- **`tools` and `prompts`:** `tools → prompts` was allowed for a while; it is now forbidden (Requirement 15.2).
+- **`policy` Layer:** moved from runtime to services (Requirement 17).
+- **Component count:** 14 → 15 with `auth` (Requirement 18); codename `ozone`.
+- **Runtime imports of optional services:** `teams`/`flows` formerly could import `memory`, `guard`, `observe`, `policy`; now excluded (Requirements 11.4, 17).
+- **Scope guard of the first phase** (requirements-only, no design/tasks) was dropped: `design.md` and `tasks.md` now exist.
 
-1. THE Structure_Spec SHALL set the allowed-imports set of the `tools` Component back to exactly {base}, and SHALL supersede the clause of Requirement 19.2 that implied `tools` imports the `prompts` Component for the MCP prompt facet.
-2. THE Structure_Spec SHALL require that the MCP prompt facet use only the message types defined in `base` (`NimbusMessage`, `UserMessage`, `AssistantMessage` in `base/messages.py`, which `prompts/messages.py` merely re-exports) and the `MCPPrompt` descriptor defined in `tools`, and SHALL NOT import the `prompts` Component.
-3. THE Structure_Spec SHALL record that "reusing the prompt abstraction" means reusing the `PromptBuilderInterface` Port and the message types that live in `base`, not importing the `prompts` Component, so that `tools` and `prompts` remain independent.
-4. THE Structure_Spec SHALL require that `tests/budget/test_import_matrix.py` record the `tools` allowed set as {base} and report any `tools` to `prompts` import as a violation.
+### Requirement renumbering (old → new)
 
-(Design open question to record, no task: whether the MCP prompt facet should implement `PromptBuilderInterface` — `render(template_name, variables) -> list[NimbusMessage]` — so the agent has one prompt shape; today `get_prompt` returns the messages directly.)
+1–10 unchanged; 11 dropped (scope guard, see above); 12 → 11; 13 → 12; 14 → 13; 15, 16, 17 dropped (superseded, folded into 15, 20, 21); 18 → 14; 19 and 28 → 15; 20 → 16; 21 → 17; 22 → 18; 23 → 19; 24 → 20; 25 → 21; 26 → 22; 27 → 23.

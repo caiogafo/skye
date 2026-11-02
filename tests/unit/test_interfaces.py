@@ -1207,8 +1207,8 @@ class TestModelRouterInterface:
         expected_methods = {
             "register_model",
             "select_model",
-            "route_request",
-            "aroute_request",
+            "complete",
+            "acomplete",
             "mark_model_failed",
             "get_model_health",
             "set_routing_strategy",
@@ -1221,7 +1221,6 @@ class TestModelRouterInterface:
             "get_usage_stats",
             "get_cooldown_models",
             "set_model_tags",
-            "route_with_tags",
         }
         assert abstract_methods == expected_methods
 
@@ -1235,7 +1234,13 @@ class TestModelRouterInterface:
             def select_model(self, request: CompletionRequest) -> str:
                 return "model_1"
 
-            def route_request(self, request: CompletionRequest) -> CompletionResponse:
+            def complete(
+                self,
+                messages: list[Any],
+                model: str | None = None,
+                tags: list[str] | None = None,
+                **kwargs: Any,
+            ) -> CompletionResponse:
                 return CompletionResponse(
                     model="model_1",
                     provider="test",
@@ -1244,12 +1249,14 @@ class TestModelRouterInterface:
                     usage=TokenUsage(prompt_tokens=1, completion_tokens=1, total_tokens=2),
                 )
 
-            async def aroute_request(self, request: CompletionRequest) -> CompletionResponse:
-                return self.complete(
-                    messages=request.messages,
-                    model=request.model,
-                    **{k: v for k, v in request.__dict__.items() if k not in ['messages', 'model']}
-                )
+            async def acomplete(
+                self,
+                messages: list[Any],
+                model: str | None = None,
+                tags: list[str] | None = None,
+                **kwargs: Any,
+            ) -> CompletionResponse:
+                return self.complete(messages, model=model, tags=tags, **kwargs)
 
             def mark_model_failed(self, model_id: str) -> None:
                 pass
@@ -1288,16 +1295,6 @@ class TestModelRouterInterface:
 
             def set_model_tags(self, model_id: str, tags: list[str]) -> None:
                 pass
-
-            def route_with_tags(
-                self, request: CompletionRequest, required_tags: list[str]
-            ) -> CompletionResponse:
-                return self.complete(
-                    messages=request.messages,
-                    model=request.model,
-                    tags=required_tags,
-                    **{k: v for k, v in request.__dict__.items() if k not in ['messages', 'model']}
-                )
 
         router = CompleteRouter()
         assert router is not None

@@ -40,7 +40,6 @@ class GoogleEmbeddingProvider(BaseEmbeddingProvider):
         >>> vectors = embedder.encode_batch(["text1", "text2"])
     """
 
-    impl_backend = "google"  # SDK-only today: no REST adapter yet (Req 17)
 
     # Model dimensions mapping
     MODEL_DIMENSIONS = {

@@ -37,7 +37,6 @@ class OpenAIEmbeddingProvider(BaseEmbeddingProvider):
         >>> vectors = embedder.encode_batch(["text1", "text2"])
     """
 
-    impl_backend = "openai"  # SDK-only today: no REST adapter yet (Req 17)
 
     # Model dimensions mapping
     MODEL_DIMENSIONS = {

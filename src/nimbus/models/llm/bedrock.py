@@ -54,7 +54,6 @@ class BedrockProvider(BaseModelProvider):
         >>> response = provider.complete(request)
     """
 
-    impl_backend = "bedrock"  # SDK-only today: no REST adapter yet (Req 17)
     
     def __init__(
         self,

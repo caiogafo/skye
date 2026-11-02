@@ -41,7 +41,6 @@ from abc import ABC, abstractmethod
 from collections.abc import Iterator
 from typing import Any, AsyncIterator
 
-from nimbus.base.backend_select import Selection, select_impl
 from nimbus.base.completion import CompletionRequest, CompletionResponse, StreamChunk
 from nimbus.base.exceptions import ProviderError
 from nimbus.base.interfaces.model import ModelInterface
@@ -110,9 +109,6 @@ class BaseModelProvider(ModelInterface, ABC):
         ...     # ... implement other abstract methods
     """
     
-    #: Backend name in ``SDK_REFERENCE`` / ``NIMBUS_<BACKEND>_IMPL``; None opts out of selection.
-    impl_backend: str | None = None
-
     def __init__(self, model: str | None = None, router: Any | None = None, **config: Any) -> None:
         """Initialize base provider with configuration.
         
@@ -127,11 +123,6 @@ class BaseModelProvider(ModelInterface, ABC):
         self.model = model
         self.router = router
         self.config = config
-        # Backend selection (Req 17): decided once per instance. Every adapter today only has
-        # the SDK path, so "sdk" is the sole available implementation.
-        self.selection: Selection | None = (
-            select_impl(self.impl_backend, available=("sdk",)) if self.impl_backend else None
-        )
         self._client = None
         self.health_metrics = HealthMetrics()
     
@@ -860,9 +851,6 @@ class BaseEmbeddingProvider(VectorEncoderInterface, ABC):
         ...         return 1536
     """
     
-    #: Backend name in ``SDK_REFERENCE`` / ``NIMBUS_<BACKEND>_IMPL``; None opts out of selection.
-    impl_backend: str | None = None
-
     def __init__(self, model: str, **config: Any) -> None:
         """Initialize base embedding provider.
         
@@ -872,11 +860,6 @@ class BaseEmbeddingProvider(VectorEncoderInterface, ABC):
         """
         self.model = model
         self.config = config
-        # Backend selection (Req 17): decided once per instance. Every embedding adapter today
-        # only has the SDK path, so "sdk" is the sole available implementation.
-        self.selection: Selection | None = (
-            select_impl(self.impl_backend, available=("sdk",)) if self.impl_backend else None
-        )
         self._client = None
         self.health_metrics = HealthMetrics()
     

@@ -49,7 +49,6 @@ class GoogleMultimodalEmbeddingProvider(BaseEmbeddingProvider):
         >>> vectors = embedder.encode_batch(["text1", "image.jpg"])
     """
 
-    impl_backend = "google"  # SDK-only today: no REST adapter yet (Req 17)
 
     # Model dimensions
     VECTOR_DIMENSION = 1408

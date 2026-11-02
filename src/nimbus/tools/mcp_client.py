@@ -6,8 +6,10 @@
   Nimbus types: ``CapabilityInterface``
   objects for tools, ``prompts`` message objects for prompts, :class:`Resource` for resources.
 * Protocol shapes are converted in exactly one place, ``nimbus.tools.mcp_boundary``.
-* Selection: :func:`create_mcp_client` (``impl="builtin"`` by default, ``"fastmcp"`` opt-in).
-  Env/config wiring is task 15.1.
+* Choice: :func:`create_mcp_client` takes an explicit ``impl`` argument (``"builtin"`` by default,
+  ``"fastmcp"`` opt-in). No environment variable, no config entry, no fallback (Req 25).
+* The built-in client only consumes MCP servers over HTTP: no stdio transport, no subprocess,
+  it never starts a server (Req 25.10).
 """
 
 from __future__ import annotations
@@ -20,7 +22,6 @@ from abc import ABC, abstractmethod
 from typing import Any
 
 from nimbus.base import http
-from nimbus.base.backend_select import select_impl
 from nimbus.base.exceptions import ConfigurationError, ProviderError, ValidationError
 from nimbus.base.messages import NimbusMessage
 from nimbus.tools import mcp_boundary as boundary
@@ -218,24 +219,21 @@ IMPLEMENTATIONS = ("builtin", "fastmcp")
 
 def create_mcp_client(
     target: Any,
+    impl: str = "builtin",
     *,
-    impl: str | None = None,
     headers: dict[str, str] | None = None,
     timeout: float = 30.0,
 ) -> MCPClientPort:
-    """Build the MCP client for ``target`` (URL, or anything fastmcp accepts).
+    """Build the MCP client for ``target`` (an HTTP URL, or anything fastmcp accepts).
 
-    ``impl=None`` (default) selects once via ``NIMBUS_MCP_IMPL`` / ``nimbus.yaml`` (``builtin`` |
-    ``sdk``, builtin when unspecified; ``sdk`` means fastmcp, with a warning and built-in fallback
-    if it cannot be imported). An explicit ``impl="builtin"|"fastmcp"|"sdk"`` argument is a
-    code-level choice: it overrides env/config and never falls back (a missing fastmcp raises
-    ``MissingExtraError``).
+    ``impl`` is ``"builtin"`` (default, standard library) or ``"fastmcp"``; any other value
+    raises ``ConfigurationError`` and returns no client. The choice is this argument only: no
+    environment variable, no configuration entry, no fallback. ``impl="fastmcp"`` without
+    fastmcp installed raises ``MissingExtraError`` naming the extra ``mcp``.
     """
-    if impl is None:
-        impl = "fastmcp" if select_impl("mcp").impl == "sdk" else "builtin"
     if impl == "builtin":
         return BuiltinMCPClient(target, headers=headers, timeout=timeout)
-    if impl in ("fastmcp", "sdk"):
+    if impl == "fastmcp":
         from nimbus.tools.mcp_fastmcp import FastMCPClient
 
         return FastMCPClient(target, headers=headers, timeout=timeout)

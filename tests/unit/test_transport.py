@@ -10,7 +10,7 @@ import pytest
 from nimbus.base.exceptions import ProviderError
 from nimbus.models.transport import http
 from nimbus.models.transport.retry import with_retry
-from nimbus.models.transport.sigv4 import sign_request
+from nimbus.auth.sigv4 import sign_request
 from nimbus.models.transport.streaming import SSEEvent, parse_sse
 
 

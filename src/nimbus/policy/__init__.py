@@ -1,6 +1,6 @@
 """Policy engine.
 
-Component: policy. Layer: runtime (3). Declared-but-minimal; content belongs to the policy spec.
+Component: policy. Layer: services (2). Declared-but-minimal; content belongs to the policy spec.
 
 Codename: isobar.
 """

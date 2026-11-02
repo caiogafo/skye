@@ -27,7 +27,7 @@ class MCPServerClient:
 
     The FastMCP library is required to use this class. If FastMCP is not installed,
     a helpful error message will be displayed directing users to install it with:
-    `pip install nimbus[tools]` or `pip install fastmcp>=0.1.0`
+    `pip install nimbus[mcp]` or `pip install fastmcp>=0.1.0`
 
     Note: MCP uses the term "tool" in its specification. This client wraps MCP tools
     as Nimbus capabilities for seamless integration with the Nimbus framework.
@@ -81,7 +81,7 @@ class MCPServerClient:
         except ImportError as e:
             raise ImportError(
                 "FastMCP is required to use MCPServerClient. "
-                "Install it with: pip install nimbus[tools] or pip install fastmcp>=0.1.0"
+                "Install it with: pip install nimbus[mcp] or pip install fastmcp>=0.1.0"
             ) from e
 
         if not server_name or not server_name.strip():

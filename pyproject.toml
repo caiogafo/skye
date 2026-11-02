@@ -22,12 +22,14 @@ google = ["google-cloud-aiplatform>=1.38"]
 cohere = ["cohere>=5.0"]
 
 # Individual components
+# auth: pure-Python RSA for RS256 (Google service-account JWT, Azure certificate assertion).
+auth = ["rsa>=4.9"]
 agents = []
 prompts = ["jinja2>=3.0"]
-# The tools Component owns the MCP client. remote_api uses the stdlib transport; the built-in
-# MCP client is stdlib JSON-RPC over HTTP; fastmcp is the optional full-capability alternative,
-# imported lazily and only when selected. Installing nimbus[tools] provides MCP (Req 19.7).
-tools = ["fastmcp>=2.0"]
+tools = []  # empty extra: a module of the core, no third-party libraries
+# mcp: fastmcp, the optional full-capability substitute for the built-in stdlib MCP client,
+# chosen only by create_mcp_client(target, impl="fastmcp") (Req 25).
+mcp = ["fastmcp>=2.0"]
 memory = ["redis>=5.0", "asyncpg>=0.29"]
 guard = []
 teams = []  # empty extra: a module of the core, no third-party libraries
@@ -39,7 +41,7 @@ llm-providers = ["openai>=1.0", "anthropic>=0.25", "boto3>=1.28", "tiktoken>=0.5
 embedding-providers = ["openai>=1.0", "cohere>=5.0", "tiktoken>=0.5"]
 all-providers = ["openai>=1.0", "anthropic>=0.25", "boto3>=1.28", "google-cloud-aiplatform>=1.38", "cohere>=5.0", "tiktoken>=0.5"]
 providers = ["openai>=1.0", "anthropic>=0.25", "boto3>=1.28", "google-cloud-aiplatform>=1.38", "cohere>=5.0", "tiktoken>=0.5"]
-all = ["openai>=1.0", "anthropic>=0.25", "boto3>=1.28", "google-cloud-aiplatform>=1.38", "cohere>=5.0", "tiktoken>=0.5", "redis>=5.0", "asyncpg>=0.29", "fastmcp>=2.0"]
+all = ["openai>=1.0", "anthropic>=0.25", "boto3>=1.28", "google-cloud-aiplatform>=1.38", "cohere>=5.0", "tiktoken>=0.5", "redis>=5.0", "asyncpg>=0.29", "fastmcp>=2.0", "rsa>=4.9"]
 
 [dependency-groups]
 dev = [

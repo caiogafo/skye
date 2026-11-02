@@ -432,6 +432,12 @@ def load_router_config(yaml_path: str | Path) -> dict[str, Any]:
         ) from e
 
 
+#: The Nimbus-prefixed variables that set configuration values (NIMBUS_CONFIG selects the file).
+ENV_CONFIG_VARS = frozenset({"NIMBUS_LOG_LEVEL", "NIMBUS_ENABLE_TELEMETRY"})
+#: All Nimbus-prefixed environment variables: exactly three.
+ALL_ENV_VARS = ENV_CONFIG_VARS | {"NIMBUS_CONFIG"}
+
+
 class ConfigLoader:
     """Loads Nimbus configuration from multiple sources.
 
@@ -492,7 +498,9 @@ class ConfigLoader:
         """
         config_data: dict[str, Any] = {}
 
-        # 1. Load from file (lowest precedence)
+        # 1. Load from file (lowest precedence); NIMBUS_CONFIG names the file when no path is given
+        if config_path is None and os.environ.get("NIMBUS_CONFIG"):
+            config_path = Path(os.environ["NIMBUS_CONFIG"])
         if config_path:
             try:
                 config_data = ConfigLoader._load_from_file(config_path)
@@ -575,8 +583,11 @@ class ConfigLoader:
     def _load_from_env() -> dict[str, Any]:
         """Load configuration from environment variables.
 
-        Reads all environment variables with NIMBUS_ prefix and converts them
-        to configuration keys. The prefix is removed and the key is lowercased.
+        Reads the Nimbus-prefixed variables that set configuration values and converts them
+        to configuration keys. The prefix is removed and the key is lowercased. There are
+        exactly three Nimbus-prefixed variables (Req 27): NIMBUS_LOG_LEVEL and
+        NIMBUS_ENABLE_TELEMETRY (read here) and NIMBUS_CONFIG (names the config file, read in
+        ``load``). Provider credentials never come from a Nimbus-prefixed variable.
 
         For example:
             NIMBUS_LOG_LEVEL=DEBUG -> log_level: "DEBUG"
@@ -588,7 +599,7 @@ class ConfigLoader:
         config_data: dict[str, Any] = {}
 
         for key, value in os.environ.items():
-            if key.startswith("NIMBUS_"):
+            if key in ENV_CONFIG_VARS:
                 # Remove NIMBUS_ prefix and convert to lowercase
                 config_key = key[7:].lower()
 
@@ -604,18 +615,3 @@ class ConfigLoader:
                     config_data[config_key] = value
 
         return config_data
-
-
-def load_impl_config(path: str | Path | None = None) -> dict[str, Any]:
-    """Read the raw ``nimbus.yaml`` mapping for backend selection (``impl:`` section).
-
-    Path: ``path``, else env ``NIMBUS_CONFIG``, else ``./nimbus.yaml`` (absent default file means
-    ``{}``; an explicitly named missing file raises ``ConfigurationError``). Reuses the
-    ``ConfigLoader`` file reader (env substitution included); called at backend construction,
-    never at import.
-    """
-    explicit = path or os.environ.get("NIMBUS_CONFIG")
-    target = Path(explicit) if explicit else Path("nimbus.yaml")
-    if not explicit and not target.is_file():
-        return {}
-    return ConfigLoader._load_from_file(target)

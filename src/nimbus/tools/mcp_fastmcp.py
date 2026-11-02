@@ -50,7 +50,7 @@ class FastMCPClient(_ToolsFacet, MCPClientPort):
     def __init__(
         self, target: Any, *, headers: dict[str, str] | None = None, timeout: float = 30.0
     ) -> None:
-        self._fastmcp = missing_extra("fastmcp", extra="tools")
+        self._fastmcp = missing_extra("fastmcp", extra="mcp")
         self._target = target
         self._kwargs: dict[str, Any] = {"timeout": timeout}
         if headers:

@@ -1,9 +1,9 @@
 """Codename watermark rules (structure spec, Requirement 9.2, 9.3, 9.6-9.9).
 
-Deterministic and offline: the 14 Component Codenames match ^[a-z]{3,7}$, are unique, number
-exactly 14, and never appear in a package name, a file name or an import under src/nimbus.
+Deterministic and offline: the 15 Component Codenames match ^[a-z]{3,7}$, are unique, number
+exactly 15, and never appear in a package name, a file name or an import under src/nimbus.
 `vapor` (the Runnable Port's documentation-only codename) is checked separately and is not
-one of the 14.
+one of the 15.
 
 A name "contains" a Codename when one of its words equals it. Words are the pieces left
 after splitting on `.`, `_`, `-` and `/`, so `stream` matches `stream.py` and `a/stream_x.py`
@@ -24,6 +24,7 @@ SRC = ROOT / "src" / "nimbus"
 # Requirement 9.1 (fixed mapping, taken as given).
 COMPONENT_CODENAMES = {
     "base": "stratus",
+    "auth": "ozone",
     "models": "zephyr",
     "store": "lake",
     "router": "jet",
@@ -38,7 +39,7 @@ COMPONENT_CODENAMES = {
     "teams": "front",
     "flows": "stream",
 }
-RUNNABLE_CODENAME = "vapor"  # Requirement 9.8: documentation-only, not one of the 14.
+RUNNABLE_CODENAME = "vapor"  # Requirement 9.8: documentation-only, not one of the 15.
 
 _WORD_SPLIT = re.compile(r"[._\-/\\]+")
 
@@ -97,9 +98,10 @@ def test_codenames_are_unique():
     assert not dups, "\n".join(dups)
 
 
-def test_exactly_14_codenames():
-    assert len(COMPONENT_CODENAMES) == 14, f"expected 14 codenames, found {len(COMPONENT_CODENAMES)}"
-    assert len(set(COMPONENT_CODENAMES.values())) == 14
+def test_exactly_15_codenames():
+    assert len(COMPONENT_CODENAMES) == 15, f"expected 15 codenames, found {len(COMPONENT_CODENAMES)}"
+    assert len(set(COMPONENT_CODENAMES.values())) == 15
+    assert COMPONENT_CODENAMES["auth"] == "ozone"
 
 
 def test_codenames_not_in_package_or_file_names():
@@ -117,8 +119,8 @@ def test_runnable_codename_vapor():
     assert RUNNABLE_CODENAME not in COMPONENT_CODENAMES.values(), (
         f"codename '{RUNNABLE_CODENAME}' collides with a Component Codename"
     )
-    # Not counted among the 14: the mapping stays at 14 without it.
-    assert len(COMPONENT_CODENAMES) == 14
+    # Not counted among the 15: the mapping stays at 15 without it.
+    assert len(COMPONENT_CODENAMES) == 15
 
 
 def test_vapor_not_in_package_file_or_import_names():

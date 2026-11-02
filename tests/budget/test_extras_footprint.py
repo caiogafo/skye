@@ -37,6 +37,9 @@ BUDGETS = load_budgets()
 # Extra -> files or directories (relative to src/nimbus) forming its Component. Current layout;
 # update when the structure moves.
 EXTRA_PATHS: dict[str, list[str]] = {
+    # auth: authentication and credentials (Layer 0). `rsa` is declared for RS256 signing, which
+    # lands with the auth strategies (see EXTRA_XFAIL); the stdlib SigV4 signer lives here today.
+    "auth": ["auth"],
     "openai": ["models/llm/openai_compatible.py", "models/embeddings/openai_embeddings.py"],
     "anthropic": ["models/llm/anthropic.py"],
     "bedrock": ["models/llm/bedrock.py", "models/embeddings/bedrock_embeddings.py"],
@@ -46,8 +49,8 @@ EXTRA_PATHS: dict[str, list[str]] = {
         "models/embeddings/google_multimodal_embeddings.py",
     ],
     "cohere": ["models/embeddings/cohere_embeddings.py"],
-    # The tools Component owns the MCP client (built-in + fastmcp); fastmcp moved from the removed
-    # `mcp` extra into `tools` (Req 19.7), so all tools/mcp_*.py files belong to this extra.
+    # tools carries no third-party library (known_empty). fastmcp, the optional MCP substitute,
+    # belongs to the separate `mcp` extra (Req 25.7).
     "tools": [
         "tools/__init__.py",
         "tools/capability_call_handler.py",
@@ -57,14 +60,16 @@ EXTRA_PATHS: dict[str, list[str]] = {
         "tools/interface.py",
         "tools/local_function.py",
         "tools/mcp_boundary.py",
-        "tools/mcp_capability.py",
         "tools/mcp_client.py",
-        "tools/mcp_fastmcp.py",
         "tools/mcp_resource.py",
-        "tools/mcp_server_client.py",
         "tools/registry.py",
         "tools/remote_api.py",
         "tools/schema.py",
+    ],
+    "mcp": [
+        "tools/mcp_capability.py",
+        "tools/mcp_fastmcp.py",
+        "tools/mcp_server_client.py",
     ],
     "memory": ["memory", "store/redis.py", "store/postgres.py"],
     "observe": ["observe"],
@@ -174,8 +179,11 @@ def _declared() -> dict[str, set[str]]:
     }
 
 
-# Reasons the current tree does not satisfy the declare-exactly rule yet (none left).
-EXTRA_XFAIL: dict[str, str] = {}
+# Reasons the current tree does not satisfy the declare-exactly rule yet (auth: rsa is not imported yet).
+EXTRA_XFAIL: dict[str, str] = {
+    "auth": "rsa is declared for RS256 (Google/Azure assertions); the strategy code that imports it "
+    "is the auth milestone, not this phase (Req 22.9).",
+}
 
 
 @pytest.mark.parametrize("extra", sorted(EXTRA_PATHS))
@@ -190,6 +198,13 @@ def test_extra_declares_exactly_what_its_component_imports(extra: str, request: 
         f"extra '{extra}': imported but not declared {missing}; declared but never imported {unused}. "
         "Declare the library in pyproject.toml or remove the dead declaration."
     )
+
+
+def test_auth_extra_declares_exactly_rsa() -> None:
+    """Req 22.9: the auth extra declares only `rsa`; the google extra does not declare it."""
+    extras = pyproject()["project"]["optional-dependencies"]
+    assert {requirement_name(r) for r in extras["auth"]} == {"rsa"}
+    assert "rsa" not in {requirement_name(r) for r in extras["google"]}
 
 
 def test_every_extra_with_a_component_is_checked() -> None:

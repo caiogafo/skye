@@ -599,7 +599,7 @@ Nimbus supports multiple configuration sources with precedence: code > environme
 
 ```bash
 export NIMBUS_LOG_LEVEL=INFO
-export NIMBUS_OPENAI_API_KEY=sk-...
+export OPENAI_API_KEY=sk-...  # provider credentials use the provider-standard variable
 export NIMBUS_ENABLE_TELEMETRY=true
 ```
 

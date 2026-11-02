@@ -57,3 +57,6 @@ uv.lock
 
 # local working prompts for Kiro (not committed)
 .kiro/prompts/
+
+# Serena
+.serena/

@@ -44,7 +44,7 @@ class TestMCPServerClient:
                 MCPServerClient("test_server", sample_server_config)
 
             assert "FastMCP is required" in str(exc_info.value)
-            assert "pip install nimbus[tools]" in str(exc_info.value)
+            assert "pip install nimbus[mcp]" in str(exc_info.value)
         finally:
             # Restore fastmcp
             if fastmcp_backup is not None:

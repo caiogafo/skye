@@ -31,7 +31,7 @@ class MCPCapability(CapabilityInterface):
 
     The FastMCP library is required to use this class. If FastMCP is not installed,
     a helpful error message will be displayed directing users to install it with:
-    `pip install nimbus[tools]` or `pip install fastmcp>=0.1.0`
+    `pip install nimbus[mcp]` or `pip install fastmcp>=0.1.0`
 
     Attributes:
         mcp_tool: The MCP tool definition dictionary
@@ -81,7 +81,7 @@ class MCPCapability(CapabilityInterface):
         except ImportError as e:
             raise ImportError(
                 "FastMCP is required to use MCPCapability. "
-                "Install it with: pip install nimbus[tools] or pip install fastmcp>=0.1.0"
+                "Install it with: pip install nimbus[mcp] or pip install fastmcp>=0.1.0"
             ) from e
 
         # Validate MCP tool definition
@@ -193,7 +193,7 @@ class MCPCapability(CapabilityInterface):
         except ImportError as e:
             raise CapabilityExecutionError(
                 f"FastMCP is required to execute MCP tool '{tool_name}'. "
-                "Install it with: pip install nimbus[tools]",
+                "Install it with: pip install nimbus[mcp]",
                 capability_name=tool_name,
                 original_error=str(e),
             ) from e

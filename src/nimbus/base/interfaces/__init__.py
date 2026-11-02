@@ -4,6 +4,8 @@ This module provides all the abstract interfaces that define contracts for
 Nimbus components. All implementations must adhere to these interfaces.
 """
 
+from nimbus.base.interfaces.authentication import AuthenticationInterface
+from nimbus.base.interfaces.authorizer import AuthorizerInterface, Decision
 from nimbus.base.interfaces.capability import CapabilityInterface, CapabilitySchema
 from nimbus.base.interfaces.config_loader import ConfigLoaderInterface
 from nimbus.base.interfaces.content_reader import ContentReaderInterface
@@ -39,6 +41,9 @@ __all__ = [
     # Prompt and message interfaces
     "PromptBuilderInterface",
     # Composition and decision Ports
+    "AuthorizerInterface",
+    "Decision",
+    "AuthenticationInterface",
     "Runnable",
     "DecisionModel",
     "DecisionResult",

@@ -76,19 +76,30 @@ def test_config_loader_from_env(monkeypatch):
     # Set environment variables
     monkeypatch.setenv("NIMBUS_LOG_LEVEL", "WARNING")
     monkeypatch.setenv("NIMBUS_ENABLE_TELEMETRY", "false")
-    monkeypatch.setenv("NIMBUS_CORRELATION_ID_HEADER", "X-Trace-ID")
-    monkeypatch.setenv("NIMBUS_DEFAULT_ROUTING_STRATEGY", "weighted")
-    monkeypatch.setenv("NIMBUS_ENABLE_FALLBACKS", "false")
-    monkeypatch.setenv("NIMBUS_ENABLE_RATE_LIMITING", "true")
 
     config = ConfigLoader.load()
 
     assert config.log_level == "WARNING"
     assert config.enable_telemetry is False
-    assert config.correlation_id_header == "X-Trace-ID"
-    assert config.default_routing_strategy == "weighted"
-    assert config.enable_fallbacks is False
-    assert config.enable_rate_limiting is True
+
+
+def test_only_three_nimbus_prefixed_env_vars(monkeypatch):
+    """Req 27: exactly NIMBUS_LOG_LEVEL, NIMBUS_CONFIG, NIMBUS_ENABLE_TELEMETRY are read."""
+    from nimbus.base.config import ALL_ENV_VARS
+
+    assert ALL_ENV_VARS == {"NIMBUS_LOG_LEVEL", "NIMBUS_CONFIG", "NIMBUS_ENABLE_TELEMETRY"}
+    monkeypatch.setenv("NIMBUS_ENABLE_FALLBACKS", "false")
+    monkeypatch.setenv("NIMBUS_OPENAI_API_KEY", "sk-ignored")
+    config = ConfigLoader.load()
+    assert config.enable_fallbacks is True  # default: the variable is not a config source
+    assert "openai_api_key" not in ConfigLoader._load_from_env()
+
+
+def test_nimbus_config_env_names_the_config_file(monkeypatch):
+    monkeypatch.setenv("NIMBUS_CONFIG", "tests/fixtures/sample_config.yaml")
+    assert ConfigLoader.load().log_level == ConfigLoader.load(
+        config_path=Path("tests/fixtures/sample_config.yaml")
+    ).log_level
 
 
 def test_config_loader_from_code_overrides():
@@ -260,12 +271,10 @@ def test_config_loader_env_type_conversion(monkeypatch):
     """Test environment variable type conversion."""
     # Test boolean conversion
     monkeypatch.setenv("NIMBUS_ENABLE_TELEMETRY", "true")
-    monkeypatch.setenv("NIMBUS_ENABLE_FALLBACKS", "false")
 
     config = ConfigLoader.load()
 
     assert config.enable_telemetry is True
-    assert config.enable_fallbacks is False
 
 
 if __name__ == "__main__":
