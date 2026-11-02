@@ -24,13 +24,13 @@ This directory contains tests for:
 
 ```bash
 # Run all router tests
-pytest tests/unit/routes/
+pytest tests/unit/router/
 
 # Run specific test file
-pytest tests/unit/routes/test_model_router.py
+pytest tests/unit/router/test_model_router.py
 
 # Run with coverage
-pytest tests/unit/routes/ --cov=src/skye/router
+pytest tests/unit/router/ --cov=src/skye/router
 ```
 
 ## Testing Approach

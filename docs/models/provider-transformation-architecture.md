@@ -1,3 +1,9 @@
+---
+title: "Provider Transformation Architecture"
+status: current
+last_updated: 2026-11-02
+---
+
 # Provider Transformation Architecture
 
 ## Overview

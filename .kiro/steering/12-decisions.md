@@ -43,7 +43,7 @@ recorded in the repository; "n/d" where I could not recover it (check git).
 | D26 | MCP resources are a Port in `base` (list and read by URI, MIME type, text or bytes), implemented by the MCP client in `tools`; the MCP prompt facet returns `base` messages and does NOT implement `PromptBuilderInterface` (resolves O7) | one resource contract, reusable by prompts and memory | R10 | base, tools |
 
 ## Open decisions (not yet taken)
-- **O1** The project name (replaces D23): constraints: at most 7 letters, related to air or sky, able to contain the cloud and weather codenames. Candidates seen: welkin, tropos, airmass, mizzle, zenith, aether.
+- **O1** The project name (replaces D23): constraints: at most 7 letters, related to air or sky, able to contain the cloud and weather codenames. Candidates seen: welkin, tropos, airmass, mizzle, zenith, aether. When it is decided, the rename is one mechanical task, executed last: the package folder and every import, the classes that carry the old name, the three prefixed environment variables, the configuration file name, the distribution name in `pyproject.toml`, and the occurrences in `budgets.toml`, CI, CODEOWNERS, the Makefile, the specs, the steering, the wiki, the examples and the README; the owner renames the GitHub repository; it is done when `make budget-fast`, `make budget`, `make differential` and the guardrail tests give the same results as before, with the codename test adapted and the old name recorded as the umbrella watermark; `tests/budget/test_no_old_name.py` then fails on any leftover.
 - **O2** Trademark check at the registries (USPTO, TMview, WIPO; classes 9 and 42) for the chosen name. Lesson from the dropped name: a web search alone found conflicts (an AI sales-automation company claiming the same marks, a funded AI app, an open-source agent orchestrator), so the registry search comes before reserving the PyPI name.
 - **O4** Moving the core models from pydantic to dataclasses, and when.
 - ~~**O5** `tiktoken`: keep, drop, or make pluggable.~~ Taken as **D25** (optional `tiktoken` extra, lazy; stdlib approximate counter in core).
@@ -60,3 +60,10 @@ recorded in the repository; "n/d" where I could not recover it (check git).
 - **O16** Gateway: the default and maximum toolset size, and the budget values.
 - **O17** Gateway: scope-token key management and rotation.
 - **O18** Gateway: JWT signature verification in the gateway itself (RSA without a compiled library), and whether the gateway also fronts model calls (the router) or only tools.
+
+## Owner actions (not decisions, not repository work)
+- Rename the GitHub repository to the final project name (the local folder still carries the first project name), once O1 is decided.
+- Replace the invented placeholder URLs in `README.md` (`github.com/your-org/skye`) and `examples/README.md` (`github.com/skyeai/skye`, `support@skyeai.com`).
+- Replace the account-wide PyPI token with one limited to the project, revoke the token that was pasted in a chat, and fix the `[testpypi]` section of `~/.pypirc` (it holds a pypi.org token: use a test.pypi.org token or drop the section).
+- PyPI names: `skyeai` 0.0.1 is a placeholder and `skye-ai` cannot be registered (PyPI blocks it as too similar). Reserve the final name after the trademark check (O2) and publish a real release under it.
+- Commit the uncommitted files, split by topic: structure, auth and REST adapters; router fix; rename; docs, wiki and specs.

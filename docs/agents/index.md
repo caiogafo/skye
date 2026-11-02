@@ -1,5 +1,8 @@
 ---
+title: "agents"
 codename: "cyclone"
+status: current
+last_updated: 2026-11-02
 ---
 
 # agents

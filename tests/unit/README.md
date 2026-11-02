@@ -46,9 +46,9 @@ unit/
 pytest tests/unit/
 
 # Run specific module tests
-pytest tests/unit/capabilities/
-pytest tests/unit/providers/
-pytest tests/unit/routes/
+pytest tests/unit/tools/
+pytest tests/unit/models/
+pytest tests/unit/router/
 
 # Run with coverage
 pytest tests/unit/ --cov=src/skye --cov-report=html

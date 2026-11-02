@@ -21,35 +21,35 @@ honors.
     - Evidence: `src/skye/models/transport/eventstream.py`; `tests/unit/test_eventstream.py`.
     - _Requirements: 9.9, 16.5_
   - [x] 1.4 Retry policy (3 after first attempt)
-    - Evidence: `src/skye/models/transport/retry.py` (`with_retry`); `tests/unit/providers/test_retry_logic.py`.
+    - Evidence: `src/skye/models/transport/retry.py` (`with_retry`); `tests/unit/models/test_retry_logic.py`.
     - _Requirements: 9.2_
   - [x] 1.5 Error mapping to the SkyeError hierarchy
-    - Evidence: `src/skye/models/transport/error_mapping.py`; `tests/unit/providers/test_error_handling.py`.
+    - Evidence: `src/skye/models/transport/error_mapping.py`; `tests/unit/models/test_error_handling.py`.
     - _Requirements: 9.9, 18.1_
 
 - [ ] 2. Base providers and registry
   - [x] 2.1 `BaseModelProvider` / `BaseEmbeddingProvider` with retry, health and `Runnable.invoke`
-    - Evidence: `src/skye/models/base.py`; `tests/unit/providers/test_base_provider.py`, `test_base_embedding_provider.py`, `test_runnable_conformance.py`.
+    - Evidence: `src/skye/models/base.py`; `tests/unit/models/test_base_provider.py`, `test_base_embedding_provider.py`, `test_runnable_conformance.py`.
     - _Requirements: 9.1, 9.5, 9.10, 16.1_
   - [x] 2.2 Registry behind the registry Port + `provider()` factory
-    - Evidence: `src/skye/models/registry.py` (`ProviderRegistry`, `provider`); `tests/unit/providers/test_provider_registry.py`, `test_provider_registration.py`.
+    - Evidence: `src/skye/models/registry.py` (`ProviderRegistry`, `provider`); `tests/unit/models/test_provider_registry.py`, `test_provider_registration.py`.
     - _Requirements: 9.9, 6.1_
   - [x]* 2.3 Health metrics unit tests
-    - Evidence: `tests/unit/providers/test_health_monitoring.py`.
+    - Evidence: `tests/unit/models/test_health_monitoring.py`.
     - _Requirements: 17.2, 18.3_
 
 - [ ] 3. REST adapters (one per provider)
   - [x] 3.1 OpenAI and Azure OpenAI (one family keyed by base URL + key)
-    - Evidence: `src/skye/models/llm/openai_compatible.py` (`OpenAIProvider`, `AzureOpenAIProvider`); `tests/unit/providers/test_openai_provider.py`, `test_azure_provider.py`, `tests/unit/test_openai_shape.py`.
+    - Evidence: `src/skye/models/llm/openai_compatible.py` (`OpenAIProvider`, `AzureOpenAIProvider`); `tests/unit/models/test_openai_provider.py`, `test_azure_provider.py`, `tests/unit/test_openai_shape.py`.
     - _Requirements: 9.3, 9.5, 9.6, 9.10, 22.1_
   - [x] 3.2 Anthropic (Messages API, system message separate)
-    - Evidence: `src/skye/models/llm/anthropic.py`; `tests/unit/providers/test_anthropic_provider.py`.
+    - Evidence: `src/skye/models/llm/anthropic.py`; `tests/unit/models/test_anthropic_provider.py`.
     - _Requirements: 9.3, 9.5, 9.6, 9.10_
   - [x] 3.3 Bedrock (Converse + stream, SigV4 via auth, boto3 not required)
-    - Evidence: `src/skye/models/llm/bedrock.py`; `tests/unit/providers/test_bedrock_provider.py`.
+    - Evidence: `src/skye/models/llm/bedrock.py`; `tests/unit/models/test_bedrock_provider.py`.
     - _Requirements: 9.3, 9.5, 9.9, 7.3_
   - [x] 3.4 Google adapter (formerly "Vertex AI", renamed `google`)
-    - Evidence: `src/skye/models/llm/google_provider.py` (`GoogleProvider`), registered as `"google"` in `src/skye/models/__init__.py`; `tests/unit/providers/test_google_provider.py`.
+    - Evidence: `src/skye/models/llm/google_provider.py` (`GoogleProvider`), registered as `"google"` in `src/skye/models/__init__.py`; `tests/unit/models/test_google_provider.py`.
     - _Requirements: 9.3; D19_
   - [ ] 3.5 Google adapter authentication through the `auth` component
     - Note: `GoogleProvider` must obtain Google service-account / metadata / ADC credentials through the `auth` authentication Port (RS256 with `rsa`, impersonation, metadata server, WIF, API key) rather than any in-adapter credential handling. Depends on the `auth` component and its credential sources; wire `GoogleProvider._initialize_client` to accept an `AuthenticationInterface` and sign over `base/http.py`.
@@ -57,10 +57,10 @@ honors.
 
 - [ ] 4. Embedding adapters behind the `vector_encoder` Port
   - [x] 4.1 OpenAI, Bedrock (Titan), Cohere, Google embeddings
-    - Evidence: `src/skye/models/embeddings/openai_embeddings.py`, `bedrock_embeddings.py`, `cohere_embeddings.py`, `google_embeddings.py`; `tests/unit/providers/test_openai_embeddings.py`, `test_bedrock_embeddings.py`, `test_cohere_embeddings.py`, `test_google_embeddings.py`.
+    - Evidence: `src/skye/models/embeddings/openai_embeddings.py`, `bedrock_embeddings.py`, `cohere_embeddings.py`, `google_embeddings.py`; `tests/unit/models/test_openai_embeddings.py`, `test_bedrock_embeddings.py`, `test_cohere_embeddings.py`, `test_google_embeddings.py`.
     - _Requirements: 25.1, 25.2, 25.3_
   - [x] 4.2 Google multimodal embeddings (image inputs, text-shaped vectors)
-    - Evidence: `src/skye/models/embeddings/google_multimodal_embeddings.py`; `tests/unit/providers/test_google_multimodal_embeddings.py`.
+    - Evidence: `src/skye/models/embeddings/google_multimodal_embeddings.py`; `tests/unit/models/test_google_multimodal_embeddings.py`.
     - _Requirements: 25.4, 26.1, 26.3_
 
 - [ ] 5. Multimodal inputs at the boundary

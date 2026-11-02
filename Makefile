@@ -91,11 +91,11 @@ test-integration:
 
 test-providers:
 	@echo "Running provider unit tests..."
-	uv run pytest tests/unit/providers/ -v
+	uv run pytest tests/unit/models/ -v
 
 test-capabilities:
 	@echo "Running capability unit tests..."
-	uv run pytest tests/unit/capabilities/ -v
+	uv run pytest tests/unit/tools/ -v
 
 test-cov:
 	@echo "Running tests with coverage..."

@@ -181,7 +181,7 @@ boundary naming the field or modality and the input is left unchanged (Requireme
 
 ## Testing Strategy
 
-Unit tests in `tests/unit/providers` cover each adapter's transformation, capability extraction, streaming, retry, error mapping,
+Unit tests in `tests/unit/models` cover each adapter's transformation, capability extraction, streaming, retry, error mapping,
 health and `Runnable` conformance against mocked transport, with no network. Differential tests in
 `tests/differential/test_models_differential.py` use the vendor SDKs (dev group) as the oracle, comparing the fields and
 behaviours the library consumes — structured fields by subset, numbers within an epsilon, errors by category — and skip when

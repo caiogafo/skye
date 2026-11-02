@@ -1,3 +1,9 @@
+---
+title: "Size and load budgets"
+status: current
+last_updated: 2026-11-02
+---
+
 # Size and load budgets
 
 Skye is meant for serverless, where every dependency is paid at install time (package size), at cold start (import time and memory) and at build time (a compiled wheel needs a container for the right architecture). The limits live in `budgets.toml` and are checked by tests and by the `budgets` workflow on every pull request.
@@ -37,7 +43,7 @@ Sizes exclude the libraries Lambda already ships. Time is the best of five fresh
 
 ## No external-library type outside its Component
 
-`tests/budget/test_boundary_rule.py` (part of `make budget-fast`) checks Requirement 16: provider SDKs (`openai`, `anthropic`, `boto3`, `vertexai`/`google.cloud.aiplatform`, `cohere`) and `fastmcp`/`mcp` are imported only by the files that own them, only inside a function, `tools/mcp_boundary.py` imports no third-party library, no public annotation in `models`/`tools` names an external type, and the provider and MCP conversions return Skye types only. A new external backend (for `observe`, `store`, `prompts`, `agents`) adds its owning file to `SDK_OWNERS` in that test; no new Component or Port. `tests/differential/test_boundary_leak.py` runs the same check on both MCP clients (needs `fastmcp`, dev group).
+`tests/budget/test_boundary_rule.py` (part of `make budget-fast`) checks the boundary rule (Requirement 9.5 in `.kiro/steering/10-requirements.md`): provider SDKs (`openai`, `anthropic`, `boto3`, `vertexai`/`google.cloud.aiplatform`, `cohere`) and `fastmcp`/`mcp` are imported only by the files that own them, only inside a function, `tools/mcp_boundary.py` imports no third-party library, no public annotation in `models`/`tools` names an external type, and the provider and MCP conversions return Skye types only. A new external backend (for `observe`, `store`, `prompts`, `agents`) adds its owning file to `SDK_OWNERS` in that test; no new Component or Port. `tests/differential/test_boundary_leak.py` runs the same check on both MCP clients (needs `fastmcp`, dev group).
 
 ## Changing a budget
 
@@ -45,12 +51,17 @@ A budget only goes down. When a PR fixes something (removes a dependency, moves 
 
 To make the check blocking, require the `budgets / fast checks` and `budgets / footprint` jobs in the repository's branch protection rules. This is a GitHub setting, not part of the repository.
 
-## Debt recorded today (2026-10-30)
+## Debt recorded today (2026-11-02)
+
+Checked against `budgets.toml` and `pyproject.toml`.
 
 | Item | Why it matters | Target |
 |---|---|---|
-| Core depends on `pydantic`, `jinja2`, `pyyaml`, `tenacity` (none in Lambda, none in the standard library) | about 9 MB and 10 packages | standard library only |
-| Compiled in the core: `pydantic-core` (Rust), `pyyaml` and `markupsafe` (C) | needs a container build | none |
-| Extras `agents`, `guard`, `prompts`, `teams`, `flows` have no dependencies of their own | they are modules, not extras | remove from `pyproject.toml` |
-| Extra sizes over the core: `google` 176 MB, `cohere` 33 MB, `openai` 18 MB, `memory` 12 MB, `anthropic` 10 MB | most come from provider SDKs | call the provider REST APIs with the standard library or `urllib3` |
-| `skyeai[all]` is about 274 MB, over the Lambda limit | cannot be deployed | not advertised for Lambda |
+| Core depends on `pydantic`, `pyyaml`, `tenacity` (none in Lambda, none in the standard library) | about 9 MB and 10 packages | standard library only (pydantic goes with the dataclass migration, open decision O4) |
+| Compiled in the core: `pydantic-core` (Rust) and `pyyaml` (C) | needs a container build | none |
+| Extras with no dependency of their own: `agents`, `guard`, `prompts`, `tools`, `teams`, `flows`, `observe`, and the provider extras `anthropic`, `bedrock`, `google`, `cohere` | they are modules, not extras (the provider extras stay so `pip install skyeai[...]` keeps working) | remove the ones that are not provider extras from `pyproject.toml` |
+| Extra sizes over the core: `mcp` 43 MB (`fastmcp`, 7 compiled distributions, accepted by the owner), `memory` 12 MB (`redis`, `asyncpg`), `openai` 18 MB (`tiktoken`, open until the token-counter extra is settled), `auth` 1 MB (`rsa`) | `mcp` and `openai` carry compiled code | `mcp` stays explicit; `openai` is reviewed with decision D25 |
+| `skyeai[all]` size | it includes `mcp` and `memory` | not advertised for Lambda |
+
+Done since the previous table (2026-10-30): `jinja2` and `markupsafe` left the core (the prompts engine is standard library), and the provider SDK extras
+(`google` 176 MB, `cohere` 33 MB, `anthropic` 10 MB) are now empty because every provider has one built-in REST adapter.

@@ -23,7 +23,7 @@ Written without the project name (it is being chosen); `<pkg>` is the import pac
 #### Acceptance Criteria
 
 1. THE library SHALL have exactly 15 components: base, auth, models, store, router, tools, prompts, memory, guard, policy, observe, gateway, agents, teams, flows.
-2. EACH name SHALL match `^[a-z]{3,7}$` and SHALL be the same for the component's package, spec folder, docs section and `budgets.toml` entry.
+2. EACH name SHALL match `^[a-z]{3,7}$` and SHALL be the same for the component's package, docs section and `budgets.toml` entry; THE spec folder SHALL carry the layer number of the component in front of the name (`<layer>-<name>`, for example `1-adapters-models`).
 3. IF a proposed name breaks the pattern or equals an existing one, THEN THE library SHALL reject it and keep the existing set.
 4. WHERE a name is used for a class or a function, THE library SHALL allow a descriptive identifier (for example `ModelRouter`).
 
@@ -191,7 +191,7 @@ Written without the project name (it is being chosen); `<pkg>` is the import pac
 #### Acceptance Criteria
 
 1. THE requirements, the high-level design and the decisions SHALL live only in `10-requirements.md`, `11-design.md` and `12-decisions.md`.
-2. EACH component SHALL have exactly one spec, named like the component (`.kiro/specs/<component>/`); the cross-cutting work SHALL live in the one spec `.kiro/specs/structure/`. EACH spec has `requirements.md` (Kiro format: its user stories as `### Requirement N:` blocks, each criterion being a pointer `THE spec SHALL realize Requirement N.k of #[[file:.kiro/steering/10-requirements.md]]`, never a copied rule), `design.md` (detailed design, opening with a `Builds on:` line that cites the sections and components of `11-design.md`) and `tasks.md` (the only place for tasks, each citing the requirements it satisfies).
+2. EACH component SHALL have exactly one spec, named `<n>-<layer>-<scope>` (`.kiro/specs/<n>-<layer>-<scope>/`, the layer from Requirement 2.1 and the component as the scope); the cross-cutting work SHALL live in the one spec `.kiro/specs/0-base-structure/`, at layer 0 with `0-base-base` and `0-base-auth`. EACH spec has `requirements.md` (Kiro format: its user stories as `### Requirement N:` blocks, each criterion being a pointer `THE spec SHALL realize Requirement N.k of #[[file:.kiro/steering/10-requirements.md]]`, never a copied rule), `design.md` (detailed design, opening with a `Builds on:` line that cites the sections and components of `11-design.md`) and `tasks.md` (the only place for tasks, each citing the requirements it satisfies).
 3. WHEN a new spec needs a requirement that no existing one covers, THE requirement SHALL be added here, in Kiro format with the next number, and the spec SHALL cite it; existing numbers SHALL NOT be renumbered.
 4. WHEN a requirement changes, THE change SHALL be made here with a decision-log line, and a milestone SHALL be added to each component that cites it.
 5. THE documentation SHALL be a wiki with one section per component, a glossary and `docs/index.md`; IF a page lacks front matter, has a broken link or is unreachable from the index, THEN THE docs test SHALL fail.

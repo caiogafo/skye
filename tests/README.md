@@ -79,13 +79,13 @@ pytest tests/stress/
 ### Run Tests for Specific Module
 ```bash
 # Capability tests
-pytest tests/unit/capabilities/
+pytest tests/unit/tools/
 
 # Router tests
-pytest tests/unit/routes/
+pytest tests/unit/router/
 
 # Provider tests
-pytest tests/unit/providers/
+pytest tests/unit/models/
 ```
 
 ### Run with Coverage

@@ -1,3 +1,9 @@
+---
+title: "Provider Architecture Validation Report"
+status: current
+last_updated: 2026-11-02
+---
+
 # Provider Architecture Validation Report
 
 **Date**: 2024-11-21  

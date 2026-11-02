@@ -1,3 +1,9 @@
+---
+title: "Skye documentation"
+status: current
+last_updated: 2026-11-02
+---
+
 # Skye documentation
 
 New here? Start with [getting started](getting-started.md).
@@ -22,4 +28,4 @@ One section per component; the section name is the component's short name.
 | [`teams`](teams/index.md) | Optional teams of agents. |
 | [`flows`](flows/index.md) | Optional flows (workflows). |
 
-Other pages: [getting started](getting-started.md), [budgets](budgets.md), [codename glossary](glossary.md).
+Other pages: [getting started](getting-started.md), [architecture](architecture.md), [deployment](deployment.md), [budgets](budgets.md), [development](development.md), [roadmap](roadmap.md), [codename glossary](glossary.md).

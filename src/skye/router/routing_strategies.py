@@ -159,7 +159,10 @@ class RoutingStrategySelector:
                 weights.append(self.model_targets[model_id].weight)
             else:
                 weights.append(self._metric(model_id, "success_rate", 1.0))
-        
+
+        if sum(weights) <= 0:
+            # random.choices rejects all-zero weights; with no signal at all, pick uniformly.
+            return random.choice(available_models)
         return random.choices(available_models, weights=weights)[0]
 
     def _priority_based_strategy(self, available_models: list[str]) -> str:

@@ -55,15 +55,40 @@ def _spec_dirs() -> list:
     return sorted(p for p in SPECS.iterdir() if p.is_dir())
 
 
-CROSS_CUTTING_SPEC = "structure"
+CROSS_CUTTING_SPEC = "0-base-structure"
 
 
-def test_every_spec_is_named_like_a_component():
-    components, _ = _requirements()
-    allowed = set(components) | {CROSS_CUTTING_SPEC} | LEGACY_SPECS
+def _layers() -> dict[str, tuple[int, str]]:
+    """component -> (layer number, layer name), read from Requirement 2.1 of 10-requirements.md."""
+    text = (STEERING / "10-requirements.md").read_text(encoding="utf-8")
+    line = re.search(r"(?m)^1\. THE layers SHALL be: (.*)$", text)
+    assert line, "Requirement 2.1 (the layers) not found"
+    out: dict[str, tuple[int, str]] = {}
+    for name, number, members in re.findall(r"(\w+) \((\d)\) = \{([^}]*)\}", line.group(1)):
+        for member in members.split(","):
+            out[member.strip()] = (int(number), name)
+    return out
+
+
+def expected_spec_names() -> set[str]:
+    """The folder name `<n>-<layer>-<scope>` of every component, plus the cross-cutting spec."""
+    names = {f"{n}-{layer}-{component}" for component, (n, layer) in _layers().items()}
+    return names | {CROSS_CUTTING_SPEC}
+
+
+def test_every_spec_is_named_n_layer_scope():
+    allowed = expected_spec_names() | LEGACY_SPECS
     bad = [p.name for p in _spec_dirs() if p.name not in allowed]
-    assert not bad, f"spec folders that are neither a component name nor `{CROSS_CUTTING_SPEC}`: {bad}"
+    assert not bad, f"spec folders that are not `<n>-<layer>-<scope>` of a component (nor the cross-cutting spec): {bad}"
     assert (SPECS / CROSS_CUTTING_SPEC).is_dir(), f"the cross-cutting spec `{CROSS_CUTTING_SPEC}` is missing"
+    components, _ = _requirements()
+    assert set(_layers()) == set(components), "Requirement 2.1 and Requirement 1.1 list different components"
+
+
+def test_the_spec_name_pattern_accepts_and_rejects():
+    names = expected_spec_names()
+    assert "1-adapters-models" in names and "0-base-auth" in names and "3-runtime-gateway" in names
+    assert "models" not in names and "1-models" not in names and "2-services-models" not in names
 
 
 def test_legacy_list_is_not_stale():
@@ -214,7 +239,8 @@ def test_criterion_pointers_are_checked_exactly():
         assert got and why in got, f"{line!r} should fail with {why!r}, got {got!r}"
 
 
-TASK_LINE = re.compile(r"^\s*- \[[ x]\]\*? \d+(?:\.\d+)*\.? \S")
+# Kiro marks a task `[ ]` not started, `[~]` in progress, `[-]` queued, `[x]` done.
+TASK_LINE = re.compile(r"^\s*- \[[ x~-]\]\*? \d+(?:\.\d+)*\.? \S")
 
 
 def test_spec_task_lines_follow_the_kiro_task_format():
@@ -235,7 +261,7 @@ def test_spec_task_lines_follow_the_kiro_task_format():
 
 
 def test_the_task_line_pattern_accepts_and_rejects():
-    good = ["- [ ] 1. Shared transport", "- [x] 2. Done", "  - [x] 1.1 Sub task", "  - [ ]* 2.3 Optional task", "- [ ] 10. Rename"]
+    good = ["- [ ] 1. Shared transport", "- [x] 2. Done", "- [~] 3. In progress", "  - [-] 3.1 Queued", "  - [x] 1.1 Sub task", "  - [ ]* 2.3 Optional task", "- [ ] 10. Rename"]
     wrong = ["- [ ] M1. Shared transport", "  - [x] M1.1 Sub task", "- [ ] models:1.1 Task", "- [ ] Do a thing", "- [ ]1. No space"]
     assert all(TASK_LINE.match(x) for x in good)
     assert not any(TASK_LINE.match(x) for x in wrong)

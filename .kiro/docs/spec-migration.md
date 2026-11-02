@@ -22,19 +22,19 @@ Module and folder structure. Groups 1 to 19 of its tasks are implemented in code
 | 15 and 21 MCP client | Requirement 10 |
 | 17 policy is a service; runtime never imports optional services | Requirements 2 and 4 |
 | 18 auth; 23 environment variables | Requirement 11 |
-| 19 project rename | one-off task (group 10 of `structure/tasks.md`), decision D23 and open decisions O1, O2 |
+| 19 project rename | one-off task, now described in open decision O1 of `12-decisions.md` (with D23 and O2) |
 | 24 licence | Requirement 14 |
 | 27 prompts without a compiled engine | Requirement 13 (done: `prompts/engine.py`) |
-| design.md | summarized in `11-design.md`; the file-by-file mapping and the correctness properties stay in `structure/design.md` as history |
+| design.md | summarized in `11-design.md`; the file-by-file mapping and the correctness properties stay in `0-base-structure/design.md` as history |
 
 The base-contracts stories (former `skye` spec) became Requirements 16 to 21 (interfaces and the standard response, router configuration, errors and
 logging, token usage and cost, configuration, type safety); the consolidation stories became Requirements 17, 20, 22, 23 and 24 (router YAML and
-environment substitution, configuration, terminology, tests, examples). Open tasks at closing: the rename (group 10), now redone with the final name.
+environment substitution, configuration, terminology, tests, examples). Open tasks at closing: the rename, now redone with the final name.
 
-## `wiki` (now group 11 of `structure/tasks.md`)
+## `wiki` (now group 10 of `0-base-structure/tasks.md`)
 Its three tasks are done in the repository (`docs/index.md`, one section per component, `docs/glossary.md`, routing and provider pages moved). Its
 rules are Requirement 15 and the "Docs wiki" section of `20-repo.md`. Remaining documentation work (front matter on every page, `docs/budgets.md`,
-the docs test in `tests/docs`, the README reduced to about 150 lines) is in group 11 of `structure/tasks.md`.
+the docs test in `tests/docs`, the README reduced to about 150 lines) is done in group 10 of `0-base-structure/tasks.md`.
 
 ## The component specs
 | Old spec | New spec | Requirements | State |
@@ -50,4 +50,4 @@ New component specs created at the requirements stage: `base` (Requirements 3, 1
 `memory` (52), `guard` (51), `observe` (53), `teams` (49 and 5), `flows` (50 and 5).
 
 Still to do: the design and tasks of the specs that stop at requirements; rename the four folders that keep an old name; migrate their `design.md`
-and `tasks.md` (group 12 of `structure/tasks.md`). Method: `20-repo.md`, "Creating a new spec" and "Canonical names for specs".
+and `tasks.md` (group 11 of `0-base-structure/tasks.md`; done per spec by Kiro). Method: `20-repo.md`, "Creating a new spec" and "Canonical names for specs".

@@ -671,6 +671,98 @@
         "chatSessionId": "sess_696a272c-3ccb-4801-a772-0f814a451e4a",
         "timestamp": 1793579807566
       }
+    ],
+    "13.1 Run the whole verification: `uv run pytest tests`, `make budget`, `make differential`. Everything passes except the documented skips (live-credential differential tests, and the one `xfail` of the `auth` extra until `auth` is implemented).": [
+      {
+        "executionId": "825a2cfa-d3be-4665-8ced-fb18265b80aa",
+        "chatSessionId": "sess_67a36de1-eb3d-4097-88c9-e4fe3e357937",
+        "timestamp": 1793652110192
+      },
+      {
+        "executionId": "825a2cfa-d3be-4665-8ced-fb18265b80aa",
+        "chatSessionId": "sess_67a36de1-eb3d-4097-88c9-e4fe3e357937",
+        "timestamp": 1793652117210
+      },
+      {
+        "executionId": "825a2cfa-d3be-4665-8ced-fb18265b80aa",
+        "chatSessionId": "sess_67a36de1-eb3d-4097-88c9-e4fe3e357937",
+        "timestamp": 1793652511014
+      }
+    ],
+    "13.2 Check that every requirement of `10-requirements.md` is cited by at least one spec story, or note which ones have no owner yet; rewrite the \"Requirement coverage\" table below with the current numbers (it still uses the numbering of the former spec).": [
+      {
+        "executionId": "825a2cfa-d3be-4665-8ced-fb18265b80aa",
+        "chatSessionId": "sess_67a36de1-eb3d-4097-88c9-e4fe3e357937",
+        "timestamp": 1793652110374
+      },
+      {
+        "executionId": "825a2cfa-d3be-4665-8ced-fb18265b80aa",
+        "chatSessionId": "sess_67a36de1-eb3d-4097-88c9-e4fe3e357937",
+        "timestamp": 1793652119799
+      },
+      {
+        "executionId": "825a2cfa-d3be-4665-8ced-fb18265b80aa",
+        "chatSessionId": "sess_67a36de1-eb3d-4097-88c9-e4fe3e357937",
+        "timestamp": 1793652506693
+      }
+    ],
+    "13.3 Audit the ticks of groups 1 to 12: each checked task has its evidence (a file or a test) and each evidence exists; the `_Requirements:` lines of groups 1 to 9 still cite the former numbering and are mapped to the current one.": [
+      {
+        "executionId": "825a2cfa-d3be-4665-8ced-fb18265b80aa",
+        "chatSessionId": "sess_67a36de1-eb3d-4097-88c9-e4fe3e357937",
+        "timestamp": 1793652110449
+      },
+      {
+        "executionId": "825a2cfa-d3be-4665-8ced-fb18265b80aa",
+        "chatSessionId": "sess_67a36de1-eb3d-4097-88c9-e4fe3e357937",
+        "timestamp": 1793652121045
+      },
+      {
+        "executionId": "825a2cfa-d3be-4665-8ced-fb18265b80aa",
+        "chatSessionId": "sess_67a36de1-eb3d-4097-88c9-e4fe3e357937",
+        "timestamp": 1793652509490
+      }
+    ],
+    "13.4 Check the documentation: `tests/docs` passes, `README.md` is a short entry, and the wiki pages moved from the README have no loss against the original (the original is in the git history).": [
+      {
+        "executionId": "825a2cfa-d3be-4665-8ced-fb18265b80aa",
+        "chatSessionId": "sess_67a36de1-eb3d-4097-88c9-e4fe3e357937",
+        "timestamp": 1793652110499
+      },
+      {
+        "executionId": "825a2cfa-d3be-4665-8ced-fb18265b80aa",
+        "chatSessionId": "sess_67a36de1-eb3d-4097-88c9-e4fe3e357937",
+        "timestamp": 1793652122277
+      },
+      {
+        "executionId": "825a2cfa-d3be-4665-8ced-fb18265b80aa",
+        "chatSessionId": "sess_67a36de1-eb3d-4097-88c9-e4fe3e357937",
+        "timestamp": 1793652508042
+      }
+    ],
+    "13.5 Report what was found and anything left open.": [
+      {
+        "executionId": "825a2cfa-d3be-4665-8ced-fb18265b80aa",
+        "chatSessionId": "sess_67a36de1-eb3d-4097-88c9-e4fe3e357937",
+        "timestamp": 1793652110543
+      },
+      {
+        "executionId": "825a2cfa-d3be-4665-8ced-fb18265b80aa",
+        "chatSessionId": "sess_67a36de1-eb3d-4097-88c9-e4fe3e357937",
+        "timestamp": 1793652515316
+      },
+      {
+        "executionId": "825a2cfa-d3be-4665-8ced-fb18265b80aa",
+        "chatSessionId": "sess_67a36de1-eb3d-4097-88c9-e4fe3e357937",
+        "timestamp": 1793652586775
+      }
+    ],
+    "13. Final verification (to be run with Kiro)": [
+      {
+        "executionId": "825a2cfa-d3be-4665-8ced-fb18265b80aa",
+        "chatSessionId": "sess_67a36de1-eb3d-4097-88c9-e4fe3e357937",
+        "timestamp": 1793652586911
+      }
     ]
   }
 }

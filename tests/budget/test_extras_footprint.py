@@ -1,6 +1,6 @@
 """Extras declare exactly what their Component imports, and `import skye` stays clean.
 
-Task 1.3 of .kiro/specs/structure. No network, no install; a few subprocesses.
+Task 1.3 of .kiro/specs/0-base-structure. No network, no install; a few subprocesses.
 
 * Extras: for each Extra in pyproject.toml, the third-party libraries declared must be the
   third-party libraries the Component's code imports (module level, lazy, or through
@@ -265,11 +265,6 @@ def test_known_leaks_are_current(fresh_import: dict) -> None:
     assert not fixed, f"`import skye` no longer imports {fixed}: remove them from known_leaks in budgets.toml."
 
 
-@pytest.mark.xfail(
-    reason="module count is inflated by the development libraries (httpx, requests, pytest plugins "
-    "...); the authoritative check is test_core_load_in_clean_environment (-m budget)",
-    strict=False,
-)
 def test_import_stays_within_module_budget(fresh_import: dict) -> None:
     assert fresh_import["modules"] <= LOAD["max_modules_loaded"], f"`import skye` loads {fresh_import['modules']} modules"
 

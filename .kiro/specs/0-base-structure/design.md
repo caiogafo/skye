@@ -855,9 +855,9 @@ def _deprecated_alias(old_name: str, new_name: str):
 
 **Key Test Files**:
 - `tests/unit/test_config_loader.py`: YAML loading and env var substitution
-- `tests/unit/routes/test_router_config.py`: Router configuration validation
-- `tests/unit/capabilities/test_capability_models.py`: Renamed model tests
-- `tests/unit/capabilities/test_capability_call_handler.py`: Handler tests
+- `tests/unit/router/test_router_config.py`: Router configuration validation
+- `tests/unit/tools/test_capability_models.py`: Renamed model tests
+- `tests/unit/tools/test_capability_call_handler.py`: Handler tests
 
 #### Integration Tests
 

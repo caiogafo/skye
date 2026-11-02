@@ -158,7 +158,7 @@ required field that is absent or malformed with `ValidationError` naming the MCP
 
 ## Testing Strategy
 
-Unit tests in `tests/unit/capabilities` cover the interface, schema, registry, local-function and remote-API capabilities,
+Unit tests in `tests/unit/tools` cover the interface, schema, registry, local-function and remote-API capabilities,
 the decorator, the call handler, the exceptions, the built-in MCP client and the boundary against mocked transport, with no
 network. The boundary rule is guarded statically and at runtime by `tests/budget/test_boundary_rule.py` (no third-party
 import in `mcp_boundary.py`; no external type in a public annotation or return value). The differential tests in

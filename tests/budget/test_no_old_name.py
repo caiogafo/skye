@@ -18,7 +18,7 @@ from tests.budget.measure import ROOT
 
 OLD = re.compile(r"nimbus", re.IGNORECASE)
 ALLOWED_PREFIXES = (
-    ".kiro/specs/structure/",
+    ".kiro/specs/0-base-structure/",
     "docs/glossary.md",  # lists the umbrella watermark `nimbus`
     "tests/budget/test_codenames.py",
     "tests/budget/test_no_old_name.py",

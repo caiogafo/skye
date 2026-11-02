@@ -1,3 +1,9 @@
+---
+title: "Skye Routing Guide"
+status: current
+last_updated: 2026-11-02
+---
+
 # Skye Routing Guide
 
 ## Overview

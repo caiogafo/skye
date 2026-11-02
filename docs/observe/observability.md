@@ -1,3 +1,9 @@
+---
+title: "Observability"
+status: current
+last_updated: 2026-11-02
+---
+
 # Observability
 
 How Skye emits signals you can watch in production. `observe` provides the hooks; it imports

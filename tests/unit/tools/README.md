@@ -22,11 +22,11 @@ This directory contains tests for:
 
 ```bash
 # Run all capability tests
-pytest tests/unit/capabilities/
+pytest tests/unit/tools/
 
 # Run specific test file
-pytest tests/unit/capabilities/test_capability_models.py
+pytest tests/unit/tools/test_capability_models.py
 
 # Run with coverage
-pytest tests/unit/capabilities/ --cov=src/skye/tools
+pytest tests/unit/tools/ --cov=src/skye/tools
 ```

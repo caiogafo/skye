@@ -5,7 +5,7 @@
 Milestones in build order for the `tools` component (codename updraft): the capability interface and schema first, then the
 registry and the capability kinds (local function, remote API, decorator), the call handler and errors, the tri-faceted MCP
 client with its single conversion boundary and its built-in/`fastmcp` implementations, and finally the open conformance work
-left by the migration. Status is judged from the code in `src/skye/tools` and the tests in `tests/unit/capabilities` and
+left by the migration. Status is judged from the code in `src/skye/tools` and the tests in `tests/unit/tools` and
 `tests/differential/test_mcp_differential.py`, not from the former `capability-support` checkboxes. Each task cites the
 steering requirement numbers it satisfies (`Requirement N.k` of `10-requirements.md`) or the decision it honors. Task IDs
 cited from other documents are `tools:N.k`.
@@ -14,10 +14,10 @@ cited from other documents are `tools:N.k`.
 
 - [ ] 1. Capability interface and schema
   - [x] 1.1 `CapabilityInterface` (get_schema, execute, aexecute)
-    - Evidence: `src/skye/tools/interface.py`; `tests/unit/capabilities/test_capability_interface.py`.
+    - Evidence: `src/skye/tools/interface.py`; `tests/unit/tools/test_capability_interface.py`.
     - _Requirements: 16.1, 16.2_
   - [x] 1.2 `CapabilitySchema` (name, description, parameters, returns)
-    - Evidence: `src/skye/tools/schema.py`; `tests/unit/capabilities/test_capability_schema.py`.
+    - Evidence: `src/skye/tools/schema.py`; `tests/unit/tools/test_capability_schema.py`.
     - _Requirements: 16.1_
   - [ ] 1.3 Move `CapabilitySchema` / `CapabilityResult` / `CapabilityCall` off pydantic to dataclasses (D24)
     - Note: `src/skye/tools/schema.py` (`CapabilitySchema`) and `src/skye/tools/capability_models.py` (`CapabilityResult`) are still `pydantic.BaseModel` subclasses, and `CapabilityCall` is re-exported from `src/skye/base/completion.py` (pydantic). Under D24/O4 new data structures are dataclasses and must raise `ValidationError` with field context on invalid data. Coordinate with the `base` spec (O4) before changing the shared completion models.
@@ -25,27 +25,27 @@ cited from other documents are `tools:N.k`.
 
 - [ ] 2. Registry and capability kinds
   - [x] 2.1 `CapabilityRegistry` behind the registry Port (register, get, list, namespaces, search)
-    - Evidence: `src/skye/tools/registry.py`; `tests/unit/capabilities/test_capability_registry.py`.
+    - Evidence: `src/skye/tools/registry.py`; `tests/unit/tools/test_capability_registry.py`.
     - _Requirements: 6.1, 6.2, 16.2_
   - [x] 2.2 `LocalFunctionCapability` (signature + docstring -> schema)
-    - Evidence: `src/skye/tools/local_function.py`; `tests/unit/capabilities/test_local_function_capability.py`.
+    - Evidence: `src/skye/tools/local_function.py`; `tests/unit/tools/test_local_function_capability.py`.
     - _Requirements: 6.1, 6.2_
   - [x] 2.3 `RemoteAPICapability` over `base/http.py` (no third-party HTTP client)
-    - Evidence: `src/skye/tools/remote_api.py` (imports `skye.base.http`); `tests/unit/capabilities/test_remote_api_capability.py`.
+    - Evidence: `src/skye/tools/remote_api.py` (imports `skye.base.http`); `tests/unit/tools/test_remote_api_capability.py`.
     - _Requirements: 6.1, 6.2, 7.3, 10.7_
   - [x] 2.4 `@capability` decorator
-    - Evidence: `src/skye/tools/decorator.py`; `tests/unit/capabilities/test_capability_decorator.py`.
+    - Evidence: `src/skye/tools/decorator.py`; `tests/unit/tools/test_capability_decorator.py`.
     - _Requirements: 6.1, 22.1_
 
 - [ ] 3. Capability call handling and errors
   - [x] 3.1 `CapabilityCallHandler` (provider-agnostic parse/validate/execute/format)
-    - Evidence: `src/skye/tools/capability_call_handler.py`, `src/skye/tools/capability_models.py` (`CapabilityResult`); `tests/unit/capabilities/test_capability_call_handler.py`, `test_capability_models.py`.
+    - Evidence: `src/skye/tools/capability_call_handler.py`, `src/skye/tools/capability_models.py` (`CapabilityResult`); `tests/unit/tools/test_capability_call_handler.py`, `test_capability_models.py`.
     - _Requirements: 9.10, 16.2_
   - [x] 3.2 `CapabilityError` hierarchy on `SkyeError` with kept context
-    - Evidence: `src/skye/tools/exceptions.py`; `tests/unit/capabilities/test_exceptions.py`.
+    - Evidence: `src/skye/tools/exceptions.py`; `tests/unit/tools/test_exceptions.py`.
     - _Requirements: 18.1_
   - [x] 3.3 Capability terminology ("Capability", not "Tool") in types and exports
-    - Evidence: `src/skye/tools/__init__.py` exports (`CapabilityInterface`, `CapabilityCall`, `CapabilityResult`, ...); `tests/unit/capabilities/test_capability_exports.py`.
+    - Evidence: `src/skye/tools/__init__.py` exports (`CapabilityInterface`, `CapabilityCall`, `CapabilityResult`, ...); `tests/unit/tools/test_capability_exports.py`.
     - _Requirements: 22.1, 22.2_
   - [x]* 3.4 Structured events for capability calls, results and errors
     - Evidence: structured `logger.info/error(..., extra={...})` in `src/skye/tools/registry.py` and `capability_call_handler.py`.
@@ -53,7 +53,7 @@ cited from other documents are `tools:N.k`.
 
 - [ ] 4. Tri-faceted MCP client and the boundary
   - [x] 4.1 `MCPClientPort` and `BuiltinMCPClient` (stdlib JSON-RPC over HTTP, consume-only)
-    - Evidence: `src/skye/tools/mcp_client.py` (`MCPClientPort`, `BuiltinMCPClient`, `MCPToolCapability`); `tests/unit/capabilities/test_mcp_client.py`, `test_mcp_stdlib_prototype.py`.
+    - Evidence: `src/skye/tools/mcp_client.py` (`MCPClientPort`, `BuiltinMCPClient`, `MCPToolCapability`); `tests/unit/tools/test_mcp_client.py`, `test_mcp_stdlib_prototype.py`.
     - _Requirements: 10.1, 10.2_
   - [x] 4.2 Single conversion boundary `mcp_boundary.py` (stdlib only, reject malformed)
     - Evidence: `src/skye/tools/mcp_boundary.py`; `tests/budget/test_boundary_rule.py` (`test_mcp_boundary_has_no_third_party_import`, `test_mcp_boundary_returns_skye_types_for_dict_and_library_objects`).
@@ -79,7 +79,7 @@ cited from other documents are `tools:N.k`.
     - Note: `src/skye/tools/mcp_capability.py` (`MCPCapability`) and `src/skye/tools/mcp_server_client.py` (`MCPServerClient`) import `fastmcp` to raise a probe error and carry placeholder stdio/subprocess framing; they are the only `fastmcp` importers outside `mcp_fastmcp.py`, tracked in `LEGACY_TOOLS_PROBES` in `tests/budget/test_boundary_rule.py`. Delete these two modules (superseded by the tri-faceted client), drop their exports from `src/skye/tools/__init__.py`, and remove the `LEGACY_TOOLS_PROBES` entry so `tools` imports `fastmcp` only in `mcp_fastmcp.py`.
     - _Requirements: 10.7_
   - [ ] 6.4 Fix the order-dependent MCP unit tests
-    - Note: `tests/unit/capabilities/test_mcp_capability.py` and `test_mcp_server_client.py` set `sys.modules["fastmcp"] = MagicMock()` at module import, which leaks a fake `fastmcp` into other tests, and `test_execute_raises_not_supported_error` depends on the event loop left by test ordering. Remove the module-level `sys.modules` assignment (patch locally instead) and make the sync-`execute` test install its own loop, so selection stays per-call and `import skye` never sees a fake `fastmcp`. These tests go away with task 6.3 if those modules are deleted.
+    - Note: `tests/unit/tools/test_mcp_capability.py` and `test_mcp_server_client.py` set `sys.modules["fastmcp"] = MagicMock()` at module import, which leaks a fake `fastmcp` into other tests, and `test_execute_raises_not_supported_error` depends on the event loop left by test ordering. Remove the module-level `sys.modules` assignment (patch locally instead) and make the sync-`execute` test install its own loop, so selection stays per-call and `import skye` never sees a fake `fastmcp`. These tests go away with task 6.3 if those modules are deleted.
     - _Requirements: 10.4_
 
 - [ ] 7. Final checkpoint

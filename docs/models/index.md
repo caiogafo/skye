@@ -1,5 +1,8 @@
 ---
+title: "models"
 codename: "zephyr"
+status: current
+last_updated: 2026-11-02
 ---
 
 # models
@@ -14,3 +17,4 @@ Pages:
 - [Provider architecture validation](provider-architecture-validation.md)
 - [Provider consolidation summary](provider-consolidation-summary.md)
 - [Structured outputs](structured-outputs.md)
+- [Provider guide](provider-guide.md)

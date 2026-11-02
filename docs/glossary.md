@@ -1,3 +1,9 @@
+---
+title: "Codename glossary"
+status: current
+last_updated: 2026-11-02
+---
+
 # Codename glossary
 
 A codename is a small watermark in the Nimbus cloud and weather theme. The plain name is always the real name; a codename never appears in an import path, folder, file, class, function or config key.

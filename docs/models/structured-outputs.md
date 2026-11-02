@@ -1,3 +1,9 @@
+---
+title: "Structured outputs"
+status: current
+last_updated: 2026-11-02
+---
+
 # Structured outputs
 
 How to get a typed, schema-validated object back from a model instead of free text.

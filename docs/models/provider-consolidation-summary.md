@@ -1,3 +1,9 @@
+---
+title: "Provider Transformation Consolidation Summary"
+status: current
+last_updated: 2026-11-02
+---
+
 # Provider Transformation Consolidation Summary
 
 **Task**: Validate provider transformation consolidation  
@@ -288,5 +294,5 @@ The codebase is production-ready with a clean, maintainable architecture that ma
 - [Architecture Validation Report](./provider-architecture-validation.md)
 - [Validation Script](../../scripts/validate_provider_architecture.py)
 - [BaseModelProvider](../../src/skye/models/base.py)
-- [Requirements Document](../../.kiro/specs/structure/requirements.md)
-- [Design Document](../../.kiro/specs/structure/design.md)
+- [Requirements Document](../../.kiro/specs/0-base-structure/requirements.md)
+- [Design Document](../../.kiro/specs/0-base-structure/design.md)

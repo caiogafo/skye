@@ -8,7 +8,7 @@ import pytest
 from skye.tools.exceptions import CapabilityValidationError
 from skye.tools.remote_api import RemoteAPICapability
 from skye.tools.schema import CapabilitySchema
-from tests.unit.capabilities import _urllib_responses as responses
+from tests.unit.tools import _urllib_responses as responses
 
 
 class TestRemoteAPICapabilityCreation:

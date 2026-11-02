@@ -24,13 +24,13 @@ This directory contains tests for:
 
 ```bash
 # Run all provider tests
-pytest tests/unit/providers/
+pytest tests/unit/models/
 
 # Run specific provider tests
-pytest tests/unit/providers/test_openai_provider.py
+pytest tests/unit/models/test_openai_provider.py
 
 # Run with coverage
-pytest tests/unit/providers/ --cov=src/skye/models
+pytest tests/unit/models/ --cov=src/skye/models
 ```
 
 ## Testing Approach
