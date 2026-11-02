@@ -102,6 +102,8 @@ owner) is decision D5; A5 (declarations, not execution) is history; A6 (Vertex r
 
 1. THE spec SHALL realize Requirement 7.1 of #[[file:.kiro/steering/10-requirements.md]].
 2. THE spec SHALL realize Requirement 7.2 of #[[file:.kiro/steering/10-requirements.md]].
+3. THE spec SHALL realize Requirement 7.12 of #[[file:.kiro/steering/10-requirements.md]].
+4. THE spec SHALL realize Requirement 7.13 of #[[file:.kiro/steering/10-requirements.md]].
 
 ### Requirement 9: S9 Codename watermark rules
 
@@ -282,6 +284,8 @@ owner) is decision D5; A5 (declarations, not execution) is history; A6 (Vertex r
 #### Acceptance Criteria
 
 1. THE spec SHALL realize Requirement 7.5 of #[[file:.kiro/steering/10-requirements.md]].
+2. THE spec SHALL realize Requirement 7.10 of #[[file:.kiro/steering/10-requirements.md]].
+3. THE spec SHALL realize Requirement 7.11 of #[[file:.kiro/steering/10-requirements.md]].
 
 ### Requirement 26: S26 Budget debts are driven to empty and kept empty
 

@@ -23,7 +23,7 @@ Skye provides a foundational layer for building AI agents and intelligent applic
 
 ```bash
 pip install skyeai            # the base: messages, completion, errors, config, Ports (standard library only)
-pip install skyeai[bedrock]   # add what you need: bedrock, openai, memory, auth, mcp, ...
+pip install skyeai[yaml]      # add only what you need: yaml, auth, memory, postgres, mcp, ...
 ```
 
 Every extra is optional and loaded lazily. All extras and install options: [getting started](docs/getting-started.md).

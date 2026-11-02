@@ -48,7 +48,7 @@ class PostgreSQLBackend(StorageBackend):
                         ON {self.table_name} (expires_at)
                     """)
             except ImportError:
-                raise ImportError("asyncpg package required for PostgreSQLBackend. Install with: pip install asyncpg")
+                raise ImportError("asyncpg package required for PostgreSQLBackend. Install with: pip install skyeai[postgres]")
         return self._pool
 
     async def _cleanup_expired(self, conn) -> None:

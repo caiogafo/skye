@@ -21,6 +21,8 @@ Basic router configuration with multiple targets.
 - Round-robin load balancing
 - Accessing routing metrics
 
+> Reading a YAML file needs the extra `yaml` (`pip install skyeai[yaml]`); the router can also be built in code, with no file.
+
 ### `yaml_config.py`
 Loading router configuration from YAML files.
 

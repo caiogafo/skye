@@ -27,17 +27,22 @@ import re
 from pathlib import Path
 from typing import Any
 
-import yaml
 from pydantic import BaseModel, Field
 from pydantic import ValidationError as PydanticValidationError
 
-from skye.base.exceptions import ConfigurationError
+from skye.base.exceptions import ConfigurationError, MissingExtraError
+from skye.base.lazy_import import missing_extra
 
 # Set up module logger
 logger = logging.getLogger(__name__)
 
 # Cache for environment variable substitutions to avoid repeated os.getenv() calls
 _env_var_cache: dict[str, str] = {}
+
+
+def _yaml() -> Any:
+    """The PyYAML module, imported when a YAML file is read: it is in the extra `yaml`, not in the core."""
+    return missing_extra("yaml", extra="yaml")
 
 
 def substitute_env_vars(config: dict[str, Any] | list[Any] | str | Any) -> Any:
@@ -387,6 +392,7 @@ def load_router_config(yaml_path: str | Path) -> dict[str, Any]:
             details={"path": str(yaml_path)},
         )
 
+    yaml = _yaml()
     try:
         with open(yaml_path) as f:
             data = yaml.safe_load(f)
@@ -504,6 +510,8 @@ class ConfigLoader:
         if config_path:
             try:
                 config_data = ConfigLoader._load_from_file(config_path)
+            except MissingExtraError:
+                raise  # already says what to install (the extra `yaml`)
             except Exception as e:
                 raise ConfigurationError(
                     f"Failed to load configuration from file: {config_path}",
@@ -548,9 +556,12 @@ class ConfigLoader:
                 details={"path": str(config_path)},
             )
 
+        # YAML needs the extra `yaml`; JSON needs nothing. The parse error types are those of the format being read.
+        yaml = _yaml() if config_path.suffix in [".yaml", ".yml"] else None
+        yaml_error = yaml.YAMLError if yaml is not None else ValueError
         try:
             with open(config_path) as f:
-                if config_path.suffix in [".yaml", ".yml"]:
+                if yaml is not None:
                     data = yaml.safe_load(f)
                 elif config_path.suffix == ".json":
                     data = json.load(f)
@@ -573,7 +584,7 @@ class ConfigLoader:
             # Apply environment variable substitution
             return substitute_env_vars(data)
 
-        except (yaml.YAMLError, json.JSONDecodeError) as e:
+        except (yaml_error, json.JSONDecodeError) as e:
             raise ConfigurationError(
                 f"Failed to parse configuration file: {config_path}",
                 details={"path": str(config_path), "error": str(e)},

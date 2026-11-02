@@ -68,7 +68,7 @@ response = router.complete(
 from skye.router import ModelRouter
 
 # Load router from YAML file with environment variable substitution
-router = ModelRouter.from_yaml("router_config.yaml")
+router = ModelRouter.from_yaml("router_config.yaml")  # reading YAML needs the extra: pip install skyeai[yaml]
 
 # Use the router
 response = router.complete(

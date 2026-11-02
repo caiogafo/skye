@@ -97,6 +97,10 @@ Written without the project name (it is being chosen); `<pkg>` is the import pac
 7. THE lists `known_leaks` and `known_import_failures` SHALL be empty; WHILE an entry exists, THE tests SHALL warn naming it, and IF a listed entry starts working again, THEN THE tests SHALL fail.
 8. THE top-level package SHALL re-export only messages, completion, exceptions, config and the function `provider` (Requirement 9.11), none of which imports an optional or provider library when `import <pkg>` runs.
 9. THE cold start of the library, measured in a fresh interpreter as `import <pkg>`, importing the router, building a router with one target and building one request, without network, SHALL stay within `max_cold_start_ms` of `budgets.toml` (best of five runs), a limit compatible with serverless (a thin Python function starts in 100 to 300 ms and an init of 500 to 2000 ms is usually acceptable for an LLM application); IF it is exceeded, THEN `tests/budget/test_cold_start.py` SHALL fail.
+10. THE budgets (size, import time, cold start) SHALL be verified for the standard installation, that is the core with no extra; THE standard installation SHALL work without any optional library (a provider SDK, `fastmcp`, `tiktoken`, `asyncpg`, `pyyaml`), and no optional library SHALL be installed or imported unless the user asks for it with an extra.
+11. THE sizes SHALL be measured on Linux x86_64, the platform of the pull-request runner and of the serverless target, where the compiled wheels are larger than on a laptop, and THE limits of `budgets.toml` SHALL apply to that measure; EACH extra SHALL have its own budget, measured in its own environment, and a heavy extra SHALL weigh only on who installs it.
+12. AN extra SHALL contain only the libraries that the feature it names needs; IF an extra bundles a library that its feature does not use (for example a database driver for a backend that the user did not ask for), THEN that library SHALL move to an extra of its own or be removed, and a library that only an optional file format needs (YAML) SHALL be in an extra, not in the core.
+13. AN extra SHALL be named after what it enables and SHALL NOT be named after a provider whose SDK it does not install: each provider has a built-in REST adapter (Requirement 9.3), so an extra named after a provider SHALL declare no library, and the extra for exact token counting SHALL be named for that function (open decision O22).
 
 ### Requirement 8: Codenames
 
@@ -252,7 +256,7 @@ Written without the project name (it is being chosen); `<pkg>` is the import pac
 
 #### Acceptance Criteria
 
-1. THE library SHALL accept configuration as a dictionary at initialization and from a YAML or JSON file (named by `<PREFIX>_CONFIG`).
+1. THE library SHALL accept configuration as a dictionary at initialization and from a YAML or JSON file (named by `<PREFIX>_CONFIG`); a JSON file needs nothing, and a YAML file needs the extra `yaml` (IF it is missing, THEN THE library SHALL raise `MissingExtraError` naming it).
 2. WHEN several sources are present, THE library SHALL apply them in the order code, then environment, then file.
 3. IF a configuration value is invalid, THEN THE library SHALL raise `ConfigurationError`.
 4. THE configuration SHALL support `${VAR}` substitution of environment variables.

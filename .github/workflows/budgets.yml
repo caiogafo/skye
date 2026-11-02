@@ -42,15 +42,13 @@ jobs:
       matrix:
         target:
           - "test_core or test_serverless"
-          - "test_extra_footprint and anthropic"
-          - "test_extra_footprint and azure"
-          - "test_extra_footprint and bedrock"
-          - "test_extra_footprint and cohere"
+          # one target per extra that has a budget in budgets.toml (tests/budget/test_workflow_matrix.py keeps the list in step)
+          - "test_extra_footprint and auth"
+          - "test_extra_footprint and mcp"
           - "test_extra_footprint and memory"
-          - "test_extra_footprint and observe"
           - "test_extra_footprint and openai"
-          - "test_extra_footprint and tools"
-          - "test_extra_footprint and vertex"
+          - "test_extra_footprint and postgres"
+          - "test_extra_footprint and yaml"
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v5

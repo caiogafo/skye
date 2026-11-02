@@ -288,19 +288,19 @@ def main():
     print("=" * 50)
     
     # Run sync examples. A backend whose library is not installed is skipped with a hint:
-    # Redis and PostgreSQL come with the `memory` extra (pip install skyeai[memory]), DynamoDB needs boto3.
+    # Redis comes with the `memory` extra (pip install skyeai[memory]), PostgreSQL with the `postgres` extra, DynamoDB needs boto3.
     import importlib.util
 
-    for example, needs in (
-        (example_in_memory_storage, None),
-        (example_redis_storage, "redis"),
-        (example_dynamodb_storage, "boto3"),
-        (example_postgresql_storage, "asyncpg"),
-        (example_filesystem_storage, None),
-        (example_durable_function_storage, None),
+    for example, needs, install in (
+        (example_in_memory_storage, None, None),
+        (example_redis_storage, "redis", "pip install skyeai[memory]"),
+        (example_dynamodb_storage, "boto3", "pip install boto3"),
+        (example_postgresql_storage, "asyncpg", "pip install skyeai[postgres]"),
+        (example_filesystem_storage, None, None),
+        (example_durable_function_storage, None, None),
     ):
         if needs and importlib.util.find_spec(needs) is None:
-            print(f"\n  skipped {example.__name__}: install `{needs}` (pip install skyeai[memory])")
+            print(f"\n  skipped {example.__name__}: `{needs}` is not installed ({install})")
             continue
         try:
             example()

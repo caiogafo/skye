@@ -32,7 +32,7 @@ class RedisBackend(StorageBackend):
                 import redis.asyncio as redis
                 self._redis = redis.from_url(self.redis_url)
             except ImportError:
-                raise ImportError("redis package required for RedisBackend. Install with: pip install redis")
+                raise ImportError("redis package required for RedisBackend. Install with: pip install skyeai[memory]")
         return self._redis
 
     def _make_key(self, key: str) -> str:

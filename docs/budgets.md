@@ -41,6 +41,14 @@ make budget         # installs Skye in clean environments, about a minute
 
 Sizes exclude the libraries Lambda already ships. Time is the best of five fresh interpreters. Measurements were taken on Python 3.13; the workflow runs the fast checks on 3.10 and 3.13 and the footprint checks on 3.13.
 
+**Sizes are Linux sizes.** The footprint jobs run on a Linux x86_64 runner, which is also the serverless target, and the compiled wheels (`pydantic-core`, `asyncpg`, ...) are larger there than on macOS: the core is 11.3 MB on Linux and 8.5 MB on macOS. The limits in `budgets.toml` are the Linux ones. To check the sizes from any machine, without a Linux runner:
+
+```bash
+uv pip install --target /tmp/skye-linux --python-platform x86_64-manylinux_2_28 --python-version 3.13 "skyeai[memory] @ file:///path/to/skyeai.whl"
+```
+
+and measure the folder as `tests/budget/measure.py` does. The footprint jobs of the workflow are one per extra that has a budget; `tests/budget/test_workflow_matrix.py` keeps that list in step with `budgets.toml`.
+
 ## No external-library type outside its Component
 
 `tests/budget/test_boundary_rule.py` (part of `make budget-fast`) checks the boundary rule (Requirement 9.5 in `.kiro/steering/10-requirements.md`): provider SDKs (`openai`, `anthropic`, `boto3`, `vertexai`/`google.cloud.aiplatform`, `cohere`) and `fastmcp`/`mcp` are imported only by the files that own them, only inside a function, `tools/mcp_boundary.py` imports no third-party library, no public annotation in `models`/`tools` names an external type, and the provider and MCP conversions return Skye types only. A new external backend (for `observe`, `store`, `prompts`, `agents`) adds its owning file to `SDK_OWNERS` in that test; no new Component or Port. `tests/differential/test_boundary_leak.py` runs the same check on both MCP clients (needs `fastmcp`, dev group).
@@ -57,10 +65,10 @@ Checked against `budgets.toml` and `pyproject.toml`.
 
 | Item | Why it matters | Target |
 |---|---|---|
-| Core depends on `pydantic`, `pyyaml`, `tenacity` (none in Lambda, none in the standard library) | about 9 MB and 10 packages | standard library only (pydantic goes with the dataclass migration, open decision O4) |
-| Compiled in the core: `pydantic-core` (Rust) and `pyyaml` (C) | needs a container build | none |
+| Core depends on `pydantic` and `tenacity` (neither in Lambda nor in the standard library) | 8.4 MB on Linux (limit 11), 7 packages; `pydantic-core` is most of it | standard library only (pydantic goes with the dataclass migration, open decision O4) |
+| Compiled in the core: `pydantic-core` (Rust) | needs a container build | none |
 | Extras with no dependency of their own: `agents`, `guard`, `prompts`, `tools`, `teams`, `flows`, `observe`, and the provider extras `anthropic`, `bedrock`, `google`, `cohere` | they are modules, not extras (the provider extras stay so `pip install skyeai[...]` keeps working) | remove the ones that are not provider extras from `pyproject.toml` |
-| Extra sizes over the core: `mcp` 43 MB (`fastmcp`, 7 compiled distributions, accepted by the owner), `memory` 12 MB (`redis`, `asyncpg`), `openai` 18 MB (`tiktoken`, open until the token-counter extra is settled), `auth` 1 MB (`rsa`) | `mcp` and `openai` carry compiled code | `mcp` stays explicit; `openai` is reviewed with decision D25 |
+| Extra sizes over the core, on Linux: `auth` 0.5 MB (`rsa`), `memory` 2.6 MB (`redis`), `yaml` 2.9 MB (`pyyaml`, compiled), `openai` 8.4 MB (`tiktoken`, compiled; it does not install the OpenAI SDK, open decision O22), `postgres` 14.0 MB (`asyncpg`, compiled), `mcp` 50.6 MB (`fastmcp`, 7 compiled distributions, over its limit of 48: `fastmcp` itself depends on `pyyaml`, so what left the core now counts as added by this extra, while the whole `mcp` environment is unchanged at 59.0 MB; open until the owner decides how the `mcp` extra is measured) | the compiled ones | only who installs an extra pays for it |
 | `skyeai[all]` size | it includes `mcp` and `memory` | not advertised for Lambda |
 
 Done since the previous table (2026-10-30): `jinja2` and `markupsafe` left the core (the prompts engine is standard library), and the provider SDK extras

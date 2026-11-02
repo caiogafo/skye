@@ -71,7 +71,9 @@ EXTRA_PATHS: dict[str, list[str]] = {
         "tools/mcp_fastmcp.py",
         "tools/mcp_server_client.py",
     ],
-    "memory": ["memory", "store/redis.py", "store/postgres.py"],
+    "memory": ["memory", "store/redis.py"],
+    "postgres": ["store/postgres.py"],
+    "yaml": ["base/config.py"],
     "observe": ["observe"],
 }
 
@@ -114,7 +116,7 @@ def _scan(path) -> list[tuple[str, str | None]]:
     """(top-level library, extra named at the call site or None) for every import in a file.
 
     Counts imports anywhere (module level, inside functions, TYPE_CHECKING excluded) and
-    string-literal LazyImporter.import_module("lib", install_extra="extra") calls.
+    string-literal LazyImporter.import_module("lib", install_extra="extra") and missing_extra("lib", extra="extra") calls.
     """
     found: list[tuple[str, str | None]] = []
     tree = ast.parse(path.read_text(encoding="utf-8"))
@@ -135,14 +137,17 @@ def _scan(path) -> list[tuple[str, str | None]]:
             found.append((node.module.split(".")[0], None))
         elif (
             isinstance(node, ast.Call)
-            and getattr(node.func, "attr", None) == "import_module"
+            and (
+                getattr(node.func, "attr", None) == "import_module"
+                or getattr(node.func, "id", getattr(node.func, "attr", None)) == "missing_extra"
+            )
             and node.args
             and isinstance(node.args[0], ast.Constant)
             and isinstance(node.args[0].value, str)
         ):
             extra = next(
                 (k.value.value for k in node.keywords
-                 if k.arg == "install_extra" and isinstance(k.value, ast.Constant)),
+                 if k.arg in ("install_extra", "extra") and isinstance(k.value, ast.Constant)),
                 None,
             )
             found.append((node.args[0].value.split(".")[0], extra))

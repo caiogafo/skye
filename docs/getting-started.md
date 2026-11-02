@@ -50,7 +50,7 @@ from skye.models.llm import openai_compatible
 from skye.router import ModelRouter
 from skye.base.messages import UserMessage
 
-router = ModelRouter.from_yaml("router_config.yaml")
+router = ModelRouter.from_yaml("router_config.yaml")  # a YAML file needs the extra: pip install skyeai[yaml]
 response = router.complete(messages=[UserMessage(content="Hello!")], model="gpt-4")
 print(response.content)
 ```
@@ -90,22 +90,20 @@ uv pip install skyeai[all]
 
 ### Available Extras
 
-| Extra | Description | Dependencies |
-|-------|-------------|--------------|
-| `bedrock` | AWS Bedrock provider | boto3 |
-| `openai` | OpenAI provider | openai |
-| `anthropic` | Anthropic provider | anthropic |
-| `agents` | Agent runtime | - |
-| `prompts` | Prompt management | - |
-| `tools` | Capability/tool registry | none |
-| `mcp` | MCP client | fastmcp (heavy: about 43 MB, 7 compiled) |
-| `memory` | Persistent memory | redis, asyncpg |
-| `guard` | Safety filters | - |
-| `teams` | Multi-agent teams | - |
-| `flows` | Declarative flows | - |
-| `observe` | Observability | - (no telemetry library yet) |
-| `all` | All components | All of the above |
+The standard installation (`pip install skyeai`) has only `pydantic` and `tenacity` and works without any extra. Each extra installs one
+optional library, only for what you ask for:
 
+| Extra | What it enables | Library installed |
+|-------|-----------------|-------------------|
+| `yaml` | reading a YAML file (router and library configuration; JSON needs nothing) | pyyaml |
+| `auth` | RS256 signing for service-account authentication | rsa |
+| `memory` | the Redis store backend | redis |
+| `postgres` | the PostgreSQL store backend | asyncpg (compiled) |
+| `mcp` | the optional `fastmcp` client, chosen with `impl="fastmcp"` (the built-in client needs nothing) | fastmcp (heavy, compiled) |
+| `openai` | exact token counts for `gpt-*` models; it does not install the OpenAI SDK (the rename is open decision O22) | tiktoken (compiled) |
+| `anthropic`, `bedrock`, `google`, `cohere` | nothing: each provider has a built-in REST adapter; they exist so old install commands keep working | none |
+| `agents`, `prompts`, `tools`, `guard`, `teams`, `flows`, `observe` | nothing: these components are part of the core | none |
+| `all` | all the libraries above | all of the above |
 
 ## Quick Start
 

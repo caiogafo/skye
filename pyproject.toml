@@ -8,7 +8,6 @@ authors = [{name = "Skye Team"}]
 requires-python = ">=3.10"
 dependencies = [
     "pydantic>=2.0",
-    "pyyaml>=6.0",
     "tenacity>=8.0",
 ]
 
@@ -24,13 +23,15 @@ cohere = []
 # Individual components
 # auth: pure-Python RSA for RS256 (Google service-account JWT, Azure certificate assertion).
 auth = ["rsa>=4.9"]
+yaml = ["pyyaml>=6.0"]  # reading a YAML file (router and library configuration); JSON needs nothing
 agents = []
 prompts = []  # empty extra: the template engine is standard library
 tools = []  # empty extra: a module of the core, no third-party libraries
 # mcp: fastmcp, the optional full-capability substitute for the built-in stdlib MCP client,
 # chosen only by create_mcp_client(target, impl="fastmcp") (Requirement 21).
 mcp = ["fastmcp>=2.0"]
-memory = ["redis>=5.0", "asyncpg>=0.29"]
+memory = ["redis>=5.0"]
+postgres = ["asyncpg>=0.29"]  # the PostgreSQL store backend (compiled wheel)
 guard = []
 teams = []  # empty extra: a module of the core, no third-party libraries
 flows = []  # empty extra: a module of the core, no third-party libraries
@@ -41,7 +42,7 @@ llm-providers = ["tiktoken>=0.5"]
 embedding-providers = ["tiktoken>=0.5"]
 all-providers = ["tiktoken>=0.5"]
 providers = ["tiktoken>=0.5"]
-all = ["tiktoken>=0.5", "redis>=5.0", "asyncpg>=0.29", "fastmcp>=2.0", "rsa>=4.9"]
+all = ["tiktoken>=0.5", "redis>=5.0", "asyncpg>=0.29", "fastmcp>=2.0", "rsa>=4.9", "pyyaml>=6.0"]
 
 [dependency-groups]
 dev = [
@@ -51,6 +52,7 @@ dev = [
     "black>=23.0",
     "ruff>=0.1",
     "mypy>=1.0",
+    "pyyaml>=6.0",  # the extra `yaml` is not in the core: the tests read YAML files
     "types-PyYAML>=6.0",
     "types-requests>=2.31",
     "responses>=0.23",
@@ -93,6 +95,7 @@ python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
 asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
 markers = [
     "stress: marks tests as stress tests (deselect with '-m \"not stress\"')",
     "differential: built-in vs official-SDK equivalence tests (dev env only; run with 'make differential')",

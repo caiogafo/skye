@@ -12,7 +12,9 @@
 # Rule: a budget only goes DOWN. Raising a number needs a reason in the PR and a
 # review from the owner of this file (.github/CODEOWNERS).
 #
-# Values were measured on 2026-10-30, Python 3.13, macOS arm64, wheels from PyPI.
+# Values were measured on 2026-10-30, Python 3.13, macOS arm64, wheels from PyPI. The pull-request workflow measures on Linux x86_64,
+# where the compiled wheels are larger: the limits below apply there. To measure from any machine:
+# `uv pip install --target DIR --python-platform x86_64-manylinux_2_28 --python-version 3.13 "skyeai[extra] @ file:///path/to.whl"`.
 # "now" is what was measured, "max" is what the test enforces (headroom for
 # dependency patch releases), "target" is where the module should end up.
 
@@ -20,13 +22,13 @@
 # Install with no extras.
 max_distributions = 12              # now 10
 max_installed_mb = 11               # now 9.0
-allowed_dependencies = ["pydantic", "pyyaml", "tenacity"]
+allowed_dependencies = ["pydantic", "tenacity"]
 # Modules that fail to import on a core-only install. Each entry must be fixed
 # (move the import behind LazyImporter, or declare the dependency) and removed.
 # The test fails if an entry starts working, so the list cannot go stale.
 # Compiled (non pure-Python) distributions in the core install. Target: none.
 # The test fails if the set changes, in either direction.
-known_compiled = ["pydantic-core", "pyyaml"]
+known_compiled = ["pydantic-core"]
 known_import_failures = []
 
 # Third-party libraries imported at module level in src/skye, with the number of
@@ -47,7 +49,6 @@ runs = 5
 
 [imports.max_files]
 pydantic = 10
-yaml = 1
 tenacity = 1
 
 [load]
@@ -66,7 +67,7 @@ known_leaks = []
 forbidden_at_import = [
   "openai", "anthropic", "boto3", "botocore", "google", "azure", "cohere",
   "redis", "psycopg2", "httpx", "requests", "tiktoken",
-  "opentelemetry", "prometheus_client", "numpy", "asyncpg", "fastmcp",
+  "opentelemetry", "prometheus_client", "numpy", "asyncpg", "fastmcp", "yaml",
 ]
 
 [lambda]
@@ -95,9 +96,23 @@ max_over_core_mb = 1
 target_over_core_mb = 1
 
 [extras.memory]
-max_compiled_over_core = 1
+max_compiled_over_core = 0
 max_over_core_mb = 13
 target_over_core_mb = 4
+
+# The yaml Extra declares only `pyyaml`, which reads a YAML file (router and library configuration; JSON needs nothing). It is the only
+# way to read YAML, so it is not in the core: the standard install carries no YAML library. Measured on Linux x86_64 2026-11-02: +2.9 MB.
+[extras.yaml]
+max_compiled_over_core = 1
+max_over_core_mb = 3
+target_over_core_mb = 1
+
+# The postgres Extra declares only `asyncpg`, for the PostgreSQL store backend. Its compiled wheel is large (+14.0 MB on Linux x86_64,
+# 2026-11-02), which is why it is not part of the memory Extra: only who uses PostgreSQL installs it.
+[extras.postgres]
+max_compiled_over_core = 1
+max_over_core_mb = 15
+target_over_core_mb = 2
 
 [extras.openai]
 max_compiled_over_core = 4

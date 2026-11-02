@@ -14,6 +14,7 @@ from pathlib import Path
 import pytest
 
 from tests.budget.measure import ROOT, load_budgets
+from skye.models.registry import ProviderRegistry
 from tests.examples.fake_network import patched
 
 EXAMPLES = ROOT / "examples"
@@ -59,10 +60,14 @@ def run_offline(script, monkeypatch, capsys) -> str:
     monkeypatch.chdir(script.parent)
     monkeypatch.syspath_prepend(str(script.parent))
     before = set(sys.modules)
+    registry = ProviderRegistry
+    saved = (dict(registry._model_providers), dict(registry._embedding_providers))
     try:
         with patched():
             runpy.run_path(str(script), run_name="__main__")
     finally:
+        # An example may register a provider of its own (`custom_providers.py`): put the registry back as it was.
+        registry._model_providers, registry._embedding_providers = saved
         # An example may import an optional library (boto3 for DynamoDB, ...): do not leave it loaded for the tests that follow.
         for name in set(sys.modules) - before:
             if name.split(".")[0] in _optional_libraries():
