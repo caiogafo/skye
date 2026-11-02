@@ -42,7 +42,7 @@ from collections.abc import Iterator
 from typing import Any, AsyncIterator
 
 from skye.base.completion import CompletionRequest, CompletionResponse, StreamChunk
-from skye.base.exceptions import ProviderError
+from skye.base.exceptions import ProviderError, ValidationError
 from skye.base.interfaces.model import ModelInterface
 from skye.base.interfaces.vector_encoder import VectorEncoderInterface
 from skye.base.health import HealthMetrics
@@ -558,17 +558,19 @@ class BaseModelProvider(ModelInterface, ABC):
                 from skye.base.messages import UserMessage
                 messages = [UserMessage(content=messages)]
             
+            # Only what the caller set: an omitted temperature or max_tokens keeps the request default.
+            sampling = {k: v for k, v in {"temperature": temperature, "max_tokens": max_tokens}.items() if v is not None}
             request = CompletionRequest(
                 messages=messages,
                 model=effective_model,
-                temperature=temperature,
-                max_tokens=max_tokens,
+                **sampling,
                 **kwargs,
             )
         
         start_time = time.time()
         try:
             response = self._complete_with_retry(request)
+            self._parse_structured_output(request, response)
             
             # Attach capabilities to response for direct execution
             if request.capabilities:
@@ -584,6 +586,27 @@ class BaseModelProvider(ModelInterface, ABC):
             self.health_metrics.record_failure()
             raise
     
+    @staticmethod
+    def _parse_structured_output(request: CompletionRequest, response: CompletionResponse) -> None:
+        """Validate the text of the response against the declared output schema and attach the result.
+
+        The REST adapters return plain JSON text (no SDK ``parsed`` field), so the shape is checked here, once, for every provider.
+        A result that does not conform raises ``ValidationError`` naming the field (Requirement 27.2); it is not retried.
+        """
+        schema = getattr(request, "response_schema", None)
+        if schema is None or response.structured_output is not None or not response.content:
+            return
+        try:
+            response.structured_output = schema.model_validate_json(response.content)
+        except Exception as e:
+            errors = e.errors() if hasattr(e, "errors") else []
+            field = ".".join(str(part) for part in errors[0]["loc"]) if errors and errors[0].get("loc") else "response_schema"
+            raise ValidationError(
+                f"The response does not conform to {getattr(schema, '__name__', schema)}: {e}",
+                field=field,
+                value=response.content,
+            ) from e
+
     @with_retry(max_retries=3, min_wait=4, max_wait=10, multiplier=1)
     def _complete_with_retry(self, request: CompletionRequest) -> CompletionResponse:
         """Internal method with retry logic.
@@ -686,11 +709,11 @@ class BaseModelProvider(ModelInterface, ABC):
                 from skye.base.messages import UserMessage
                 messages = [UserMessage(content=messages)]
             
+            sampling = {k: v for k, v in {"temperature": temperature, "max_tokens": max_tokens}.items() if v is not None}
             request = CompletionRequest(
                 messages=messages,
                 model=effective_model,
-                temperature=temperature,
-                max_tokens=max_tokens,
+                **sampling,
                 stream=True,
                 **kwargs,
             )

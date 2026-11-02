@@ -92,6 +92,7 @@ owner) is decision D5; A5 (declarations, not execution) is history; A6 (Vertex r
 
 1. THE spec SHALL realize Requirement 7.4 of #[[file:.kiro/steering/10-requirements.md]].
 2. THE spec SHALL realize Requirement 7.7 of #[[file:.kiro/steering/10-requirements.md]].
+3. THE spec SHALL realize Requirement 7.9 of #[[file:.kiro/steering/10-requirements.md]].
 
 ### Requirement 8: S8 Extras declare exactly the imported libraries
 
@@ -429,6 +430,7 @@ owner) is decision D5; A5 (declarations, not execution) is history; A6 (Vertex r
 
 1. THE spec SHALL realize Requirement 24.1 of #[[file:.kiro/steering/10-requirements.md]].
 2. THE spec SHALL realize Requirement 24.2 of #[[file:.kiro/steering/10-requirements.md]].
+3. THE spec SHALL realize Requirement 24.3 of #[[file:.kiro/steering/10-requirements.md]].
 
 ### Requirement 42: C5 Accurate steering
 

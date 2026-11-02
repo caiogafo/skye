@@ -42,7 +42,7 @@ def main():
         print(f"✗ Classification template error: {e}")
     
     try:
-        messages = builder.render("qa", {
+        messages = builder.render("question_answering", {
             "context": "The sky is blue during the day.",
             "question": "What color is the sky?"
         })

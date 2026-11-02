@@ -14,7 +14,7 @@ Skye supports two ways to provide capabilities to the LLM:
 ### Option 1: Direct Capabilities (Recommended)
 
 ```python
-from skye.models.registry import provider as create_provider
+import skye
 from skye.base.messages import UserMessage
 from skye.tools import capability
 
@@ -28,7 +28,7 @@ def get_weather(location: str) -> str:
     """
     return f"Weather in {location}: Sunny, 72°F"
 
-client = create_provider("openai", api_key="sk-...")
+client = skye.provider("openai", api_key="sk-...")
 
 # Pass capabilities directly - no registry needed!
 response = client.complete(

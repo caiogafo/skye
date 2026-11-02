@@ -174,6 +174,9 @@ The migration is done and was verified green on 2026-11-02. The only open work i
   - [x] 10.7 Reduce `README.md` from 1075 lines to 84 and move the rest into the wiki.
     - Evidence: `README.md`; the moved text is in `docs/getting-started.md` (install, extras, quick start), `docs/models/provider-guide.md` (providers, embeddings, multimodal, structured outputs, streaming, async), `docs/tools/function-calling.md`, `docs/deployment.md` (lazy loading, Lambda), `docs/base/configuration.md`, `docs/architecture.md`, `docs/base/interfaces.md`, `docs/router/overview.md` (routing, YAML, health, fallbacks, external storage), `docs/development.md`, `docs/roadmap.md`.
     - _Requirements: 15.6_
+  - [x] 10.8 Update the examples to the current library and complete them with the ones of the former README: every example creates its client with `skye.provider(name, **config)`; new examples `basic/quickstart.py`, `basic/async_and_streaming.py`, `basic/configuration.py`, `providers/bring_your_own_adapter.py`, `capabilities/mcp_client.py`, `routing/fallbacks_and_health.py`, `serverless/lambda_handler.py`, and the six of `advanced/` (`multimodal.py`, `structured_output.py`, `function_calling.py`, `streaming.py`, `prompt_engineering.py`, `custom_providers.py`); the README points to `examples/`.
+    - Evidence: `examples/`; `tests/examples/test_examples.py` runs every example offline against the fake network of `tests/examples/fake_network.py`. Running them found and fixed seven defects of the library: `acomplete` of the OpenAI and Anthropic adapters rejected `messages=`; `complete` without `temperature` raised `ValidationError`; the last OpenAI stream chunk (`"delta": {}`) raised `AttributeError`; `response.structured_output` was never filled by the REST adapters (now validated against the schema, Requirement 27.2); `router.complete(model=<alias>)` did not resolve the alias; Azure through the router lacked `azure_endpoint` and `deployment_name`; callable default values of the prompt builder were printed instead of called (Requirement 30.4).
+    - _Requirements: 9.11, 9.12, 24.1, 24.2, 24.3_
 
 - [x] 11. Migrate and create the component specs
   - [x] 11.1 Migrate the requirements of the remaining old specs to the pointer format: `prompts-support`, `policy-engine`, `agent-runtime`, `gateway` (`models` and `tools` were done by Kiro). The migration of their design and tasks and the rename of their folders is done per spec by Kiro, one spec per run, following `.kiro/prompts/03-specs-and-docs.md`; it is not a task of this spec.
@@ -202,6 +205,10 @@ The migration is done and was verified green on 2026-11-02. The only open work i
   - [x] 12.4 Run `make budget-fast` on its own after the rename.
     - Evidence: 88 passed, 1 xfailed.
     - _Requirements: 7.5_
+
+  - [x] 12.5 Replace the script `scripts/validate_provider_architecture.py` (run by nothing, and broken: it looked for folders and classes that no longer exist) with a test of the same rule, and remove the `scripts/` folder.
+    - Evidence: `tests/budget/test_provider_agnostic_core.py` (the core has no host, wire key, adapter class or `models/llm` import of one provider; no adapter imports the adapter of another provider; the detector is tested); the three pages of `docs/models/` that cited the script now cite the test.
+    - _Requirements: 9.10_
 
 - [x] 13. Final verification (to be run with Kiro)
   - [x] 13.1 Run the whole verification: `uv run pytest tests`, `make budget`, `make differential`. Everything passes except the documented skips (live-credential differential tests, and the one `xfail` of the `auth` extra until `auth` is implemented).

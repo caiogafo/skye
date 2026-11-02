@@ -14,7 +14,7 @@ Working with multimodal inputs (text, images, audio, video).
 - Provider-specific multimodal support
 
 ### `structured_output.py`
-Requesting structured outputs with Pydantic schemas.
+Requesting structured outputs with declared schemas (nested objects, enums, optional fields) and validating the answer.
 
 **Topics covered:**
 - Defining output schemas
@@ -28,37 +28,36 @@ Requesting structured outputs with Pydantic schemas.
 Advanced function calling patterns.
 
 **Topics covered:**
-- Complex capability schemas
-- Parallel capability execution
-- Capability result handling
-- Error handling in capabilities
+- Several capabilities defined with `@capability`
+- Executing the calls the model asks for (`execute_capability_calls`)
+- Capability result messages and the follow-up call
+- A capability that raises: the error goes back to the model
 
 ### `streaming.py`
 Streaming responses and handling tokens in real-time.
 
 **Topics covered:**
-- Streaming completions
-- Token-by-token processing
-- Streaming with capabilities
-- Async streaming
+- Streaming completions with `stream`
+- Token-by-token processing and time to first token
+- Async streaming with `astream`
 
 ### `prompt_engineering.py`
 Advanced prompt engineering techniques.
 
 **Topics covered:**
-- Few-shot learning
-- Chain-of-thought prompting
-- Prompt templates
-- Dynamic prompt generation
+- Few-shot learning with an example template
+- Chain-of-thought prompting with system and user messages
+- Template composition
+- Dynamic prompts: callable defaults and custom filters
 
 ### `custom_providers.py`
 Implementing custom model providers.
 
 **Topics covered:**
-- Extending ModelInterface
-- Custom transformation logic
-- Provider registration
-- Error handling
+- Extending `BaseModelProvider`
+- The transformation of a request and of an answer
+- Provider registration, then `skye.provider("name")`
+- Errors of the library (a lighter option, a `Runnable`, is in `examples/providers/bring_your_own_adapter.py`)
 
 ## Running the Examples
 
@@ -84,17 +83,15 @@ python examples/advanced/custom_providers.py
 
 ## Key Concepts
 
+All of them create the client with one call, `skye.provider(name, **config)`.
+
 ### Multimodal Processing
 
 ```python
 from skye.base.messages import UserMessage
 
-message = UserMessage(
-    content=[
-        {"type": "text", "text": "What's in this image?"},
-        {"type": "image_url", "image_url": {"url": "https://example.com/image.jpg"}}
-    ]
-)
+message = UserMessage(content="What's in this image?", images=["https://example.com/image.jpg"])
+response = client.complete(messages=[message], model="gpt-4o")
 ```
 
 ### Structured Outputs
@@ -105,25 +102,15 @@ from pydantic import BaseModel
 class Person(BaseModel):
     name: str
     age: int
-    occupation: str
 
-request = CompletionRequest(
-    messages=[...],
-    model="gpt-4",
-    response_schema=Person
-)
+response = client.complete(messages=[...], model="gpt-4", response_schema=Person)
+person = response.structured_output  # a Person; a non-conforming answer raises ValidationError
 ```
 
 ### Streaming
 
 ```python
-request = CompletionRequest(
-    messages=[...],
-    model="gpt-4",
-    stream=True
-)
-
-for chunk in provider.stream(request):
+for chunk in client.stream(messages=[...], model="gpt-4"):
     print(chunk.delta, end="", flush=True)
 ```
 
@@ -133,7 +120,7 @@ for chunk in provider.stream(request):
 import asyncio
 
 async def main():
-    response = await provider.acomplete(request)
+    response = await client.acomplete(messages=[...], model="gpt-4")
     print(response.content)
 
 asyncio.run(main())
@@ -150,12 +137,14 @@ asyncio.run(main())
 ## Error Handling
 
 ```python
-from skye.base.exceptions import SkyeError, RateLimitError
+from skye.base.exceptions import ProviderError, SkyeError, ValidationError
 
 try:
-    response = provider.complete(request)
-except RateLimitError as e:
-    print(f"Rate limited: {e}")
+    response = client.complete(messages=[...], model="gpt-4")
+except ValidationError as e:
+    print(f"The answer did not match the schema: {e}")
+except ProviderError as e:
+    print(f"The provider failed: {e}")
 except SkyeError as e:
     print(f"Error: {e}")
 ```

@@ -5,15 +5,15 @@ This directory contains examples demonstrating the simplified boto3-style API fo
 ## Quick Start
 
 ```python
-from skye.models.registry import provider as create_provider
+import skye
 from skye.base.messages import UserMessage, SystemMessage
 
 # Create a client
-client = create_provider("openai", api_key="sk-...")
+client = skye.provider("openai", api_key="sk-...")
 
 # Simple completion
 response = client.complete(
-    messages=[UserMessage("What is AI?")],
+    messages=[UserMessage(content="What is AI?")],
     model="gpt-4"
 )
 
@@ -26,9 +26,9 @@ print(response.usage.total_tokens)
 ### OpenAI
 
 ```python
-client = create_provider("openai", api_key="sk-...")
+client = skye.provider("openai", api_key="sk-...")
 response = client.complete(
-    messages=[UserMessage("Hello")],
+    messages=[UserMessage(content="Hello")],
     model="gpt-4",
     temperature=0.7
 )
@@ -39,9 +39,9 @@ response = client.complete(
 ### AWS Bedrock
 
 ```python
-client = create_provider("bedrock", region="us-east-1")
+client = skye.provider("bedrock", region="us-east-1")
 response = client.complete(
-    messages=[UserMessage("Hello")],
+    messages=[UserMessage(content="Hello")],
     model="anthropic.claude-3-sonnet-20240229-v1:0"
 )
 ```
@@ -51,9 +51,9 @@ response = client.complete(
 ### Anthropic
 
 ```python
-client = create_provider("anthropic", api_key="sk-ant-...")
+client = skye.provider("anthropic", api_key="sk-ant-...")
 response = client.complete(
-    messages=[UserMessage("Hello")],
+    messages=[UserMessage(content="Hello")],
     model="claude-3-sonnet-20240229"
 )
 ```
@@ -63,14 +63,14 @@ response = client.complete(
 ### Azure OpenAI
 
 ```python
-client = create_provider(
+client = skye.provider(
     "azure",
     api_key="...",
     azure_endpoint="https://your-resource.openai.azure.com",
     api_version="2024-02-15-preview"
 )
 response = client.complete(
-    messages=[UserMessage("Hello")],
+    messages=[UserMessage(content="Hello")],
     model="gpt-4"  # Your deployment name
 )
 ```
@@ -80,13 +80,13 @@ response = client.complete(
 ### Google
 
 ```python
-client = create_provider(
+client = skye.provider(
     "google",
     project_id="your-project-id",
     location="us-central1"
 )
 response = client.complete(
-    messages=[UserMessage("Hello")],
+    messages=[UserMessage(content="Hello")],
     model="gemini-1.5-pro"
 )
 ```
@@ -98,7 +98,7 @@ response = client.complete(
 ### Creating a Client
 
 ```python
-client = create_provider(name, **config)
+client = skye.provider(name, **config)
 ```
 
 - `name`: Provider name ("openai", "bedrock", "anthropic", "azure", "google")
@@ -149,10 +149,10 @@ response = await client.acomplete(
 from skye.base.messages import UserMessage, SystemMessage, AssistantMessage
 
 messages = [
-    SystemMessage("You are a helpful assistant."),
-    UserMessage("What is AI?"),
-    AssistantMessage("AI stands for..."),
-    UserMessage("Tell me more")
+    SystemMessage(content="You are a helpful assistant."),
+    UserMessage(content="What is AI?"),
+    AssistantMessage(content="AI stands for..."),
+    UserMessage(content="Tell me more")
 ]
 ```
 

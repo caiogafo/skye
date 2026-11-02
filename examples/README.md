@@ -28,7 +28,7 @@ export ANTHROPIC_API_KEY="sk-ant-..."
 
 # Azure OpenAI
 export AZURE_OPENAI_API_KEY="..."
-export AZURE_API_BASE="https://..."
+export AZURE_OPENAI_ENDPOINT="https://..."
 
 # AWS Bedrock (uses AWS credentials)
 export AWS_PROFILE="your-profile"
@@ -37,19 +37,34 @@ export AWS_ACCESS_KEY_ID="..."
 export AWS_SECRET_ACCESS_KEY="..."
 ```
 
+## How every example creates a client
+
+One call, in the style of `boto3.client`; the same line for every provider:
+
+```python
+import skye
+
+client = skye.provider("openai", api_key="sk-...")
+response = client.complete(messages=[...], model="gpt-4")
+```
+
+Skye is built for serverless architectures, where the size of the library and its cold start make a difference, so each example needs
+only the extra of the provider it uses. Every example is run offline against a fake network by `tests/examples`, so none of them can
+drift from the library.
+
 ## Example Categories
 
 ### 1. Basic Examples (`examples/basic/`)
 
 Start here to learn the fundamentals:
-- Simple completions
-- Multi-turn conversations
-- Structured outputs
-- Message types and metadata
+- `quickstart.py`: create a client with one call and ask a question
+- `async_and_streaming.py`: `acomplete` and `stream`
+- `configuration.py`: file, environment and code overrides, `${VAR}` substitution
+- `simple_completion.py`: multi-turn conversations, structured outputs, message types and metadata
 
 **Run:**
 ```bash
-python examples/basic/simple_completion.py
+python examples/basic/quickstart.py
 ```
 
 ### 2. Capabilities (`examples/capabilities/`)
@@ -59,6 +74,8 @@ Learn how to use capabilities (tools/functions):
 - Capability execution
 - Multi-turn capability workflows
 - Provider-specific implementations
+
+- `mcp_client.py`: list and call the tools of an MCP server with the built-in client
 
 **Run:**
 ```bash
@@ -75,6 +92,7 @@ Explore provider-specific features:
 - Embeddings
 - Multimodal inputs
 - Structured outputs
+- `bring_your_own_adapter.py`: your own model or SDK wrapper as a `Runnable`
 
 **Run:**
 ```bash
@@ -91,6 +109,7 @@ Master load balancing and failover:
 - Fallback chains
 - Rate limiting
 - Multiple routing strategies
+- `fallbacks_and_health.py`: fallbacks, retry policies, health, usage and cooldown
 
 **Run:**
 ```bash
@@ -101,27 +120,45 @@ python examples/routing/yaml_config.py
 ### 5. Advanced (`examples/advanced/`)
 
 Explore advanced patterns:
-- Multimodal processing
-- Streaming responses
-- Prompt engineering
-- Custom providers
-- Async operations
+- `multimodal.py`: images from a URL, a data URL or a file
+- `structured_output.py`: nested schemas, enums and optional fields, validated
+- `function_calling.py`: several capabilities, parallel execution, errors inside a capability
+- `streaming.py`: `stream` and `astream`, time to first token
+- `prompt_engineering.py`: few-shot, chain of thought, composition, dynamic prompts
+- `custom_providers.py`: your own provider, registered and used with `skye.provider`
 
 **Run:**
 ```bash
-python examples/advanced/multimodal.py
 python examples/advanced/streaming.py
+python examples/advanced/custom_providers.py
 ```
+
+### 6. Serverless (`examples/serverless/`)
+
+Patterns for serverless runtimes, where the size of the library and its cold start matter:
+- `lambda_handler.py`: a handler that creates its client once, outside the handler (written for AWS Lambda, valid on any runtime)
+- `serverless_router_example.py`: a router whose state lives in an external store (file system, Redis, DynamoDB, PostgreSQL)
+
+**Run:**
+```bash
+python examples/serverless/lambda_handler.py
+```
+
+### 7. Prompts (`examples/prompts/`)
+
+Templates, few-shot examples, message roles and multimodal prompts (`basic_usage.py`, `few_shot_learning.py`, `message_roles.py`, `multimodal_content.py`).
+
+Provider by provider versions of multimodal inputs, structured outputs and function calling are in `examples/providers/`.
 
 ## Common Patterns
 
 ### Basic Completion
 
 ```python
-from skye.models.registry import provider as create_provider
+import skye
 from skye.base.messages import UserMessage
 
-client = create_provider("openai", api_key="sk-...")
+client = skye.provider("openai", api_key="sk-...")
 
 response = client.complete(
     messages=[UserMessage(content="Hello, world!")],
@@ -134,10 +171,10 @@ print(response.content)
 ### With Capabilities
 
 ```python
-from skye.models.registry import provider as create_provider
+import skye
 from skye.base.messages import UserMessage
 
-client = create_provider("openai", api_key="sk-...")
+client = skye.provider("openai", api_key="sk-...")
 
 capabilities = [
     {
@@ -184,13 +221,13 @@ router = ModelRouter(
 )
 
 response = router.complete(
-    messages=[UserMessage("Hello!")],
+    messages=[UserMessage(content="Hello!")],
     model="gpt-4"
 )
 
 # Tag-based selection
 response = router.complete(
-    messages=[UserMessage("Hello!")],
+    messages=[UserMessage(content="Hello!")],
     tags=["fast", "cheap"]
 )
 ```
@@ -212,7 +249,7 @@ from skye.router import ModelRouter
 
 router = ModelRouter.from_yaml("router_config.yaml")
 response = router.complete(
-    messages=[UserMessage("Hello!")],
+    messages=[UserMessage(content="Hello!")],
     model="gpt-4"
 )
 ```

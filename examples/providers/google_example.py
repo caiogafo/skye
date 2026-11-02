@@ -4,11 +4,11 @@ This version demonstrates:
 - Basic completion with Google (Gemini models)
 - Streaming responses
 - GCP project and location configuration
-- Simple client creation: create_provider("google")
+- Simple client creation: skye.provider("google")
 """
 
 import os
-from skye.models.registry import provider as create_provider
+import skye
 from skye.base.messages import UserMessage, SystemMessage
 
 
@@ -27,7 +27,7 @@ def basic_completion():
         return
     
     try:
-        client = create_provider(
+        client = skye.provider(
             "google",
             project_id=project_id,
             location=location
@@ -38,8 +38,8 @@ def basic_completion():
         return
     
     messages = [
-        SystemMessage("You are a helpful assistant."),
-        UserMessage("What is the capital of France?"),
+        SystemMessage(content="You are a helpful assistant."),
+        UserMessage(content="What is the capital of France?"),
     ]
     
     response = client.complete(
@@ -69,13 +69,13 @@ def streaming_example():
         print("⚠️  GCP_PROJECT_ID environment variable not set")
         return
     
-    client = create_provider(
+    client = skye.provider(
         "google",
         project_id=project_id,
         location=location
     )
     
-    messages = [UserMessage("Write a short story about a robot learning to paint.")]
+    messages = [UserMessage(content="Write a short story about a robot learning to paint.")]
     
     print("\nStreaming response:")
     print("-" * 40)
@@ -99,7 +99,7 @@ def multiple_models():
         print("⚠️  GCP_PROJECT_ID environment variable not set")
         return
     
-    client = create_provider(
+    client = skye.provider(
         "google",
         project_id=project_id,
         location=location
@@ -112,7 +112,7 @@ def multiple_models():
     ]
     
     prompt = "What is artificial intelligence?"
-    messages = [UserMessage(prompt)]
+    messages = [UserMessage(content=prompt)]
     
     print(f"\nPrompt: {prompt}")
     print("-" * 40)
@@ -134,14 +134,14 @@ def cloud_run_example():
 Example Cloud Run service using Skye with Google:
 
 ```python
-from skye.models.registry import provider as create_provider
+import skye
 from skye.base.messages import UserMessage
 from flask import Flask, request, jsonify
 
 app = Flask(__name__)
 
 # Initialize client (uses Application Default Credentials)
-client = create_provider(
+client = skye.provider(
     "google",
     project_id="your-project-id",
     location="us-central1"
@@ -150,7 +150,7 @@ client = create_provider(
 @app.route("/complete", methods=["POST"])
 def complete():
     data = request.json
-    messages = [UserMessage(data["prompt"])]
+    messages = [UserMessage(content=data["prompt"])]
     
     response = client.complete(
         messages=messages,
@@ -184,17 +184,17 @@ def configuration_example():
 Google configuration options:
 
 ```python
-from skye.models.registry import provider as create_provider
+import skye
 
 # Basic configuration
-client = create_provider(
+client = skye.provider(
     "google",
     project_id="your-project-id",
     location="us-central1"  # or "europe-west1", "asia-northeast1", etc.
 )
 
 # With custom credentials
-client = create_provider(
+client = skye.provider(
     "google",
     project_id="your-project-id",
     location="us-central1",

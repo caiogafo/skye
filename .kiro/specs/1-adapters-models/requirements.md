@@ -160,3 +160,14 @@ The `models` component holds the adapters for every model API kind — language 
 #### Acceptance Criteria
 
 1. THE spec SHALL keep this story as history only, no requirement of it being left in steering.
+
+### Requirement 16: Create a client with one call
+
+**User Story:** As a developer, I want to create the client of any provider with one call in the style of `boto3.client`, so that I write the same line for every provider and the library stays light to import.
+
+#### Acceptance Criteria
+
+1. THE spec SHALL realize Requirement 9.11 of #[[file:.kiro/steering/10-requirements.md]].
+2. THE spec SHALL realize Requirement 9.12 of #[[file:.kiro/steering/10-requirements.md]].
+3. THE spec SHALL realize Requirement 7.8 of #[[file:.kiro/steering/10-requirements.md]].
+4. THE spec SHALL honor decision D28 of #[[file:.kiro/steering/12-decisions.md]].

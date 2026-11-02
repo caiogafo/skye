@@ -92,7 +92,7 @@ Steering is always changed before the spec: first `10-requirements.md` or `11-de
 ## Tests
 - Run with **uv**: `uv run pytest tests/`; coverage `uv run pytest tests/ --cov=src/skye`.
 - Layout: `tests/unit` (fast, isolated, mock externals), `tests/integration` (real implementations where possible), `tests/stress`
-  (performance), `tests/differential` (built-in against vendor SDK), `tests/fixtures` (shared).
+  (performance), `tests/differential` (built-in against vendor SDK), `tests/examples` (every example run offline against a fake network), `tests/docs` (the wiki), `tests/fixtures` (shared).
 - `tests/budget` holds the deterministic size, load and structure checks. They run on every pull request via the `budgets` workflow and
   stay offline and deterministic (no network, no install in the fast job). The import matrix is `test_import_matrix.py`; the steering
   decisions are `test_steering.py`.

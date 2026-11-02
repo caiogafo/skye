@@ -30,14 +30,35 @@ Every extra is optional and loaded lazily. All extras and install options: [gett
 
 ## Quick start
 
+One call creates the client of a provider, in the style of `boto3.client`:
+
 ```python
-from skye.router import ModelRouter
+import skye
 from skye.base.messages import UserMessage
 
-router = ModelRouter.from_yaml("router_config.yaml")
-response = router.complete(messages=[UserMessage(content="Hello!")], model="gpt-4")
+client = skye.provider("openai", api_key="sk-...")
+response = client.complete(messages=[UserMessage(content="Hello!")], model="gpt-4")
 print(response.content)
 ```
+
+The same line works for every provider (`"anthropic"`, `"bedrock"`, `"azure"`, `"google"`, `"cohere"`); for embeddings add `provider_type="embedding"`.
+To balance several models with fallbacks, use the router: [router overview](docs/router/overview.md).
+
+## Examples
+
+Runnable examples are in [`examples/`](examples/README.md), one folder per topic:
+
+| Folder | What it shows |
+|---|---|
+| [`examples/basic`](examples/basic/) | quick start, async and streaming, configuration, completion requests |
+| [`examples/providers`](examples/providers/README.md) | OpenAI, Anthropic, Azure, Bedrock, Google, embeddings, multimodal, structured output, function calling, your own adapter |
+| [`examples/routing`](examples/routing/README.md) | the router: strategies, YAML configuration, fallbacks, health and usage |
+| [`examples/capabilities`](examples/capabilities/README.md) | local functions, remote APIs, function calling, the MCP client |
+| [`examples/advanced`](examples/advanced/README.md) | multimodal, structured output, function calling, streaming, prompt engineering, your own provider |
+| [`examples/prompts`](examples/prompts/) | templates, few-shot examples, roles, multimodal prompts |
+| [`examples/serverless`](examples/serverless/) | a handler that creates its client once, and a router with external state |
+
+Every example is run offline against a fake network by `tests/examples`, so it cannot drift from the library.
 
 ## Documentation
 
@@ -51,7 +72,7 @@ The documentation is a wiki with one section per component; start from [`docs/in
 | Providers, embeddings, multimodal, streaming | [provider guide](docs/models/provider-guide.md) |
 | Function calling and capabilities | [function calling](docs/tools/function-calling.md) |
 | Routing, YAML, health, fallbacks | [router overview](docs/router/overview.md), [routing guide](docs/router/routing-guide.md) |
-| Lazy loading and AWS Lambda | [deployment](docs/deployment.md) |
+| Lazy loading and serverless deployment | [deployment](docs/deployment.md) |
 | Size and load budgets | [budgets](docs/budgets.md) |
 | Codename glossary | [glossary](docs/glossary.md) |
 | Development: setup, tests, code quality | [development](docs/development.md) |

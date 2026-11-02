@@ -177,12 +177,12 @@ User Code
 
 ## Validation Method
 
-The validation was performed using `scripts/validate_provider_architecture.py`, which:
+The validation was first performed with a script (`scripts/validate_provider_architecture.py`, since removed: it was not run by anything and had stopped matching the code). It is now the test `tests/budget/test_provider_agnostic_core.py`, which runs with every `make budget-fast` and in the pull-request workflow, and:
 
-1. **Checks Core Library**: Scans core library modules for provider-specific references
-2. **Checks Transformers**: Verifies transformers only contain delegation methods
-3. **Checks Providers**: Verifies providers implement required transformation methods
-4. **Documents Debt**: Identifies and documents known architectural debt
+1. **Checks the core**: scans `base`, `router` and `tools` for anything that belongs to one provider (a host name, a key of its wire format, one of its adapter classes, an import of `models/llm`); the OpenAI data shape in `base/openai_shape.py` is the one allowed exception
+2. **Checks the adapters**: verifies that no adapter imports the adapter of another provider, so adding a provider changes only its own file
+
+The transformers of the earlier design no longer exist: each adapter does its own transformation.
 
 ## Recommendations
 
@@ -225,4 +225,4 @@ The architecture is production-ready and maintainable. The single instance of do
 - [BaseModelProvider](../../src/skye/models/base.py) - Base provider class
 - [OpenAIProvider](../../src/skye/models/llm/openai_compatible.py) - Example implementation
 - [BedrockProvider](../../src/skye/models/llm/bedrock.py) - Example implementation
-- [Validation Script](../../scripts/validate_provider_architecture.py) - Automated validation tool
+- [Validation test](../../tests/budget/test_provider_agnostic_core.py) - Automated validation

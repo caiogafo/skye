@@ -136,3 +136,7 @@ After understanding routing, explore:
 - `examples/providers/` - Provider-specific features
 - `examples/capabilities/` - Using capabilities with routing
 - `examples/advanced/` - Advanced routing patterns
+
+## Fallbacks, health and usage
+
+`fallbacks_and_health.py` builds a router with a fallback chain and retry policies, then reads the health, the rate-limit usage and the cooldown of each model.

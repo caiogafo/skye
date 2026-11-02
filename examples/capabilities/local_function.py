@@ -19,7 +19,7 @@ Note: Set environment variables for API keys:
 import os
 import json
 import asyncio
-from skye.models.registry import provider as create_provider
+import skye
 from skye.base.messages import UserMessage, CapabilityMessage
 from skye.tools import capability
 
@@ -83,7 +83,7 @@ def basic_local_function_example():
         return
     
     try:
-        provider = create_provider("openai", api_key=api_key)
+        client = skye.provider("openai", api_key=api_key)
     except ImportError:
         print("⚠️  OpenAI provider not available")
         return
@@ -101,7 +101,7 @@ def basic_local_function_example():
     print(f"  Message: What's the weather in San Francisco and what is 25 * 4?")
     
     try:
-        response = provider.complete(
+        response = client.complete(
             messages=[
                 UserMessage(content="What's the weather in San Francisco and what is 25 * 4?")
             ],
@@ -115,8 +115,8 @@ def basic_local_function_example():
         if response.capability_calls:
             print(f"\n  Capability calls: {len(response.capability_calls)}")
             for call in response.capability_calls:
-                func_name = call['function']['name']
-                args = call['function']['arguments']
+                func_name = call.name
+                args = call.arguments
                 print(f"    - {func_name}({args})")
         
     except Exception as e:
@@ -135,7 +135,7 @@ async def execute_and_continue_example():
         return
     
     try:
-        provider = create_provider("openai", api_key=api_key)
+        client = skye.provider("openai", api_key=api_key)
     except ImportError:
         print("⚠️  OpenAI provider not available")
         return
@@ -146,7 +146,7 @@ async def execute_and_continue_example():
     print("\nStep 1: Initial request")
     
     try:
-        response = provider.complete(
+        response = client.complete(
             messages=[
                 UserMessage(content="What's the weather in New York?")
             ],
@@ -169,7 +169,7 @@ async def execute_and_continue_example():
             print(f"\nStep 3: Continue conversation with results")
             
             # Continue conversation with capability results
-            final_response = provider.complete(
+            final_response = client.complete(
                 messages=[
                     UserMessage(content="What's the weather in New York?"),
                     response.to_message(),
@@ -196,7 +196,7 @@ async def async_capability_example():
         return
     
     try:
-        provider = create_provider("openai", api_key=api_key)
+        client = skye.provider("openai", api_key=api_key)
     except ImportError:
         print("⚠️  OpenAI provider not available")
         return
@@ -223,7 +223,7 @@ async def async_capability_example():
     print(f"  Message: Tell me about user_123")
     
     try:
-        response = provider.complete(
+        response = client.complete(
             messages=[
                 UserMessage(content="Tell me about user_123")
             ],
@@ -239,8 +239,8 @@ async def async_capability_example():
             
             # Execute async capabilities
             for call in response.capability_calls:
-                func_name = call['function']['name']
-                args = json.loads(call['function']['arguments'])
+                func_name = call.name
+                args = call.arguments
                 
                 if func_name == "fetch_user_info":
                     result = await fetch_user_info.aexecute(**args)

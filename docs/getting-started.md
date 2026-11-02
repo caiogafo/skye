@@ -112,11 +112,11 @@ uv pip install skyeai[all]
 ### Basic Usage
 
 ```python
-from skye.models.registry import provider as create_provider
+import skye
 from skye.base.messages import UserMessage
 
 # Create provider client (boto3-style)
-client = create_provider("bedrock", region="us-east-1")
+client = skye.provider("bedrock", region="us-east-1")
 
 # Make completion request
 response = client.complete(
@@ -132,11 +132,11 @@ print(response.content)
 
 ```python
 import asyncio
-from skye.models.registry import provider as create_provider
+import skye
 from skye.base.messages import UserMessage
 
 async def main():
-    client = create_provider("openai", api_key="sk-...")
+    client = skye.provider("openai", api_key="sk-...")
     
     response = await client.acomplete(
         messages=[UserMessage(content="Explain async/await")],
@@ -151,10 +151,10 @@ asyncio.run(main())
 ### Streaming
 
 ```python
-from skye.models.registry import provider as create_provider
+import skye
 from skye.base.messages import UserMessage
 
-client = create_provider("openai", api_key="sk-...")
+client = skye.provider("openai", api_key="sk-...")
 
 for chunk in client.stream(
     messages=[UserMessage(content="Write a story")],
@@ -167,7 +167,7 @@ for chunk in client.stream(
 
 ```python
 from pydantic import BaseModel
-from skye.models.registry import provider as create_provider
+import skye
 from skye.base.messages import UserMessage
 
 class Person(BaseModel):
@@ -175,7 +175,7 @@ class Person(BaseModel):
     age: int
     occupation: str
 
-client = create_provider("openai", api_key="sk-...")
+client = skye.provider("openai", api_key="sk-...")
 
 response = client.complete(
     messages=[UserMessage(content="Extract: John is 30 and works as an engineer")],

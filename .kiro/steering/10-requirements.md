@@ -95,7 +95,8 @@ Written without the project name (it is being chosen); `<pkg>` is the import pac
 5. THE limits SHALL live in `budgets.toml`, read identically by `make budget-fast`, `make budget` and the workflow `.github/workflows/budgets.yml`; THE workflow SHALL run `tests/budget` on every pull request and fail on a breach; THE budgets SHALL only go down, and a change to a limit SHALL be an explicit, reviewed edit.
 6. THE extras `teams` and `flows` SHALL exist as optional-dependency groups recorded in `budgets.toml`, SHALL be independent of each other (installing one excludes every library unique to the other), SHALL declare no third-party library and no compiled package until one is needed and be listed in `known_empty`; WHEN one is added, THE declaration SHALL equal the import and THE extra SHALL leave `known_empty` in the same change; THE core SHALL work with neither installed.
 7. THE lists `known_leaks` and `known_import_failures` SHALL be empty; WHILE an entry exists, THE tests SHALL warn naming it, and IF a listed entry starts working again, THEN THE tests SHALL fail.
-8. THE top-level package SHALL re-export only messages, completion, exceptions and config, none of which imports an optional or provider library.
+8. THE top-level package SHALL re-export only messages, completion, exceptions, config and the function `provider` (Requirement 9.11), none of which imports an optional or provider library when `import <pkg>` runs.
+9. THE cold start of the library, measured in a fresh interpreter as `import <pkg>`, importing the router, building a router with one target and building one request, without network, SHALL stay within `max_cold_start_ms` of `budgets.toml` (best of five runs), a limit compatible with serverless (a thin Python function starts in 100 to 300 ms and an init of 500 to 2000 ms is usually acceptable for an LLM application); IF it is exceeded, THEN `tests/budget/test_cold_start.py` SHALL fail.
 
 ### Requirement 8: Codenames
 
@@ -124,6 +125,8 @@ Written without the project name (it is being chosen); `<pkg>` is the import pac
 8. THE `DecisionModel` Port SHALL return one option from a finite set with a probability per option, each in 0 to 1 and summing to 1, SHALL reject an empty set with an error and return no choice, and SHALL be consumed by `gateway`, `router` and `guard`.
 9. WHEN a model identifier is given, THE library SHALL route the request to the provider implementation, and SHALL support synchronous and streaming completions for every provider; WHEN a provider call fails, THE library SHALL return a standardized error with the error type and provider details.
 10. ALL provider-specific transformation of requests, messages and capabilities SHALL live inside the provider adapter; THE router, the tools and the completion models SHALL stay provider-agnostic, and adding a provider SHALL need no change outside its adapter.
+11. THE library SHALL create the client of a provider with one call, `<pkg>.provider(name, **config)`, in the style of `boto3.client`, and the function SHALL import the models registry only when it is called, so that `import <pkg>` stays light.
+12. THE client returned by `<pkg>.provider` SHALL support `complete`, `acomplete` and `stream` for a language model, and `encode`, `encode_batch`, `aencode` and `aencode_batch` for an embedding model (chosen with `provider_type="embedding"`); THE documentation and the examples SHALL use `<pkg>.provider` as the default way to create a client, naming the variable `client` (`embedder` for embeddings), and SHALL NOT use an alias such as `create_provider`.
 
 ### Requirement 10: Tools and the MCP client
 
@@ -291,6 +294,7 @@ Written without the project name (it is being chosen); `<pkg>` is the import pac
 
 1. THE examples SHALL be organized by feature category, each with a README.
 2. THE examples SHALL demonstrate every capability type, YAML router configuration and every supported provider.
+3. THE examples SHALL create a client with `<pkg>.provider(name, **config)` (Requirement 9.11), and WHEN the examples change or the library changes, a test SHALL run every example offline against a fake network and fail on an uncaught exception or on a failure that an example prints.
 ### Requirement 25: Embeddings
 
 **User Story:** As a developer building retrieval, I want embedding adapters behind one Port, so that I can switch embedding models without changing my code.
@@ -632,7 +636,7 @@ Written without the project name (it is being chosen); `<pkg>` is the import pac
 4. THE `gateway` SHALL keep all state that must survive between invocations in the external store.
 5. THE `gateway` SHALL write one structured JSON log line per decision (principal, operation identifier, selector, tools exposed or called, policy decision, latency) and SHALL NOT log tool arguments or results unless explicitly enabled.
 6. THE `gateway` SHALL publish its counters through the observability module.
-7. THE `gateway` SHALL depend only on the standard library and libraries preinstalled in AWS Lambda.
+7. THE `gateway` SHALL depend only on the standard library and libraries preinstalled in the serverless runtime.
 8. THE `gateway` SHALL have its own entry in `budgets.toml` for size over the core and import time (values open, O16) and SHALL be covered by the budget tests in the pull request workflow.
 
 ### Requirement 49: Teams

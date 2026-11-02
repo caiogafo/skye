@@ -13,7 +13,7 @@ src_path = Path(__file__).parent.parent.parent / "src"
 sys.path.insert(0, str(src_path))
 
 from skye.prompts import BasePromptBuilder
-from skye.models.registry import provider as create_provider
+import skye
 
 
 def complete_with_provider(messages, model="gpt-4", temperature=0.7, max_tokens=200, provider_name="openai"):
@@ -24,8 +24,8 @@ def complete_with_provider(messages, model="gpt-4", temperature=0.7, max_tokens=
         return None
     
     try:
-        provider = create_provider(provider_name, api_key=api_key)
-        response = provider.complete(
+        client = skye.provider(provider_name, api_key=api_key)
+        response = client.complete(
             messages=messages,
             model=model,
             temperature=temperature,

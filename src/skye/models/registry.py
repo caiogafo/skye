@@ -215,7 +215,7 @@ def provider(name: str, **config: Any) -> ModelInterface | VectorEncoderInterfac
         >>> # OpenAI LLM
         >>> client = provider("openai", api_key="sk-...")
         >>> response = client.complete(
-        ...     messages=[UserMessage("Hello")],
+        ...     messages=[UserMessage(content="Hello")],
         ...     model="gpt-4"
         ... )
         >>>
@@ -231,7 +231,7 @@ def provider(name: str, **config: Any) -> ModelInterface | VectorEncoderInterfac
         >>> # Bedrock LLM
         >>> client = provider("bedrock", region="us-east-1")
         >>> response = client.complete(
-        ...     messages=[UserMessage("Hello")],
+        ...     messages=[UserMessage(content="Hello")],
         ...     model="anthropic.claude-3-sonnet-20240229-v1:0"
         ... )
         >>>

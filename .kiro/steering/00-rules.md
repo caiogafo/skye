@@ -17,14 +17,14 @@ enforced by `tests/budget/test_import_matrix.py`; do not restate it elsewhere. E
 appears in four sanctioned places and never in a path, import, file name or class name (`tests/budget/test_codenames.py`).
 
 ## Serverless first
-- The deployment target is AWS Lambda, packaged as a **zip**. No container image.
+- Skye is built for serverless architectures, where the size of the library and its cold start make a difference. Install only what is needed: the core is the standard library, and nothing forces a third-party library on the user.
 - No multiprocessing, no background threads, no long-lived processes.
 - All durable state is **external** (DynamoDB first; Redis where used). Do not rely on in-process caches or connection pools
   surviving between invocations.
 
 ## Dependencies, in order of preference
 1. the Python standard library;
-2. libraries the AWS Lambda runtime already ships (boto3, botocore, urllib3, ...);
+2. libraries the serverless runtime already provides (on AWS Lambda: boto3, botocore, urllib3, ...);
 3. pure-Python packages (`py3-none-any` wheel), only when 1 and 2 cannot do the job;
 4. **never** a compiled (C/Rust) package in the core.
 
@@ -55,6 +55,7 @@ component imports; an extra that imports none is empty and listed in `known_empt
 ## Naming
 - Interfaces follow `{Concept}Interface` (`ModelInterface`, `CapabilityInterface`, `VectorEncoderInterface`,
   `EventHandlerInterface`, `ContentReaderInterface`).
+- Create the client of a provider with `<pkg>.provider(name, **config)`, in the style of `boto3.client`; name the variable `client`, and use no alias.
 - **Capability, not Tool**, in type names: `CapabilityCall`, `CapabilityResult`, `CapabilityCallHandler`. The MCP wire terms stay as
   MCP defines them, and the component folder is literally `tools`.
 - Messages: `SkyeMessage`, `UserMessage`, `AssistantMessage`, `SystemMessage`, `CapabilityMessage`; `ContentChunk`;

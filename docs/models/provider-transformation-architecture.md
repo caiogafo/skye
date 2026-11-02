@@ -224,14 +224,12 @@ This would make `CapabilityCallHandler` a thin delegation layer like `MessageTra
 To validate the architecture, run:
 
 ```bash
-python scripts/validate_provider_architecture.py
+uv run pytest tests/budget/test_provider_agnostic_core.py
 ```
 
-This script checks:
-1. All provider-specific transformation logic is in provider client classes
-2. No provider-specific code exists in core library modules
-3. MessageTransformer and CapabilityTransformer only delegate to providers
-4. Adding a new provider requires no changes to core library code
+This test checks (it replaces the former script `scripts/validate_provider_architecture.py`):
+1. No provider-specific code exists in the core modules (`base`, `router`, `tools`)
+2. No adapter imports the adapter of another provider, so adding a new provider requires no changes to core library code or to another adapter
 
 ## Benefits
 

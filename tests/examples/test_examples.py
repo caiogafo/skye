@@ -1,0 +1,91 @@
+"""Run every example offline against a fake network (see fake_network.py).
+
+An example that no longer matches the library fails here: a wrong import, a renamed argument, a removed method. Provider keys are
+dummy values and every HTTP call is answered by the fake, so nothing leaves the machine.
+"""
+
+from __future__ import annotations
+
+import os
+import runpy
+import sys
+from pathlib import Path
+
+import pytest
+
+from tests.budget.measure import ROOT, load_budgets
+from tests.examples.fake_network import patched
+
+EXAMPLES = ROOT / "examples"
+SCRIPTS = sorted(p for p in EXAMPLES.rglob("*.py") if p.name != "__init__.py" and "__pycache__" not in p.parts)
+
+DUMMY_ENV = {
+    "OPENAI_API_KEY": "sk-test",
+    "ANTHROPIC_API_KEY": "sk-ant-test",
+    "AZURE_OPENAI_API_KEY": "az-test",
+    "AZURE_OPENAI_ENDPOINT": "https://example.openai.azure.com",
+    "COHERE_API_KEY": "co-test",
+    "GOOGLE_API_KEY": "g-test",
+    "AWS_ACCESS_KEY_ID": "AKIATEST",
+    "AWS_SECRET_ACCESS_KEY": "secret",
+    "AWS_REGION": "us-east-1",
+    "AWS_DEFAULT_REGION": "us-east-1",
+}
+
+
+def _id(path: Path) -> str:
+    return str(path.relative_to(EXAMPLES))
+
+
+@pytest.mark.parametrize("script", SCRIPTS, ids=_id)
+def test_example_compiles(script):
+    compile(script.read_text(encoding="utf-8"), str(script), "exec")
+
+
+# Most examples catch their errors and print them, so an example can drift and still exit cleanly. These markers mean "the example
+# failed and said so": a failed call, a traceback, an exception printed by the library. `Expected` marks an error that an example
+# provokes on purpose to show how it is handled.
+FAILURE_MARKERS = ("❌", "✗", "Traceback", "ProviderError:", "ConfigurationError:", "ValidationError:", "AttributeError", "TypeError", "KeyError")
+
+
+def _optional_libraries() -> set[str]:
+    """The libraries that `import skye` must not import (provider SDKs, optional dependencies): other tests assert they are absent."""
+    return set(load_budgets()["load"]["forbidden_at_import"])
+
+
+def run_offline(script, monkeypatch, capsys) -> str:
+    for key, value in DUMMY_ENV.items():
+        monkeypatch.setenv(key, value)
+    monkeypatch.chdir(script.parent)
+    monkeypatch.syspath_prepend(str(script.parent))
+    before = set(sys.modules)
+    try:
+        with patched():
+            runpy.run_path(str(script), run_name="__main__")
+    finally:
+        # An example may import an optional library (boto3 for DynamoDB, ...): do not leave it loaded for the tests that follow.
+        for name in set(sys.modules) - before:
+            if name.split(".")[0] in _optional_libraries():
+                del sys.modules[name]
+    captured = capsys.readouterr()
+    return captured.out + captured.err
+
+
+@pytest.mark.parametrize("script", SCRIPTS, ids=_id)
+def test_example_runs_offline(script, monkeypatch, capsys):
+    """The example runs to the end against the fake network and does not print a failure."""
+    output = run_offline(script, monkeypatch, capsys)
+    failures = [
+        line.strip()[:140]
+        for line in output.splitlines()
+        if any(marker in line for marker in FAILURE_MARKERS) and "Expected" not in line
+    ]
+    assert not failures, f"{_id(script)} printed a failure: {failures[:3]}"
+
+
+def test_the_failure_markers_catch_a_swallowed_error(tmp_path, monkeypatch, capsys):
+    """An example that catches an error and prints it is reported: this is how drift from the library shows up."""
+    script = tmp_path / "swallows.py"
+    script.write_text('try:\n    {}["x"]\nexcept Exception as e:\n    print(f"❌ Error: {e}")\n', encoding="utf-8")
+    output = run_offline(script, monkeypatch, capsys)
+    assert any(marker in output for marker in FAILURE_MARKERS)

@@ -4,30 +4,25 @@ This directory contains basic examples demonstrating core Skye concepts.
 
 ## Examples
 
+All of them create the client with one call, `skye.provider(name, **config)`, in the style of `boto3.client`.
+
+### `quickstart.py`
+Create a client and ask a question.
+
+### `async_and_streaming.py`
+`acomplete` (async) and `stream` (chunks as the model writes them).
+
+### `configuration.py`
+Configuration from a file, the environment and code, in that order of precedence; `${VAR}` substitution; the three prefixed environment variables.
+
 ### `simple_completion.py`
-Basic completion request with different message types and token usage tracking.
-
-**Topics covered:**
-- Creating completion requests
-- Using different message types (UserMessage, AssistantMessage, SystemMessage)
-- Handling token usage
-- Structured outputs
-- Prompt templates
-
-### `streaming_example.py`
-Streaming responses from language models.
-
-**Topics covered:**
-- Streaming completions
-- Handling stream chunks
-- Real-time token counting
-- Async streaming
+Completion requests with different message types, token usage, structured outputs and several providers.
 
 ## Running the Examples
 
 ```bash
 # Run basic completion example
-python examples/basic/simple_completion.py
+python examples/basic/quickstart.py
 
 # Run streaming example
 python examples/basic/streaming_example.py

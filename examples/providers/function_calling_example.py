@@ -13,7 +13,7 @@ import os
 import json
 from skye.base.completion import CompletionRequest
 from skye.base.messages import UserMessage, CapabilityMessage
-from skye.models import ProviderRegistry
+import skye
 
 
 def basic_function_calling():
@@ -28,7 +28,7 @@ def basic_function_calling():
         return
     
     try:
-        provider = ProviderRegistry.get_model_provider("openai", api_key=api_key)
+        client = skye.provider("openai", api_key=api_key)
     except ImportError:
         print("⚠️  OpenAI provider not available")
         return
@@ -75,7 +75,7 @@ def basic_function_calling():
     print(f"  Capabilities: {len(request.capabilities)}")
     
     try:
-        response = provider.complete(request)
+        response = client.complete(request)
         
         print("\nResponse:")
         print(f"  Content: {response.content}")
@@ -83,8 +83,8 @@ def basic_function_calling():
         if response.capability_calls:
             print(f"  Function calls: {len(response.capability_calls)}")
             for call in response.capability_calls:
-                print(f"    - {call['function']['name']}")
-                print(f"      Args: {call['function']['arguments']}")
+                print(f"    - {call.name}")
+                print(f"      Args: {call.arguments}")
         
     except Exception as e:
         print(f"\n❌ Error: {e}")
@@ -102,7 +102,7 @@ def function_execution_workflow():
         return
     
     try:
-        provider = ProviderRegistry.get_model_provider("openai", api_key=api_key)
+        client = skye.provider("openai", api_key=api_key)
     except ImportError:
         print("⚠️  OpenAI provider not available")
         return
@@ -144,7 +144,7 @@ def function_execution_workflow():
     )
     
     try:
-        response = provider.complete(request)
+        response = client.complete(request)
         print(f"  Assistant: {response.content[:80]}...")
         
         if response.capability_calls:
@@ -153,8 +153,8 @@ def function_execution_workflow():
             # Execute each function call
             function_results = []
             for call in response.capability_calls:
-                func_name = call['function']['name']
-                func_args = json.loads(call['function']['arguments'])
+                func_name = call.name
+                func_args = call.arguments
                 
                 print(f"  Calling {func_name}({func_args})")
                 
@@ -165,7 +165,7 @@ def function_execution_workflow():
                     function_results.append(
                         CapabilityMessage(
                             content=result,
-                            capability_id=call['id'],
+                            capability_id=call.id,
                             capability_name=func_name
                         )
                     )
@@ -183,7 +183,7 @@ def function_execution_workflow():
                 capabilities=capabilities
             )
             
-            final_response = provider.complete(request)
+            final_response = client.complete(request)
             print(f"  Assistant: {final_response.content}")
         
     except Exception as e:
@@ -202,7 +202,7 @@ def multiple_functions():
         return
     
     try:
-        provider = ProviderRegistry.get_model_provider("openai", api_key=api_key)
+        client = skye.provider("openai", api_key=api_key)
     except ImportError:
         print("⚠️  OpenAI provider not available")
         return
@@ -267,7 +267,7 @@ def multiple_functions():
     )
     
     try:
-        response = provider.complete(request)
+        response = client.complete(request)
         
         print("\nResponse:")
         print(f"  Content: {response.content[:80]}...")
@@ -275,7 +275,7 @@ def multiple_functions():
         if response.capability_calls:
             print(f"  Function calls: {len(response.capability_calls)}")
             for call in response.capability_calls:
-                print(f"    - {call['function']['name']}")
+                print(f"    - {call.name}")
         
     except Exception as e:
         print(f"\n❌ Error: {e}")
@@ -293,7 +293,7 @@ def anthropic_tool_use():
         return
     
     try:
-        provider = ProviderRegistry.get_model_provider(
+        client = skye.provider(
             "anthropic",
             api_key=api_key
         )
@@ -333,12 +333,12 @@ request = CompletionRequest(
     capabilities=capabilities
 )
 
-response = provider.complete(request)
+response = client.complete(request)
 
 if response.capability_calls:
     for call in response.capability_calls:
-        print(f"Tool: {call['function']['name']}")
-        print(f"Args: {call['function']['arguments']}")
+        print(f"Tool: {call.name}")
+        print(f"Args: {call.arguments}")
 ```
 
 Skye automatically converts between provider formats!
@@ -358,11 +358,11 @@ Skye provides a unified interface across all providers.
 Example:
 
 ```python
-from skye.models import ProviderRegistry
+import skye
 
-provider = ProviderRegistry.get_model_provider(
+client = skye.provider(
     "bedrock",
-    region_name="us-east-1"
+    region="us-east-1"
 )
 
 capabilities = [
@@ -390,7 +390,7 @@ request = CompletionRequest(
     capabilities=capabilities
 )
 
-response = provider.complete(request)
+response = client.complete(request)
 ```
 
 Same code works across OpenAI, Anthropic, and Bedrock!

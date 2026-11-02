@@ -99,7 +99,7 @@ Example YAML:
             masked = value[:8] + "..." if len(value) > 8 else "***"
             print(f"  ✓ {var}: {masked}")
         else:
-            print(f"  ✗ {var}: Not set")
+            print(f"  - {var}: not set")
     
     print("""
 To set environment variables:

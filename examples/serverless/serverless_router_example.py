@@ -166,8 +166,9 @@ def example_filesystem_storage():
                 targets=[
                     ModelTarget(
                         model="llama-2-7b",
-                        provider="local",
-                        api_base="http://localhost:8000",
+                        provider="openai",  # any OpenAI-compatible server (vLLM, Ollama, ...)
+                        api_key="not-needed",
+                        api_base="http://localhost:8000/v1",
                         tpm=50000,
                         rpm=500
                     )
@@ -212,8 +213,8 @@ async def example_explicit_initialization():
     """Example showing that storage initialization happens automatically."""
     print("\n=== Automatic Storage Initialization Example ===")
     
-    # Create storage backend
-    redis_storage = RedisBackend("redis://localhost:6379")
+    # Create the storage backend (a file system backend here; Redis or DynamoDB work the same way)
+    redis_storage = FileSystemBackend(base_path="/tmp/skye_router_state")
     
     # Create router - connect() is called automatically during initialization
     router = ModelRouter(
@@ -242,8 +243,8 @@ async def example_async_usage():
     """Example showing async usage with external storage."""
     print("\n=== Async Usage Example ===")
     
-    # Create router with Redis storage
-    redis_storage = RedisBackend("redis://localhost:6379")
+    # Create router with an external storage backend (a file system backend here; Redis or DynamoDB work the same way)
+    redis_storage = FileSystemBackend(base_path="/tmp/skye_router_state")
     router = ModelRouter(
         routes=[
             RouteConfig(
@@ -270,7 +271,7 @@ async def example_async_usage():
     
     try:
         # Use async routing (recommended for external storage)
-        response = await router.aroute_request(request)
+        response = await router.acomplete(messages=request.messages, model=request.model)
         print(f"Async response received: {response.content[:50]}...")
         
         # Get health metrics asynchronously
@@ -278,7 +279,7 @@ async def example_async_usage():
         print(f"Model health - Success rate: {health.success_rate:.1%}")
         
     except Exception as e:
-        print(f"Request failed (expected in demo): {e}")
+        print(f"Request failed: {e}")
 
 
 def main():
@@ -286,13 +287,25 @@ def main():
     print("Skye Router Storage Backend Examples")
     print("=" * 50)
     
-    # Run sync examples
-    example_in_memory_storage()
-    example_redis_storage()
-    example_dynamodb_storage()
-    example_postgresql_storage()
-    example_filesystem_storage()
-    example_durable_function_storage()
+    # Run sync examples. A backend whose library is not installed is skipped with a hint:
+    # Redis and PostgreSQL come with the `memory` extra (pip install skyeai[memory]), DynamoDB needs boto3.
+    import importlib.util
+
+    for example, needs in (
+        (example_in_memory_storage, None),
+        (example_redis_storage, "redis"),
+        (example_dynamodb_storage, "boto3"),
+        (example_postgresql_storage, "asyncpg"),
+        (example_filesystem_storage, None),
+        (example_durable_function_storage, None),
+    ):
+        if needs and importlib.util.find_spec(needs) is None:
+            print(f"\n  skipped {example.__name__}: install `{needs}` (pip install skyeai[memory])")
+            continue
+        try:
+            example()
+        except ImportError as e:
+            print(f"  skipped ({example.__name__}): {e}")
     
     # Run async examples
     print("\nRunning async examples...")

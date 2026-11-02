@@ -13,7 +13,7 @@ Note: Set environment variables for API keys:
 """
 
 import os
-from skye.models.registry import provider as create_provider
+import skye
 from pydantic import BaseModel
 
 from skye.base.messages import UserMessage, AssistantMessage, SystemMessage
@@ -31,7 +31,7 @@ def basic_completion_example():
         return
     
     try:
-        provider = create_provider("openai", api_key=api_key)
+        client = skye.provider("openai", api_key=api_key)
     except ImportError:
         print("⚠️  OpenAI provider not available")
         return
@@ -49,7 +49,7 @@ def basic_completion_example():
         print(f"  {i+1}. [{msg.role}] {msg.content[:50]}...")
     
     try:
-        response = provider.complete(
+        response = client.complete(
             messages=messages,
             model="gpt-4",
             temperature=0.7,
@@ -77,7 +77,7 @@ def conversation_example():
         return
     
     try:
-        provider = create_provider("openai", api_key=api_key)
+        client = skye.provider("openai", api_key=api_key)
     except ImportError:
         print("⚠️  OpenAI provider not available")
         return
@@ -96,7 +96,7 @@ def conversation_example():
         print(f"  {role_emoji} [{msg.role}] {msg.content[:60]}...")
     
     try:
-        response = provider.complete(
+        response = client.complete(
             messages=messages,
             model="gpt-3.5-turbo",
             temperature=0.5,
@@ -120,7 +120,7 @@ def structured_output_example():
         return
     
     try:
-        provider = create_provider("openai", api_key=api_key)
+        client = skye.provider("openai", api_key=api_key)
     except ImportError:
         print("⚠️  OpenAI provider not available")
         return
@@ -135,7 +135,7 @@ def structured_output_example():
     print(f"  Fields: {list(Person.model_fields.keys())}")
     
     try:
-        response = provider.complete(
+        response = client.complete(
             messages=[
                 UserMessage(content="Extract person info: John is a 30-year-old software engineer.")
             ],
@@ -227,7 +227,7 @@ def anthropic_example():
         return
     
     try:
-        provider = create_provider("anthropic", api_key=api_key)
+        client = skye.provider("anthropic", api_key=api_key)
     except ImportError:
         print("⚠️  Anthropic provider not available")
         return
@@ -235,7 +235,7 @@ def anthropic_example():
     print(f"\nUsing Anthropic Claude model")
     
     try:
-        response = provider.complete(
+        response = client.complete(
             messages=[
                 UserMessage(content="Explain quantum computing in simple terms.")
             ],
@@ -261,7 +261,7 @@ def bedrock_example():
         return
     
     try:
-        provider = create_provider("bedrock", region="us-east-1")
+        client = skye.provider("bedrock", region="us-east-1")
     except ImportError:
         print("⚠️  Bedrock provider not available")
         return
@@ -269,7 +269,7 @@ def bedrock_example():
     print(f"\nUsing AWS Bedrock Claude model")
     
     try:
-        response = provider.complete(
+        response = client.complete(
             messages=[
                 UserMessage(content="What is machine learning?")
             ],

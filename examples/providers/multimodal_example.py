@@ -14,7 +14,7 @@ import base64
 from pathlib import Path
 from skye.base.completion import CompletionRequest
 from skye.base.messages import UserMessage
-from skye.models import ProviderRegistry
+import skye
 
 
 def image_from_url():
@@ -29,7 +29,7 @@ def image_from_url():
         return
     
     try:
-        provider = ProviderRegistry.get_model_provider("openai", api_key=api_key)
+        client = skye.provider("openai", api_key=api_key)
     except ImportError:
         print("⚠️  OpenAI provider not available")
         return
@@ -48,7 +48,7 @@ request = CompletionRequest(
     model="gpt-4-vision"
 )
 
-response = provider.complete(request)
+response = client.complete(request)
 print(response.content)
 ```
 
@@ -71,7 +71,7 @@ def image_from_file():
         return
     
     try:
-        provider = ProviderRegistry.get_model_provider("openai", api_key=api_key)
+        client = skye.provider("openai", api_key=api_key)
     except ImportError:
         print("⚠️  OpenAI provider not available")
         return
@@ -94,7 +94,7 @@ request = CompletionRequest(
     model="gpt-4-vision"
 )
 
-response = provider.complete(request)
+response = client.complete(request)
 print(response.content)
 ```
 
@@ -120,7 +120,7 @@ def image_from_base64():
         return
     
     try:
-        provider = ProviderRegistry.get_model_provider("openai", api_key=api_key)
+        client = skye.provider("openai", api_key=api_key)
     except ImportError:
         print("⚠️  OpenAI provider not available")
         return
@@ -148,7 +148,7 @@ request = CompletionRequest(
     model="gpt-4-vision"
 )
 
-response = provider.complete(request)
+response = client.complete(request)
 print(response.content)
 ```
 
@@ -171,7 +171,7 @@ def multiple_images():
         return
     
     try:
-        provider = ProviderRegistry.get_model_provider("openai", api_key=api_key)
+        client = skye.provider("openai", api_key=api_key)
     except ImportError:
         print("⚠️  OpenAI provider not available")
         return
@@ -193,7 +193,7 @@ request = CompletionRequest(
     model="gpt-4-vision"
 )
 
-response = provider.complete(request)
+response = client.complete(request)
 print(response.content)
 ```
 
@@ -237,9 +237,9 @@ Different providers support different vision models:
 Example with Anthropic:
 
 ```python
-from skye.models import ProviderRegistry
+import skye
 
-provider = ProviderRegistry.get_model_provider(
+client = skye.provider(
     "anthropic",
     api_key="sk-ant-..."
 )
@@ -254,7 +254,7 @@ request = CompletionRequest(
     model="claude-3-sonnet-20240229"
 )
 
-response = provider.complete(request)
+response = client.complete(request)
 print(response.content)
 ```
 """)
@@ -272,7 +272,7 @@ def image_analysis_workflow():
         return
     
     try:
-        provider = ProviderRegistry.get_model_provider("openai", api_key=api_key)
+        client = skye.provider("openai", api_key=api_key)
     except ImportError:
         print("⚠️  OpenAI provider not available")
         return
@@ -284,10 +284,10 @@ Complete workflow for image analysis:
 from pathlib import Path
 from skye.base.completion import CompletionRequest
 from skye.base.messages import UserMessage
-from skye.models import ProviderRegistry
+import skye
 
 # Initialize provider
-provider = ProviderRegistry.get_model_provider(
+client = skye.provider(
     "openai",
     api_key="sk-..."
 )
@@ -306,7 +306,7 @@ request = CompletionRequest(
     max_tokens=500
 )
 
-response = provider.complete(request)
+response = client.complete(request)
 analysis = response.content
 
 print("Analysis:", analysis)
@@ -325,7 +325,7 @@ request = CompletionRequest(
     max_tokens=300
 )
 
-response = provider.complete(request)
+response = client.complete(request)
 print("UI Elements:", response.content)
 
 # Step 3: Extract structured data
@@ -347,7 +347,7 @@ request = CompletionRequest(
     response_schema=UIElement
 )
 
-response = provider.complete(request)
+response = client.complete(request)
 element = response.structured_output
 print(f"Element: {element.name} ({element.type})")
 ```

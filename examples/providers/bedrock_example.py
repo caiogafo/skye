@@ -6,10 +6,10 @@ This version demonstrates:
 - Streaming responses
 - AWS region/profile configuration
 - Lambda-friendly design
-- Boto3-like provider creation: create_provider("bedrock")
+- Boto3-like provider creation: skye.provider("bedrock")
 """
 
-from skye.models.registry import provider as create_provider
+import skye
 from skye.base.messages import UserMessage, SystemMessage
 
 
@@ -20,7 +20,7 @@ def basic_completion():
     print("=" * 60)
     
     try:
-        client = create_provider(
+        client = skye.provider(
             "bedrock",
             region="us-east-1",
             model="anthropic.claude-3-sonnet-20240229-v1:0"
@@ -31,8 +31,8 @@ def basic_completion():
         return
     
     messages = [
-        SystemMessage("You are a helpful assistant."),
-        UserMessage("What is the capital of France?"),
+        SystemMessage(content="You are a helpful assistant."),
+        UserMessage(content="What is the capital of France?"),
     ]
     
     response = client.complete(messages=messages, temperature=0.7, max_tokens=100)
@@ -50,7 +50,7 @@ def multiple_models():
     print("AWS Bedrock - Multiple Models")
     print("=" * 60)
     
-    client = create_provider("bedrock", region="us-west-2")
+    client = skye.provider("bedrock", region="us-west-2")
     
     models = [
         "anthropic.claude-3-sonnet-20240229-v1:0",
@@ -59,7 +59,7 @@ def multiple_models():
     ]
     
     prompt = "What is artificial intelligence?"
-    messages = [UserMessage(prompt)]
+    messages = [UserMessage(content=prompt)]
     
     print(f"\nPrompt: {prompt}")
     print("-" * 40)
@@ -77,9 +77,9 @@ def streaming_example():
     print("AWS Bedrock - Streaming")
     print("=" * 60)
     
-    client = create_provider("bedrock", region="us-east-1")
+    client = skye.provider("bedrock", region="us-east-1")
     
-    messages = [UserMessage("Write a short story about a robot learning to paint.")]
+    messages = [UserMessage(content="Write a short story about a robot learning to paint.")]
     
     print("\nStreaming response:")
     print("-" * 40)
@@ -101,17 +101,17 @@ def lambda_deployment_example():
     print("\nExample AWS Lambda handler using Skye:")
     print("-" * 40)
     print("""
-from skye.models.registry import provider as create_provider
+import skye
 from skye.base.messages import UserMessage
 
 # Initialize client once (reused across invocations)
-client = create_provider("bedrock", region="us-east-1")
+client = skye.provider("bedrock", region="us-east-1")
 
 def lambda_handler(event, context):
     '''Handle Lambda invocation.'''
     try:
         prompt = event.get("prompt", "Hello")
-        messages = [UserMessage(prompt)]
+        messages = [UserMessage(content=prompt)]
         
         response = client.complete(
             messages=messages,
@@ -154,17 +154,17 @@ def aws_profile_example():
     print("\nMethod 1: Using AWS Profile in Code")
     print("-" * 40)
     print("""
-from skye.models.registry import provider as create_provider
+import skye
 
 # Use specific AWS profile
-client = create_provider(
+client = skye.provider(
     "bedrock",
     region="us-east-1",
     profile_name="my-profile"
 )
 
 response = client.complete(
-    messages=[UserMessage("Hello")],
+    messages=[UserMessage(content="Hello")],
     model="anthropic.claude-3-sonnet-20240229-v1:0"
 )
 """)
@@ -177,9 +177,9 @@ export AWS_PROFILE=my-profile
 export AWS_REGION=us-east-1
 
 # Then in Python
-from skye.models.registry import provider as create_provider
+import skye
 
-client = create_provider("bedrock", region="us-east-1")
+client = skye.provider("bedrock", region="us-east-1")
 """)
     
     print("\nMethod 3: Using AWS Credentials")
@@ -191,9 +191,9 @@ export AWS_SECRET_ACCESS_KEY=your-secret-key
 export AWS_REGION=us-east-1
 
 # Then in Python
-from skye.models.registry import provider as create_provider
+import skye
 
-client = create_provider("bedrock", region="us-east-1")
+client = skye.provider("bedrock", region="us-east-1")
 """)
     
     print("\nProfile Configuration (~/.aws/config):")
@@ -270,7 +270,7 @@ def router_example():
         print("\nUsage:")
         print("  # Router automatically selects best region")
         print("  response = client.complete(")
-        print("      messages=[UserMessage('Hello')],")
+        print("      messages=[UserMessage(content='Hello')],")
         print("      model='claude'  # Routes to us-east-1 or us-west-2")
         print("  )")
         

@@ -24,7 +24,7 @@ import asyncio
 import math
 import os
 
-from skye.models.registry import provider as create_provider
+import skye
 
 
 def openai_embeddings():
@@ -39,8 +39,8 @@ def openai_embeddings():
         return
     
     try:
-        # Use the modern create_provider() interface
-        embedder = create_provider(
+        # Use the modern skye.provider() interface
+        embedder = skye.provider(
             "openai",
             model="text-embedding-3-small",
             api_key=api_key,
@@ -82,10 +82,10 @@ def bedrock_embeddings():
     print("=" * 60)
     
     try:
-        embedder = create_provider(
+        embedder = skye.provider(
             "bedrock",
             model="amazon.titan-embed-text-v1",
-            region_name="us-east-1",
+            region="us-east-1",
             provider_type="embedding"
         )
     except ImportError as e:
@@ -127,7 +127,7 @@ def google_embeddings():
         return
     
     try:
-        embedder = create_provider(
+        embedder = skye.provider(
             "google",
             model="textembedding-gecko@003",
             project_id=project_id,
@@ -181,7 +181,7 @@ def single_text_encoding():
         return
     
     try:
-        embedder = create_provider(
+        embedder = skye.provider(
             "openai",
             model="text-embedding-3-small",
             api_key=api_key,
@@ -219,7 +219,7 @@ async def async_encoding():
         return
     
     try:
-        embedder = create_provider(
+        embedder = skye.provider(
             "openai",
             model="text-embedding-3-small",
             api_key=api_key,
@@ -259,7 +259,7 @@ def batch_processing():
         return
     
     try:
-        embedder = create_provider(
+        embedder = skye.provider(
             "openai",
             model="text-embedding-3-small",
             api_key=api_key,

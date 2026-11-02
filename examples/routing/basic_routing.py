@@ -12,7 +12,8 @@ Features shown:
 
 import os
 from skye.base.messages import UserMessage
-from skye.router import ModelRouter, ModelTarget, RouteConfig, RoutingStrategy
+from skye.base.interfaces.router import RoutingStrategy
+from skye.router import ModelRouter, ModelTarget, RouteConfig
 
 
 def basic_router_example():
@@ -257,6 +258,10 @@ def azure_multi_region():
     print("Azure Multi-Region with Failover")
     print("=" * 60)
     
+    if not (os.getenv("AZURE_OPENAI_API_KEY_EAST") and os.getenv("AZURE_OPENAI_API_KEY_WEST")):
+        print("AZURE_OPENAI_API_KEY_EAST and AZURE_OPENAI_API_KEY_WEST not set, showing the configuration only")
+        return
+
     print("""
 This example shows how to configure multi-region Azure deployments
 for automatic failover and load balancing.

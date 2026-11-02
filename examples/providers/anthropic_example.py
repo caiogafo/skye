@@ -5,11 +5,11 @@ This version demonstrates:
 - Streaming responses
 - System messages (Anthropic-specific)
 - Multi-turn conversations
-- Simple client creation: create_provider("anthropic")
+- Simple client creation: skye.provider("anthropic")
 """
 
 import os
-from skye.models.registry import provider as create_provider
+import skye
 from skye.base.messages import UserMessage, SystemMessage
 
 
@@ -26,15 +26,15 @@ def basic_completion():
         return
     
     try:
-        client = create_provider("anthropic", api_key=api_key)
+        client = skye.provider("anthropic", api_key=api_key)
     except ImportError as e:
         print(f"⚠️  Error: {e}")
         print("\nTo use Anthropic, install with: pip install skyeai[anthropic]")
         return
     
     messages = [
-        SystemMessage("You are a helpful assistant specialized in science."),
-        UserMessage("Explain photosynthesis in simple terms"),
+        SystemMessage(content="You are a helpful assistant specialized in science."),
+        UserMessage(content="Explain photosynthesis in simple terms"),
     ]
     
     response = client.complete(
@@ -63,12 +63,12 @@ def streaming_example():
         return
     
     try:
-        client = create_provider("anthropic", api_key=api_key)
+        client = skye.provider("anthropic", api_key=api_key)
     except ImportError:
         print("⚠️  Anthropic provider not available")
         return
     
-    messages = [UserMessage("Write a haiku about artificial intelligence")]
+    messages = [UserMessage(content="Write a haiku about artificial intelligence")]
     
     print("\nStreaming response:")
     print("-" * 40)
@@ -91,7 +91,7 @@ def claude_models():
         return
     
     try:
-        client = create_provider("anthropic", api_key=api_key)
+        client = skye.provider("anthropic", api_key=api_key)
     except ImportError:
         print("⚠️  Anthropic provider not available")
         return
@@ -103,7 +103,7 @@ def claude_models():
     ]
     
     prompt = "What is the meaning of life?"
-    messages = [UserMessage(prompt)]
+    messages = [UserMessage(content=prompt)]
     
     print(f"\nPrompt: {prompt}")
     print("-" * 40)
@@ -129,14 +129,14 @@ The system message is sent separately from the conversation messages.
 Example:
 
 ```python
-from skye.models.registry import provider as create_provider
+import skye
 from skye.base.messages import SystemMessage, UserMessage
 
-client = create_provider("anthropic", api_key="sk-ant-...")
+client = skye.provider("anthropic", api_key="sk-ant-...")
 
 messages = [
-    SystemMessage("You are a Python expert."),
-    UserMessage("How do I use decorators?")
+    SystemMessage(content="You are a Python expert."),
+    UserMessage(content="How do I use decorators?")
 ]
 
 response = client.complete(messages=messages, model="claude-3-sonnet-20240229")
@@ -158,14 +158,14 @@ def multi_turn_conversation():
         return
     
     try:
-        client = create_provider("anthropic", api_key=api_key)
+        client = skye.provider("anthropic", api_key=api_key)
     except ImportError:
         print("⚠️  Anthropic provider not available")
         return
     
     # First turn
     print("\nTurn 1: User asks about Python")
-    messages = [UserMessage("What is a Python list?")]
+    messages = [UserMessage(content="What is a Python list?")]
     
     response1 = client.complete(
         messages=messages, model="claude-3-sonnet-20240229", max_tokens=150
@@ -175,7 +175,7 @@ def multi_turn_conversation():
     # Second turn - continue conversation
     print("\nTurn 2: User asks follow-up question")
     messages.append(response1.to_message())
-    messages.append(UserMessage("How do I add items to a list?"))
+    messages.append(UserMessage(content="How do I add items to a list?"))
     
     response2 = client.complete(
         messages=messages, model="claude-3-sonnet-20240229", max_tokens=150

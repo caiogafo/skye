@@ -13,7 +13,7 @@ import os
 from pydantic import BaseModel, Field
 from skye.base.completion import CompletionRequest
 from skye.base.messages import UserMessage
-from skye.models import ProviderRegistry
+import skye
 
 
 def basic_structured_output():
@@ -28,7 +28,7 @@ def basic_structured_output():
         return
     
     try:
-        provider = ProviderRegistry.get_model_provider("openai", api_key=api_key)
+        client = skye.provider("openai", api_key=api_key)
     except ImportError:
         print("⚠️  OpenAI provider not available")
         return
@@ -56,7 +56,7 @@ def basic_structured_output():
     print(f"  Schema: {Person.__name__}")
     
     try:
-        response = provider.complete(request)
+        response = client.complete(request)
         person = response.structured_output
         
         print("\nResponse:")
@@ -81,7 +81,7 @@ def nested_schema():
         return
     
     try:
-        provider = ProviderRegistry.get_model_provider("openai", api_key=api_key)
+        client = skye.provider("openai", api_key=api_key)
     except ImportError:
         print("⚠️  OpenAI provider not available")
         return
@@ -117,7 +117,7 @@ def nested_schema():
     )
     
     try:
-        response = provider.complete(request)
+        response = client.complete(request)
         person = response.structured_output
         
         print("\nResponse:")
@@ -144,7 +144,7 @@ def list_extraction():
         return
     
     try:
-        provider = ProviderRegistry.get_model_provider("openai", api_key=api_key)
+        client = skye.provider("openai", api_key=api_key)
     except ImportError:
         print("⚠️  OpenAI provider not available")
         return
@@ -179,7 +179,7 @@ def list_extraction():
     )
     
     try:
-        response = provider.complete(request)
+        response = client.complete(request)
         todo_list = response.structured_output
         
         print("\nResponse:")
@@ -204,7 +204,7 @@ def field_validation():
         return
     
     try:
-        provider = ProviderRegistry.get_model_provider("openai", api_key=api_key)
+        client = skye.provider("openai", api_key=api_key)
     except ImportError:
         print("⚠️  OpenAI provider not available")
         return
@@ -233,7 +233,7 @@ def field_validation():
     )
     
     try:
-        response = provider.complete(request)
+        response = client.complete(request)
         product = response.structured_output
         
         print("\nResponse:")
@@ -258,7 +258,7 @@ def enum_fields():
         return
     
     try:
-        provider = ProviderRegistry.get_model_provider("openai", api_key=api_key)
+        client = skye.provider("openai", api_key=api_key)
     except ImportError:
         print("⚠️  OpenAI provider not available")
         return
@@ -292,7 +292,7 @@ def enum_fields():
     )
     
     try:
-        response = provider.complete(request)
+        response = client.complete(request)
         review = response.structured_output
         
         print("\nResponse:")
@@ -316,7 +316,7 @@ def optional_fields():
         return
     
     try:
-        provider = ProviderRegistry.get_model_provider("openai", api_key=api_key)
+        client = skye.provider("openai", api_key=api_key)
     except ImportError:
         print("⚠️  OpenAI provider not available")
         return
@@ -346,7 +346,7 @@ def optional_fields():
     )
     
     try:
-        response = provider.complete(request)
+        response = client.complete(request)
         contact = response.structured_output
         
         print("\nResponse:")

@@ -355,14 +355,19 @@ class OpenAICompatibleProvider(BaseModelProvider):
         Returns:
             StreamChunk in skye format
         """
-        choice = chunk.choices[0]
-        delta = choice.delta
-        
+        # The API omits keys it has nothing to say about: the last chunk has `"delta": {}`, and a usage-only chunk has no choices.
+        chunk_id = getattr(chunk, "id", "")
+        choices = getattr(chunk, "choices", None) or []
+        if not choices:
+            return StreamChunk(id=chunk_id, delta="", finish_reason=None, index=0)
+        choice = choices[0]
+        delta = getattr(choice, "delta", None)
+
         return StreamChunk(
-            id=chunk.id,
-            delta=delta.content or "",
-            finish_reason=choice.finish_reason,
-            index=choice.index
+            id=chunk_id,
+            delta=(getattr(delta, "content", None) or "") if delta is not None else "",
+            finish_reason=getattr(choice, "finish_reason", None),
+            index=getattr(choice, "index", 0),
         )
     
     def _call_provider(self, request: dict[str, Any]) -> Any:
@@ -380,12 +385,13 @@ class OpenAICompatibleProvider(BaseModelProvider):
             provider=self.provider_name,
         )
 
-    async def acomplete(self, request: CompletionRequest) -> CompletionResponse:
-        """Execute asynchronous completion (sync REST call run in the default executor)."""
-        provider_request = self._transform_request(request)
+    async def acomplete(self, *args: Any, **kwargs: Any) -> CompletionResponse:  # type: ignore[override]
+        """Run :meth:`complete` in an executor so the event loop is not blocked.
+
+        Takes the same arguments as :meth:`complete`: ``messages=..., model=...`` or a ``CompletionRequest``.
+        """
         loop = asyncio.get_running_loop()
-        response = await loop.run_in_executor(None, self._call_provider, provider_request)
-        return self._transform_response(response)
+        return await loop.run_in_executor(None, lambda: self.complete(*args, **kwargs))
 
     def format_capability_results(self, results: list[Any]) -> list[dict[str, Any]]:
         """Format capability results for OpenAI.

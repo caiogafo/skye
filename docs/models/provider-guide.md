@@ -38,11 +38,11 @@ pip install skyeai[all-providers]
 ### OpenAI
 
 ```python
-from skye.models.registry import provider as create_provider
+import skye
 from skye.base.messages import UserMessage
 
 # Create provider client
-client = create_provider("openai", api_key="sk-...")
+client = skye.provider("openai", api_key="sk-...")
 
 # Make completion request
 response = client.complete(
@@ -56,10 +56,10 @@ print(response.content)
 ### Anthropic
 
 ```python
-from skye.models.registry import provider as create_provider
+import skye
 from skye.base.messages import UserMessage
 
-client = create_provider("anthropic", api_key="sk-ant-...")
+client = skye.provider("anthropic", api_key="sk-ant-...")
 
 response = client.complete(
     messages=[UserMessage(content="Hello!")],
@@ -70,12 +70,12 @@ response = client.complete(
 ### AWS Bedrock
 
 ```python
-from skye.models.registry import provider as create_provider
+import skye
 from skye.base.messages import UserMessage
 
 # Works with or without boto3 installed
-# In AWS Lambda, boto3 is pre-installed
-client = create_provider("bedrock", region="us-east-1")
+# Bedrock needs no boto3: the REST call and the SigV4 signature use the standard library
+client = skye.provider("bedrock", region="us-east-1")
 
 response = client.complete(
     messages=[UserMessage(content="Hello!")],
@@ -86,10 +86,10 @@ response = client.complete(
 ### Azure OpenAI
 
 ```python
-from skye.models.registry import provider as create_provider
+import skye
 from skye.base.messages import UserMessage
 
-client = create_provider(
+client = skye.provider(
     "azure",
     azure_endpoint="https://your-resource.openai.azure.com/",
     api_key="your-api-key",
@@ -105,10 +105,10 @@ response = client.complete(
 ### Google
 
 ```python
-from skye.models.registry import provider as create_provider
+import skye
 from skye.base.messages import UserMessage
 
-client = create_provider(
+client = skye.provider(
     "google",
     project_id="your-project",
     location="us-central1"
@@ -123,10 +123,10 @@ response = client.complete(
 ## Embedding Providers
 
 ```python
-from skye.models.registry import provider as create_provider
+import skye
 
 # OpenAI embeddings
-embedder = create_provider(
+embedder = skye.provider(
     "openai",
     model="text-embedding-3-small",
     api_key="sk-...",
@@ -142,7 +142,7 @@ embeddings = embedder.encode_batch([
 print(f"Dimension: {embedder.get_vector_dimension()}")
 
 # Bedrock embeddings
-embedder = create_provider(
+embedder = skye.provider(
     "bedrock",
     model="amazon.titan-embed-text-v1",
     region="us-east-1",
@@ -152,7 +152,7 @@ embedder = create_provider(
 embeddings = embedder.encode_batch(["Hello world"])
 
 # Google embeddings
-embedder = create_provider(
+embedder = skye.provider(
     "google",
     model="textembedding-gecko@003",
     project_id="my-project",
@@ -172,10 +172,10 @@ embeddings = await embedder.aencode_batch(["text1", "text2"])
 ## Multimodal Inputs
 
 ```python
-from skye.models.registry import provider as create_provider
+import skye
 from skye.base.messages import UserMessage
 
-client = create_provider("openai", api_key="sk-...")
+client = skye.provider("openai", api_key="sk-...")
 
 # Image from URL
 response = client.complete(
@@ -219,7 +219,7 @@ response = client.complete(
 
 ```python
 from pydantic import BaseModel
-from skye.models.registry import provider as create_provider
+import skye
 from skye.base.messages import UserMessage
 
 class Person(BaseModel):
@@ -227,7 +227,7 @@ class Person(BaseModel):
     age: int
     occupation: str
 
-client = create_provider("openai", api_key="sk-...")
+client = skye.provider("openai", api_key="sk-...")
 
 response = client.complete(
     messages=[
@@ -245,10 +245,10 @@ print(f"{person.name} is {person.age} years old")
 ## Streaming
 
 ```python
-from skye.models.registry import provider as create_provider
+import skye
 from skye.base.messages import UserMessage
 
-client = create_provider("openai", api_key="sk-...")
+client = skye.provider("openai", api_key="sk-...")
 
 for chunk in client.stream(
     messages=[UserMessage(content="Write a story")],
@@ -261,11 +261,11 @@ for chunk in client.stream(
 
 ```python
 import asyncio
-from skye.models.registry import provider as create_provider
+import skye
 from skye.base.messages import UserMessage
 
 async def main():
-    client = create_provider("openai", api_key="sk-...")
+    client = skye.provider("openai", api_key="sk-...")
     
     response = await client.acomplete(
         messages=[UserMessage(content="Hello!")],

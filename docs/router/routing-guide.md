@@ -28,7 +28,7 @@ Skye provides a unified, comprehensive routing solution with health tracking, ra
 
 ```python
 import os
-from skye.models.registry import provider as create_provider
+import skye
 from skye.router import (
     ModelRouter,
     FallbackConfig,
@@ -40,8 +40,8 @@ from skye.base.messages import UserMessage
 from skye.base.completion import CompletionRequest
 
 # Create provider instances
-gpt4 = create_provider("openai", api_key=os.getenv("OPENAI_API_KEY"))
-gpt35 = create_provider("openai", api_key=os.getenv("OPENAI_API_KEY"))
+gpt4 = skye.provider("openai", api_key=os.getenv("OPENAI_API_KEY"))
+gpt35 = skye.provider("openai", api_key=os.getenv("OPENAI_API_KEY"))
 
 # Create router with all configurations in constructor
 router = ModelRouter(

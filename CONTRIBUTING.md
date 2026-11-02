@@ -13,7 +13,7 @@ Skye is a light, modular library for serverless GenAI applications. Contribution
 
 ## Dependencies and size
 
-Skye is deployed as an AWS Lambda zip, without containers. For everything the library imports, in this order: the Python standard library, then libraries already in the Lambda runtime (boto3, botocore, urllib3, ...), then pure-Python packages, only when nothing earlier can do the job. Provider SDKs and other optional libraries are imported inside the function that uses them (`LazyImporter`), never at module level.
+Skye is built for serverless architectures, where the size of the library and its cold start make a difference, so a user installs only what is needed and nothing forces a third-party library on them. For everything the library imports, in this order: the Python standard library, then libraries already in the serverless runtime (on AWS Lambda: boto3, botocore, urllib3, ...), then pure-Python packages, only when nothing earlier can do the job. Provider SDKs and other optional libraries are imported inside the function that uses them (`LazyImporter`), never at module level.
 
 The limits are in `budgets.toml` and are checked in every pull request (see `docs/budgets.md`):
 

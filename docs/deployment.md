@@ -1,5 +1,5 @@
 ---
-title: "Lazy loading and AWS Lambda deployment"
+title: "Lazy loading and serverless deployment"
 status: current
 last_updated: 2026-11-02
 ---
@@ -10,13 +10,13 @@ Skye uses lazy loading to defer importing provider SDKs until they're actually u
 
 1. **Minimal startup overhead**: Only import what you use
 2. **Optional dependencies**: Install only the providers you need
-3. **Lambda-friendly**: Bedrock works in AWS Lambda without boto3 as a dependency (it's pre-installed)
+3. **Serverless-friendly**: Bedrock needs no boto3 at all (the SigV4 signer is in the standard library), so nothing extra is shipped
 
 ```python
-from skye.models.registry import provider as create_provider
+import skye
 
 # This doesn't import OpenAI SDK until you actually use it
-client = create_provider("openai", api_key="sk-...")
+client = skye.provider("openai", api_key="sk-...")
 
 # SDK is imported here when complete() is called
 response = client.complete(
@@ -25,19 +25,18 @@ response = client.complete(
 )
 ```
 
-## AWS Lambda Deployment
+## Serverless deployment
 
-Skye is Lambda-friendly:
+Skye is built for serverless architectures, where the size of the library and its cold start make a difference. A user installs only the extras they need; nothing forces a third-party library. Example on AWS Lambda:
 
 ```python
-# In AWS Lambda, boto3 is pre-installed
-# No need to include it in your deployment package
-from skye.models.registry import provider as create_provider
+# Bedrock is called over REST with the standard library: no boto3, no SDK to ship
+import skye
 from skye.base.messages import UserMessage
 
 def lambda_handler(event, context):
     # Bedrock provider works without boto3 in dependencies
-    client = create_provider("bedrock", region="us-east-1")
+    client = skye.provider("bedrock", region="us-east-1")
     
     response = client.complete(
         messages=[UserMessage(content=event['prompt'])],

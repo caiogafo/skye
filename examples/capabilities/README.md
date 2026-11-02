@@ -161,3 +161,7 @@ After understanding capabilities, explore:
 - `examples/providers/` - Provider-specific features
 - `examples/routing/` - Load balancing with capabilities
 - `examples/advanced/` - Advanced capability patterns
+
+## MCP client
+
+`mcp_client.py` lists and calls the tools of an MCP server with the built-in client (`create_mcp_client(url)`: standard library, JSON-RPC over HTTP, no extra to install). The optional `fastmcp` client is chosen only with `impl="fastmcp"` (extra `mcp`); `mcp_server.py` shows it. Set `MCP_SERVER_URL` to the server address.

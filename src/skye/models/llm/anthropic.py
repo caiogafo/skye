@@ -416,12 +416,13 @@ class AnthropicProvider(BaseModelProvider):
             timeout=self.timeout, provider="anthropic",
         )
 
-    async def acomplete(self, request: CompletionRequest) -> CompletionResponse:
-        """Execute asynchronous completion (sync REST call in an executor)."""
-        provider_request = self._transform_request(request)
+    async def acomplete(self, *args: Any, **kwargs: Any) -> CompletionResponse:  # type: ignore[override]
+        """Run :meth:`complete` in an executor so the event loop is not blocked.
+
+        Takes the same arguments as :meth:`complete`: ``messages=..., model=...`` or a ``CompletionRequest``.
+        """
         loop = asyncio.get_running_loop()
-        response = await loop.run_in_executor(None, self._call_provider, provider_request)
-        return self._transform_response(response)
+        return await loop.run_in_executor(None, lambda: self.complete(*args, **kwargs))
 
     def format_capability_results(self, results: list[Any]) -> list[dict[str, Any]]:
         """Format capability results for Anthropic.

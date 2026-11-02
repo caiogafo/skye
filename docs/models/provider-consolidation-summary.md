@@ -151,18 +151,16 @@ Detailed validation report including:
 - Known architectural debt details
 - Recommendations for future improvements
 
-### 3. Validation Script
-**File**: `scripts/validate_provider_architecture.py`
+### 3. Validation test
+**File**: `tests/budget/test_provider_agnostic_core.py` (replaces the script `scripts/validate_provider_architecture.py`, which was removed)
 
-Automated validation tool that checks:
-- Core library is provider-agnostic
-- Transformers use delegation pattern
-- Providers implement required methods
-- Known architectural debt is documented
+Automated validation that checks:
+- The core (`base`, `router`, `tools`) is provider-agnostic
+- No adapter imports the adapter of another provider
 
 **Usage**:
 ```bash
-uv run python scripts/validate_provider_architecture.py
+uv run pytest tests/budget/test_provider_agnostic_core.py
 ```
 
 ## Code Comments Added
@@ -292,7 +290,7 @@ The codebase is production-ready with a clean, maintainable architecture that ma
 
 - [Provider Transformation Architecture](./provider-transformation-architecture.md)
 - [Architecture Validation Report](./provider-architecture-validation.md)
-- [Validation Script](../../scripts/validate_provider_architecture.py)
+- [Validation test](../../tests/budget/test_provider_agnostic_core.py)
 - [BaseModelProvider](../../src/skye/models/base.py)
 - [Requirements Document](../../.kiro/specs/0-base-structure/requirements.md)
 - [Design Document](../../.kiro/specs/0-base-structure/design.md)

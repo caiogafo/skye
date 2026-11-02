@@ -445,6 +445,12 @@ class ModelRouter(ModelRouterInterface):
             if target.timeout:
                 provider_config["timeout"] = target.timeout
 
+            if target.provider == "azure":
+                # Azure names its endpoint differently, and the model of a target is the name of the deployment.
+                if "api_base" in provider_config:
+                    provider_config["azure_endpoint"] = provider_config.pop("api_base")
+                provider_config.setdefault("deployment_name", target.model)
+
             model = ProviderRegistry.get_model_provider(target.provider, **provider_config)
 
             # Register the model
@@ -642,17 +648,22 @@ class ModelRouter(ModelRouterInterface):
 
     async def _aroute_request_internal(self, request: CompletionRequest) -> CompletionResponse:
         """Route a request asynchronously (internal method)."""
-        model_id = request.model if request.model else await self.select_model(request)
-        fallback_chain = self.fallbacks.get(model_id, [])
+        # A registered model id is used as is; an alias (or no model) is resolved by the routing strategy.
+        model_id = request.model if request.model in self.models else await self.select_model(request)
+        fallback_chain = self.fallbacks.get(request.model, []) or self.fallbacks.get(model_id, [])
 
         # Try primary model
         response = await self._try_model(model_id, request)
         if response:
             return response
 
-        # Try fallbacks
-        for fallback_id in fallback_chain:
-            logger.warning(f"Primary model {model_id} failed, trying fallback: {fallback_id}")
+        # Try fallbacks (each entry is a registered model id or an alias)
+        for fallback in fallback_chain:
+            logger.warning(f"Primary model {model_id} failed, trying fallback: {fallback}")
+            try:
+                fallback_id = fallback if fallback in self.models else await self._select_from_alias(fallback, request)
+            except (ProviderError, KeyError):
+                continue
             response = await self._try_model(fallback_id, request)
             if response:
                 return response

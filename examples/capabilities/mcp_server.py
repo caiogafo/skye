@@ -16,20 +16,23 @@ Example MCP servers you can use:
 
 import os
 import asyncio
-from skye.models.registry import provider as create_provider
+import skye
 from skye.base.messages import UserMessage
 from skye.tools import MCPCapability
 
 
-# Configure your MCP server connection here
-SERVER_URL = "http://localhost:8000/sse"  # Update this to your MCP server URL
-# Or use stdio: SERVER_URL = "my_server.py"
-# Or use command: SERVER_URL = ["python", "my_server.py"]
+# The MCP server to connect to: set MCP_SERVER_URL (for example http://localhost:8000/sse).
+# fastmcp also accepts a script (stdio): SERVER_URL = "my_server.py", or a command: ["python", "my_server.py"].
+SERVER_URL = os.getenv("MCP_SERVER_URL")
 
 
 async def main():
     """Connect to MCP server, list tools, and use them with a language model."""
     
+    if not SERVER_URL:
+        print("MCP_SERVER_URL not set, skipping (start an MCP server and set its address)")
+        return
+
     # Check for FastMCP
     try:
         from fastmcp import Client
@@ -46,7 +49,7 @@ async def main():
     
     # Get provider
     try:
-        provider = create_provider("openai", api_key=api_key)
+        client = skye.provider("openai", api_key=api_key)
     except ImportError:
         print("❌ OpenAI provider not available")
         return
@@ -89,7 +92,7 @@ async def main():
             print("\n💬 Sending request to language model...")
             user_message = "Use the available tools to help me"
             
-            response = provider.complete(
+            response = client.complete(
                 messages=[UserMessage(content=user_message)],
                 model="gpt-4",
                 capabilities=capabilities
@@ -112,7 +115,7 @@ async def main():
                 
                 # Step 6: Continue conversation with results
                 print("\n💬 Continuing conversation with results...")
-                final_response = provider.complete(
+                final_response = client.complete(
                     messages=[
                         UserMessage(content=user_message),
                         response.to_message(),

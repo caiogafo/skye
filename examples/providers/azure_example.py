@@ -4,11 +4,11 @@ This version demonstrates:
 - Basic completion with Azure OpenAI
 - Streaming responses
 - Azure-specific configuration (endpoint, deployment)
-- Simple client creation: create_provider("azure")
+- Simple client creation: skye.provider("azure")
 """
 
 import os
-from skye.models.registry import provider as create_provider
+import skye
 from skye.base.messages import UserMessage, SystemMessage
 
 
@@ -29,20 +29,21 @@ def basic_completion():
         return
     
     try:
-        client = create_provider(
+        client = skye.provider(
             "azure",
             api_key=api_key,
             azure_endpoint=endpoint,
-            api_version="2024-02-15-preview"
+            api_version="2024-02-15-preview",
+            deployment_name=os.getenv("AZURE_OPENAI_DEPLOYMENT", "gpt-4"),  # the name of your Azure deployment
         )
     except ImportError as e:
         print(f"⚠️  Error: {e}")
-        print("\nTo use Azure OpenAI, install with: pip install skyeai[azure]")
+        print("\nAzure OpenAI is served by the built-in REST adapter: there is nothing to install")
         return
     
     messages = [
-        SystemMessage("You are a helpful assistant."),
-        UserMessage("What is the capital of France?"),
+        SystemMessage(content="You are a helpful assistant."),
+        UserMessage(content="What is the capital of France?"),
     ]
     
     # Note: For Azure, model is your deployment name
@@ -73,14 +74,15 @@ def streaming_example():
         print("⚠️  Azure OpenAI credentials not set")
         return
     
-    client = create_provider(
+    client = skye.provider(
         "azure",
         api_key=api_key,
         azure_endpoint=endpoint,
-        api_version="2024-02-15-preview"
+        api_version="2024-02-15-preview",
+        deployment_name=os.getenv("AZURE_OPENAI_DEPLOYMENT", "gpt-4"),
     )
     
-    messages = [UserMessage("Write a short poem about cloud computing")]
+    messages = [UserMessage(content="Write a short poem about cloud computing")]
     
     print("\nStreaming response:")
     print("-" * 40)
@@ -104,26 +106,26 @@ def multiple_deployments():
         print("⚠️  Azure OpenAI credentials not set")
         return
     
-    client = create_provider(
-        "azure",
-        api_key=api_key,
-        azure_endpoint=endpoint,
-        api_version="2024-02-15-preview"
-    )
-    
-    # Different deployment names in your Azure resource
+    # In the REST adapter the deployment name stands in for the model, so there is one client per deployment
     deployments = [
         "gpt-4",
         "gpt-35-turbo",
     ]
     
     prompt = "What is artificial intelligence?"
-    messages = [UserMessage(prompt)]
+    messages = [UserMessage(content=prompt)]
     
     print(f"\nPrompt: {prompt}")
     print("-" * 40)
     
     for deployment in deployments:
+        client = skye.provider(
+            "azure",
+            api_key=api_key,
+            azure_endpoint=endpoint,
+            api_version="2024-02-15-preview",
+            deployment_name=deployment,
+        )
         print(f"\nDeployment: {deployment}")
         response = client.complete(messages=messages, model=deployment, max_tokens=80)
         print("  Response:", response.content[:80], "...")
@@ -140,18 +142,19 @@ def configuration_example():
 Azure OpenAI requires specific configuration:
 
 ```python
-from skye.models.registry import provider as create_provider
+import skye
 
-client = create_provider(
+client = skye.provider(
     "azure",
     api_key="your-api-key",
     azure_endpoint="https://your-resource.openai.azure.com",
-    api_version="2024-02-15-preview"
+    api_version="2024-02-15-preview",
+    deployment_name="gpt-4",  # your deployment name in Azure
 )
 
-# The model parameter is your deployment name
+# The deployment stands in for the model
 response = client.complete(
-    messages=[UserMessage("Hello")],
+    messages=[UserMessage(content="Hello")],
     model="gpt-4"  # Your deployment name in Azure
 )
 ```

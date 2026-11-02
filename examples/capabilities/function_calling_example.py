@@ -17,8 +17,9 @@ Note: Set environment variables for API keys:
 import os
 import json
 import asyncio
-from skye.models.registry import provider as create_provider
+import skye
 from skye.base.messages import UserMessage, CapabilityMessage
+from skye.tools import capability
 from skye.tools.registry import CapabilityRegistry
 
 
@@ -34,7 +35,7 @@ def basic_function_calling():
         return
     
     try:
-        provider = create_provider("openai", api_key=api_key)
+        client = skye.provider("openai", api_key=api_key)
     except ImportError:
         print("⚠️  OpenAI provider not available")
         return
@@ -73,7 +74,7 @@ def basic_function_calling():
     print(f"  Capabilities: {len(capabilities)}")
     
     try:
-        response = provider.complete(
+        response = client.complete(
             messages=[
                 UserMessage(content="What's the weather in San Francisco?")
             ],
@@ -87,8 +88,8 @@ def basic_function_calling():
         if response.capability_calls:
             print(f"  Capability calls: {len(response.capability_calls)}")
             for call in response.capability_calls:
-                print(f"    - {call['function']['name']}")
-                print(f"      Args: {call['function']['arguments']}")
+                print(f"    - {call.name}")
+                print(f"      Args: {call.arguments}")
         
     except Exception as e:
         print(f"\n❌ Error: {e}")
@@ -106,42 +107,32 @@ async def function_execution_workflow():
         return
     
     try:
-        provider = create_provider("openai", api_key=api_key)
+        client = skye.provider("openai", api_key=api_key)
     except ImportError:
         print("⚠️  OpenAI provider not available")
         return
     
-    # Define capabilities
-    capabilities = [
-        {
-            "type": "function",
-            "function": {
-                "name": "get_weather",
-                "description": "Get weather for a location",
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "location": {"type": "string"}
-                    },
-                    "required": ["location"]
-                }
-            }
-        }
-    ]
-    
-    # Mock weather function
+    # Define the capability with the decorator: its schema comes from the signature and the docstring
+    @capability
     def get_weather(location: str) -> str:
+        """Get weather for a location.
+
+        Args:
+            location: The city or location to get weather for
+        """
         weather_data = {
             "San Francisco": "Sunny, 72°F",
             "New York": "Cloudy, 65°F",
-            "London": "Rainy, 55°F"
+            "London": "Rainy, 55°F",
         }
         return weather_data.get(location, "Unknown location")
-    
+
+    capabilities = [get_weather]  # passed directly: no registry needed
+
     print("\nStep 1: Initial request")
     
     try:
-        response = provider.complete(
+        response = client.complete(
             messages=[
                 UserMessage(content="What's the weather in San Francisco and New York?")
             ],
@@ -154,9 +145,8 @@ async def function_execution_workflow():
             print(f"\nStep 2: Execute capabilities")
             print(f"  Found {len(response.capability_calls)} capability call(s)")
             
-            # Execute all capability calls and get messages
-            registry = CapabilityRegistry.get_instance()
-            capability_messages = await response.execute_capability_calls(registry)
+            # Execute all capability calls and get the result messages (the capabilities travel with the response)
+            capability_messages = await response.execute_capability_calls()
             
             for msg in capability_messages:
                 print(f"  {msg.capability_name}: {msg.content[:60]}...")
@@ -164,7 +154,7 @@ async def function_execution_workflow():
             print(f"\nStep 3: Continue conversation with results")
             
             # Continue conversation with capability results
-            final_response = provider.complete(
+            final_response = client.complete(
                 messages=[
                     UserMessage(content="What's the weather in San Francisco and New York?"),
                     response.to_message(),
@@ -191,7 +181,7 @@ def multiple_functions():
         return
     
     try:
-        provider = create_provider("openai", api_key=api_key)
+        client = skye.provider("openai", api_key=api_key)
     except ImportError:
         print("⚠️  OpenAI provider not available")
         return
@@ -248,7 +238,7 @@ def multiple_functions():
         print(f"  - {func['name']}: {func['description']}")
     
     try:
-        response = provider.complete(
+        response = client.complete(
             messages=[
                 UserMessage(content="What's the weather in Paris and what time is it there?")
             ],
@@ -262,7 +252,7 @@ def multiple_functions():
         if response.capability_calls:
             print(f"  Capability calls: {len(response.capability_calls)}")
             for call in response.capability_calls:
-                print(f"    - {call['function']['name']}")
+                print(f"    - {call.name}")
         
     except Exception as e:
         print(f"\n❌ Error: {e}")
@@ -280,7 +270,7 @@ def anthropic_tool_use():
         return
     
     try:
-        provider = create_provider("anthropic", api_key=api_key)
+        client = skye.provider("anthropic", api_key=api_key)
     except ImportError:
         print("⚠️  Anthropic provider not available")
         return
@@ -317,12 +307,12 @@ request = CompletionRequest(
     capabilities=capabilities
 )
 
-response = provider.complete(request)
+response = client.complete(request)
 
 if response.capability_calls:
     for call in response.capability_calls:
-        print(f"Tool: {call['function']['name']}")
-        print(f"Args: {call['function']['arguments']}")
+        print(f"Tool: {call.name}")
+        print(f"Args: {call.arguments}")
 ```
 
 Skye automatically converts between provider formats!
@@ -342,9 +332,9 @@ Skye provides a unified interface across all providers.
 Example:
 
 ```python
-from skye.models.registry import provider as create_provider
+import skye
 
-provider = create_provider(
+client = skye.provider(
     "bedrock",
     region="us-east-1"
 )
@@ -374,7 +364,7 @@ request = CompletionRequest(
     capabilities=capabilities
 )
 
-response = provider.complete(request)
+response = client.complete(request)
 ```
 
 Same code works across OpenAI, Anthropic, and Bedrock!

@@ -15,7 +15,7 @@ recorded in the repository; "n/d" where I could not recover it (check git).
 
 | ID | Decision | Why | Supports | Touches |
 |----|----------|-----|----------|---------|
-| D1 | Serverless first: Lambda zip, no container, no multiprocessing, no background threads, external state | target deployment | R7, R11 | all |
+| D1 | Serverless first: no multiprocessing, no background threads, external state (the Lambda-zip wording is superseded by D27) | target deployment | R7, R11 | all |
 | D2 | Standard library first, then libraries in the serverless runtime, then pure Python; no compiled code in the core | package size, load time | R7, R9 | all |
 | D3 | Size and load budgets in `budgets.toml`, enforced by tests and CI, only going down | keep the footprint honest | R7 | all |
 | D4 | One short plain name per component, shared by folder, spec, docs, budget; themed names rejected as obscure | readability | R1 | all |
@@ -41,6 +41,8 @@ recorded in the repository; "n/d" where I could not recover it (check git).
 | D24 | New data structures are dataclasses, not pydantic (the base spec's "use Pydantic models" criterion is superseded); existing models move later (O4) | pydantic is a core dependency being removed | R21 | base, all |
 | D25 | Token counting is approximate in the core (standard library); exact counts use `tiktoken` through the optional `tiktoken` extra, imported lazily and never on the runtime path (resolves O5) | serverless footprint; no tokenizer SDK in core | R28 | models |
 | D26 | MCP resources are a Port in `base` (list and read by URI, MIME type, text or bytes), implemented by the MCP client in `tools`; the MCP prompt facet returns `base` messages and does NOT implement `PromptBuilderInterface` (resolves O7) | one resource contract, reusable by prompts and memory | R10 | base, tools |
+| D27 | Skye is built for serverless architectures where the size of the library and its cold start make a difference; a user installs only what is needed and nothing forces a third-party library on them (supersedes the Lambda-zip wording of D1) | size and cold start are the cost of a serverless library | R7 | all |
+| D28 | Clients are created with one call, `<pkg>.provider(name, **config)`, in the style of `boto3.client`: the name already used by `models/registry.py` and by the docs, imported lazily from the top-level package; `<pkg>.client` and the `create_provider` alias are not used | one name for one thing; `client` would clash with the SDK-client property and the MCP client | R7, R9 | models, all examples |
 
 ## Open decisions (not yet taken)
 - **O1** The project name (replaces D23): constraints: at most 7 letters, related to air or sky, able to contain the cloud and weather codenames. Candidates seen: welkin, tropos, airmass, mizzle, zenith, aether. When it is decided, the rename is one mechanical task, executed last: the package folder and every import, the classes that carry the old name, the three prefixed environment variables, the configuration file name, the distribution name in `pyproject.toml`, and the occurrences in `budgets.toml`, CI, CODEOWNERS, the Makefile, the specs, the steering, the wiki, the examples and the README; the owner renames the GitHub repository; it is done when `make budget-fast`, `make budget`, `make differential` and the guardrail tests give the same results as before, with the codename test adapted and the old name recorded as the umbrella watermark; `tests/budget/test_no_old_name.py` then fails on any leftover.

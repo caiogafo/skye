@@ -5,12 +5,12 @@ This version demonstrates:
 - Streaming responses
 - Async operations
 - Multi-turn conversations
-- Simple client creation: create_provider("openai")
+- Simple client creation: skye.provider("openai")
 """
 
 import asyncio
 import os
-from skye.models.registry import provider as create_provider
+import skye
 from skye.base.messages import UserMessage, SystemMessage
 
 
@@ -26,11 +26,11 @@ def basic_completion():
         print("   Set it with: export OPENAI_API_KEY='sk-...'")
         return
     
-    client = create_provider("openai", api_key=api_key)
+    client = skye.provider("openai", api_key=api_key)
     
     messages = [
-        SystemMessage("You are a helpful assistant."),
-        UserMessage("What is the capital of France?"),
+        SystemMessage(content="You are a helpful assistant."),
+        UserMessage(content="What is the capital of France?"),
     ]
     
     response = client.complete(
@@ -55,9 +55,9 @@ def streaming_example():
         print("⚠️  OPENAI_API_KEY environment variable not set")
         return
     
-    client = create_provider("openai", api_key=api_key)
+    client = skye.provider("openai", api_key=api_key)
     
-    messages = [UserMessage("Write a short poem about Python programming")]
+    messages = [UserMessage(content="Write a short poem about Python programming")]
     
     print("\nStreaming response:")
     print("-" * 40)
@@ -79,9 +79,9 @@ async def async_completion():
         print("⚠️  OPENAI_API_KEY environment variable not set")
         return
     
-    client = create_provider("openai", api_key=api_key)
+    client = skye.provider("openai", api_key=api_key)
     
-    messages = [UserMessage("Explain async/await in Python")]
+    messages = [UserMessage(content="Explain async/await in Python")]
     
     print("\nMaking async request...")
     response = await client.acomplete(messages=messages, model="gpt-4", max_tokens=200)
@@ -101,11 +101,11 @@ def multi_turn_conversation():
         print("⚠️  OPENAI_API_KEY environment variable not set")
         return
     
-    client = create_provider("openai", api_key=api_key)
+    client = skye.provider("openai", api_key=api_key)
     
     # First turn
     print("\nTurn 1: User asks a question")
-    messages = [UserMessage("What is machine learning?")]
+    messages = [UserMessage(content="What is machine learning?")]
     
     response1 = client.complete(messages=messages, model="gpt-4", max_tokens=150)
     print(f"Assistant: {response1.content[:100]}...")
@@ -113,7 +113,7 @@ def multi_turn_conversation():
     # Second turn - continue conversation
     print("\nTurn 2: User asks follow-up question")
     messages.append(response1.to_message())
-    messages.append(UserMessage("Can you give me a practical example?"))
+    messages.append(UserMessage(content="Can you give me a practical example?"))
     
     response2 = client.complete(messages=messages, model="gpt-4", max_tokens=150)
     print(f"Assistant: {response2.content[:100]}...")
@@ -129,7 +129,7 @@ def router_example():
 Use RouterRegistry for load balancing across deployments:
 
 ```python
-from skye.models.registry import provider as create_provider
+import skye
 import skye.router as rt
 from skye.base.messages import UserMessage
 
@@ -162,11 +162,11 @@ registry = rt.RouterRegistry([
 ])
 
 # Create client with router
-client = create_provider("openai", router=registry)
+client = skye.provider("openai", router=registry)
 
 # Use alias - router handles selection
 response = client.complete(
-    messages=[UserMessage("Hello")],
+    messages=[UserMessage(content="Hello")],
     model="fast"  # Routes to gpt-3.5-turbo or gpt-3.5-turbo-16k
 )
 ```

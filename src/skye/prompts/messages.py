@@ -334,8 +334,9 @@ class BasePromptBuilder(PromptBuilderInterface):
     def _merge_variables(self, template_vars: list[str], provided_vars: dict[str, Any]) -> dict[str, Any]:
         """Merge variables."""
         merged = {}
-        merged.update(self._defaults)
-        merged.update(self._partial_vars)
+        # A default that is a function is called at each rendering (Requirement 30.4): the provided variables still win.
+        merged.update({k: (v() if callable(v) else v) for k, v in self._defaults.items() if k not in provided_vars})
+        merged.update({k: v for k, v in self._partial_vars.items() if k not in provided_vars})
         merged.update(provided_vars)
         return merged
     

@@ -39,8 +39,8 @@ FILEMATCH_FILES = {
 # (anchor regex, human description)
 REQUIRED_DECISIONS = [
     (r"serverless", "serverless-first deployment"),
-    (r"AWS Lambda", "AWS Lambda zip target"),
-    (r"no container", "no container image"),
+    (r"serverless architectures", "serverless architectures where size and cold start matter"),
+    (r"cold start", "cold start as a cost of the library"),
     (r"budgets\.toml", "budgets governed by budgets.toml"),
     (r"only (go|goes|shrink)|may only shrink", "budgets only go down"),
     (r"lazil|LazyImporter", "lazy imports for heavy/optional libraries"),

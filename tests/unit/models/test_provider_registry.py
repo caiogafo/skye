@@ -73,9 +73,14 @@ class TestProviderRegistry:
     """Test suite for ProviderRegistry."""
 
     def setup_method(self):
-        """Clear registry before each test."""
+        """Clear registry before each test (and keep the real one to put it back)."""
+        self._saved = (ProviderRegistry._model_providers, ProviderRegistry._embedding_providers)
         ProviderRegistry._model_providers = {}
         ProviderRegistry._embedding_providers = {}
+
+    def teardown_method(self):
+        """Put the built-in providers back, so that later tests can create a client."""
+        ProviderRegistry._model_providers, ProviderRegistry._embedding_providers = self._saved
 
     def test_register_model_provider(self):
         """Test registering a model provider."""

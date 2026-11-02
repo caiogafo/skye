@@ -5,17 +5,20 @@ with environment variable substitution for API keys and other sensitive data.
 """
 
 import os
+import re
 from pathlib import Path
 
 from skye.base.messages import UserMessage
 from skye.router import ModelRouter
 
-# Set environment variables (in production, these would be set externally)
-os.environ["OPENAI_API_KEY"] = "your-api-key-here"
+# In production the variables referenced as ${VAR} in the YAML are set externally. Here every one that is not set gets a placeholder,
+# so the example can load the file and show the routing without real keys.
+for _name in re.findall(r"\$\{(\w+)\}", (Path(__file__).parent / "router_config.yaml").read_text(encoding="utf-8")):
+    os.environ.setdefault(_name, "your-api-key-here")
 
 
-def main():
-    """Demonstrate YAML-based router configuration."""
+async def main():
+    """Demonstrate YAML-based router configuration (the router is also used asynchronously)."""
 
     # Method 1: Load router from YAML file
     print("Loading router from YAML configuration...")
@@ -76,11 +79,7 @@ def main():
         print(f"Error: {e}")
 
 
-async def main_async():
-    """Async version of the main function."""
-    await main()
-
-
 if __name__ == "__main__":
     import asyncio
-    asyncio.run(main_async())
+
+    asyncio.run(main())

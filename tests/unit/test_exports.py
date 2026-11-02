@@ -16,6 +16,21 @@ def test_all_defined():
     assert len(skye.__all__) > 0
 
 
+def test_provider_is_exported_and_loads_the_registry_only_when_called():
+    """`skye.provider(name, **config)` is the boto3-style way to create a client; `import skye` must not import `skye.models`."""
+    import subprocess
+    import sys
+
+    assert "provider" in skye.__all__
+    code = (
+        "import sys, skye; assert 'skye.models' not in sys.modules; "
+        "c = skye.provider('openai', api_key='k'); assert hasattr(c, 'complete') and hasattr(c, 'stream'); "
+        "e = skye.provider('openai', model='text-embedding-3-small', api_key='k', provider_type='embedding'); "
+        "assert hasattr(e, 'encode_batch'); assert 'skye.models' in sys.modules"
+    )
+    subprocess.run([sys.executable, "-c", code], check=True)
+
+
 def test_exception_exports():
     """Test that all exceptions are importable from skye.base.exceptions."""
     from skye.base.exceptions import (
@@ -134,10 +149,10 @@ CURATED = ["messages", "completion", "exceptions", "config"]
 
 
 def test_all_exports_in_all_list():
-    """__all__ is exactly the version plus the four curated base modules (task 6.1)."""
+    """__all__ is the version, the four curated base modules and the lazy `provider` function (Requirement 7.8, decision D28)."""
     from skye import __all__
 
-    assert __all__ == ["__version__", *CURATED]
+    assert __all__ == ["__version__", *CURATED, "provider"]
 
 
 def test_curated_top_level_modules():
@@ -164,10 +179,10 @@ def test_combined_import():
 
 
 def test_removed_names_not_reexported():
-    """Names re-exported before task 10.1 are no longer on the top-level package."""
+    """Names re-exported before task 10.1 are no longer on the top-level package (`provider` came back as a lazy function, D28)."""
     import skye
 
-    for name in ["provider", "ModelRouter", "UserMessage", "SkyeError",
+    for name in ["ModelRouter", "UserMessage", "SkyeError",
                  "ConfigLoader", "ModelInterface", "MemoryInterface"]:
         assert not hasattr(skye, name), name
 
