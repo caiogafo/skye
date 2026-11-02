@@ -9,7 +9,7 @@ The design is shaped by binding product constraints: a serverless-first deployme
 The target is organized as:
 
 - **Four Layers** with a single downward dependency direction (`base=0`, `adapters=1`, `services=2`, `runtime=3`).
-- **14 Components**, each with one short shared name (`^[a-z]{3,7}$`) used identically for its package folder, spec folder, module package, and docs section.
+- **~~14~~ 15 Components** (Req 22.14 added `auth`), each with one short shared name (`^[a-z]{3,7}$`) used identically for its package folder, spec folder, module package, and docs section.
 - **A codename watermark** per Component (cloud/weather words) that appears in exactly four places and never in code, imports, file names, or spec folders.
 - **One distribution with extras**: the core install carries always-present Components; optional Components are bounded by an Extra and loaded lazily through the stdlib lazy-import mechanism plus a thin `MissingExtraError` wrapper (see Lazy imports at boundaries).
 - **No code moves in this phase**: every boundary, rename, merge, split, and overlap resolution below is a declaration of target state (Requirements 5, 11).
@@ -41,11 +41,22 @@ The structure defines exactly four Layers, each with an ordinal from most founda
 | services | 2 | `router`, `tools`, `prompts`, `memory`, `guard`, `observe` |
 | runtime | 3 | `policy`, `gateway`, `agents`, `teams`, `flows` |
 
+> **SUPERSEDED — current Layer assignment (15 Components).** The table above is the original 14-Component assignment and is retained for history. Per Requirement 21 (`policy` moves to the services Layer) and Requirement 22 (`auth` is added to Layer 0 as the fifteenth Component), the **current** assignment is:
+>
+> | Layer | Ordinal | Components (current) |
+> |-------|---------|----------------------|
+> | base | 0 | `base`, `auth` |
+> | adapters | 1 | `models`, `store` |
+> | services | 2 | `router`, `tools`, `prompts`, `memory`, `guard`, `observe`, `policy` |
+> | runtime | 3 | `gateway`, `agents`, `teams`, `flows` |
+>
+> See the sections *Policy is a service (append 2026-11-02)* and *Auth component (append 2026-11-02)* at the end of this document for the rationale, the authorizer/authentication Ports in `base`, and the updated allowed-imports rows.
+
 This table is **Axis 1 only** — it assigns each Component to a Layer so the import-direction rule can be enforced. It says nothing about what is installed or loaded, and it does not imply that a Component depends on every Component in a lower Layer.
 
 ### Installation classification (core vs extra)
 
-This section defines **Axis 2** and implements the complete partition required by Requirement 6.1: each of the 14 Components is classified as exactly one of core-always-present or optional-behind-an-Extra. This classification is **orthogonal to the Layer table above** — Layer membership does not determine installation, and installation does not determine import direction.
+This section defines **Axis 2** and implements the complete partition required by Requirement 6.1: each of the ~~14~~ **15** Components (incl. `auth`, optional behind the `auth` Extra — Req 22.9) is classified as exactly one of core-always-present or optional-behind-an-Extra. This classification is **orthogonal to the Layer table above** — Layer membership does not determine installation, and installation does not determine import direction.
 
 | Class | Components | What installs it | Heavy libraries |
 |-------|------------|------------------|-----------------|
@@ -67,7 +78,9 @@ This section defines **Axis 2** and implements the complete partition required b
 
 ### Dependency rule
 
-A Component in the Layer with ordinal `N` imports only from Components in a Layer with ordinal **less than or equal to** `N` (Requirement 2.3). Equivalently, imports point downward (toward more foundational layers) or sideways (within the same layer); no import points upward. This is a **ceiling**, not a dependency list: it states the maximum a Component is *allowed* to import, and a Component typically imports far fewer Components than the Layer rule permits (the exact, tighter per-component allowances are given in the per-component dependency matrix). The `base` Layer imports only the Python standard library and performs no file-system, network, or process I/O (Requirement 2.4).
+A Component in the Layer with ordinal `N` imports only from Components in a Layer with ordinal **less than or equal to** `N` (Requirement 2.3). Equivalently, imports point downward (toward more foundational layers) or sideways (within the same layer); no import points upward.
+
+> **UPDATED — no horizontal import between non-`base` peers (Requirement 2.3, standing rule).** The "sideways within the same layer" allowance is narrowed: a Component **may not** import another Component in the same Layer, **except** that every Component may import `base` (the Layer-0 foundation). When a Component needs to consume a peer in the same Layer, the contract is expressed as a **Port defined in `base`** and the consumer depends on that `base` Port, not on the peer Component. The only same-Layer import permitted is importing `base` itself (Requirement 22.6) — including `auth → base` — because `base` introduces no upward dependency and `base` itself never imports another Component. This supersedes the earlier `tools → prompts` peer allowance (see *Tools does not import prompts (append 2026-11-02)*) and governs the deferred MCP-resource consumption (see *MCP resource consumption deferred (append 2026-11-02)*). This is a **ceiling**, not a dependency list: it states the maximum a Component is *allowed* to import, and a Component typically imports far fewer Components than the Layer rule permits (the exact, tighter per-component allowances are given in the per-component dependency matrix). The `base` Layer imports only the Python standard library and performs no file-system, network, or process I/O (Requirement 2.4).
 
 ```mermaid
 graph TD
@@ -227,6 +240,8 @@ src/nimbus/
     └── __init__.py
 ```
 
+> **UPDATED tree (append 2026-11-02).** The tree above predates the newer decisions. Current additions: (a) a new Layer-0 package `src/nimbus/auth/` (fifteenth Component, empty `__init__` this phase; strategies/sources land in the `auth` and `models` specs); (b) `base/interfaces/` also contains an **authorizer Port** (implemented by `policy`, Req 21.4) and an **authentication Port** (implemented by `auth`, Req 22.4); (c) `models/transport/sigv4.py` **moves to `auth`** (Req 22.8); (d) `base/http.py` is the stdlib-only shared HTTP transport that stays in `base` (resolved); (e) the model-provider selection modules (`base/backend_select.py`, `base/sdk_versions.py`, the `impl` handling in `base/config.py`) are **removed** per Req 24. See the append sections at the end for details.
+
 Notes:
 
 - `base` is a real package containing the core models, the error hierarchy, configuration loading, and the Ports — all four module groups (Requirement 3.2).
@@ -263,13 +278,19 @@ The `Allowed_Imports_Matrix` declares, at **Component** granularity, the exact s
 
 Each entry lists the **maximum** a Component may import. A Component importing fewer Components than its entry allows is fine — the matrix is an upper bound, not a requirement. `base` imports nothing internal (standard library only). Every Component also consumes Ports defined in `base`; the "Ports consumed" column in Components and Interfaces lists those.
 
+> **SUPERSEDED rows — see the dedicated append sections for the current matrix.** The table below is the original matrix. The following rows are superseded and the authoritative, current versions live in the append sections at the end of this document:
+> - `tools` → `{base}` only (not `{base, prompts}`): Req 28, *Tools does not import prompts (append 2026-11-02)*.
+> - `policy` moves to the services Layer with allowed set `{base, models}`: Req 21, *Policy is a service (append 2026-11-02)*.
+> - the runtime rows `gateway`, `agents`, `teams`, `flows` **lose** `policy`, `guard`, `observe`, and `memory` from their allowed/optional sets (those optional services are injected through `base` Ports, not imported): Req 21, same append section.
+> - new Layer-0 Component `auth` with allowed set `{base}`; and `models`/`store`/`tools`/`memory` may additionally import `auth`, `gateway` may import `auth`: Req 22, *Auth component (append 2026-11-02)*.
+
 | Importer Component | Layer | May import these Components (maximum) | Optional (only if a feature is enabled) |
 |--------------------|-------|---------------------------------------|------------------------------------------|
 | `base` | base (0) | none (standard library only) | — |
 | `models` | adapters (1) | `base` | — |
 | `store` | adapters (1) | `base` | — |
 | `router` | services (2) | `base`, `models`, `store` | — |
-| `tools` | services (2) | `base`, `prompts` | `prompts` is a peer (same services Layer) imported only so the MCP client's prompt facet can return Nimbus prompt objects (Req 19.2) |
+| `tools` | services (2) | `base` ~~`, prompts`~~ | **SUPERSEDED (Req 28):** the `tools` allowed set is `{base}` only; `tools` does **not** import `prompts`. The MCP prompt facet uses the message types in `base` (`NimbusMessage`, `UserMessage`, `AssistantMessage`) via the `MCPPrompt` descriptor in `tools`. Add `auth` when `tools` uses the MCP client's outbound auth → `{base, auth}` (Req 22.5). |
 | `prompts` | services (2) | `base` | — |
 | `memory` | services (2) | `base`, `store` | — |
 | `guard` | services (2) | `base` | `models` (Jev/decision for pre-flight) |
@@ -313,7 +334,7 @@ This section lists each Component, its Layer, the public interface role it plays
 | `models` | 1 | Adapters for LLMs, embeddings, and decision models; one shared transport, retry, error mapping, token counting. Model adapters also implement the `runnable` Port, so a model is usable anywhere a `Runnable` is accepted (Req 12.7) | — | `model`, `decision`, `vector_encoder`, `registry`, `cost_calculator`, `error_handler`, `token_counter`, `runnable` (implemented by its adapters) |
 | `store` | 1 | One shared set of state backends (in-memory, file, DynamoDB, Redis) | — | `storage` |
 | `router` | 2 | ModelRouter, strategies, health tracking, fallbacks | — | `router`, `model`, `decision`, `registry`, `storage` |
-| `tools` | 2 | Capability registry, local functions, remote API, tri-faceted MCP client (tools/prompts/resources; built-in + `fastmcp`) | — | `capability`, `registry`, `prompt` (for the MCP client's prompt facet, consumed from the peer `prompts` Component) |
+| `tools` | 2 | Capability registry, local functions, remote API, tri-faceted MCP client (tools/prompts/resources; built-in + `fastmcp`) | — | `capability`, `registry`, `prompt` (the `PromptBuilderInterface` Port in `base`) and `base` message types for the MCP prompt facet — **not** the `prompts` Component (SUPERSEDED, Req 28); optionally the authentication Port via `auth` (Req 22.5) |
 | `prompts` | 2 | Loaders, role-based messages, templates | — | `prompt`, `content_reader` |
 | `memory` | 2 | Conversation/state memory (declared-but-minimal this step) | — | `memory`, `storage` |
 | `guard` | 2 | Safety filters, pre-flight checks (declared-but-minimal this step) | — | `safety`, `decision` |
@@ -336,7 +357,7 @@ Key interface contracts:
 
 The three runtime orchestrators — `agents`, `teams`, and `flows` — compose one another freely at runtime: a flow can contain agents, teams, or other flows; a team can contain agents, flows, or other teams. The structural challenge is to allow this composition **without** creating an import cycle among the orchestrator implementation modules. The design solves it with a single abstraction defined in `base` (Requirement 12).
 
-**One Port, one operation.** `base/interfaces/runnable.py` defines exactly one `Runnable` Port that declares a single invocation operation accepting exactly one input argument and returning exactly one output value (Requirement 12.1). It performs no I/O and imports only the standard library, so it lives cleanly at Layer 0. The `Runnable` Port carries a conceptual codename `vapor` (a documentation-only watermark, distinct from the 14 Component Codenames; see Codename watermark placement, Requirement 9.8, 9.9).
+**One Port, one operation.** `base/interfaces/runnable.py` defines exactly one `Runnable` Port that declares a single invocation operation accepting exactly one input argument and returning exactly one output value (Requirement 12.1). It performs no I/O and imports only the standard library, so it lives cleanly at Layer 0. The `Runnable` Port carries a conceptual codename `vapor` (a documentation-only watermark, distinct from the Component Codenames — now 15 including `auth=ozone`; see Codename watermark placement, Requirement 9.8, 9.9).
 
 **Runnable is the universal composition contract.** `Runnable` is Nimbus's single, universal "one input → one output" composition contract (LCEL-like): anything that conforms to it is substitutable wherever a `Runnable` is accepted. The implementers are:
 
@@ -376,7 +397,7 @@ The structure spec defines **where** data models live and the boundary rules the
 | Decision result | returned by the `DecisionModel` Port | a choice from a finite option set + per-option probability in `[0,1]` summing to `1.0` | contract in `base/interfaces/decision.py`; impl in `models/decision/` (Req 4.4) |
 | Router config | `router/config_models.py` | route aliases, targets, strategy, rate limits | services layer; consumes base ports only |
 | Store records | `store/*.py` | backend-specific record/state shapes | one location per backend in `store` (Req 5.1, 5.5) |
-| Resource (MCP) | `tools` (MCP client) | MCP resource read by URI: a MIME type and either text or bytes | type internal to `tools`, returned by the MCP client; **no base Port** and no new Component (Req 19.2, 19.3) |
+| Resource (MCP) | `tools` (MCP client) | MCP resource read by URI: a MIME type and either text or bytes | type internal to `tools`, returned by the MCP client; **no base Port** and no new Component today (Req 19.2, 19.3). *(UPDATED: when `prompts`/`memory` consume resources, a resource Port is added to `base` per the no-horizontal-import rule — see MCP resource consumption deferred (append 2026-11-02).)* |
 
 ## Current-file mapping table
 
@@ -500,6 +521,7 @@ Every external integration kind enters Nimbus through **exactly one** extension 
 | store backend | `storage.py` | store registry (in `store`, behind the storage Port) | `store` | exactly one new module in `store` implementing the storage Port; no file edited outside `store` (Requirement 13.3) |
 | tool / capability | `capability.py` | tools registry (`tools/registry.py`) | `tools` | register the capability through the tools registry; no file edited outside `tools` (Requirement 13.6) |
 | observability exporter | `observer.py` | observe registry (in `observe`) | `observe` | register the exporter through the observe registry; no file edited outside `observe` (Requirement 13.6) |
+| credential provider *(append 2026-11-02, Req 22.10)* | authentication / credential-source Port (in `base`) | auth credential-source registry (in `auth`) | `auth` | register a custom credential source (e.g. a secret manager beyond the natively supported AWS Secrets Manager / SSM / Azure Key Vault / Google Secret Manager) through the `auth` registry; no file edited outside `auth` |
 
 **Tie-in with the REST-over-SDK dependency policy.** The model-provider extension point is where the "standard library first, REST over SDK" rule pays off directly: adding an OpenAI-compatible provider is **pure configuration** (a name, a `base_url`, an `api_key`, minor quirks) handed to the one `openai_compatible.py` adapter — no new module, no file touched outside `models`. That is the extension point in action: one Port plus one registry in the owning Component, and a new integration never fans out edits across the core (see Dependency policy: standard library first, REST over SDK).
 
@@ -610,8 +632,12 @@ Reflecting the SDK-free provider policy (see Dependency policy), the `models` Co
 |-----------|-------|----------------------------|
 | models (all providers) | — (none) | stdlib only (`urllib.request`, `json`, `hashlib`, `hmac`, `datetime`) — OpenAI/Azure/OpenAI-compatible, Anthropic, and Bedrock via stdlib REST + SigV4 |
 | memory | `memory` | `asyncpg` (pure-Python), `redis` / `redis.asyncio` |
-| tools | `tools` | MCP transport only if no stdlib path exists (otherwise none) |
+| tools | `tools` | ~~MCP transport only if no stdlib path exists~~ **none** — *(UPDATED, Req 25.7: `tools` carries no third-party library; `fastmcp` is in the separate `mcp` Extra below, not here)* |
 | observe | `observe` | telemetry export libs only if no stdlib path exists (otherwise none) |
+| tools (MCP client) | `mcp` | `fastmcp` — the optional substitute for the built-in MCP client; separate Extra with its own `budgets.toml` entry (Req 25.7); imported only when `create_mcp_client(..., impl="fastmcp")` is called |
+| auth | `auth` | `rsa` (pure-Python, RS256 signing) — the only third-party library `auth` imports (Req 22.9); the `google` Extra declares only the provider SDK, not `rsa` |
+| teams | `teams` | none at creation — empty Extra, listed in `known_empty` (Req 14.2) |
+| flows | `flows` | none at creation — empty Extra, listed in `known_empty` (Req 14.2) |
 
 boto3 is not an extra of `models`; it is only an optional Bedrock-signing fallback where it is already preinstalled in the target serverless runtime (see Dependency policy). The former provider-SDK extras (`openai`, `anthropic`, `cohere`, `azure`, `vertex`) are driven to zero.
 
@@ -637,10 +663,11 @@ Each Component carries exactly one Codename from this fixed mapping (Requirement
 | prompts | cirrus | agents | cyclone |
 | | | teams | front |
 | | | flows | stream |
+| | | **auth** | **ozone** |
 
-Every Codename is 3–7 lowercase ASCII letters matching `^[a-z]{3,7}$`; the mapping has exactly 14 entries, one per Component, and all Codenames are unique (Requirement 9.2, 9.3).
+Every Codename is 3–7 lowercase ASCII letters matching `^[a-z]{3,7}$`; the mapping has exactly ~~14~~ **15** entries, one per Component, and all Codenames are unique (Requirement 9.2, 9.3). *(UPDATED by Requirement 22.14–22.15: the fifteenth Component `auth` has Codename `ozone`, chosen by the owner; the mapping is now 15 entries. After the planned rename (Requirement 23) the freed word `nimbus` becomes the project-wide umbrella watermark, documentation-only, outside the 15 Component Codenames and analogous to `vapor` for `Runnable`.)*
 
-**Conceptual codename for the `Runnable` Port (`vapor`).** The `Runnable` Port carries a conceptual codename `vapor` (a cloud-theme word, matching `^[a-z]{3,7}$` and unique with respect to the 14 Component Codenames). It is a **documentation-only watermark**: it is **not** one of the 14 Component Codenames, it is **not** counted in the "exactly 14 entries" invariant, and it appears only in documentation — the glossary/wiki and the `Runnable` Port's module docstring. `vapor` never appears in any import path, folder name, file name, class name, function name, configuration key, or spec folder name (Requirement 9.8, 9.9).
+**Conceptual codename for the `Runnable` Port (`vapor`).** The `Runnable` Port carries a conceptual codename `vapor` (a cloud-theme word, matching `^[a-z]{3,7}$` and unique with respect to the Component Codenames, now 15 including `auth=ozone`). It is a **documentation-only watermark**: it is **not** one of the Component Codenames, it is **not** counted in the "exactly 15 entries" invariant, and it appears only in documentation — the glossary/wiki and the `Runnable` Port's module docstring. `vapor` never appears in any import path, folder name, file name, class name, function name, configuration key, or spec folder name (Requirement 9.8, 9.9).
 
 A Codename appears in exactly these four places and nowhere else (Requirement 9.4):
 
@@ -651,7 +678,7 @@ A Codename appears in exactly these four places and nowhere else (Requirement 9.
 
 A Codename never appears in any import path, folder name, file name, class name, function name, configuration key, log field, or spec folder name (Requirement 9.5).
 
-**Deterministic test (Requirement 9.6, 9.7):** a test verifies every Codename matches `^[a-z]{3,7}$`, all Codenames are unique, the mapping has exactly 14 entries, and no Codename appears in a package name, a file name, or an import. On violation it reports the offending Codename and location and fails. The same test also asserts, **separately from the 14-entry count**, that `vapor` matches `^[a-z]{3,7}$` and is unique with respect to the 14 Component Codenames; `vapor` is checked on its own and is never folded into the "exactly 14 entries" invariant (Requirement 9.8, 9.9).
+**Deterministic test (Requirement 9.6, 9.7):** a test verifies every Codename matches `^[a-z]{3,7}$`, all Codenames are unique, the mapping has exactly ~~14~~ **15** entries (Requirement 22.14), and no Codename appears in a package name, a file name, or an import. On violation it reports the offending Codename and location and fails. The same test also asserts, **separately from the entry count**, that `vapor` matches `^[a-z]{3,7}$` and is unique with respect to the Component Codenames, and that the umbrella watermark `nimbus` (adopted after the rename, Requirement 23.7) is likewise unique and documentation-only; `vapor` and `nimbus` are checked on their own and are never folded into the "exactly 15 entries" invariant (Requirement 9.8, 9.9).
 
 ## Correctness Properties
 
@@ -689,7 +716,7 @@ A Codename never appears in any import path, folder name, file name, class name,
 
 ### Property 6: codename invariants hold
 
-*For any* Codename in the mapping, it matches `^[a-z]{3,7}$`; across the mapping all Codenames are unique and the mapping has exactly 14 entries; and no Codename string appears in any package name, file name, or import path.
+*For any* Codename in the mapping, it matches `^[a-z]{3,7}$`; across the mapping all Codenames are unique and the mapping has exactly ~~14~~ **15** entries (Requirement 22.14, including `auth=ozone`); and no Codename string appears in any package name, file name, or import path.
 
 **Validates: Requirements 9.2, 9.3, 9.6, 9.7**
 
@@ -755,7 +782,7 @@ The structure is verified by deterministic tests, all runnable with `uv run pyte
 
 - **Import-matrix test** — AST-based, modeled on `tests/budget/test_policy.py`. Parses every `src/nimbus` module, resolves imports to Components and Layers, and asserts (i) the Layer ceiling (no upward import), (ii) membership in each Component's declared allowed set in the Per-component dependency matrix, and (iii) no direct import among the `agents`, `teams`, and `flows` implementation modules (Requirement 12.6). Reports importer/imported Component and Layer; exits non-zero on violation (Requirements 2.5, 2.6, 12.6, 12.8, 12.9). Covers the three known violations in Requirement 2.7, catches out-of-set imports such as `gateway` importing `memory` and `teams`/`flows` importing `models` (a composed model must arrive as a `Runnable` reference, Requirement 12.8, 12.9), and catches orchestrator cross-imports such as `flows` importing `agents`.
 - **Base stdlib-only test** — asserts no `base` module imports a non-stdlib package (pydantic included) or a higher Layer (Requirements 3.3, 3.4, 3.5).
-- **Codename test** — asserts the `^[a-z]{3,7}$` pattern, uniqueness, exactly 12 entries, and absence from package/file/import names (Requirements 9.6, 9.7).
+- **Codename test** — asserts the `^[a-z]{3,7}$` pattern, uniqueness, exactly **15** entries (Requirement 22.14; the stale "12" was a typo, and the pre-`auth` count was 14), and absence from package/file/import names (Requirements 9.6, 9.7).
 - **Extras-declare-exactly test** — compares each Extra's declared libraries against the libraries imported by its Component's code (Requirements 8.1, 8.4, 8.6), reusing the `[imports.max_files]` machinery in `budgets.toml`.
 - **No-provider-SDK test (Property 10)** — AST-based; asserts that no module in the `models` Component (transport and adapters) imports a provider SDK (`openai`, `anthropic`, `boto3`, `azure`, `cohere`, `google`) or a third-party HTTP client (`httpx`, `requests`); every import resolves to the standard library, a permitted Nimbus Component, or an honest residual Extra (Requirements 7.1, 7.2, 8.1). This overlaps the `forbidden_at_import` check but asserts it at the source-tree level for `models`.
 
@@ -823,6 +850,8 @@ No import-matrix rule is added for this hypothesis. Because the client-location 
 
 ## Extras and budgets — mcp under the tools extra (append 2026-11-01, supersedes the gateway folding)
 
+> **SUPERSEDED by Requirement 25.7 (append 2026-11-02).** This note associated `fastmcp` with the `tools` Extra and stated there is no standalone `mcp` Extra. That is now reversed: `fastmcp` lives in a **separate `mcp` Extra** with its own budget in `budgets.toml`, and the `tools` Component carries **no** third-party library. Retained for history; see *MCP implementation chosen by an explicit argument (append 2026-11-02)*.
+
 **This note records the FINAL MCP-extra decision (Requirement 19.7) and supersedes the interim "mcp folded into gateway" folding.** The MCP client dependency (`fastmcp` today) is associated with the **`tools` Extra**: installing `nimbus[tools]` is sufficient to use MCP, and `fastmcp` is the optional full-capability alternative to the built-in standard-library MCP client. There is **no standalone `mcp` Extra** and **no `gateway`-specific MCP extra** for this purpose; the earlier folding of MCP into the `gateway` Extra (Requirement 16.6) is **withdrawn**. Where an earlier appended section or the extras table still refers to a standalone `mcp` extra or to MCP under `gateway` (for example the "Note (append 2026-11-01) — teams, flows, and mcp extras" paragraph, the MCP client (append 2026-11-01) section, and the superseded "MCP decided: client in tools" interim gateway wording), those references are **superseded** by this decision; the earlier text is left for history and this note is the final clarification (Requirement 19.7). The `tools` Extra and its `fastmcp` dependency are covered by the same extras-declare-exactly and `[imports.max_files]` machinery as every other Extra, and `fastmcp` is imported only at first use (never at `import nimbus` time) per Lazy imports at boundaries.
 
 ## MCP decided: client in tools (append 2026-11-01, supersedes the interim gateway decision)
@@ -835,11 +864,13 @@ No import-matrix rule is added for this hypothesis. Because the client-location 
 - **Built-in and `fastmcp` behind one Port.** The built-in MCP client (a standard-library JSON-RPC-over-HTTP client) and the official `fastmcp` client both implement the **same Port** and both return the identical Nimbus types for tools, prompts, and resources, so selecting one or the other requires no change to user application code (Requirement 19.4).
 - **One boundary conversion; no leak.** Any official MCP/`fastmcp` protocol type (for example `mcp.types.Tool`, `mcp.types.Prompt`, `mcp.types.Resource`) is converted to the corresponding Nimbus type at exactly **one boundary point** within the `tools` MCP client, so no official protocol type is returned from or leaks outside the `tools` Component (Requirement 19.5). The conversion covers 100% of the fields and behaviors Nimbus consumes (consistent with Requirement 18.2), not the full official SDK surface (Requirement 19.6). If a received protocol type is missing or malformed in a field the conversion requires, the boundary **rejects** the input with an error naming the failing type and field and returns no partially populated Nimbus type (Requirement 19.9).
 - **Import-matrix consequence (additive, prose-only).** Because the prompt facet returns Nimbus prompt objects, the `tools` Component may import its peer `prompts` Component (same services Layer, ordinal 2), as reflected in the updated `tools` row of the Per-component dependency matrix. This is a sideways (peer) import, introduces no cycle, and is in-set and legal. Correspondingly, the interim `gateway → {tools, prompts}` MCP allowance is **withdrawn**: `gateway` no longer imports `prompts` for MCP, so a `gateway → prompts` import is now an out-of-set violation (Requirement 19.1).
-- **Extra: MCP under the `tools` Extra; `fastmcp` optional.** The MCP client dependency (`fastmcp` today) is associated with the **`tools` Extra**, so installing `nimbus[tools]` provides MCP and `fastmcp` is the optional full-capability alternative to the built-in client (Requirement 19.7). This **supersedes** Requirement 16.6's folding of MCP into the `gateway` Extra: there is no `gateway`-specific MCP extra and no standalone `mcp` Extra for this purpose.
-- **Selection follows Requirement 17.** Selection between the built-in MCP client and `fastmcp` follows the backend-selection model (import-time selection via configuration or environment, one implementation per instance, no runtime mixing), so `import nimbus` imports neither the built-in client's optional dependency nor `fastmcp` unless selected (Requirement 19.8). If the implementation selected at import time is unavailable because its optional dependency is not installed, `import nimbus` surfaces an error naming the missing dependency and the selected implementation and does **not** silently fall back to the other implementation (Requirement 19.10).
+- **Extra: MCP under the `tools` Extra; `fastmcp` optional.** ~~The MCP client dependency (`fastmcp` today) is associated with the **`tools` Extra**, so installing `nimbus[tools]` provides MCP~~ *(SUPERSEDED by Requirement 25.7: `fastmcp` is in a **separate `mcp` Extra**, not the `tools` Extra, and the `tools` Component carries **no** third-party library. See MCP implementation chosen by an explicit argument (append 2026-11-02).)* `fastmcp` is the optional full-capability alternative to the built-in client (Requirement 19.7).
+- ~~**Selection follows Requirement 17.**~~ *(SUPERSEDED by Requirement 25.)* Selection between the built-in MCP client and `fastmcp` is made **only by an explicit code argument** to the factory `create_mcp_client(target, impl="builtin")`: `impl` defaults to `"builtin"`, `"fastmcp"` is the only other accepted value, and there is **no environment variable, no configuration entry, and no fallback**. Calling the factory without `impl` always returns the built-in client, so `import nimbus` imports neither the built-in client's optional dependency nor `fastmcp` unless `fastmcp` is explicitly selected (Requirement 19.8). If `impl="fastmcp"` and `fastmcp` is not installed, the factory raises `MissingExtraError` naming the extra `mcp` and returns no client; an invalid `impl` value is rejected with an error (Requirement 19.10, 25.4, 25.6).
 - **Future target: stdlib MCP client.** The future-target built-in MCP client is a standard-library client using **JSON-RPC over stateless HTTP on top of the shared `models/transport/http.py`** transport, so the built-in path depends on **no third-party library**; `fastmcp` stays the optional full-capability alternative. This ties directly to the Dependency policy: standard library first, REST over SDK section — the same `urllib`-based transport that carries the provider REST dialects also carries JSON-RPC-over-HTTP for MCP.
 
 ## Backend selection: built-in vs official SDK (append 2026-11-01)
+
+> **SUPERSEDED by Requirement 24 (model providers) and Requirement 25 (MCP); retained for history.** The entire mechanism described in this section — auto-detect with explicit preference, `NIMBUS_<BACKEND>_IMPL` / `NIMBUS_IMPL` environment variables, an `impl` block in `nimbus.yaml`, a global default, an SDK version table, the fallback and version-mismatch warnings, and import-time SDK auto-discovery — is **withdrawn for model providers**. Per Requirement 24 each model provider has **exactly one** active implementation (the built-in standard-library adapter); there is no selection machinery, no SDK on the runtime path, and no fallback. The only remaining explicit implementation choice is the MCP client, governed by Requirement 25: `create_mcp_client(target, impl="builtin")`, default `"builtin"`, `"fastmcp"` the only other value, no environment variable, no config entry, no fallback. See *One implementation per model provider (append 2026-11-02)* and *MCP implementation chosen by an explicit argument (append 2026-11-02)* at the end of this document for the current design.
 
 This section records the interchangeable-backend policy of Requirement 17. It generalizes the `gateway`/`fastmcp` pattern above (built-in stdlib client by default, optional SDK when selected) to **every** backend — model providers, embeddings, the MCP client, and any future backend — appended without altering any existing section.
 
@@ -878,3 +909,96 @@ This section records Requirement 20: one general rule for **any** Component that
 - **`agents` exposes multiple agent types via its registry behind the Runnable/agent Port.** The `agents` Component exposes its multiple agent types (for example a ReAct agent) through the `agents` registry behind the `Runnable`/agent Port, extensible per Requirement 13 (one Port in `base` plus a registry in the owning Component). The concrete agent-type implementations are defined in the future `agents` spec and are **out of scope** for this structure spec (Requirement 20.6).
 
 **Correctness note (stated in prose to avoid renumbering the Correctness Properties section): no external-library type leaks outside its owning Component.** *For any* Component that offers both a built-in and an external-library implementation (today `models` with provider SDKs and `tools` with `fastmcp`/`mcp` protocol types), no external-library type — no provider SDK type, no `fastmcp`/`mcp` protocol type such as `mcp.types.Tool`, `mcp.types.Prompt`, or `mcp.types.Resource` — is exposed outside that Component through a Port return value, Port parameter, or public API; every such external type is converted to a Nimbus type at a single boundary point within the Component. This is a structural/static invariant (not a generated-input property): it is enforced by an AST check that the owning Component's public surface (Port return types, Port parameters, and exported symbols) names only Nimbus or standard-library types, complementing the no-provider-SDK test already described in the Testing Strategy. **Validates: Requirements 19.5, 20.2, 20.3.**
+
+## Policy is a service; runtime never imports optional services (append 2026-11-02)
+
+This section records Requirement 21 and supersedes the original Layer assignment (`policy` in the runtime Layer) and the matrix rows for the runtime Components. Appended without renumbering the existing sections.
+
+- **`policy` moves to the services Layer.** `policy` decides (permit or forbid) and does not orchestrate, exactly like `guard`; it belongs in the services Layer (Layer 2), not the runtime Layer (Requirement 21.1). The current Layer assignment is: services = `router`, `tools`, `prompts`, `memory`, `guard`, `observe`, `policy`; runtime = `gateway`, `agents`, `teams`, `flows` (Requirement 21.2). The allowed imports of `policy` are `{base, models}` (`models` only if it uses decision models for a check).
+- **Authorizer Port in `base`.** `base` defines an **authorizer Port** that accepts a principal identifier, an action identifier, and a resource identifier and returns a decision of exactly one of `{permit, forbid}`; `policy` implements this Port (Requirement 21.4). It joins the other service Ports already in `base`: the guard Port (`interfaces/safety.py`), the observe Port (`interfaces/observer.py`), and the memory Port (`interfaces/memory.py`).
+- **Runtime never imports the optional services.** The runtime Components — `gateway`, `agents`, `teams`, `flows` — have allowed-import sets that **exclude** `policy`, `guard`, `observe`, and `memory` (Requirement 21.3, 21.5). These four optional services are supplied to the runtime **only through `base` Ports**, by injection or hooks, so none of them has to be installed to use the runtime. This supersedes the original matrix rows that listed `policy`/`guard`/`observe`/`memory` as optional consumers of `gateway` and `agents`; those optional entries are withdrawn.
+- **Gateway authorization is conditional on an injected authorizer.** When an authorizer Port is provided to the `gateway`, every capability listing and every capability call is checked by that authorizer; when none is provided, the behavior is deferred to the `gateway` spec (Requirement 21.6). This replaces the earlier unconditional "every listing and call is checked by the policy engine."
+- **Current allowed-imports rows (supersede the matrix above).**
+
+  | Component | Layer | Allowed set (current) |
+  |-----------|-------|------------------------|
+  | `policy` | services (2) | `base`; optionally `models` (decision models only) |
+  | `gateway` | runtime (3) | `base`, `tools`, `models` (+ `auth`, see auth section); **not** `policy`, `guard`, `observe`, `memory`, `prompts` |
+  | `agents` | runtime (3) | `base`, `models`; **not** `policy`, `guard`, `observe`, `memory` (received via `base` Ports/hooks); never `teams`/`flows` |
+  | `teams` | runtime (3) | `base`; **not** `policy`, `guard`, `observe`, `memory`, `models`; never `agents`/`teams`/`flows` |
+  | `flows` | runtime (3) | `base`; **not** `policy`, `guard`, `observe`, `memory`, `models`; never `agents`/`teams`/`flows` |
+
+- **Test.** `tests/budget/test_import_matrix.py` places `policy` in the services Layer in `LAYER` and removes `policy`, `guard`, `observe`, and `memory` from the `gateway`, `agents`, `teams`, and `flows` rows of `ALLOWED`; any runtime import of one of those four services fails the test and names the offending package and service (Requirement 21.7, 21.8).
+
+## Auth component (append 2026-11-02)
+
+This section records Requirement 22: a new fifteenth Component `auth` (authentication and credentials) in Layer 0 next to `base`. Appended without altering the existing sections; it supersedes the "14 Components" count and the Layer-0 "standard library only, no I/O" rule as it applies to the whole layer.
+
+- **A separate Layer-0 Component, not part of `base`.** `auth` is distinct from `base`: `base` imports only the standard library (Requirement 3.4) and performs no I/O (Requirement 2.4), whereas `auth` calls metadata and token endpoints, reads credential files, may run a subprocess, and needs the pure-Python package `rsa` for RS256 signing (Google service-account JWT, Azure certificate assertion). Requirement 2.4 and 3.4 therefore apply to the **`base` Component specifically**, not to the whole Layer 0 (Requirement 22.3).
+- **Authentication Port in `base`; implementations in `auth`.** `base` defines an authentication Port — an object that applies authentication to a request by adding headers or signing it — and `auth` supplies the implementations (Requirement 22.4). This keeps the contract at the foundation while the I/O-bearing code lives in `auth`.
+- **Allowed imports.** `auth` imports only `base`. `models`, `store`, and `tools` may import `base` and `auth`; `gateway` may import `base`, `tools`, `models`, and `auth`; `memory` may also import `auth`; every other matrix row is unchanged (Requirement 22.5). The only same-Layer imports permitted are the Layer-0 Components importing `base` (`auth → base`), the single exception to the no-same-Layer-import rule (Requirement 22.6; see the UPDATED note under Dependency rule).
+- **What `auth` holds.** Authentication strategies (API key and bearer, SigV4, OAuth2), credential sources (environment, files, container credentials, instance metadata IMDSv2, token exchange services, metadata server), **plus native support for the principal cloud secret managers (AWS Secrets Manager, AWS SSM Parameter Store, Azure Key Vault, Google Secret Manager)**, and a token cache. `auth` serves `models` (every provider), `store` (cloud database credentials), `tools` (the MCP client's outbound auth), and `gateway` (outbound auth) (Requirement 22.7). The SigV4 signer currently at `models/transport/sigv4.py` moves into `auth`.
+- **Extensible credential-source Port (secret managers resolved).** Beyond the native secret-manager sources above, `auth` defines an **extensible credential-source Port** through which user code registers additional secret-manager or custom credential sources (Requirement 22.10; the credential-provider extension point of the Extension points section, now a fifth integration kind owned by `auth`). A secret-manager source performs a network call through `base/http.py`, authenticated or signed with the `auth` strategies, so secret managers are **within** the scope of `auth`, not out of scope. This resolves the open question that previously left cloud secret managers undecided.
+- **Extra.** The `auth` Extra declares exactly `rsa` (pure-Python, RS256 only); the `google` Extra declares only the provider SDK, not `rsa` (Requirement 22.9).
+- **Scope: non-interactive only.** `auth` supports only the documented, non-deprecated, non-interactive authentication modes of each provider at a stated date and **never** runs an interactive login (browser login, device code, MFA prompt). Where a mode depends on an interactive login performed earlier by a vendor CLI (AWS IAM Identity Center SSO, `az login`, `gcloud auth login`, ADC login), `auth` only **reads the cache** the CLI wrote and raises a clear "log in again with the CLI" error if that cache is missing or expired (Requirement 22.10, 22.11). Supported modes to verify against each provider's current docs in detail: serverless execution role (env vars, container-credentials endpoint, IMDSv2); AWS assume-role incl. cross-account via signed STS; web identity (OIDC token file, e.g. CI runner / managed Kubernetes); Bedrock API keys; Google service-account files (RS256 with `rsa`), service-account impersonation, metadata server, authorized-user refresh token, Workload Identity Federation, API key / access token from env; Microsoft Entra ID for Azure OpenAI via managed identity, client secret, certificate (RSA with `rsa`), federated token file, API key; API key / bearer for OpenAI-compatible, Anthropic, Cohere (Requirement 22.12). **Out of scope:** on-premises Active Directory (Kerberos, NTLM, ADFS), SAML, HSMs (PKCS#11), and non-RSA signing (Requirement 22.13).
+- **Count and codename.** The Component count is now **15**; `auth`'s Codename is **`ozone`** (chosen by the owner; Requirement 22.14–22.15). The `auth` package, the `.kiro/specs/auth` spec folder, the docs section, and the `budgets.toml` entry share the single name `auth` (Requirement 22.16). The glossary states: `auth` is authentication and credentials, `policy` is authorization.
+- **Test.** `tests/budget/test_import_matrix.py` (`LAYER` and `ALLOWED`) and the codename test (15 entries) are updated for `auth`; implementing the strategies and sources belongs to the `auth` and `models` specs, not this structure phase (Requirement 22.17).
+
+### `base/http.py` stays in `base` (resolved open question)
+
+The shared HTTP transport `base/http.py` **stays inside `base`** as the single, explicit exception to the base-layer network-I/O prohibition of Requirement 2.4. It uses only the standard library (`urllib` / `http.client`, `json`, `hashlib`/`hmac` for signing helpers) and imports **no** third-party package, so it does not weaken the stdlib-only rule for the rest of `base`. It is the shared transport that `auth` (token/metadata/secret-manager calls) and the `models` adapters build upon. This resolves the open question of where `base/http.py` lives (the earlier candidate of moving it to a new Layer-0 component is rejected): the transport is stdlib-only and belongs at the foundation, and the no-I/O rule is a `base`-Component rule with `http.py` named as its one sanctioned transport exception.
+
+## One implementation per model provider (append 2026-11-02)
+
+This section records Requirement 24 and supersedes the Backend selection: built-in vs official SDK (append 2026-11-01) section for model providers.
+
+- **No selection machinery.** There is no `NIMBUS_IMPL` / `NIMBUS_<BACKEND>_IMPL` environment variable, no `impl` block in `nimbus.yaml`, no global default implementation, no SDK version table, no version-mismatch warning, no fallback to an SDK on import failure, and no auto-discovery of an installed SDK (Requirement 24.1).
+- **Exactly one active implementation per provider.** Each model provider has exactly one active implementation at any time, and that implementation is Nimbus's **built-in standard-library adapter**; no vendor SDK is on the runtime path (Requirement 24.2, 24.3). Where a provider's built-in REST adapter does not yet exist, the provider is implemented by the built-in adapter as it lands, one active implementation at all times, never a vendor SDK as the active runtime implementation (Requirement 24.4).
+- **Vendor SDK adapters are deleted or demoted to a doc example.** Any vendor-SDK adapter is either deleted or retained only as a bring-your-own example in the documentation, never registered as a provider's active runtime implementation (Requirement 24.5). Vendor SDKs remain only as references: dev/test dependencies and the differential-test oracles of Requirement 18, never on a runtime path (Requirement 24.6).
+- **Code to remove (later task, not this phase).** `base/backend_select.py`, `base/sdk_versions.py`, `load_impl_config` and the `impl` handling in `base/config.py`, the `impl_backend` handling and the selection in `models/base.py` and the adapters, and `tests/unit/test_backend_select.py`; `tests/differential` stays (Requirement 24.7). `budgets.toml` and the extras tests are updated accordingly.
+
+## MCP implementation chosen by an explicit argument (append 2026-11-02)
+
+This section records Requirement 25 and supersedes the MCP selection and extra clauses of the earlier MCP sections.
+
+- **Explicit `impl` argument, no machinery.** The built-in MCP client is the default; `fastmcp` is an optional substitute chosen **only** by an explicit code argument through a factory `create_mcp_client(target, impl="builtin")` where `impl` defaults to `"builtin"` (Requirement 25.1). Called without `impl`, the factory returns the built-in client (Requirement 25.2). Called with `impl="fastmcp"` and `fastmcp` installed, it returns the `fastmcp` client (Requirement 25.3). An `impl` value other than `"builtin"` or `"fastmcp"` is rejected with an error and returns no client (Requirement 25.4). Selection uses **no environment variable, no configuration entry, and no fallback** (Requirement 25.5). With `impl="fastmcp"` and `fastmcp` not installed, the factory raises `MissingExtraError` naming the extra `mcp` and returns no client (Requirement 25.6).
+- **Separate `mcp` Extra; `tools` has no third-party library.** The `mcp` Extra (providing `fastmcp`, with its own `budgets.toml` entry) is a **separate** Extra, and the `tools` Component carries **no** third-party library. This supersedes the earlier association of `fastmcp` with the `tools` Extra (Requirement 25.7).
+- **Differential tests stay.** The differential tests between the built-in MCP client and the `fastmcp` client remain as the contract that the two are interchangeable (Requirement 25.8).
+- **`NIMBUS_MCP_IMPL` removed (later task).** The `NIMBUS_MCP_IMPL` environment-variable reading is removed from `tools/mcp_client.py`, keeping the explicit `impl` argument with its default `"builtin"` (Requirement 25.9).
+- **Consume-only client; no stdio / no server (resolved open question).** The built-in MCP client is a **consume-only client over HTTP transport** and has **no stdio transport** that starts a local MCP server as a subprocess (Requirement 25.10). The project consumes MCP servers and never starts one; this is consistent with Requirement 15.1 (the MCP server role is out of scope, delegated to `gateway`) and with the serverless, no-subprocess product constraint. If the optional `fastmcp` substitute provides a stdio transport, that is a `fastmcp`-only capability outside the built-in client's contract and is not covered by the differential tests.
+
+## SDK compatibility at the data level (append 2026-11-02)
+
+This section records Requirement 26: interoperability with vendor SDKs is at the level of data shapes, not classes.
+
+- **Accept the OpenAI data shape, return Nimbus types.** When Nimbus receives messages or tool definitions expressed in the OpenAI data shape, it accepts them and returns results as Nimbus types (Requirement 26.1). Nimbus data shapes do **not** mirror, subclass, or re-export any vendor SDK client class (Requirement 26.2). An input that does not conform to the OpenAI data shape is rejected with an error naming the invalid field or shape, and the original input is retained unchanged (Requirement 26.3).
+- **Bring-your-own `Runnable` adapter is the only vendor-SDK path.** A user who wants a vendor SDK writes a small adapter that satisfies the `Runnable` Port and passes it where a model is expected — zero configuration entries, zero environment variables, zero registration steps (Requirement 26.4). This bring-your-own adapter is the **only** valid path for vendor-SDK use on the runtime path; any other vendor-SDK integration path is invalid and is not exposed (Requirement 26.5).
+
+## Environment-variable scope (append 2026-11-02)
+
+This section records Requirement 27.
+
+- **Provider credentials come from provider-standard variables, via `auth`.** Provider credentials are read from each provider's standard environment-variable names (`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, the `AWS_*`, `GOOGLE_*`, `AZURE_*` variables) exclusively through the credential sources of `auth` (Requirement 27.1). No provider credential is read from a Nimbus-prefixed variable (Requirement 27.2).
+- **Exactly three Nimbus-prefixed variables.** The only Nimbus-prefixed environment variables are `NIMBUS_LOG_LEVEL`, `NIMBUS_CONFIG`, and `NIMBUS_ENABLE_TELEMETRY` (Requirement 27.3, 27.4). This bounds the scope of the planned rename: exactly these three, and no others, become `SKYE_*` (Requirement 27.5). Requirement 20 (no vendor SDK or `mcp`/`fastmcp` type outside its owning Component) is unchanged (Requirement 27.6).
+
+## Tools does not import prompts (append 2026-11-02)
+
+This section records Requirement 28 and supersedes the `tools → prompts` peer-import allowance introduced for the MCP prompt facet.
+
+- **`tools` allowed set is `{base}`.** The `tools` Component's allowed-imports set is set back to exactly `{base}` (plus `auth` where the MCP client needs outbound auth, per Requirement 22.5), superseding the Requirement 19.2 clause that implied `tools` imports `prompts` (Requirement 28.1).
+- **The MCP prompt facet uses `base` message types.** The MCP prompt facet uses only the message types defined in `base` — `NimbusMessage`, `UserMessage`, `AssistantMessage` in `base/messages.py` (which `prompts/messages.py` merely re-exports) — and the `MCPPrompt` descriptor defined in `tools`; it does **not** import the `prompts` Component (Requirement 28.2). "Reusing the prompt abstraction" means reusing the `PromptBuilderInterface` Port and the message types in `base`, not importing `prompts`, so `tools` and `prompts` stay independent (Requirement 28.3).
+- **Test.** `tests/budget/test_import_matrix.py` records the `tools` allowed set as `{base}` (plus `auth`) and reports any `tools → prompts` import as a violation (Requirement 28.4). The code change and the matrix-test change are already made.
+
+## MCP resource consumption deferred (append 2026-11-02)
+
+The `Resource` type stays internal to `tools` (Requirement 19.3) and is sufficient while no same-Layer peer consumes MCP resources. Per the standing no-horizontal-import rule (Requirement 2.3), a cross-Component consumption in the same Layer requires a Port in `base`. Therefore: **when** `prompts` (as a context source) or `memory` (as a retrieval source) needs to consume MCP resources, a **resource Port is defined in `base`** (list and read a resource by URI, returning a MIME type and text or bytes), implemented by the `tools` MCP client and consumed through that `base` Port; that addition supersedes the "no resource Port in `base`" clause of Requirement 19.3. Until then this is a design open question with the resolution already fixed, and **no new Component** is introduced in either case. The earlier *Open questions (append 2026-11-01)* MCP-resource hypothesis is thereby resolved into this conditional rule.
+
+## Planned rename Nimbus → Skye (append 2026-11-02, executed last)
+
+This section records Requirement 23: the rename is documented now and executed as the final task group, not in this phase. No file, class, variable, or text is renamed in this run.
+
+- **Names.** Project **Skye**; import package `skye`; PyPI distribution `skyeai` (`skye` belongs to an unrelated package, `skyai` is taken) (Requirement 23.1).
+- **Mechanical substitution.** `src/nimbus → src/skye` and every import; `NimbusMessage`/`NimbusError`/`NimbusConfig` and any other `Nimbus*` name → `Skye*`; the three `NIMBUS_*` environment variables (Requirement 27.3) → `SKYE_*`; `nimbus.yaml → skye.yaml`; the project name in `pyproject.toml → skyeai`; and the occurrences in `budgets.toml`, CI, CODEOWNERS, the Makefile, the specs, the steering, the wiki, the examples, and the README (Requirement 23.3). The GitHub repository rename is done by the owner, with the platform redirecting the old address (Requirement 23.4).
+- **Precondition (non-coding first task).** All previous task groups closed; the owner has checked the trademark of "Skye" in software; the owner has reserved `skyeai` (and `skye-ai`) on PyPI (Requirement 23.5).
+- **Definition of done.** `make budget-fast`, `make budget`, `make differential`, and the guardrail tests give the same results as before the rename, with the codename test adapted to the new names (Requirement 23.6).
+- **Umbrella watermark `nimbus` (resolved).** After the rename the freed word `nimbus` becomes the **project-wide umbrella watermark**, documentation-only, outside the 15 Component Codenames and analogous to `vapor` for `Runnable`; it never appears in any import path, folder name, file name, class name, function name, configuration key, or spec folder name, and Requirement 9.1 is unchanged because `nimbus` is not a component Codename (Requirement 23.7, resolved).
