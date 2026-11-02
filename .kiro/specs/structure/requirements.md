@@ -223,7 +223,7 @@ owner) is decision D5; A5 (declarations, not execution) is history; A6 (Vertex r
 #### Acceptance Criteria
 
 1. THE spec SHALL keep this story as history only, its criteria being mapped in `.kiro/docs/requirements-trace.md`.
-2. THE spec SHALL honor decision D23 of `.kiro/steering/12-decisions.md`.
+2. THE spec SHALL honor decision D23 of #[[file:.kiro/steering/12-decisions.md]].
 
 ### Requirement 20: S20 One implementation per model provider (no selection machinery)
 
@@ -262,7 +262,7 @@ owner) is decision D5; A5 (declarations, not execution) is history; A6 (Vertex r
 
 1. THE spec SHALL realize Requirement 11.6 of #[[file:.kiro/steering/10-requirements.md]].
 2. THE spec SHALL realize Requirement 9.5 of #[[file:.kiro/steering/10-requirements.md]].
-3. THE spec SHALL honor decision D23 of `.kiro/steering/12-decisions.md`.
+3. THE spec SHALL honor decision D23 of #[[file:.kiro/steering/12-decisions.md]].
 
 ### Requirement 24: S24 Licence and attribution
 

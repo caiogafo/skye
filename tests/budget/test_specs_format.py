@@ -20,13 +20,13 @@ LEGACY_SPECS = {
     "agent-runtime",
     "capability-support",
     "gateway",
-    "model-providers",
     "policy-engine",
     "prompts-support",
 }
 ALLOWED_FILES = {"requirements.md", "design.md", "tasks.md", "tasks.meta.json", ".config.kiro"}
 REQ_FILE_REF = "#[[file:.kiro/steering/10-requirements.md]]"
 DESIGN_FILE_REF = "#[[file:.kiro/steering/11-design.md]]"
+DECISIONS_FILE_REF = "#[[file:.kiro/steering/12-decisions.md]]"
 
 
 def _requirements() -> tuple[list[str], set[str]]:
@@ -56,16 +56,15 @@ def _spec_dirs() -> list:
     return sorted(p for p in SPECS.iterdir() if p.is_dir())
 
 
+CROSS_CUTTING_SPEC = "structure"
+
+
 def test_every_spec_is_named_like_a_component():
     components, _ = _requirements()
-    bad = []
-    cross = [p.name for p in _spec_dirs() if p.name.endswith("-structure")]
-    for p in _spec_dirs():
-        if p.name in LEGACY_SPECS or p.name in components or p.name.endswith("-structure"):
-            continue
-        bad.append(p.name)
-    assert not bad, f"spec folders that are not a component name (nor the one cross-cutting spec): {bad}"
-    assert len(cross) <= 1, f"more than one cross-cutting spec: {cross}"
+    allowed = set(components) | {CROSS_CUTTING_SPEC} | LEGACY_SPECS
+    bad = [p.name for p in _spec_dirs() if p.name not in allowed]
+    assert not bad, f"spec folders that are neither a component name nor `{CROSS_CUTTING_SPEC}`: {bad}"
+    assert (SPECS / CROSS_CUTTING_SPEC).is_dir(), f"the cross-cutting spec `{CROSS_CUTTING_SPEC}` is missing"
 
 
 def test_legacy_list_is_not_stale():
@@ -98,8 +97,30 @@ def _decisions() -> set[str]:
 REALIZE = re.compile(
     r"^\d+\. THE spec SHALL realize Requirement (\d+\.\d+) of " + re.escape(REQ_FILE_REF) + r"\.$"
 )
-HONOR = re.compile(r"^\d+\. THE spec SHALL honor decision (D\d+) of `\.kiro/steering/12-decisions\.md`\.$")
+HONOR = re.compile(r"^\d+\. THE spec SHALL honor decision (D\d+) of " + re.escape(DECISIONS_FILE_REF) + r"\.$")
 HISTORY = re.compile(r"^\d+\. THE spec SHALL keep this story as history only, its criteria being mapped in `[^`]+`\.$")
+
+
+def check_criterion(line: str, ids: set[str], decisions: set[str]) -> str | None:
+    """Return why a spec criterion is not an exact pointer to steering, or None when it is.
+
+    The three allowed forms (the file is always written as a Kiro file reference, never as plain text or a code span):
+      1. THE spec SHALL realize Requirement N.k of #[[file:.kiro/steering/10-requirements.md]].
+      2. THE spec SHALL honor decision Dn of #[[file:.kiro/steering/12-decisions.md]].
+      3. THE spec SHALL keep this story as history only, its criteria being mapped in `<path>`.
+    """
+    r, h = REALIZE.match(line), HONOR.match(line)
+    if r:
+        return None if r.group(1) in ids else f"Requirement {r.group(1)} does not exist in 10-requirements.md"
+    if h:
+        return None if h.group(1) in decisions else f"decision {h.group(1)} does not exist in 12-decisions.md"
+    if HISTORY.match(line):
+        return None
+    if "SHALL honor decision" in line:
+        return f"a decision pointer must name the file as {DECISIONS_FILE_REF}: {line[:90]}"
+    if "SHALL realize Requirement" in line:
+        return f"a requirement pointer must name the file as {REQ_FILE_REF}: {line[:90]}"
+    return f"not a pointer to steering (write the rule in steering first): {line[:80]}"
 
 
 def test_spec_requirements_follow_kiro_format_and_only_point_to_steering():
@@ -136,15 +157,9 @@ def test_spec_requirements_follow_kiro_format_and_only_point_to_steering():
                 if not line.startswith(f"{n}. "):
                     bad.append(f"{p.name}: Requirement {expected} criteria are not numbered 1..n")
                     break
-                r, h, hist = REALIZE.match(line), HONOR.match(line), HISTORY.match(line)
-                if r:
-                    if r.group(1) not in ids:
-                        bad.append(f"{p.name}: Requirement {expected} cites {r.group(1)}, which does not exist")
-                elif h:
-                    if h.group(1) not in decisions:
-                        bad.append(f"{p.name}: Requirement {expected} cites decision {h.group(1)}, which does not exist")
-                elif not hist:
-                    bad.append(f"{p.name}: Requirement {expected} criterion {n} is not a pointer to steering: {line[:80]}")
+                problem = check_criterion(line, ids, decisions)
+                if problem:
+                    bad.append(f"{p.name}: Requirement {expected} criterion {n}: {problem}")
     assert not bad, "; ".join(bad)
 
 
@@ -168,3 +183,54 @@ def test_spec_designs_build_on_the_steering_design():
                 if not any(name in s for s in sections):
                     bad.append(f"{p.name}: section '{name}' is not in 11-design.md")
     assert not bad, "; ".join(bad)
+
+
+def test_criterion_pointers_are_checked_exactly():
+    """Each wrong form of a pointer is rejected, each right one accepted (the decision file must be a #[[file:...]] reference)."""
+    ids, decisions = {"28.1", "19.1"}, {"D25"}
+    ok = [
+        "1. THE spec SHALL realize Requirement 28.1 of #[[file:.kiro/steering/10-requirements.md]].",
+        "6. THE spec SHALL honor decision D25 of #[[file:.kiro/steering/12-decisions.md]].",
+        "1. THE spec SHALL keep this story as history only, its criteria being mapped in `.kiro/docs/requirements-trace.md`.",
+    ]
+    for line in ok:
+        assert check_criterion(line, ids, decisions) is None, line
+    bad = {
+        "6. THE spec SHALL honor decision D25 of `.kiro/steering/12-decisions.md`.": "must name the file",
+        "6. THE spec SHALL honor decision D25 of .kiro/steering/12-decisions.md.": "must name the file",
+        "6. THE spec SHALL honor decision D25.": "must name the file",
+        "1. THE spec SHALL realize Requirement 28.1 of `.kiro/steering/10-requirements.md`.": "must name the file",
+        "1. THE spec SHALL realize Requirement 28.1.": "must name the file",
+        "1. THE spec SHALL realize Requirement 99.9 of #[[file:.kiro/steering/10-requirements.md]].": "does not exist",
+        "6. THE spec SHALL honor decision D99 of #[[file:.kiro/steering/12-decisions.md]].": "does not exist",
+        "6. THE spec SHALL honor decision D25 of #[[file:.kiro/steering/10-requirements.md]].": "must name the file",
+        "1. THE store SHALL keep state in DynamoDB.": "not a pointer",
+    }
+    for line, why in bad.items():
+        got = check_criterion(line, ids, decisions)
+        assert got and why in got, f"{line!r} should fail with {why!r}, got {got!r}"
+
+
+TASK_LINE = re.compile(r"^\s*- \[[ x]\]\*? \d+(?:\.\d+)*\.? \S")
+
+
+def test_spec_task_lines_follow_the_kiro_task_format():
+    """Every checkbox line of a migrated spec is `- [ ] N. title` or `- [x] N.k title` (optional tasks add `*` after the box).
+
+    Kiro validates this syntax; a milestone is a numbered top-level task, not an `M1` label, and nothing may precede the number.
+    """
+    bad = []
+    for p in _spec_dirs():
+        if p.name in LEGACY_SPECS:
+            continue
+        for n, line in enumerate((p / "tasks.md").read_text(encoding="utf-8").splitlines(), 1):
+            if re.match(r"^\s*- \[", line) and not TASK_LINE.match(line):
+                bad.append(f"{p.name}/tasks.md:{n}: {line.strip()[:70]}")
+    assert not bad, "; ".join(bad)
+
+
+def test_the_task_line_pattern_accepts_and_rejects():
+    good = ["- [ ] 1. Shared transport", "- [x] 2. Done", "  - [x] 1.1 Sub task", "  - [ ]* 2.3 Optional task", "- [ ] 10. Rename"]
+    wrong = ["- [ ] M1. Shared transport", "  - [x] M1.1 Sub task", "- [ ] models:1.1 Task", "- [ ] Do a thing", "- [ ]1. No space"]
+    assert all(TASK_LINE.match(x) for x in good)
+    assert not any(TASK_LINE.match(x) for x in wrong)

@@ -191,7 +191,7 @@ Written without the project name (it is being chosen); `<pkg>` is the import pac
 #### Acceptance Criteria
 
 1. THE requirements, the high-level design and the decisions SHALL live only in `10-requirements.md`, `11-design.md` and `12-decisions.md`.
-2. EACH component SHALL have exactly one spec, named like the component (`.kiro/specs/<component>/`); the cross-cutting work SHALL live in the one spec `.kiro/specs/skye-structure/`. EACH spec has `requirements.md` (Kiro format: its user stories as `### Requirement N:` blocks, each criterion being a pointer `THE spec SHALL realize Requirement N.k of #[[file:.kiro/steering/10-requirements.md]]`, never a copied rule), `design.md` (detailed design, opening with a `Builds on:` line that cites the sections and components of `11-design.md`) and `tasks.md` (the only place for tasks, each citing the requirements it satisfies).
+2. EACH component SHALL have exactly one spec, named like the component (`.kiro/specs/<component>/`); the cross-cutting work SHALL live in the one spec `.kiro/specs/structure/`. EACH spec has `requirements.md` (Kiro format: its user stories as `### Requirement N:` blocks, each criterion being a pointer `THE spec SHALL realize Requirement N.k of #[[file:.kiro/steering/10-requirements.md]]`, never a copied rule), `design.md` (detailed design, opening with a `Builds on:` line that cites the sections and components of `11-design.md`) and `tasks.md` (the only place for tasks, each citing the requirements it satisfies).
 3. WHEN a new spec needs a requirement that no existing one covers, THE requirement SHALL be added here, in Kiro format with the next number, and the spec SHALL cite it; existing numbers SHALL NOT be renumbered.
 4. WHEN a requirement changes, THE change SHALL be made here with a decision-log line, and a milestone SHALL be added to each component that cites it.
 5. THE documentation SHALL be a wiki with one section per component, a glossary and `docs/index.md`; IF a page lacks front matter, has a broken link or is unreachable from the index, THEN THE docs test SHALL fail.
@@ -291,3 +291,42 @@ Written without the project name (it is being chosen); `<pkg>` is the import pac
 
 1. THE examples SHALL be organized by feature category, each with a README.
 2. THE examples SHALL demonstrate every capability type, YAML router configuration and every supported provider.
+### Requirement 25: Embeddings
+
+**User Story:** As a developer building retrieval, I want embedding adapters behind one Port, so that I can switch embedding models without changing my code.
+
+#### Acceptance Criteria
+
+1. THE `models` component SHALL provide embedding adapters for OpenAI, Bedrock (Titan), Cohere and Google, each a thin standard-library REST adapter behind the `VectorEncoder` Port in `base`, with no vendor SDK on the runtime path.
+2. THE embedding adapters SHALL support single and batch encoding and SHALL provide sync and async forms, the async methods prefixed with `a` (`aencode`, `aencode_batch`).
+3. EACH embedding adapter SHALL report its vector dimension.
+4. WHERE a provider offers multimodal embeddings (for example Google `multimodalembedding`), THE adapter SHALL accept image inputs and return vectors in the same shape as text embeddings; IF a provider does not support multimodal embeddings, THEN THE adapter SHALL reject the input naming the limitation.
+
+### Requirement 26: Multimodal inputs
+
+**User Story:** As a developer building vision applications, I want to send images and other media to multimodal models, so that I can build richer experiences through the same interface.
+
+#### Acceptance Criteria
+
+1. THE `models` component SHALL accept image inputs in a user message as a URL, a base64 data URL, a file path or raw bytes, and SHALL convert them to each provider's documented shape at the provider boundary.
+2. WHERE a model accepts audio or video, THE adapter SHALL carry those inputs through the same boundary conversion.
+3. IF a provider does not support a submitted modality, THEN THE adapter SHALL raise a `ProviderError` naming the unsupported modality and SHALL leave the input unchanged.
+
+### Requirement 27: Structured output
+
+**User Story:** As a developer, I want models to return data validated against a declared shape, so that I can parse outputs reliably.
+
+#### Acceptance Criteria
+
+1. WHEN a completion request declares an output schema, THE `models` component SHALL use the provider's native structured-output mechanism where available and otherwise function calling, and SHALL validate the result against the declared shape.
+2. THE declared output shape SHALL be a dataclass, not a pydantic model (decision D24); IF the result does not conform, THEN THE library SHALL raise a `ValidationError` naming the field.
+
+### Requirement 28: Token counting
+
+**User Story:** As a product manager, I want token counts without shipping a tokenizer in the core, so that the serverless footprint stays light while exact counts remain available.
+
+#### Acceptance Criteria
+
+1. THE `models` component SHALL provide an approximate token counter using only the standard library, present in the core install.
+2. WHERE exact counts are needed, THE library SHALL use `tiktoken` through the optional `tiktoken` extra, imported lazily and never on the core runtime path; IF the extra is not installed, THEN THE library SHALL fall back to the approximate counter.
+3. THE core install SHALL NOT import a tokenizer library at import time, and `import skye` SHALL NOT import `tiktoken`.

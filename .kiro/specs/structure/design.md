@@ -2,7 +2,7 @@
 component: none (cross-cutting: structure, base contracts, consolidation, documentation)
 ---
 
-# Design Document: skye-structure
+# Design Document: structure
 
 Builds on: #[[file:.kiro/steering/11-design.md]] (sections: Layers, Allowed imports, Installation, Ports, Composition, Extension points, Base contracts, Transport and providers, Store layout, Extras and budgets, Auth component, MCP client, Codename placement, Correctness properties).
 The high-level design lives there. This file holds only the detail of this spec: the target package tree and the file-by-file mapping of the migration,
