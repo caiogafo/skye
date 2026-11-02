@@ -18,7 +18,6 @@ STEERING = KIRO / "steering"
 # Specs still in the old format. Remove a name when its spec is migrated.
 LEGACY_SPECS = {
     "agent-runtime",
-    "capability-support",
     "gateway",
     "policy-engine",
     "prompts-support",
@@ -98,7 +97,7 @@ REALIZE = re.compile(
     r"^\d+\. THE spec SHALL realize Requirement (\d+\.\d+) of " + re.escape(REQ_FILE_REF) + r"\.$"
 )
 HONOR = re.compile(r"^\d+\. THE spec SHALL honor decision (D\d+) of " + re.escape(DECISIONS_FILE_REF) + r"\.$")
-HISTORY = re.compile(r"^\d+\. THE spec SHALL keep this story as history only, its criteria being mapped in `[^`]+`\.$")
+HISTORY = re.compile(r"^\d+\. THE spec SHALL keep this story as history only, no requirement of it being left in steering\.$")
 
 
 def check_criterion(line: str, ids: set[str], decisions: set[str]) -> str | None:
@@ -107,7 +106,7 @@ def check_criterion(line: str, ids: set[str], decisions: set[str]) -> str | None
     The three allowed forms (the file is always written as a Kiro file reference, never as plain text or a code span):
       1. THE spec SHALL realize Requirement N.k of #[[file:.kiro/steering/10-requirements.md]].
       2. THE spec SHALL honor decision Dn of #[[file:.kiro/steering/12-decisions.md]].
-      3. THE spec SHALL keep this story as history only, its criteria being mapped in `<path>`.
+      3. THE spec SHALL keep this story as history only, no requirement of it being left in steering.
     """
     r, h = REALIZE.match(line), HONOR.match(line)
     if r:
@@ -191,7 +190,7 @@ def test_criterion_pointers_are_checked_exactly():
     ok = [
         "1. THE spec SHALL realize Requirement 28.1 of #[[file:.kiro/steering/10-requirements.md]].",
         "6. THE spec SHALL honor decision D25 of #[[file:.kiro/steering/12-decisions.md]].",
-        "1. THE spec SHALL keep this story as history only, its criteria being mapped in `.kiro/docs/requirements-trace.md`.",
+        "1. THE spec SHALL keep this story as history only, no requirement of it being left in steering.",
     ]
     for line in ok:
         assert check_criterion(line, ids, decisions) is None, line

@@ -10,7 +10,7 @@ The only place where requirements are written. Component specs repeat the user s
 below as pointers (`THE spec SHALL realize Requirement 9.2 of #[[file:.kiro/steering/10-requirements.md]]`); they do not copy criteria. `Requirement 9.2` means criterion 2 of Requirement 9. A requirement
 starts at the heading `### Requirement 9: <title>` (the Kiro syntax), so `grep -n -A25 "^### Requirement 9:" .kiro/steering/10-requirements.md`
 returns it whole. Design is in `11-design.md`; decisions, taken and open, are in `12-decisions.md`. To change a requirement, edit it here
-and add a line to the decision log. Where each criterion of the former specs went is in `.kiro/docs/requirements-trace.md`.
+and add a line to the decision log.
 Written without the project name (it is being chosen); `<pkg>` is the import package. Terms: **Port** is an interface in `base`;
 **Extra** is an optional dependency group; **Runnable** is the one-input, one-output Port.
 
@@ -135,7 +135,7 @@ Written without the project name (it is being chosen); `<pkg>` is the import pac
 2. THE built-in client SHALL be a standard-library JSON-RPC client over HTTP, consume-only, with no stdio transport, no subprocess and no server of its own; a stdio transport offered by `fastmcp` SHALL be outside the built-in contract and the differential tests.
 3. WHEN `create_mcp_client(target)` is called without `impl`, THE factory SHALL return the built-in client; WHEN `impl="fastmcp"` and it is installed, THE `fastmcp` client; OTHERWISE it SHALL raise an error and return no client, with `MissingExtraError` naming the extra `mcp` if `fastmcp` is missing.
 4. THE selection SHALL use no environment variable, configuration entry or fallback; `import <pkg>` SHALL import neither `fastmcp` nor an optional MCP dependency unless it is selected; BOTH clients SHALL return identical types, kept equal by differential tests.
-5. THE `Resource` type SHALL be internal to `tools` while no other component needs it; WHEN `prompts` or `memory` needs MCP resources, THE library SHALL define a resource Port in `base` (list and read by URI, MIME type, text or bytes) implemented by the MCP client (open decision O7).
+5. THE library SHALL define a resource Port in `base` (list and read by URI, MIME type, text or bytes) implemented by the MCP client in `tools` (decision D26), so that `prompts` and `memory` can consume MCP resources through `base`; THE MCP prompt facet SHALL return `base` messages and SHALL NOT implement `PromptBuilderInterface`.
 6. THE MCP client SHALL convert official MCP types to library types at one boundary point, covering all the fields and behaviors the library consumes, and IF a required field is absent or malformed, THEN THE boundary SHALL reject it naming the type and field and return no partial object.
 7. THE `mcp` extra (providing `fastmcp`) SHALL be separate with its own budget, and `tools` SHALL carry no third-party library.
 

@@ -40,12 +40,13 @@ recorded in the repository; "n/d" where I could not recover it (check git).
 | D23 | The first project name was replaced by a second one, which was then dropped too (trademark conflicts); the new name is under choice | trademark | — | all (rename) |
 | D24 | New data structures are dataclasses, not pydantic (the base spec's "use Pydantic models" criterion is superseded); existing models move later (O4) | pydantic is a core dependency being removed | R21 | base, all |
 | D25 | Token counting is approximate in the core (standard library); exact counts use `tiktoken` through the optional `tiktoken` extra, imported lazily and never on the runtime path (resolves O5) | serverless footprint; no tokenizer SDK in core | R28 | models |
+| D26 | MCP resources are a Port in `base` (list and read by URI, MIME type, text or bytes), implemented by the MCP client in `tools`; the MCP prompt facet returns `base` messages and does NOT implement `PromptBuilderInterface` (resolves O7) | one resource contract, reusable by prompts and memory | R10 | base, tools |
 
 ## Open decisions (not yet taken)
 - **O1** The project name (replaces D23): constraints: at most 7 letters, related to air or sky, able to contain the cloud and weather codenames. Candidates seen: welkin, tropos, airmass, mizzle, zenith, aether.
-- **O2** Trademark check at the registries (USPTO, TMview, WIPO; classes 9 and 42) for the chosen name.
+- **O2** Trademark check at the registries (USPTO, TMview, WIPO; classes 9 and 42) for the chosen name. Lesson from the dropped name: a web search alone found conflicts (an AI sales-automation company claiming the same marks, a funded AI app, an open-source agent orchestrator), so the registry search comes before reserving the PyPI name.
 - **O4** Moving the core models from pydantic to dataclasses, and when.
 - ~~**O5** `tiktoken`: keep, drop, or make pluggable.~~ Taken as **D25** (optional `tiktoken` extra, lazy; stdlib approximate counter in core).
 - **O6** Where `base/http.py` goes, given that `base` must do no I/O; and whether cloud secret managers are in scope of `auth`.
-- **O7** Where MCP resources live (a Port in `base`; or in `tools` as a read-only capability; `store` is rejected because it covers only what the framework writes), and whether the MCP prompt facet implements `PromptBuilderInterface`.
+- ~~**O7** Where MCP resources live; whether the MCP prompt facet implements `PromptBuilderInterface`.~~ Taken as **D26** (resource Port in `base` implemented by the MCP client; prompt facet returns `base` messages, not `PromptBuilderInterface`).
 - **O8** Whether decision models (Jev) get their own milestone in `models` and a selector in `gateway`.

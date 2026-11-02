@@ -12,7 +12,7 @@ component and is listed separately.
 | 3 | models | zephyr | migrated | `models/` (was `model-providers`) |
 | 4 | store | lake | missing | — |
 | 5 | router | jet | missing | — |
-| 6 | tools | updraft | legacy | `capability-support/` |
+| 6 | tools | updraft | migrated | `tools/` (was `capability-support`) |
 | 7 | prompts | cirrus | legacy | `prompts-support/` |
 | 8 | memory | dew | missing | — |
 | 9 | guard | halo | missing | — |
@@ -25,7 +25,6 @@ component and is listed separately.
 
 Cross-cutting (not a component): `structure` — system structure, the docs wiki and the old consolidation work.
 
-Legacy specs still to migrate: `agent-runtime` (agents), `capability-support` (tools), `gateway`, `policy-engine` (policy),
-`prompts-support` (prompts).
+Legacy specs still to migrate: `agent-runtime` (agents), `gateway`, `policy-engine` (policy), `prompts-support` (prompts).
 
 Missing specs to create: `base`, `auth`, `store`, `router`, `memory`, `guard`, `observe`, `teams`, `flows`.
