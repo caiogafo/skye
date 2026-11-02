@@ -72,7 +72,7 @@ def test_legacy_list_is_not_stale():
     assert not stale, f"remove from LEGACY_SPECS (spec no longer exists, so it was migrated or renamed): {stale}"
 
 
-def test_migrated_specs_have_only_the_three_files_and_no_subfolder():
+def test_migrated_specs_have_only_the_allowed_files_and_no_subfolder():
     bad = []
     for p in _spec_dirs():
         if p.name in LEGACY_SPECS:
@@ -82,9 +82,11 @@ def test_migrated_specs_have_only_the_three_files_and_no_subfolder():
                 bad.append(f"{p.name}/{child.name} is a folder")
             elif child.name not in ALLOWED_FILES:
                 bad.append(f"{p.name}/{child.name} is not allowed")
-        for needed in ("requirements.md", "design.md", "tasks.md"):
-            if not (p / needed).exists():
-                bad.append(f"{p.name}/{needed} is missing")
+        # Kiro's flow is requirements, then design, then tasks, each approved before the next: a spec may stop at an earlier stage.
+        if not (p / "requirements.md").exists():
+            bad.append(f"{p.name}/requirements.md is missing")
+        if (p / "tasks.md").exists() and not (p / "design.md").exists():
+            bad.append(f"{p.name}/tasks.md exists without design.md (design comes before tasks)")
     assert not bad, "; ".join(bad)
 
 
@@ -168,6 +170,8 @@ def test_spec_designs_build_on_the_steering_design():
     for p in _spec_dirs():
         if p.name in LEGACY_SPECS:
             continue
+        if not (p / "design.md").exists():
+            continue
         text = (p / "design.md").read_text(encoding="utf-8")
         head = text.split("\n", 15)[:15]
         line = next((x for x in head if x.startswith("Builds on:")), None)
@@ -221,6 +225,8 @@ def test_spec_task_lines_follow_the_kiro_task_format():
     bad = []
     for p in _spec_dirs():
         if p.name in LEGACY_SPECS:
+            continue
+        if not (p / "tasks.md").exists():
             continue
         for n, line in enumerate((p / "tasks.md").read_text(encoding="utf-8").splitlines(), 1):
             if re.match(r"^\s*- \[", line) and not TASK_LINE.match(line):

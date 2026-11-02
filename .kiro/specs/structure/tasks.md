@@ -178,6 +178,35 @@ Most of the migration is done and was verified green on 2026-11-02 (`tests/budge
   - [ ] 11.7 Reduce `README.md` (1075 lines) to about 150 lines and move the rest into the wiki sections.
     - _Requirements: 15.6_
 
+- [ ] 12. Migrate and create the component specs
+  - [ ] 12.1 Migrate the remaining old specs to component specs named like the component, following `.kiro/steering/20-repo.md`: `prompts-support` to `prompts`, `policy-engine` to `policy`, `agent-runtime` to `agents`, `gateway` (already named like its component); `models` and `tools` are done.
+    - _Requirements: 15.1, 15.2, 15.3_
+  - [ ] 12.2 Create the missing specs: `base` (it receives the detailed design of the base contracts that now sits in this spec's `design.md`), `auth`, `router`, `store`, `memory`, `guard`, `observe`, `teams`, `flows`.
+    - _Requirements: 15.2_
+  - [ ] 12.3 Keep `.kiro/specs/README.md`, the progression view across components, current as each spec is migrated.
+    - _Requirements: 15.2_
+  - [ ] 12.4 Retire the one-off prompts `.kiro/prompts/01..03` after copying any choice of the owner they hold to `.kiro/steering/12-decisions.md` (the folder is local and ignored by git).
+    - _Requirements: 15.1_
+
+- [ ] 13. Pending code and test work until the owning specs exist
+  - [ ] 13.1 `auth`: the OAuth2 and Azure strategies, the token cache, the secret-manager sources (AWS Secrets Manager, SSM, Key Vault, Google Secret Manager) and the credential-source extension point. `aws.py` and `google.py` exist; the `auth` extra declares `rsa` but no code imports it yet (the one `xfail`).
+    - _Requirements: 11.1, 11.4, 11.5, 11.9_
+  - [ ] 13.2 `router`: review the diff of `router/model_router.py`, `router/routing_strategies.py` and `router/health_tracker.py` (async snapshot `prepare`, `aget_usage_stats`, `aget_cooldown_models`) before the commit.
+    - _Requirements: 17.2_
+  - [ ] 13.3 Remove the `xfail` marker on `test_extras_footprint.py::test_import_stays_within_module_budget`, which passes now, or make it strict.
+    - _Requirements: 7.4_
+  - [ ] 13.4 Rename the test directories that kept the old names: `tests/unit/providers`, `routes` and `capabilities` to `models`, `router` and `tools`.
+    - _Requirements: 23.1_
+  - [ ] 13.5 Run `make budget-fast` on its own, which has not been done since the rename.
+    - _Requirements: 7.5_
+
+- [ ] 14. Owner actions (not doable from the repository)
+  - [ ] 14.1 Rename the GitHub repository to the final project name (the local folder is still `nimbus/core`); part of group 10.
+  - [ ] 14.2 Replace the invented placeholder URLs in `README.md` (`github.com/your-org/skye`) and `examples/README.md` (`github.com/skyeai/skye`, `support@skyeai.com`).
+  - [ ] 14.3 Replace the account-wide PyPI token with one limited to the project, revoke the token that was pasted in a chat, and fix the `[testpypi]` section of `~/.pypirc` (it holds a pypi.org token: use a test.pypi.org token or drop the section).
+  - [ ] 14.4 PyPI names: `skyeai` 0.0.1 is a placeholder and `skye-ai` cannot be registered (PyPI blocks it as too similar). Reserve the final name after the trademark check (open decision O2) and publish a real release under it.
+  - [ ] 14.5 Commit the uncommitted files (about 314 at the last count), split by topic: structure, auth and REST adapters; router fix; rename; docs, wiki and specs.
+
 ## Requirement coverage
 
 Every requirement in `requirements.md` is realized by at least one task above:

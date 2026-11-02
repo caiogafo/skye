@@ -16,7 +16,7 @@ from tests.budget.measure import load_budgets, load_metrics
 
 # Runtime orchestrators that are optional (empty) extras: `import skye` curates only the
 # four base modules, so it must never pull their implementation packages into sys.modules.
-# Spec: .kiro/specs/skye-structure (Requirement 7).
+# Spec: .kiro/specs/structure (Requirement 7).
 OPTIONAL_RUNTIME_MODULES = ("skye.teams", "skye.flows")
 
 _SUBMODULE_PROBE = """

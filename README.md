@@ -1020,8 +1020,8 @@ For detailed documentation, see:
 
 - [Architecture Guidelines](.kiro/steering/00-rules.md)
 - [Python Standards](.kiro/steering/00-rules.md)
-- [Design Document](.kiro/specs/skye-structure/design.md)
-- [Requirements](.kiro/specs/skye-structure/requirements.md)
+- [Design Document](.kiro/specs/structure/design.md)
+- [Requirements](.kiro/specs/structure/requirements.md)
 
 ## Contributing
 

@@ -330,3 +330,360 @@ Written without the project name (it is being chosen); `<pkg>` is the import pac
 1. THE `models` component SHALL provide an approximate token counter using only the standard library, present in the core install.
 2. WHERE exact counts are needed, THE library SHALL use `tiktoken` through the optional `tiktoken` extra, imported lazily and never on the core runtime path; IF the extra is not installed, THEN THE library SHALL fall back to the approximate counter.
 3. THE core install SHALL NOT import a tokenizer library at import time, and `import skye` SHALL NOT import `tiktoken`.
+
+### Requirement 29: Prompt template registry
+
+**User Story:** As a developer, I want to register and inspect versioned prompt templates, so that I can organize reusable prompts and debug them.
+
+#### Acceptance Criteria
+
+1. WHEN a template is registered from a string or from a file path, THE `prompts` registry SHALL store it under the given name and version; IF the file cannot be loaded, THEN THE registry SHALL raise `FileNotFoundError` with the attempted path.
+2. WHEN a template is retrieved by name without a version, THE registry SHALL return the latest version, and WHEN with a version, the exact version; IF the template does not exist, THEN THE registry SHALL raise `KeyError`.
+3. IF a template has invalid syntax at registration, THEN THE registry SHALL raise a validation error that carries the engine's error details.
+4. WHEN templates are listed, THE registry SHALL return every registered name and version.
+5. WHEN metadata is requested, THE registry SHALL return the variables (distinguishing required from optional), the examples, the content types, the roles, and the current settings for examples, roles and content types.
+6. WHEN a template is validated, THE registry SHALL check the syntax and the variable references and return detailed results, without raising an exception for a validation failure.
+
+### Requirement 30: Prompt rendering and variables
+
+**User Story:** As a developer, I want to render templates with runtime data, defaults and conditional logic, so that I can generate dynamic prompts.
+
+#### Acceptance Criteria
+
+1. WHEN a template is rendered with all its required variables, THE builder SHALL return a list of `SkyeMessage` objects.
+2. IF a required variable is missing, THEN THE builder SHALL raise `ValueError` naming the variables, unless the variable is in the allowed-missing list set by the developer.
+3. WHEN variables that the template does not use are provided, THE builder SHALL ignore them without error.
+4. THE builder SHALL use the default values for variables that are not provided, merge provided variables over the defaults with the provided ones winning, and call callable defaults to get their current values.
+5. WHEN the variables of a template are extracted, THE builder SHALL return every variable name found in it.
+6. WHEN a partial builder is created with bound variables, THE builder SHALL return a new instance with those variables pre-filled.
+7. WHEN a template is composed from several parts, THE builder SHALL create a new template by joining the parts with the given separator.
+8. THE template engine SHALL evaluate conditionals, loops and filters, SHALL let the developer register custom filters available in every rendering, and SHALL support whitespace control.
+9. THE template engine SHALL NOT support macros, template inheritance, include directives or variable assignment (decision D20).
+
+### Requirement 31: Few-shot examples
+
+**User Story:** As a developer, I want to attach examples to templates and select them dynamically, so that I can implement few-shot prompting.
+
+#### Acceptance Criteria
+
+1. WHEN examples are added to a template, THE builder SHALL store them and, at rendering, format and inject them with the configured example template.
+2. WHERE a semantic example selector is configured, THE builder SHALL select the examples most relevant to the input by similarity.
+3. WHERE a random selector is configured, THE builder SHALL select random examples up to the maximum; WHERE a fixed selector is configured, it SHALL always use the same set.
+4. WHEN no example selector is configured, THE builder SHALL use all available examples up to a reasonable default limit.
+
+### Requirement 32: Prompt message roles and multimodal content
+
+**User Story:** As a developer, I want to control message roles and include images and other media, so that I can build proper conversations for text, vision and audio models.
+
+#### Acceptance Criteria
+
+1. WHEN roles are set for template sections, THE builder SHALL create a separate `SystemMessage`, `UserMessage` or `AssistantMessage` for each, and WHEN no role mapping is given, a `UserMessage`.
+2. WHEN message placeholders are added, THE builder SHALL allow dynamic insertion of conversation history.
+3. IF a role name is invalid, THEN THE builder SHALL raise a validation error.
+4. WHEN content is configured for a variable, THE builder SHALL process image URLs, base64 data and file paths, validate the content format, and create messages with the proper multimodal content structure.
+5. WHEN multimodal content is rendered, THE builder SHALL preserve the content type metadata in the resulting messages.
+6. IF the image format or a content type is invalid, THEN THE builder SHALL raise a validation error with a descriptive message that lists the supported formats.
+
+### Requirement 33: Prompt output schema
+
+**User Story:** As a developer, I want to declare the expected output schema in a prompt, so that I can generate structured outputs and validate responses.
+
+#### Acceptance Criteria
+
+1. WHEN an output schema is set with a dataclass, THE builder SHALL generate the JSON-schema instructions for it (decision D24: a Pydantic model is not used).
+2. WHEN an output schema is set with a JSON-schema dictionary, THE builder SHALL format it for the model.
+3. WHEN output instructions are requested, THE builder SHALL return them formatted from the configured schema, and an empty text when no schema is configured.
+4. IF a schema is invalid, THEN THE builder SHALL raise a validation error.
+
+### Requirement 34: Prompts integration and performance
+
+**User Story:** As a developer, I want prompts to fit the rest of the library and render fast, so that I can use them with other components under load.
+
+#### Acceptance Criteria
+
+1. THE `prompts` component SHALL need no third-party dependency (decisions D20 and Requirement 13: the template engine is the standard-library one).
+2. THE builder SHALL create standard `SkyeMessage` objects that every provider accepts, and SHALL create and format `CapabilityMessage` objects when used with capabilities.
+3. THE builder SHALL follow the library's configuration patterns with `${VAR}` substitution (Requirement 20.4), and SHALL use the library's exception hierarchy and logging.
+4. WHEN a template is registered, THE builder SHALL compile and cache it, and SHALL reuse the compiled template for later renderings without recompiling.
+5. THE builder SHALL cache the variable list of a template and the formatted examples for reuse.
+6. WHEN many templates are registered, THE builder SHALL keep memory use reasonable through efficient storage.
+
+### Requirement 35: Policy model and evaluation
+
+**User Story:** As a security owner, I want rules expressed as permit and forbid with predictable evaluation, so that access is explicit, reviewable and repeatable.
+
+#### Acceptance Criteria
+
+1. THE `policy` component SHALL represent a policy as an effect (permit or forbid), a scope over principal, action and resource, and optional when and unless conditions over context and attributes.
+2. THE `policy` component SHALL allow a scope element to be any, an exact entity, a set of entities, or a membership test (in a group or collection).
+3. THE `policy` component SHALL give every policy an identifier and optional annotations (description, owner).
+4. THE `policy` component SHALL deny a request unless at least one permit policy matches, and WHEN any forbid policy matches, SHALL deny whatever the permits.
+5. THE `policy` component SHALL return the decision with the identifiers of the policies that determined it.
+6. THE `policy` component SHALL evaluate without side effects and give the same decision for the same inputs.
+7. WHEN a condition cannot be evaluated (a missing attribute, a type error), THE `policy` component SHALL treat that policy as not matching and record the error.
+8. THE conditions SHALL support comparisons, boolean operators, set membership, attribute presence tests, string prefix and suffix tests, and membership in an entity hierarchy.
+9. THE conditions SHALL NOT support loops, user-defined functions, I/O or regular expressions.
+10. THE `policy` component SHALL bound evaluation time by the size of the policy set, with no unbounded recursion.
+
+### Requirement 36: Policy entities, representation and validation
+
+**User Story:** As a platform engineer, I want to describe who and what exists, write policies in a reviewable format, and have mistakes found at load time, so that policies are correct before any request is denied.
+
+#### Acceptance Criteria
+
+1. THE `policy` component SHALL take entities from an entity provider supplied by the caller, as identifier, attributes and parents.
+2. THE `policy` component SHALL support principals from IAM identities and from JWT claims, mapped by a configurable function.
+3. THE `policy` component SHALL treat an unknown entity as having no attributes and no parents.
+4. THE `policy` component SHALL load policies from JSON and TOML with the standard library.
+5. THE `policy` component SHALL define a text syntax close to Cedar for the same policies (open decision O9).
+6. IF a policy has an error, THEN THE `policy` component SHALL report it with the policy identifier and the position of the problem.
+7. THE `policy` component SHALL export a policy set to the representation it was loaded from without changing its meaning.
+8. THE `policy` component SHALL validate policies against a schema of entity types, actions and attributes, built from the gateway registry so that every tool is an action.
+9. IF a policy names an unknown action or attribute, THEN THE `policy` component SHALL reject the policy set at load time.
+
+### Requirement 37: Policy integration, enforcement and observability
+
+**User Story:** As a security owner, I want one engine for every place that needs a decision, a way to try policies before enforcing them, and a record of every decision, so that access is enforced and auditable.
+
+#### Acceptance Criteria
+
+1. THE `policy` component SHALL implement the authorizer Port (Requirement 4.2): one interface that takes principal, action, resource and context and returns a decision.
+2. THE gateway SHALL use the engine for tool listing, tool discovery and tool calls; the router MAY use it to restrict the models and regions a principal may use; the agent loop MAY use it through a hook provider at the policy check operation; the memory systems MAY use it for read and write access.
+3. THE `policy` component SHALL support enforce and log-only modes, set per policy set, and in log-only mode SHALL return allow and record the decision it would have made.
+4. THE `policy` component SHALL load a policy set from a file, an environment variable or an external store (DynamoDB through boto3 in Lambda).
+5. THE `policy` component SHALL cache a loaded policy set with a time to live and refresh it inside the request that notices the expiry, not in a background thread.
+6. THE `policy` component SHALL give each policy set a version and a content hash and include both in every decision log.
+7. THE `policy` component SHALL write one structured JSON log line per decision (principal, action, resource, decision, determining policies, policy set version, latency) and SHALL NOT log context values unless a setting enables it.
+8. THE `policy` component SHALL publish counters for allow, deny and error through the observability module.
+
+### Requirement 38: Policy dependencies and Cedar alignment
+
+**User Story:** As a maintainer and security owner, I want the policy engine to stay light and move to Cedar later without rewriting policies, so that it fits a Lambda package and has a clear upgrade path.
+
+#### Acceptance Criteria
+
+1. THE `policy` component SHALL use only the standard library, with no compiled dependency and no third-party import at module level.
+2. THE `policy` component SHALL have an entry in `budgets.toml` for import time and a limit on evaluation time for a typical policy set (values open, O10), and SHALL pass the budget tests.
+3. THE `policy` component SHALL document which parts of Cedar it implements and which it leaves out.
+4. THE `policy` component SHALL keep the permit, forbid, scope and condition semantics identical to Cedar for the parts it implements.
+5. THE `policy` component SHALL be tested with policies and requests whose expected decisions come from the Cedar documentation (availability and licence of an official conformance suite is open, O9).
+
+### Requirement 39: Agent loop and hook points
+
+**User Story:** As a developer, I want the agent loop in one reusable class with a hook point before and after each operation, so that I can build my own agent without rewriting the loop.
+
+#### Acceptance Criteria
+
+1. THE `agents` component SHALL provide a `BaseAgent` class that implements the agent loop for synchronous and asynchronous use.
+2. THE `BaseAgent` SHALL take as inputs the model (or the router), a `ToolProvider`, optional memory and optional hook providers.
+3. THE `BaseAgent` SHALL stop when the model returns a final answer, when the maximum number of steps is reached, when a hook stops the run, or when the run is suspended, and SHALL return a result that states why the run ended.
+4. THE default `Agent` SHALL be a `BaseAgent` subclass and SHALL NOT duplicate the loop.
+5. THE `BaseAgent` SHALL define these operations, each with a pre hook point and a post hook point: run, step, toolset selection, model call, tool call, memory read, memory write, safety check, policy check.
+6. WHEN an operation fails, THE `BaseAgent` SHALL call the error hooks of that operation.
+7. THE `BaseAgent` SHALL pass each hook a context with the `AgentState`, the operation name and the operation payload (the request before, the result after).
+8. THE `agents` component SHALL list the operations in one enumeration so that hooks can be registered by name.
+
+### Requirement 40: Hook semantics and customization
+
+**User Story:** As a developer, I want hooks that can change what happens, in several ways to customize, so that a small change does not need a new class and observers cannot alter a run.
+
+#### Acceptance Criteria
+
+1. THE pre hook of an operation SHALL be able to return one of: continue unchanged, continue with a modified payload, skip the operation and supply its result, or deny the operation with a reason.
+2. THE post hook of an operation SHALL be able to return one of: keep the result, replace the result, retry the operation with a modified payload within a retry limit, or stop the run.
+3. THE `BaseAgent` SHALL run pre hooks in registration order and post hooks in reverse order.
+4. THE `BaseAgent` SHALL accept hooks written as synchronous or asynchronous functions.
+5. WHEN a hook raises an error, THE `BaseAgent` SHALL apply a per-hook setting, fail closed (stop the operation) or fail open (log and continue), the default being fail closed for hooks that protect (safety, policy, limits) and fail open for observers.
+6. THE `BaseAgent` SHALL provide a retry limit and a per-hook time limit (default values open, O11).
+7. THE `BaseAgent` SHALL let a subclass override a method for each hook point, let a caller register and remove hooks on an instance by operation name, and accept hook providers that register several hooks together.
+8. THE `BaseAgent` SHALL let hooks be restricted to a subset of tools or models, by name or tag.
+9. THE `BaseAgent` SHALL document the order in which subclass overrides, instance hooks and hook providers run.
+10. THE `BaseAgent` SHALL call the existing event-handler methods for model calls, tool calls, steps and completion.
+11. THE `BaseAgent` SHALL treat event-handler implementations as observers: their errors SHALL NOT stop the run, and they SHALL NOT modify a payload or a result.
+
+### Requirement 41: Default agent behaviour
+
+**User Story:** As a developer, I want the default agent's own rules to be visible and removable, so that nothing is hidden in the loop.
+
+#### Acceptance Criteria
+
+1. THE default `Agent` SHALL provide these optional, replaceable hook providers: limits (steps, tokens, cost, time), safety (the safety Port), policy (the authorizer Port), observability (the event-handler and observer Ports), and checkpointing.
+2. THE default `Agent` SHALL enable the limits provider by default.
+3. WHEN a safety filter or an authorizer is configured, THE default `Agent` SHALL enable the matching provider automatically.
+4. THE default `Agent` SHALL expose the list of active hooks, in execution order, for inspection.
+
+### Requirement 42: Agent toolset, state and resumability
+
+**User Story:** As a platform engineer, I want the agent to ask for the tools its operation needs and a run to survive the end of a Lambda invocation, so that the loop behaves correctly in serverless.
+
+#### Acceptance Criteria
+
+1. THE `BaseAgent` SHALL obtain tools only through a `ToolProvider`, at the toolset selection operation, at the start of a run and again when a hook or the model asks for different tools.
+2. THE `BaseAgent` SHALL work with the local capability registry as `ToolProvider` without any gateway.
+3. WHEN the `ToolProvider` is the gateway client, THE `BaseAgent` SHALL carry the scope token in the `AgentState` and send it with every tool call, and SHALL pass the operation description to the `ToolProvider` (who writes it is open, O12).
+4. THE `BaseAgent` SHALL keep the whole run in an `AgentState` that serializes to JSON with the standard library.
+5. THE `BaseAgent` SHALL save a checkpoint through the storage Port at configurable points (after each step by default).
+6. WHEN the remaining time, read from a configurable function (the Lambda context, or a deadline elsewhere), is below a configurable margin, THE `BaseAgent` SHALL stop before the next step and return a `Suspended` result with the checkpoint identifier.
+7. WHEN given a checkpoint identifier, THE `BaseAgent` SHALL resume the run from the saved state.
+8. THE `BaseAgent` SHALL NOT use multiprocessing and SHALL NOT start work that continues after the run returns.
+9. WHEN a model asks for several tools in one step, THE `BaseAgent` SHALL run them concurrently, with asyncio or threads, up to a configurable limit, and return the results in the order the model asked for them.
+10. WHEN a model call fails, THE `BaseAgent` SHALL use the fallbacks and retries of the router before failing the operation.
+11. WHEN a tool call fails, THE `BaseAgent` SHALL return the error to the model as a tool result, unless a hook stops the run (the default per error type is open, O13).
+12. THE `BaseAgent` SHALL stop after a configurable number of consecutive failed steps.
+13. THE `BaseAgent` SHALL count tokens and cost per run from the model responses and expose them in the result.
+
+### Requirement 43: Agent runtime packaging and tests
+
+**User Story:** As a maintainer, I want the runtime light and testable without a real model, so that it stays in budget and its loop and hooks are verified.
+
+#### Acceptance Criteria
+
+1. THE `agents` component SHALL use the standard library for the models of state, hooks and results (dataclasses, enums, json) and SHALL NOT add a third-party import at module level.
+2. THE `agents` component SHALL be part of the core, with no extra of its own.
+3. THE `agents` component SHALL have an entry in `budgets.toml` for import time and module count (values open, O11) and SHALL pass the budget tests.
+4. THE library SHALL provide a scripted model for tests that returns prepared responses and tool calls.
+5. THE test suite SHALL cover each hook outcome (continue, modify, skip, deny, retry, replace, stop), the hook order, fail open and fail closed, suspension and resumption, and concurrent tool calls.
+
+### Requirement 44: Gateway endpoint, targets, registry and local mode
+
+**User Story:** As an agent developer and platform engineer, I want one standard MCP endpoint over targets I attach, backed by an external registry, that also runs locally, so that any MCP client can use my tools and I can test without AWS.
+
+#### Acceptance Criteria
+
+1. THE `gateway` SHALL serve MCP over stateless HTTP, handling initialize, ping, tools/list and tools/call, and SHALL NOT require a session held in the memory of one process between requests.
+2. THE `gateway` SHALL return protocol errors in the JSON-RPC format defined by MCP.
+3. THE `gateway` SHALL be implemented with the Python standard library, without the `mcp` package and without a web framework.
+4. THE `gateway` SHALL state the MCP specification version it implements (the version, and whether responses stream, are open, O14).
+5. THE `gateway` SHALL support four target types: Lambda function, OpenAPI document, upstream MCP server, local capability.
+6. WHEN a target is registered, THE `gateway` SHALL convert its operations into tools with a stable identifier made of the target and the tool name.
+7. THE `gateway` SHALL read OpenAPI documents in JSON, and in YAML only when the optional YAML parser is installed.
+8. WHEN one target fails, THE `gateway` SHALL keep serving the tools of the other targets.
+9. THE `gateway` SHALL reuse the existing capability registry for local capabilities.
+10. THE `gateway` SHALL keep the registry in an external store: DynamoDB through boto3 in Lambda, files or memory for local use and tests (whether S3 or Parameter Store are also supported is open, O15).
+11. THE `gateway` SHALL load the registry lazily and cache it in the warm container with a time to live, and WHEN the time to live expires SHALL refresh it inside the request that notices it, not in a background thread.
+12. THE `gateway` SHALL store for each tool its name, description, argument schema, tags, target and version.
+13. THE `gateway` SHALL run as a local HTTP server built on the standard library, using the same request handler as in Lambda.
+
+### Requirement 45: Gateway toolset per operation, discovery and scope token
+
+**User Story:** As an agent developer, I want the agent to see only the tools its current operation needs, find more when it needs them, and have that bound by a stateless token, so that prompts stay small and the agent cannot reach tools it should not use.
+
+#### Acceptance Criteria
+
+1. WHEN a client lists tools for an operation, THE `gateway` SHALL return only the toolset selected for that operation, taking the operation description, tags and principal from the caller in each request.
+2. THE `gateway` SHALL limit the size of a toolset to a configurable maximum (the default is open, O16).
+3. THE `gateway` SHALL reject a tool call for a tool outside the toolset named by the scope token.
+4. WHEN no operation is given, THE `gateway` SHALL return only the discovery tool.
+5. THE `gateway` SHALL always expose a discovery tool (`<prefix>_find_tools`) that takes a query and returns matching tools.
+6. WHEN the discovery tool returns tools, THE `gateway` SHALL return an extended scope token that includes them.
+7. THE `gateway` SHALL apply the authorizer to the discovery results, so that a caller never learns about tools it may not use.
+8. THE `gateway` SHALL issue a scope token that carries the operation identifier, the tool identifiers, the principal and an expiry time.
+9. THE `gateway` SHALL sign the scope token with HMAC-SHA256 from the standard library.
+10. WHEN a tools/call arrives, THE `gateway` SHALL verify the signature and the expiry before executing.
+11. THE `gateway` SHALL read the signing key from the environment or from a secrets store (key rotation is open, O17).
+
+### Requirement 46: Gateway selection strategies
+
+**User Story:** As an agent developer, I want to choose tools with hybrid search or with a decision model, so that the agent gets the right few tools fast, with every choice a setting of mine and not a hidden default.
+
+#### Acceptance Criteria
+
+1. THE `gateway` SHALL define a selector interface that takes an operation and the registry and returns ranked tools with a reason for each, so that other selectors can be added later.
+2. THE `gateway` SHALL ship two selectors: hybrid search and Jev.
+3. THE hybrid selector SHALL combine a lexical ranking (BM25-style, standard library) with a semantic ranking (embeddings from a model of the `models` component) and fuse the two rankings.
+4. THE `gateway` SHALL support more than one fusion method (reciprocal rank fusion and weighted scores), chosen by a setting.
+5. THE `gateway` SHALL compute the embedding of a tool when the tool is registered and store it through a vector storage interface, with an implementation that keeps vectors with the tool in the registry and room for others, and SHALL NOT require a vector database.
+6. THE `gateway` SHALL support ranking all tools and ranking only the best N lexical candidates, chosen by a setting.
+7. WHEN the embedding service is unavailable, THE hybrid selector SHALL use the lexical ranking alone and record that it did.
+8. THE Jev selector SHALL ask a decision model (Jev, or any model that implements the decision Port of `models`) to choose the tools for an operation from a shortlist, and SHALL record the probabilities it returns.
+9. THE `gateway` SHALL reach a decision model through an endpoint and credentials given in settings, and SHALL work with any endpoint that speaks the Jev wire format, local-jev included.
+10. WHEN there are more candidates than the maximum number of labels set for the decision model, THE selector SHALL choose in two steps, domain first and then tool.
+11. WHEN the probability of the best choice is below the configured threshold, THE selector SHALL return the hybrid shortlist instead; WHEN the decision model is unavailable, THE `gateway` SHALL fall back to the hybrid selector and record the fallback.
+12. THE `gateway` SHALL support three modes, chosen per operation type by a setting: hybrid alone, Jev alone, and hybrid then Jev (hybrid builds the shortlist, Jev chooses from it).
+13. THE `gateway` SHALL record which selector and which mode exposed each tool, for audit.
+14. THE `gateway` SHALL NOT choose the mode, the decision model, the embedding model, the vector storage or any threshold on its own; each is a setting provided by the owner, and WHEN the chosen mode needs a setting that is not set, THE `gateway` SHALL fail with a clear error naming it.
+15. THE `gateway` SHALL define one configuration object for these settings: the selection mode per operation type; the decision model endpoint and credentials, maximum labels and probability threshold; the embedding model and the vector storage; the hybrid fusion method, the number of lexical candidates (all or the best N) and the weights; and the toolset size per operation.
+
+### Requirement 47: Gateway authorization
+
+**User Story:** As a platform engineer and security owner, I want to know who is calling, call each target with its own credentials, and have every listing and call authorized in one place, so that callers never hold credentials and access is enforced.
+
+#### Acceptance Criteria
+
+1. THE `gateway` SHALL support AWS IAM (SigV4) authentication and a JWT authorizer in front of it, taking the principal from the verified identity.
+2. THE `gateway` SHALL NOT verify JWT signatures itself unless this is approved in design (it needs RSA verification without a compiled library, O18).
+3. WHEN no identity is available, THE `gateway` SHALL deny the request unless an explicit local-development setting allows it.
+4. THE `gateway` SHALL support these outbound modes per target, through the `auth` component: the function execution role, API key, OAuth client credentials, SigV4 signing.
+5. THE `gateway` SHALL cache an OAuth access token in the warm container until shortly before it expires.
+6. THE `gateway` SHALL NOT include credentials in tool results, logs or error messages.
+7. THE `gateway` SHALL ask the authorizer for a decision on every tools/list, every discovery query and every tools/call (Requirement 4.3).
+8. WHEN the decision is deny, THE `gateway` SHALL omit the tool from listings and reject the call.
+9. THE `gateway` SHALL support an enforcement mode and a log-only mode.
+
+### Requirement 48: Gateway operation: Lambda, observability and budgets
+
+**User Story:** As a platform engineer and maintainer, I want the gateway to behave correctly in Lambda, leave a record of what each agent could see and do, and stay small, so that it deploys in one function within budget.
+
+#### Acceptance Criteria
+
+1. THE `gateway` SHALL NOT use multiprocessing and SHALL NOT depend on work that continues after the response is returned, because the environment is frozen between invocations.
+2. THE `gateway` SHALL run concurrent I/O, such as calls to several targets, with asyncio or threads inside one invocation only.
+3. THE `gateway` SHALL finish every request within a configurable time limit and return a partial result with an error note when a target is late.
+4. THE `gateway` SHALL keep all state that must survive between invocations in the external store.
+5. THE `gateway` SHALL write one structured JSON log line per decision (principal, operation identifier, selector, tools exposed or called, policy decision, latency) and SHALL NOT log tool arguments or results unless explicitly enabled.
+6. THE `gateway` SHALL publish its counters through the observability module.
+7. THE `gateway` SHALL depend only on the standard library and libraries preinstalled in AWS Lambda.
+8. THE `gateway` SHALL have its own entry in `budgets.toml` for size over the core and import time (values open, O16) and SHALL be covered by the budget tests in the pull request workflow.
+
+### Requirement 49: Teams
+
+**User Story:** As a developer, I want to coordinate several units (models, agents, flows or other teams) toward a shared objective, so that I can build multi-unit behavior from one abstraction.
+
+#### Acceptance Criteria
+
+1. THE `teams` component SHALL define a `TeamMember` that holds a `Runnable`, a role, a name and metadata.
+2. THE roles SHALL be free strings defined by the team type and not a closed enumeration in `base` (Requirement 5.2).
+3. THE `teams` component SHALL provide a supervisor that decides which member works next and how work is routed to members, and the supervisor MAY use a decision model received as a `Runnable`.
+4. THE `teams` component SHALL provide coordination strategies: parallel, hand-off and vote.
+5. THE `teams` component SHALL detect a team that contains itself, directly or transitively (Requirement 5.3).
+
+### Requirement 50: Flows
+
+**User Story:** As a developer, I want to sequence units into steps with conditions and error handling, so that I can express a workflow as data.
+
+#### Acceptance Criteria
+
+1. THE `flows` component SHALL define a step with a name (`step_name`), an error handler (`on_error`), conditions and branching, and each step SHALL hold a `Runnable`.
+2. THE `flows` component SHALL run steps in sequence, SHALL run in parallel the steps declared as parallel, and SHALL apply the step's error handler when it fails.
+3. THE `flows` component SHALL detect a flow that contains itself, directly or transitively (Requirement 5.3).
+
+### Requirement 51: Guard
+
+**User Story:** As a security owner, I want safety filters and pre-flight checks that the runtime can use without depending on them, so that unsafe inputs and outputs are caught and no optional service is forced on a user.
+
+#### Acceptance Criteria
+
+1. THE `guard` component SHALL provide safety filters that validate the input and the output of a model call through the safety Port in `base`.
+2. THE `guard` component SHALL provide pre-flight checks that MAY ask a decision model (Requirement 9.8).
+3. THE runtime components SHALL reach `guard` only through the safety Port, never by import (Requirement 4.1).
+
+### Requirement 52: Memory
+
+**User Story:** As a developer, I want conversation and state memory behind one Port, so that agents can remember without depending on a particular store.
+
+#### Acceptance Criteria
+
+1. THE `memory` component SHALL provide conversation and state memory through the memory Port in `base`, persisting through the storage Port (Requirement 12.1).
+2. THE `memory` extra SHALL declare exactly the libraries the component imports, `redis` and `asyncpg`, and no compiled driver (Requirement 7.1).
+3. THE runtime components SHALL reach `memory` only through the memory Port, never by import (Requirement 4.1).
+
+### Requirement 53: Observe
+
+**User Story:** As a platform engineer, I want events, logs, metrics and traces behind Ports, so that I can plug the library into my observability stack without the runtime depending on it.
+
+#### Acceptance Criteria
+
+1. THE `observe` component SHALL provide events, logs, metrics and traces through the observer and event-handler Ports in `base`.
+2. THE `observe` component SHALL accept new exporters through its registry (Requirement 6.1).
+3. WHERE an exporter has no standard-library path, THE `observe` extra SHALL declare only that library (Requirement 7.1).
+4. THE runtime components SHALL reach `observe` only through the observer Port, never by import (Requirement 4.1).

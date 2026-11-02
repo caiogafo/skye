@@ -50,3 +50,13 @@ recorded in the repository; "n/d" where I could not recover it (check git).
 - **O6** Where `base/http.py` goes, given that `base` must do no I/O; and whether cloud secret managers are in scope of `auth`.
 - ~~**O7** Where MCP resources live; whether the MCP prompt facet implements `PromptBuilderInterface`.~~ Taken as **D26** (resource Port in `base` implemented by the MCP client; prompt facet returns `base` messages, not `PromptBuilderInterface`).
 - **O8** Whether decision models (Jev) get their own milestone in `models` and a selector in `gateway`.
+- **O9** Policy: the text syntax in the first release (or JSON and TOML first), how much of the Cedar grammar, how closely Cedar compatibility is promised, and whether an official conformance suite is available and under which licence.
+- **O10** Policy: how principals map from IAM roles and JWT claims (one fixed way, or defined by each application), the policy-set cache lifetime and the evaluation time limit.
+- **O11** Agents: the names `BaseAgent` and `Agent` and whether the operation list misses anything (for example a streaming-chunk hook); streaming hooks on each chunk or only on the complete response; the defaults for retry limit, hook time limit, maximum steps and consecutive failure limit; the budget values.
+- **O12** Agents and gateway: who writes the operation description (the agent, the calling application, or the gateway from the conversation).
+- **O13** Agents: whether a tool failure goes back to the model by default or stops the run, per error type; whether checkpointing is on by default in Lambda or opt-in.
+- **O14** Gateway: which MCP specification version to target and whether responses stream.
+- **O15** Gateway: the registry store, DynamoDB only or also S3 or Parameter Store.
+- **O16** Gateway: the default and maximum toolset size, and the budget values.
+- **O17** Gateway: scope-token key management and rotation.
+- **O18** Gateway: JWT signature verification in the gateway itself (RSA without a compiled library), and whether the gateway also fronts model calls (the router) or only tools.

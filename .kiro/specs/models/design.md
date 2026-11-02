@@ -131,7 +131,7 @@ When a request declares an output shape, the adapter uses the provider's native 
 and otherwise function calling, then validates the result against the shape (Requirement 27.1). The declared shape is a
 dataclass, not a pydantic model (Requirement 27.2, D24); a non-conforming result raises `ValidationError` naming the field.
 Note: the current `base/completion.py` still types `response_schema`/`structured_output` as pydantic models; moving them to
-dataclasses is open work tracked in tasks.md and in `.kiro/docs/requirements-trace.md` (D24, O4).
+dataclasses is open work tracked in tasks.md (D24, O4).
 
 ### Token counting and cost
 
@@ -229,8 +229,7 @@ to the standard-library approximation when the extra is absent.
 
 ## Superseded (history)
 
-The former `model-providers` spec is replaced, not deleted; where each of its criteria went is recorded in
-`.kiro/docs/requirements-trace.md`. The changes:
+The former `model-providers` spec is replaced, not deleted; its text is in the git history. The changes:
 - The selecting `ProviderRegistry` with SDK discovery and fallback is gone: one REST adapter per provider, no selector, no
   `impl` setting, no SDK fallback (D13; Requirement 9.3). `ProviderRegistry` survives only as a name-to-class map behind the
   registry Port.

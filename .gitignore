@@ -60,3 +60,6 @@ uv.lock
 
 # Serena
 .serena/
+
+# personal working notes (not part of the wiki, not committed)
+docs/_notes/

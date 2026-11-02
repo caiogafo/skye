@@ -29,14 +29,16 @@ Add a file to the right group; do not invent a prefix. Keep the set small: merge
 ## Canonical names for specs
 - **Spec name = component name**, exactly, lower case: `.kiro/specs/models/`, `.kiro/specs/auth/`. No suffix, no prefix, no `-support`,
   `-engine` or `-runtime`. The 15 names are in Requirement 1; there is no spec with another name. Specs are never archived or deleted.
-- **The one exception is `skye-structure`**, the cross-cutting spec. It holds the work that belongs to no single component: the system
+- **The one exception is `structure`**, the cross-cutting spec. It holds the work that belongs to no single component: the system
   structure, the documentation wiki and the old consolidation work, all inside its own three files and with no subfolder. Its tasks are
-  numbered groups (`skye-structure` group 11 is the wiki).
+  numbered groups (`structure` group 11 is the wiki).
 - **Files** are exactly `requirements.md`, `design.md`, `tasks.md` (Kiro's three). No other file is a source of truth.
 - **Front matter** of each spec file: `component: <name>` and `codename: <word>`; `previous_name: <old folder>` while a renamed spec still
   has that history.
-- **Milestones** are `M1`, `M2`, ... in build order, with a short title. **Task IDs** are `<component>:M<n>.<k>` (for example
-  `models:M2.3`), so a task can be cited from any other document without ambiguity.
+- **Tasks** use Kiro's task syntax, because Kiro's tools validate it: a milestone is a top-level task `- [ ] 1. <title>` (or `- [x] 1. <title>`) and
+  its tasks are indented sub-tasks `  - [ ] 1.1 <title>`; an optional task adds `*` after the checkbox (`- [ ]* 1.2 <title>`). Numbers are plain
+  (`1.`, `1.1`), never `M1` or a component prefix in the line. The **task ID** used to cite a task from another document is `<component>:<N.k>`
+  (for example `models:2.3`).
 - **Requirements** are cited as `Requirement N` or `Requirement N.k` (the numbers in `10-requirements.md`); decisions as `D<n>`;
   open decisions as `O<n>`.
 
@@ -50,7 +52,7 @@ and `#[[file:.kiro/steering/11-design.md]]`). One spec = one component, named li
    `### Requirement N: <title>` blocks numbered 1..n, each with `**User Story:**` and `#### Acceptance Criteria`. Our rule on top of the format:
    every criterion is a pointer and nothing else, in one of three exact forms:
    `THE spec SHALL realize Requirement 9.2 of #[[file:.kiro/steering/10-requirements.md]].` or
-   ``THE spec SHALL honor decision D13 of `.kiro/steering/12-decisions.md`.`` or the history form used in `skye-structure`.
+   `THE spec SHALL honor decision D13 of #[[file:.kiro/steering/12-decisions.md]].` or the history form used in `structure`.
    A real rule is never written in the spec: if a story needs one that steering does not state, go back to step 1. The number in a spec heading
    is local to the spec; the number in a pointer is the steering one. `tests/budget/test_specs_format.py` fails on any other criterion.
    **How to fetch a requirement:** each steering requirement starts at `### Requirement N: <title>` and its criteria are the numbered list under
@@ -95,4 +97,4 @@ Steering is always changed before the spec: first `10-requirements.md` or `11-de
 - One glossary page maps every codename to its plain name and role, lists the documentation-only watermarks (the `Runnable` Port's
   and the project umbrella watermark) separately, and states the `auth` (authentication) vs `policy` (authorization) contrast.
 - Every page has front matter (title, status, last_updated, related pages) and is linked from its section index; `docs/index.md`
-  reaches every page. The structure and migration plan are in `skye-structure` (group 11 of its tasks).
+  reaches every page. The structure and migration plan are in `structure` (group 11 of its tasks).

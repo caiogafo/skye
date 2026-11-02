@@ -10,8 +10,8 @@ This spec merges four former specs: `structure` (S), `skye` (B, the base contrac
 themselves live only in `.kiro/steering/10-requirements.md`; here each requirement is one user story, and each acceptance criterion is a pointer
 of the form `THE spec SHALL realize Requirement N.k of #[[file:.kiro/steering/10-requirements.md]]`, never a copy of the criterion. The number
 after `Requirement` in a heading below is local to this file; the number in a criterion is the steering one. Fetch a steering requirement with
-`grep -n -A25 "^### Requirement 9:" .kiro/steering/10-requirements.md`. Where each criterion of the former specs went is in
-`.kiro/docs/requirements-trace.md`.
+`grep -n -A25 "^### Requirement 9:" .kiro/steering/10-requirements.md`. The story ids (`S`, `B`, `C`, `W`) in the headings name the former specs
+(structure, base, consolidation, wiki); their text is in the git history.
 
 Assumptions of the former `structure` spec, and where they are now: A1 (pydantic against dataclasses) is open decision O4; A2 (one
 distribution) is Requirement 7.1; A3 (declared-but-minimal packages) is history, all 15 packages exist; A4 (codename theme given by the
@@ -119,7 +119,7 @@ owner) is decision D5; A5 (declarations, not execution) is history; A6 (Vertex r
 
 #### Acceptance Criteria
 
-1. THE spec SHALL keep this story as history only, its criteria being mapped in `.kiro/docs/requirements-trace.md`.
+1. THE spec SHALL keep this story as history only, no requirement of it being left in steering.
 
 ### Requirement 11: S11 Composition abstraction for orchestrators
 
@@ -222,7 +222,7 @@ owner) is decision D5; A5 (declarations, not execution) is history; A6 (Vertex r
 
 #### Acceptance Criteria
 
-1. THE spec SHALL keep this story as history only, its criteria being mapped in `.kiro/docs/requirements-trace.md`.
+1. THE spec SHALL keep this story as history only, no requirement of it being left in steering.
 2. THE spec SHALL honor decision D23 of #[[file:.kiro/steering/12-decisions.md]].
 
 ### Requirement 20: S20 One implementation per model provider (no selection machinery)

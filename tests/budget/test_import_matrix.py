@@ -1,7 +1,7 @@
 """Import-direction checks over src/skye: Layer ceiling, allowed sets, orchestrator isolation.
 
 Pure static analysis with `ast`: no network, no install, same result for the same tree.
-Spec: .kiro/steering/11-design.md (allowed imports); history in .kiro/specs/skye-structure/design.md (Allowed_Imports_Matrix), Requirements 2.3, 2.5, 2.6,
+Spec: .kiro/steering/11-design.md (allowed imports); history in .kiro/specs/structure/design.md (Allowed_Imports_Matrix), Requirements 2.3, 2.5, 2.6,
 2.7, 12.3, 12.6, 12.8, 12.9.
 
 Every top-level name below skye is mapped to its Component before the matrix is applied.

@@ -288,5 +288,5 @@ The codebase is production-ready with a clean, maintainable architecture that ma
 - [Architecture Validation Report](./provider-architecture-validation.md)
 - [Validation Script](../../scripts/validate_provider_architecture.py)
 - [BaseModelProvider](../../src/skye/models/base.py)
-- [Requirements Document](../../.kiro/specs/skye-structure/requirements.md)
-- [Design Document](../../.kiro/specs/skye-structure/design.md)
+- [Requirements Document](../../.kiro/specs/structure/requirements.md)
+- [Design Document](../../.kiro/specs/structure/design.md)

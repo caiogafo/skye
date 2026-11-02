@@ -1,6 +1,6 @@
 """Extras declare exactly what their Component imports, and `import skye` stays clean.
 
-Task 1.3 of .kiro/specs/skye-structure. No network, no install; a few subprocesses.
+Task 1.3 of .kiro/specs/structure. No network, no install; a few subprocesses.
 
 * Extras: for each Extra in pyproject.toml, the third-party libraries declared must be the
   third-party libraries the Component's code imports (module level, lazy, or through

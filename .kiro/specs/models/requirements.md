@@ -159,4 +159,4 @@ The `models` component holds the adapters for every model API kind — language 
 
 #### Acceptance Criteria
 
-1. THE spec SHALL keep this story as history only, its criteria being mapped in `.kiro/docs/requirements-trace.md`.
+1. THE spec SHALL keep this story as history only, no requirement of it being left in steering.

@@ -209,8 +209,7 @@ imported lazily, and `import skye` reaches neither `fastmcp` nor any optional MC
 
 ## Superseded (history)
 
-The former `capability-support` spec is replaced, not deleted; where each of its criteria went is recorded in
-`.kiro/docs/requirements-trace.md`. The changes:
+The former `capability-support` spec is replaced, not deleted; its text is in the git history. The changes:
 - The pydantic `CapabilitySchema`, `CapabilityResult` and `CapabilityCall` models are replaced by dataclasses (D24;
   Requirement 16.1); the code still carries the pydantic types and is migrated under O4.
 - The `fastmcp`-required, stdio/subprocess MCP design — `MCPCapability` and `MCPServerClient` that import `fastmcp` to run,

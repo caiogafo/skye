@@ -19,8 +19,6 @@ from tests.budget.measure import ROOT
 OLD = re.compile(r"nimbus", re.IGNORECASE)
 ALLOWED_PREFIXES = (
     ".kiro/specs/structure/",
-    ".kiro/docs/requirements-trace.md",  # quotes the former specs, which name the old project name
-    ".kiro/docs/open-items.md",  # status note that names the old project name
     "docs/glossary.md",  # lists the umbrella watermark `nimbus`
     "tests/budget/test_codenames.py",
     "tests/budget/test_no_old_name.py",

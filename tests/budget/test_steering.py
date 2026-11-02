@@ -192,33 +192,3 @@ def test_requirement_headings_follow_the_kiro_syntax_and_are_sequential():
         if crit != [str(i) for i in range(1, len(crit) + 1)] or not crit:
             bad.append(f"Requirement {expected}: criteria are not numbered 1..n")
     assert not bad, "; ".join(bad)
-
-
-def test_requirements_trace_points_only_to_existing_criteria():
-    """Every row of .kiro/docs/requirements-trace.md that targets `N.k` points to a criterion that exists.
-
-    The trace is the proof that no criterion of the former specs was lost when the requirements moved to steering.
-    """
-    req = (STEERING / "10-requirements.md").read_text(encoding="utf-8")
-    existing: set[str] = set()
-    current = None
-    for line in req.splitlines():
-        h = re.match(r"### Requirement (\d+):", line)
-        if h:
-            current = h.group(1)
-        c = re.match(r"(\d+)\. ", line)
-        if current and c:
-            existing.add(f"{current}.{c.group(1)}")
-    trace = (STEERING.parent / "docs" / "requirements-trace.md").read_text(encoding="utf-8")
-    rows = [r for r in trace.splitlines() if re.match(r"\| [SBCW]\d+\.\d+ \|", r)]
-    assert len(rows) >= 274, f"trace lost rows: {len(rows)}"
-    bad = []
-    for row in rows:
-        cells = [c.strip() for c in row.strip("|").split("|")]
-        source, now = cells[0], cells[-1]
-        if now.startswith(("history", "task:", "D", "O")):
-            continue
-        for t in re.findall(r"(?<![\w.])(\d+\.\d+)(?![\w.])", now.split("(")[0]):
-            if t not in existing:
-                bad.append(f"{source} -> {t}")
-    assert not bad, "; ".join(bad)

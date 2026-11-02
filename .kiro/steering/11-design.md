@@ -5,7 +5,7 @@ inclusion: manual
 # High-level design
 
 How the system is built to meet `10-requirements.md`. Component specs hold the detailed design of each component and
-cite the section they depend on. The long form, with the file-by-file mapping, is in `.kiro/specs/skye-structure/design.md`
+cite the section they depend on. The long form, with the file-by-file mapping, is in `.kiro/specs/structure/design.md`
 while that spec exists. `<pkg>` is the import package.
 
 ## Two independent axes
