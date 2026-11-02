@@ -1,6 +1,6 @@
-"""Helpers that measure what Nimbus costs to install and to load.
+"""Helpers that measure what Skye costs to install and to load.
 
-Used by the budget tests. Nothing here imports nimbus in the current process.
+Used by the budget tests. Nothing here imports skye in the current process.
 """
 
 from __future__ import annotations
@@ -99,7 +99,7 @@ def build_wheel(dest: Path) -> Path:
         check=True,
         capture_output=True,
     )
-    return next(dest.glob("nimbus-*.whl"))
+    return next(dest.glob("skyeai-*.whl"))
 
 
 def make_env(wheel: Path, extra: str | None, workdir: Path) -> Path:
@@ -110,7 +110,7 @@ def make_env(wheel: Path, extra: str | None, workdir: Path) -> Path:
     if python.exists():
         return python  # already built in this run
     subprocess.run(["uv", "venv", "--python", py, "-q", str(venv)], check=True, capture_output=True)
-    spec = f"nimbus[{extra}] @ {wheel.as_uri()}" if extra else f"nimbus @ {wheel.as_uri()}"
+    spec = f"skyeai[{extra}] @ {wheel.as_uri()}" if extra else f"skyeai @ {wheel.as_uri()}"
     subprocess.run(
         ["uv", "pip", "install", "-q", "--python", str(python), spec],
         check=True,
@@ -124,7 +124,7 @@ import json, resource, sys, time
 before = set(sys.modules)
 r0 = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
 t = time.perf_counter()
-import nimbus
+import skye
 elapsed = time.perf_counter() - t
 r1 = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
 scale = 1024 * 1024 if sys.platform == "darwin" else 1024
@@ -133,7 +133,7 @@ print(json.dumps({
     "modules": len(new),
     "ms": elapsed * 1000,
     "rss_mb": (r1 - r0) / scale,
-    # only what `import nimbus` itself loaded: a .pth file of an installed SDK (e.g. the
+    # only what `import skye` itself loaded: a .pth file of an installed SDK (e.g. the
     # google-cloud-aiplatform nspkg.pth) pre-imports `google` at interpreter start-up
     "loaded": sorted({m.split(".")[0] for m in new}),
 }))
@@ -141,7 +141,7 @@ print(json.dumps({
 
 
 def load_metrics(python: str | Path, runs: int = 5) -> dict:
-    """Best of several fresh interpreters: import nimbus and report cost."""
+    """Best of several fresh interpreters: import skye and report cost."""
     results = [
         json.loads(
             subprocess.check_output([str(python), "-c", LOAD_PROBE], text=True, cwd=tempfile.gettempdir())
@@ -161,10 +161,10 @@ def importable(python: str | Path, module: str) -> bool:
     return proc.returncode == 0
 
 
-def nimbus_subpackages() -> list[str]:
-    src = ROOT / "src" / "nimbus"
+def skye_subpackages() -> list[str]:
+    src = ROOT / "src" / "skye"
     return sorted(
-        f"nimbus.{p.name}" for p in src.iterdir() if p.is_dir() and (p / "__init__.py").exists()
+        f"skye.{p.name}" for p in src.iterdir() if p.is_dir() and (p / "__init__.py").exists()
     )
 
 
@@ -176,7 +176,7 @@ def module_level_third_party_imports(lambda_libs: list[str]) -> dict[str, list[s
     """
     import ast
 
-    stdlib = set(sys.stdlib_module_names) | {"nimbus"}
+    stdlib = set(sys.stdlib_module_names) | {"skye"}
     allowed = {normalize(n).replace("-", "_") for n in lambda_libs} | {"dateutil"}
     found: dict[str, set[str]] = {}
 
@@ -206,14 +206,14 @@ def module_level_third_party_imports(lambda_libs: list[str]) -> dict[str, list[s
                     walk(block, path)
 
     src = ROOT / "src"
-    for file in sorted((src / "nimbus").rglob("*.py")):
+    for file in sorted((src / "skye").rglob("*.py")):
         walk(ast.parse(file.read_text(encoding="utf-8")).body, str(file.relative_to(src)))
     return {k: sorted(v) for k, v in sorted(found.items())}
 
 
 def report(line: str) -> None:
-    """Append a markdown line to the file named by NIMBUS_BUDGET_REPORT (CI summary)."""
-    target = os.environ.get("NIMBUS_BUDGET_REPORT")
+    """Append a markdown line to the file named by SKYE_BUDGET_REPORT (CI summary)."""
+    target = os.environ.get("SKYE_BUDGET_REPORT")
     if target:
         with open(target, "a", encoding="utf-8") as fh:
             fh.write(line + "\n")

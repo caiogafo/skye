@@ -1,6 +1,6 @@
-"""Boundary rule at runtime, both MCP clients (needs fastmcp; Req 20.1-20.3, task 15.4).
+"""Boundary rule at runtime, both MCP clients (needs fastmcp; Requirement 16, task 7.4).
 
-Built-in and fastmcp clients, against the local fake server, return identical Nimbus types and
+Built-in and fastmcp clients, against the local fake server, return identical Skye types and
 nothing originating from `mcp`/`fastmcp`/`httpx`. The static half is tests/budget/test_boundary_rule.py.
 """
 
@@ -10,8 +10,8 @@ import pytest
 
 pytest.importorskip("fastmcp", reason="fastmcp not installed (dev/test dependency group)")
 
-from nimbus.tools.mcp_client import BuiltinMCPClient  # noqa: E402
-from nimbus.tools.mcp_fastmcp import FastMCPClient  # noqa: E402
+from skye.tools.mcp_client import BuiltinMCPClient  # noqa: E402
+from skye.tools.mcp_fastmcp import FastMCPClient  # noqa: E402
 from tests.budget.test_boundary_rule import _foreign_types  # noqa: E402
 
 
@@ -28,7 +28,7 @@ async def _surface(c):
     }
 
 
-async def test_mcp_clients_expose_only_nimbus_types_and_same_types(mcp_server):
+async def test_mcp_clients_expose_only_skye_types_and_same_types(mcp_server):
     out = [await _surface(c) for c in (BuiltinMCPClient(mcp_server.url), FastMCPClient(mcp_server.url))]
     for surface in out:
         assert not _foreign_types(surface)

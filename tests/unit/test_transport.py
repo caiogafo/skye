@@ -7,11 +7,11 @@ from unittest.mock import patch
 
 import pytest
 
-from nimbus.base.exceptions import ProviderError
-from nimbus.models.transport import http
-from nimbus.models.transport.retry import with_retry
-from nimbus.auth.sigv4 import sign_request
-from nimbus.models.transport.streaming import SSEEvent, parse_sse
+from skye.base.exceptions import ProviderError
+from skye.models.transport import http
+from skye.models.transport.retry import with_retry
+from skye.auth.sigv4 import sign_request
+from skye.models.transport.streaming import SSEEvent, parse_sse
 
 
 class TestSSE:

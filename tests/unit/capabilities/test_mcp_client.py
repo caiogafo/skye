@@ -12,13 +12,13 @@ from types import SimpleNamespace
 
 import pytest
 
-from nimbus.base.exceptions import ConfigurationError, MissingExtraError, ProviderError, ValidationError
-from nimbus.base.messages import AssistantMessage, UserMessage
-from nimbus.tools import mcp_boundary as b
-from nimbus.tools.exceptions import CapabilityExecutionError
-from nimbus.tools.interface import CapabilityInterface
-from nimbus.tools.mcp_client import BuiltinMCPClient, create_mcp_client
-from nimbus.tools.mcp_resource import Resource
+from skye.base.exceptions import ConfigurationError, MissingExtraError, ProviderError, ValidationError
+from skye.base.messages import AssistantMessage, UserMessage
+from skye.tools import mcp_boundary as b
+from skye.tools.exceptions import CapabilityExecutionError
+from skye.tools.interface import CapabilityInterface
+from skye.tools.mcp_client import BuiltinMCPClient, create_mcp_client
+from skye.tools.mcp_resource import Resource
 
 TOOLS = [
     {"name": "add", "description": "Add", "inputSchema": {"type": "object", "properties": {"a": {"type": "integer"}}}},
@@ -238,7 +238,7 @@ def _fake_fastmcp():
 
 
 @pytest.mark.asyncio
-async def test_fastmcp_returns_identical_nimbus_types(server, monkeypatch):
+async def test_fastmcp_returns_identical_skye_types(server, monkeypatch):
     monkeypatch.setitem(sys.modules, "fastmcp", _fake_fastmcp())
     fc = create_mcp_client("http://x", impl="fastmcp")
     bi = BuiltinMCPClient(server.url)
@@ -262,14 +262,14 @@ def test_fastmcp_missing_raises_without_fallback(monkeypatch):
 
 
 def test_impl_is_an_argument_only(monkeypatch):
-    """Req 25: no environment variable or config entry selects the client."""
-    monkeypatch.setenv("NIMBUS_MCP_IMPL", "sdk")
-    monkeypatch.setenv("NIMBUS_IMPL", "sdk")
+    """Requirement 21: no environment variable or config entry selects the client."""
+    monkeypatch.setenv("SKYE_MCP_IMPL", "sdk")
+    monkeypatch.setenv("SKYE_IMPL", "sdk")
     assert isinstance(create_mcp_client("http://x"), BuiltinMCPClient)
     with pytest.raises(ConfigurationError):
         create_mcp_client("http://x", impl="sdk")
 
 
-def test_fastmcp_not_imported_with_nimbus_or_tools():
-    code = "import sys, nimbus, nimbus.tools; from nimbus.tools import create_mcp_client; create_mcp_client('http://x'); assert 'fastmcp' not in sys.modules"
+def test_fastmcp_not_imported_with_skye_or_tools():
+    code = "import sys, skye, skye.tools; from skye.tools import create_mcp_client; create_mcp_client('http://x'); assert 'fastmcp' not in sys.modules"
     subprocess.run([sys.executable, "-c", code], check=True)

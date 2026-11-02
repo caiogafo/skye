@@ -15,10 +15,10 @@ from typing import Any
 
 import pytest
 
-from nimbus.base.completion import CompletionRequest, CompletionResponse, TokenUsage
-from nimbus.base.interfaces.runnable import Runnable
-from nimbus.base.messages import UserMessage
-from nimbus.models.llm import (
+from skye.base.completion import CompletionRequest, CompletionResponse, TokenUsage
+from skye.base.interfaces.runnable import Runnable
+from skye.base.messages import UserMessage
+from skye.models.llm import (
     AnthropicProvider,
     AzureOpenAIProvider,
     BedrockProvider,

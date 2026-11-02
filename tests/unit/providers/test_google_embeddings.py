@@ -1,174 +1,67 @@
-"""Unit tests for Google embedding provider.
+"""Unit tests for the Google embedding provider (REST, no SDK)."""
 
-Tests cover:
-- Client initialization
-- Batch encoding
-- Vector dimensions
-- Error handling
-"""
-
-from unittest.mock import MagicMock, Mock, patch
+import ast
+from pathlib import Path
+from unittest.mock import patch
 
 import pytest
 
-from nimbus.models.embeddings.google_embeddings import GoogleEmbeddingProvider
+import skye.models.embeddings.google_embeddings as mod
+from skye.models.embeddings.google_embeddings import GoogleEmbeddingProvider
+from skye.models.transport.rest import JsonObject
+
+from skye.auth.google import GoogleBearerAuth
 
 
-class TestGoogleEmbeddingProviderInitialization:
-    """Test Google embedding provider initialization."""
-    
-    def test_init_with_required_params(self) -> None:
-        """Test initialization with required parameters."""
-        provider = GoogleEmbeddingProvider(
-            model="text-embedding-004",
-            project_id="my-project",
-            location="us-central1"
-        )
-        assert provider.model == "text-embedding-004"
-        assert provider.project_id == "my-project"
-        assert provider.location == "us-central1"
-    
-    def test_init_with_additional_config(self) -> None:
-        """Test initialization with additional configuration."""
-        provider = GoogleEmbeddingProvider(
-            model="text-multilingual-embedding-002",
-            project_id="my-project",
-            location="us-west1",
-            credentials_path="/path/to/creds.json"
-        )
-        assert provider.model == "text-multilingual-embedding-002"
-        assert provider.project_id == "my-project"
-        assert provider.location == "us-west1"
-        assert provider.config["credentials_path"] == "/path/to/creds.json"
-    
-    @patch("nimbus.models.embeddings.google_embeddings.LazyImporter.import_module")
-    def test_lazy_client_initialization(self, mock_import: Mock) -> None:
-        """Test that client is lazily initialized."""
-        mock_aiplatform = MagicMock()
-        mock_model = MagicMock()
-        mock_aiplatform.TextEmbeddingModel.from_pretrained.return_value = mock_model
-        mock_import.return_value = mock_aiplatform
-        
-        provider = GoogleEmbeddingProvider(
-            model="text-embedding-004",
-            project_id="my-project",
-            location="us-central1"
-        )
-        
-        # Client should not be initialized yet
-        mock_import.assert_not_called()
-        
-        # Access client to trigger initialization
-        _ = provider.client
-        
-        # Now it should be initialized
-        mock_import.assert_called_once_with(
-            "google.cloud.aiplatform",
-            package_name="google-cloud-aiplatform",
-            install_extra="google"
-        )
-        mock_aiplatform.init.assert_called_once_with(
-            project="my-project",
-            location="us-central1"
-        )
-        mock_aiplatform.TextEmbeddingModel.from_pretrained.assert_called_once_with(
-            "text-embedding-004"
-        )
+def make(**kw: object) -> GoogleEmbeddingProvider:
+    return GoogleEmbeddingProvider(
+        model="text-embedding-004", project_id="p", location="us-central1",
+        credentials=GoogleBearerAuth("tok"), **kw,
+    )
 
 
-class TestGoogleEmbeddingProviderBatchEncoding:
-    """Test batch encoding functionality."""
-    
-    @patch("nimbus.models.embeddings.google_embeddings.LazyImporter.import_module")
-    def test_encode_batch(self, mock_import: Mock) -> None:
-        """Test batch encoding."""
-        # Setup mock
-        mock_aiplatform = MagicMock()
-        mock_model = MagicMock()
-        mock_aiplatform.TextEmbeddingModel.from_pretrained.return_value = mock_model
-        mock_import.return_value = mock_aiplatform
-        
-        # Mock embeddings
-        mock_embedding_1 = MagicMock()
-        mock_embedding_1.values = [0.1, 0.2, 0.3]
-        mock_embedding_2 = MagicMock()
-        mock_embedding_2.values = [0.4, 0.5, 0.6]
-        
-        mock_model.get_embeddings.return_value = [mock_embedding_1, mock_embedding_2]
-        
-        # Test
-        provider = GoogleEmbeddingProvider(
-            model="text-embedding-004",
-            project_id="my-project",
-            location="us-central1"
-        )
-        
-        result = provider.encode_batch(["text1", "text2"])
-        
-        # Verify
-        assert len(result) == 2
-        assert result[0] == [0.1, 0.2, 0.3]
-        assert result[1] == [0.4, 0.5, 0.6]
-        
-        mock_model.get_embeddings.assert_called_once_with(["text1", "text2"])
-    
-    @patch("nimbus.models.embeddings.google_embeddings.LazyImporter.import_module")
-    def test_encode_single_text(self, mock_import: Mock) -> None:
-        """Test encoding single text."""
-        # Setup mock
-        mock_aiplatform = MagicMock()
-        mock_model = MagicMock()
-        mock_aiplatform.TextEmbeddingModel.from_pretrained.return_value = mock_model
-        mock_import.return_value = mock_aiplatform
-        
-        # Mock embedding
-        mock_embedding = MagicMock()
-        mock_embedding.values = [0.1, 0.2, 0.3]
-        
-        mock_model.get_embeddings.return_value = [mock_embedding]
-        
-        # Test
-        provider = GoogleEmbeddingProvider(
-            model="text-embedding-004",
-            project_id="my-project",
-            location="us-central1"
-        )
-        
-        result = provider.encode("hello")
-        
-        # Verify
-        assert result == [0.1, 0.2, 0.3]
-        
-        mock_model.get_embeddings.assert_called_once_with(["hello"])
+def test_init() -> None:
+    e = GoogleEmbeddingProvider(model="m", project_id="p", location="l", credentials_path="/x")
+    assert (e.model, e.project_id, e.location) == ("m", "p", "l")
+    assert e.config["credentials_path"] == "/x"
 
 
-class TestGoogleEmbeddingProviderVectorDimensions:
-    """Test vector dimension retrieval."""
-    
-    def test_get_vector_dimension_text_embedding_004(self) -> None:
-        """Test vector dimension for text-embedding-004."""
-        provider = GoogleEmbeddingProvider(
-            model="text-embedding-004",
-            project_id="my-project",
-            location="us-central1"
-        )
-        assert provider.get_vector_dimension() == 768
-    
-    def test_get_vector_dimension_multilingual(self) -> None:
-        """Test vector dimension for text-multilingual-embedding-002."""
-        provider = GoogleEmbeddingProvider(
-            model="text-multilingual-embedding-002",
-            project_id="my-project",
-            location="us-central1"
-        )
-        assert provider.get_vector_dimension() == 768
-    
-    def test_get_vector_dimension_unknown_model(self) -> None:
-        """Test vector dimension for unknown model."""
-        provider = GoogleEmbeddingProvider(
-            model="unknown-model",
-            project_id="my-project",
-            location="us-central1"
-        )
-        with pytest.raises(ValueError, match="Unknown model"):
-            provider.get_vector_dimension()
+def test_client_is_none_and_no_sdk() -> None:
+    assert make().client is None
+    tree = ast.parse(Path(mod.__file__).read_text())
+    names = [n.module or "" for n in ast.walk(tree) if isinstance(n, ast.ImportFrom)]
+    names += [a.name for n in ast.walk(tree) if isinstance(n, ast.Import) for a in n.names]
+    assert not [n for n in names if n.startswith(("google.cloud", "vertexai"))]
+
+
+def test_encode_batch_rest_call() -> None:
+    resp = JsonObject({"predictions": [{"embeddings": {"values": [0.1, 0.2]}}, {"embeddings": {"values": [0.3, 0.4]}}]})
+    with patch("skye.models.transport.rest.post_json", return_value=resp) as post:
+        out = make().encode_batch(["a", "b"])
+    assert out == [[0.1, 0.2], [0.3, 0.4]]
+    url, body = post.call_args[0]
+    assert url == (
+        "https://us-central1-aiplatform.googleapis.com/v1/projects/p/locations/us-central1"
+        "/publishers/google/models/text-embedding-004:predict"
+    )
+    assert body == {"instances": [{"content": "a"}, {"content": "b"}]}
+    assert isinstance(post.call_args.kwargs["authenticator"], GoogleBearerAuth)
+
+
+def test_encode_single() -> None:
+    resp = JsonObject({"predictions": [{"embeddings": {"values": [1.0]}}]})
+    with patch("skye.models.transport.rest.post_json", return_value=resp):
+        assert make().encode("x") == [1.0]
+
+
+def test_chunks_over_250() -> None:
+    resp = JsonObject({"predictions": [{"embeddings": {"values": [0.0]}}] * 250})
+    with patch("skye.models.transport.rest.post_json", return_value=resp) as post:
+        out = make()._encode_batch_impl(["t"] * 250 + ["u"])
+    assert post.call_count == 2 and len(out) == 500
+
+
+def test_dimensions() -> None:
+    assert make().get_vector_dimension() == 768
+    with pytest.raises(ValueError):
+        GoogleEmbeddingProvider(model="zzz", project_id="p", location="l").get_vector_dimension()

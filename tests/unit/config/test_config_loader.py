@@ -4,8 +4,8 @@ from pathlib import Path
 
 import pytest
 
-from nimbus.base.config import ConfigLoader, ModelConfig, NimbusConfig
-from nimbus.base.exceptions import ConfigurationError
+from skye.base.config import ConfigLoader, ModelConfig, SkyeConfig
+from skye.base.exceptions import ConfigurationError
 
 
 def test_config_loader_from_yaml():
@@ -13,7 +13,7 @@ def test_config_loader_from_yaml():
     config_path = Path("tests/fixtures/sample_config.yaml")
     config = ConfigLoader.load(config_path=config_path)
 
-    assert isinstance(config, NimbusConfig)
+    assert isinstance(config, SkyeConfig)
     assert config.log_level == "INFO"
     assert config.enable_telemetry is True
     assert config.correlation_id_header == "X-Correlation-ID"
@@ -49,7 +49,7 @@ def test_config_loader_from_json():
     config_path = Path("tests/fixtures/sample_config.json")
     config = ConfigLoader.load(config_path=config_path)
 
-    assert isinstance(config, NimbusConfig)
+    assert isinstance(config, SkyeConfig)
     assert config.log_level == "DEBUG"
     assert config.enable_telemetry is False
     assert config.correlation_id_header == "X-Request-ID"
@@ -74,8 +74,8 @@ def test_config_loader_from_json():
 def test_config_loader_from_env(monkeypatch):
     """Test loading configuration from environment variables."""
     # Set environment variables
-    monkeypatch.setenv("NIMBUS_LOG_LEVEL", "WARNING")
-    monkeypatch.setenv("NIMBUS_ENABLE_TELEMETRY", "false")
+    monkeypatch.setenv("SKYE_LOG_LEVEL", "WARNING")
+    monkeypatch.setenv("SKYE_ENABLE_TELEMETRY", "false")
 
     config = ConfigLoader.load()
 
@@ -83,20 +83,20 @@ def test_config_loader_from_env(monkeypatch):
     assert config.enable_telemetry is False
 
 
-def test_only_three_nimbus_prefixed_env_vars(monkeypatch):
-    """Req 27: exactly NIMBUS_LOG_LEVEL, NIMBUS_CONFIG, NIMBUS_ENABLE_TELEMETRY are read."""
-    from nimbus.base.config import ALL_ENV_VARS
+def test_only_three_skye_prefixed_env_vars(monkeypatch):
+    """Requirement 23: exactly SKYE_LOG_LEVEL, SKYE_CONFIG, SKYE_ENABLE_TELEMETRY are read."""
+    from skye.base.config import ALL_ENV_VARS
 
-    assert ALL_ENV_VARS == {"NIMBUS_LOG_LEVEL", "NIMBUS_CONFIG", "NIMBUS_ENABLE_TELEMETRY"}
-    monkeypatch.setenv("NIMBUS_ENABLE_FALLBACKS", "false")
-    monkeypatch.setenv("NIMBUS_OPENAI_API_KEY", "sk-ignored")
+    assert ALL_ENV_VARS == {"SKYE_LOG_LEVEL", "SKYE_CONFIG", "SKYE_ENABLE_TELEMETRY"}
+    monkeypatch.setenv("SKYE_ENABLE_FALLBACKS", "false")
+    monkeypatch.setenv("SKYE_OPENAI_API_KEY", "sk-ignored")
     config = ConfigLoader.load()
     assert config.enable_fallbacks is True  # default: the variable is not a config source
     assert "openai_api_key" not in ConfigLoader._load_from_env()
 
 
-def test_nimbus_config_env_names_the_config_file(monkeypatch):
-    monkeypatch.setenv("NIMBUS_CONFIG", "tests/fixtures/sample_config.yaml")
+def test_skye_config_env_names_the_config_file(monkeypatch):
+    monkeypatch.setenv("SKYE_CONFIG", "tests/fixtures/sample_config.yaml")
     assert ConfigLoader.load().log_level == ConfigLoader.load(
         config_path=Path("tests/fixtures/sample_config.yaml")
     ).log_level
@@ -134,8 +134,8 @@ def test_config_loader_precedence(monkeypatch):
     config_path = Path("tests/fixtures/sample_config.yaml")
 
     # 2. Set environment variables (medium precedence)
-    monkeypatch.setenv("NIMBUS_LOG_LEVEL", "WARNING")
-    monkeypatch.setenv("NIMBUS_ENABLE_TELEMETRY", "false")
+    monkeypatch.setenv("SKYE_LOG_LEVEL", "WARNING")
+    monkeypatch.setenv("SKYE_ENABLE_TELEMETRY", "false")
 
     # 3. Set code overrides (highest precedence)
     overrides = {
@@ -161,7 +161,7 @@ def test_config_loader_no_sources():
     """Test loading configuration with no sources (all defaults)."""
     config = ConfigLoader.load()
 
-    assert isinstance(config, NimbusConfig)
+    assert isinstance(config, SkyeConfig)
     assert config.log_level == "INFO"
     assert config.enable_telemetry is True
     assert config.correlation_id_header == "X-Correlation-ID"
@@ -270,7 +270,7 @@ def test_config_loader_non_dict_root():
 def test_config_loader_env_type_conversion(monkeypatch):
     """Test environment variable type conversion."""
     # Test boolean conversion
-    monkeypatch.setenv("NIMBUS_ENABLE_TELEMETRY", "true")
+    monkeypatch.setenv("SKYE_ENABLE_TELEMETRY", "true")
 
     config = ConfigLoader.load()
 

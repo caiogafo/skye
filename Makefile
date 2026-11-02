@@ -2,7 +2,7 @@
 
 # Default target
 help:
-	@echo "Nimbus Development Commands"
+	@echo "Skye Development Commands"
 	@echo "============================"
 	@echo ""
 	@echo "Setup:"
@@ -60,13 +60,13 @@ lint:
 # Type checking
 type-check:
 	@echo "Type checking with mypy..."
-	uv run mypy src/nimbus --strict
+	uv run mypy src/skye --strict
 	@echo "✓ Type checking complete"
 
 # Type checking for providers specifically
 type-check-providers:
 	@echo "Type checking providers with mypy..."
-	uv run mypy src/nimbus/models --strict
+	uv run mypy src/skye/models --strict
 	@echo "✓ Provider type checking complete"
 
 # Run all checks (for task completion validation)
@@ -99,7 +99,7 @@ test-capabilities:
 
 test-cov:
 	@echo "Running tests with coverage..."
-	uv run pytest tests/ --cov=src/nimbus --cov-report=term-missing --cov-report=html
+	uv run pytest tests/ --cov=src/skye --cov-report=term-missing --cov-report=html
 	@echo ""
 	@echo "Coverage report generated in htmlcov/index.html"
 

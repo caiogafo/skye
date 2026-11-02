@@ -1,10 +1,10 @@
 """MCP Server Capability Example.
 
 This example demonstrates how to connect to an existing MCP server,
-list its tools, and use them as Nimbus capabilities with language models.
+list its tools, and use them as Skye capabilities with language models.
 
 Prerequisites:
-- FastMCP installed: pip install nimbus[mcp]
+- FastMCP installed: pip install skyeai[mcp]
 - An MCP server running (update SERVER_URL below)
 - OPENAI_API_KEY environment variable set
 
@@ -16,9 +16,9 @@ Example MCP servers you can use:
 
 import os
 import asyncio
-from nimbus.models.registry import provider as create_provider
-from nimbus.base.messages import UserMessage
-from nimbus.tools import MCPCapability
+from skye.models.registry import provider as create_provider
+from skye.base.messages import UserMessage
+from skye.tools import MCPCapability
 
 
 # Configure your MCP server connection here
@@ -35,7 +35,7 @@ async def main():
         from fastmcp import Client
     except ImportError:
         print("❌ FastMCP not installed")
-        print("   Install with: pip install nimbus[mcp]")
+        print("   Install with: pip install skyeai[mcp]")
         return
     
     # Check for API key
@@ -72,8 +72,8 @@ async def main():
             for tool in tools:
                 print(f"   - {tool['name']}: {tool['description']}")
             
-            # Step 3: Convert tools to Nimbus capabilities
-            print("\n🔧 Converting tools to Nimbus capabilities...")
+            # Step 3: Convert tools to Skye capabilities
+            print("\n🔧 Converting tools to Skye capabilities...")
             capabilities = []
             for tool in tools:
                 capability = MCPCapability(

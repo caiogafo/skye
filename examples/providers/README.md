@@ -1,12 +1,12 @@
-# Nimbus Provider Examples
+# Skye Provider Examples
 
-This directory contains examples demonstrating the simplified boto3-style API for Nimbus providers.
+This directory contains examples demonstrating the simplified boto3-style API for Skye providers.
 
 ## Quick Start
 
 ```python
-from nimbus.models.registry import provider as create_provider
-from nimbus.base.messages import UserMessage, SystemMessage
+from skye.models.registry import provider as create_provider
+from skye.base.messages import UserMessage, SystemMessage
 
 # Create a client
 client = create_provider("openai", api_key="sk-...")
@@ -34,7 +34,7 @@ response = client.complete(
 )
 ```
 
-**Installation:** `pip install nimbus[openai]`
+**Installation:** `pip install skyeai[openai]`
 
 ### AWS Bedrock
 
@@ -46,7 +46,7 @@ response = client.complete(
 )
 ```
 
-**Installation:** `pip install nimbus[bedrock]`
+**Installation:** `pip install skyeai[bedrock]`
 
 ### Anthropic
 
@@ -58,7 +58,7 @@ response = client.complete(
 )
 ```
 
-**Installation:** `pip install nimbus[anthropic]`
+**Installation:** `pip install skyeai[anthropic]`
 
 ### Azure OpenAI
 
@@ -75,7 +75,7 @@ response = client.complete(
 )
 ```
 
-**Installation:** `pip install nimbus[azure]`
+**Installation:** `pip install skyeai[azure]`
 
 ### Google
 
@@ -91,7 +91,7 @@ response = client.complete(
 )
 ```
 
-**Installation:** `pip install nimbus[google]`
+**Installation:** `pip install skyeai[google]`
 
 ## API Reference
 
@@ -116,7 +116,7 @@ response = client.complete(
 ```
 
 **Parameters:**
-- `messages`: List of `NimbusMessage` objects or a string
+- `messages`: List of `SkyeMessage` objects or a string
 - `model`: Model identifier
 - `temperature`: Sampling temperature (0.0-2.0)
 - `max_tokens`: Maximum tokens to generate
@@ -146,7 +146,7 @@ response = await client.acomplete(
 ## Message Types
 
 ```python
-from nimbus.base.messages import UserMessage, SystemMessage, AssistantMessage
+from skye.base.messages import UserMessage, SystemMessage, AssistantMessage
 
 messages = [
     SystemMessage("You are a helpful assistant."),

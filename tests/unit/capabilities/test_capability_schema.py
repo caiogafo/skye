@@ -3,7 +3,7 @@
 import pytest
 from pydantic import ValidationError
 
-from nimbus.tools.schema import CapabilitySchema
+from skye.tools.schema import CapabilitySchema
 
 
 class TestCapabilitySchemaCreation:

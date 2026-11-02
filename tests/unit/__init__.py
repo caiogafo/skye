@@ -1,1 +1,1 @@
-"""Unit tests for Nimbus components."""
+"""Unit tests for Skye components."""

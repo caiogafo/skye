@@ -2,11 +2,11 @@
 
 import pytest
 
-from nimbus.tools.decorator import capability
-from nimbus.tools.exceptions import CapabilityValidationError
-from nimbus.tools.interface import CapabilityInterface
-from nimbus.tools.local_function import LocalFunctionCapability
-from nimbus.tools.schema import CapabilitySchema
+from skye.tools.decorator import capability
+from skye.tools.exceptions import CapabilityValidationError
+from skye.tools.interface import CapabilityInterface
+from skye.tools.local_function import LocalFunctionCapability
+from skye.tools.schema import CapabilitySchema
 
 
 class TestCapabilityDecorator:

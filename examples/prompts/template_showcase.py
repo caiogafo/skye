@@ -6,8 +6,8 @@ from pathlib import Path
 src_path = Path(__file__).parent.parent.parent / "src"
 sys.path.insert(0, str(src_path))
 
-from nimbus.prompts import BasePromptBuilder
-from nimbus.models.registry import provider as create_provider
+from skye.prompts import BasePromptBuilder
+from skye.models.registry import provider as create_provider
 
 
 def complete_with_provider(messages, model="gpt-4", temperature=0.7, max_tokens=200, provider_name="openai"):
@@ -37,7 +37,7 @@ def complete_with_provider(messages, model="gpt-4", temperature=0.7, max_tokens=
         return None
 
 
-"""Template showcase using current Nimbus templates.
+"""Template showcase using current Skye templates.
 
 This script demonstrates how to use the comprehensive Jinja2 templates
 with real test data to create sophisticated prompts for various AI tasks.
@@ -270,7 +270,7 @@ def showcase_agent_templates():
 
 def main():
     """Run all template showcase examples."""
-    print("Nimbus Prompts Support - Template Showcase")
+    print("Skye Prompts Support - Template Showcase")
     print("=" * 50)
     print()
     

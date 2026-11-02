@@ -1,4 +1,4 @@
-"""Simple Template Demo for Nimbus Prompts Support.
+"""Simple Template Demo for Skye Prompts Support.
 
 This script demonstrates basic template functionality without complex dependencies.
 """
@@ -10,7 +10,7 @@ from pathlib import Path
 src_path = Path(__file__).parent.parent.parent / "src"
 sys.path.insert(0, str(src_path))
 
-from nimbus.prompts import MockPromptBuilder
+from skye.prompts import MockPromptBuilder
 
 
 def simple_ner_demo():
@@ -110,7 +110,7 @@ def template_with_defaults_demo():
     )
     
     # Set default values
-    builder.set_default_values({"platform": "Nimbus"})
+    builder.set_default_values({"platform": "Skye"})
     
     messages = builder.render("greeting", {"name": "Alice"})
     
@@ -147,7 +147,7 @@ Please describe what you see in the image:"""
 
 def main():
     """Run all simple template demos."""
-    print("Nimbus Prompts Support - Simple Template Demo")
+    print("Skye Prompts Support - Simple Template Demo")
     print("=" * 50)
     print()
     
@@ -164,7 +164,7 @@ def main():
     print("- Variable substitution using {variable} syntax")
     print("- Default values for templates")
     print("- Multimodal content handling")
-    print("- Compatible with Nimbus completion API")
+    print("- Compatible with Skye completion API")
 
 
 if __name__ == "__main__":

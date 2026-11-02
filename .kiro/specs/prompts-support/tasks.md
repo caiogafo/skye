@@ -2,7 +2,7 @@
 
 ## Overview
 
-This implementation plan converts the comprehensive prompts support design into discrete coding tasks. The implementation will create a production-ready Jinja2-based prompt builder that integrates seamlessly with Nimbus architecture, providing template management, few-shot learning, multimodal content support, and structured output generation.
+This implementation plan converts the comprehensive prompts support design into discrete coding tasks. The implementation will create a production-ready Jinja2-based prompt builder that integrates seamlessly with Skye architecture, providing template management, few-shot learning, multimodal content support, and structured output generation.
 
 The plan starts with interfaces, mocks, and samples to validate the user experience before implementing the full functionality.
 
@@ -10,7 +10,7 @@ The plan starts with interfaces, mocks, and samples to validate the user experie
 
 - [ ] 1. Create interfaces, mocks, and samples for user experience validation
   - [x] 1.1 Set up prompts module structure and imports
-    - Create src/nimbus/prompts/ directory structure
+    - Create src/skye/prompts/ directory structure
     - Set up __init__.py with proper exports
     - Add imports for PromptBuilderInterface from core
     - _Requirements: 11.1_
@@ -113,7 +113,7 @@ The plan starts with interfaces, mocks, and samples to validate the user experie
 - [ ] 8. Implement message formatting and role management
   - [ ] 8.1 Create MessageFormatter class
     - Implement role section parsing from rendered templates
-    - Add NimbusMessage creation for different roles (System, User, Assistant, Capability)
+    - Add SkyeMessage creation for different roles (System, User, Assistant, Capability)
     - Support role mapping configuration and validation
     - _Requirements: 6.1, 6.2, 6.3, 6.4_
   
@@ -139,7 +139,7 @@ The plan starts with interfaces, mocks, and samples to validate the user experie
     - **Validates: Requirements 5.1, 5.4**
   
   - [ ] 9.3 Integrate multimodal content with message creation
-    - Add multimodal content to NimbusMessage objects
+    - Add multimodal content to SkyeMessage objects
     - Implement content metadata preservation
     - Support provider-agnostic content representation
     - _Requirements: 5.3, 5.5_
@@ -198,19 +198,19 @@ The plan starts with interfaces, mocks, and samples to validate the user experie
     - Support validation reporting without exceptions
     - _Requirements: 9.2, 9.5, 10.5_
 
-- [ ] 14. Implement configuration and Nimbus integration
+- [ ] 14. Implement configuration and Skye integration
   - [ ] 14.1 Create configuration models and loading
     - Implement PromptBuilderConfig and Jinja2Config Pydantic models
     - Add configuration loading from environment variables and files
-    - Support Nimbus configuration patterns with ${VAR} substitution
+    - Support Skye configuration patterns with ${VAR} substitution
     - _Requirements: 11.4_
   
   - [ ]* 14.2 Write property test for configuration loading
     - **Property 10: Configuration consistency**
     - **Validates: Requirements 11.4**
   
-  - [ ] 14.3 Integrate with Nimbus exception hierarchy and logging
-    - Ensure all exceptions inherit from NimbusError
+  - [ ] 14.3 Integrate with Skye exception hierarchy and logging
+    - Ensure all exceptions inherit from SkyeError
     - Add structured logging with correlation IDs
     - Implement proper error context and recovery
     - _Requirements: 11.5, 10.1, 10.2, 10.3, 10.4_
@@ -241,13 +241,13 @@ The plan starts with interfaces, mocks, and samples to validate the user experie
   
   - [ ]* 16.2 Write integration tests for end-to-end functionality
     - Test complete template lifecycle from registration to rendering
-    - Validate integration with NimbusMessage types and providers
+    - Validate integration with SkyeMessage types and providers
     - Test multimodal content with different message types
     - _Requirements: 11.2, 11.3_
   
   - [ ] 16.3 Add module exports and package configuration
     - Update __init__.py files with proper exports
-    - Configure optional dependency for nimbus[prompts]
+    - Configure optional dependency for skyeai[prompts]
     - Add comprehensive docstrings and type hints
     - _Requirements: 11.1_
 
@@ -261,5 +261,5 @@ The plan starts with interfaces, mocks, and samples to validate the user experie
 - Checkpoints ensure incremental validation
 - Property tests validate universal correctness properties with 100+ iterations
 - Unit tests validate specific examples and edge cases
-- Implementation follows Nimbus architecture guidelines with clean separation of concerns
+- Implementation follows Skye architecture guidelines with clean separation of concerns
 - The first task focuses on creating interfaces, mocks, and samples to validate user experience before full implementation

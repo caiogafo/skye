@@ -8,11 +8,19 @@ Tests cover:
 - Error handling
 """
 
-from unittest.mock import AsyncMock, MagicMock, Mock, patch
+from unittest.mock import patch
 
 import pytest
 
-from nimbus.models.embeddings.openai_embeddings import OpenAIEmbeddingProvider
+from skye.models.embeddings.openai_embeddings import OpenAIEmbeddingProvider
+from skye.models.transport.rest import JsonObject
+
+POST = "skye.models.transport.rest.post_json"
+URL = "https://api.openai.com/v1/embeddings"
+
+
+def _embeddings(*vectors: list[float]) -> JsonObject:
+    return JsonObject({"data": [{"index": i, "embedding": v} for i, v in enumerate(vectors)]})
 
 
 class TestOpenAIEmbeddingProviderInitialization:
@@ -38,175 +46,72 @@ class TestOpenAIEmbeddingProviderInitialization:
         assert provider.api_key == "sk-test"
         assert provider.config["organization"] == "org-123"
     
-    @patch("nimbus.models.embeddings.openai_embeddings.LazyImporter.import_module")
-    def test_lazy_client_initialization(self, mock_import: Mock) -> None:
-        """Test that client is lazily initialized."""
-        mock_openai = MagicMock()
-        mock_import.return_value = mock_openai
-        
-        provider = OpenAIEmbeddingProvider(
-            model="text-embedding-3-small",
-            api_key="sk-test"
-        )
-        
-        # Client should not be initialized yet
-        mock_import.assert_not_called()
-        
-        # Access client to trigger initialization
-        _ = provider.client
-        
-        # Now it should be initialized
-        mock_import.assert_called_once_with("openai", install_extra="openai")
-        mock_openai.OpenAI.assert_called_once_with(api_key="sk-test")
+    def test_lazy_client_initialization(self) -> None:
+        """Construction performs no I/O and holds no vendor client."""
+        with patch(POST) as post:
+            provider = OpenAIEmbeddingProvider(model="text-embedding-3-small", api_key="sk-test")
+            assert provider.client is None
+        post.assert_not_called()
+
+    def test_module_imports_no_openai_sdk(self) -> None:
+        """The adapter must not import the vendor SDK."""
+        import inspect
+
+        import skye.models.embeddings.openai_embeddings as mod
+
+        source = inspect.getsource(mod)
+        assert "import openai" not in source and "from openai" not in source
+        assert "LazyImporter" not in source
 
 
 class TestOpenAIEmbeddingProviderBatchEncoding:
     """Test batch encoding functionality."""
     
-    @patch("nimbus.models.embeddings.openai_embeddings.LazyImporter.import_module")
-    def test_encode_batch(self, mock_import: Mock) -> None:
-        """Test batch encoding."""
-        # Setup mock
-        mock_openai = MagicMock()
-        mock_client = MagicMock()
-        mock_openai.OpenAI.return_value = mock_client
-        mock_import.return_value = mock_openai
-        
-        # Mock response
-        mock_embedding_1 = MagicMock()
-        mock_embedding_1.embedding = [0.1, 0.2, 0.3]
-        mock_embedding_2 = MagicMock()
-        mock_embedding_2.embedding = [0.4, 0.5, 0.6]
-        
-        mock_response = MagicMock()
-        mock_response.data = [mock_embedding_1, mock_embedding_2]
-        
-        mock_client.embeddings.create.return_value = mock_response
-        
-        # Test
-        provider = OpenAIEmbeddingProvider(
-            model="text-embedding-3-small",
-            api_key="sk-test"
-        )
-        
-        result = provider.encode_batch(["text1", "text2"])
-        
-        # Verify
-        assert len(result) == 2
-        assert result[0] == [0.1, 0.2, 0.3]
-        assert result[1] == [0.4, 0.5, 0.6]
-        
-        mock_client.embeddings.create.assert_called_once_with(
-            model="text-embedding-3-small",
-            input=["text1", "text2"]
-        )
+    def test_encode_batch(self) -> None:
+        with patch(POST, return_value=_embeddings([0.1, 0.2, 0.3], [0.4, 0.5, 0.6])) as post:
+            provider = OpenAIEmbeddingProvider(model="text-embedding-3-small", api_key="sk-test")
+            result = provider.encode_batch(["text1", "text2"])
+
+        assert result == [[0.1, 0.2, 0.3], [0.4, 0.5, 0.6]]
+        assert post.call_args.args[0] == URL
+        assert post.call_args.args[1] == {"model": "text-embedding-3-small", "input": ["text1", "text2"]}
+        assert post.call_args.kwargs["headers"] == {"Authorization": "Bearer sk-test"}
     
-    @patch("nimbus.models.embeddings.openai_embeddings.LazyImporter.import_module")
-    def test_encode_single_text(self, mock_import: Mock) -> None:
-        """Test encoding single text."""
-        # Setup mock
-        mock_openai = MagicMock()
-        mock_client = MagicMock()
-        mock_openai.OpenAI.return_value = mock_client
-        mock_import.return_value = mock_openai
-        
-        # Mock response
-        mock_embedding = MagicMock()
-        mock_embedding.embedding = [0.1, 0.2, 0.3]
-        
-        mock_response = MagicMock()
-        mock_response.data = [mock_embedding]
-        
-        mock_client.embeddings.create.return_value = mock_response
-        
-        # Test
-        provider = OpenAIEmbeddingProvider(
-            model="text-embedding-3-small",
-            api_key="sk-test"
-        )
-        
-        result = provider.encode("hello")
-        
-        # Verify
+    def test_encode_single_text(self) -> None:
+        with patch(POST, return_value=_embeddings([0.1, 0.2, 0.3], [0.4, 0.5, 0.6])) as post:
+            provider = OpenAIEmbeddingProvider(model="text-embedding-3-small", api_key="sk-test")
+            result = provider.encode("hello")
+
         assert result == [0.1, 0.2, 0.3]
-        
-        mock_client.embeddings.create.assert_called_once_with(
-            model="text-embedding-3-small",
-            input=["hello"]
-        )
+        assert post.call_args.args[0] == URL
+        assert post.call_args.args[1] == {"model": "text-embedding-3-small", "input": ["hello"]}
+        assert post.call_args.kwargs["headers"] == {"Authorization": "Bearer sk-test"}
 
 
 class TestOpenAIEmbeddingProviderAsyncEncoding:
     """Test async encoding functionality."""
     
-    @patch("nimbus.models.embeddings.openai_embeddings.LazyImporter.import_module")
     @pytest.mark.asyncio
-    async def test_aencode_batch(self, mock_import: Mock) -> None:
-        """Test async batch encoding."""
-        # Setup mock
-        mock_openai = MagicMock()
-        mock_async_client = AsyncMock()
-        mock_openai.AsyncOpenAI.return_value = mock_async_client
-        mock_import.return_value = mock_openai
-        
-        # Mock response
-        mock_embedding_1 = MagicMock()
-        mock_embedding_1.embedding = [0.1, 0.2, 0.3]
-        mock_embedding_2 = MagicMock()
-        mock_embedding_2.embedding = [0.4, 0.5, 0.6]
-        
-        mock_response = MagicMock()
-        mock_response.data = [mock_embedding_1, mock_embedding_2]
-        
-        mock_async_client.embeddings.create = AsyncMock(return_value=mock_response)
-        
-        # Test
-        provider = OpenAIEmbeddingProvider(
-            model="text-embedding-3-small",
-            api_key="sk-test"
-        )
-        
-        result = await provider.aencode_batch(["text1", "text2"])
-        
-        # Verify
-        assert len(result) == 2
-        assert result[0] == [0.1, 0.2, 0.3]
-        assert result[1] == [0.4, 0.5, 0.6]
-        
-        mock_async_client.embeddings.create.assert_called_once_with(
-            model="text-embedding-3-small",
-            input=["text1", "text2"]
-        )
+    async def test_aencode_batch(self) -> None:
+        with patch(POST, return_value=_embeddings([0.1, 0.2, 0.3], [0.4, 0.5, 0.6])) as post:
+            provider = OpenAIEmbeddingProvider(model="text-embedding-3-small", api_key="sk-test")
+            result = await provider.aencode_batch(["text1", "text2"])
+
+        assert result == [[0.1, 0.2, 0.3], [0.4, 0.5, 0.6]]
+        assert post.call_args.args[0] == URL
+        assert post.call_args.args[1] == {"model": "text-embedding-3-small", "input": ["text1", "text2"]}
+        assert post.call_args.kwargs["headers"] == {"Authorization": "Bearer sk-test"}
     
-    @patch("nimbus.models.embeddings.openai_embeddings.LazyImporter.import_module")
     @pytest.mark.asyncio
-    async def test_aencode_single_text(self, mock_import: Mock) -> None:
-        """Test async encoding single text."""
-        # Setup mock
-        mock_openai = MagicMock()
-        mock_async_client = AsyncMock()
-        mock_openai.AsyncOpenAI.return_value = mock_async_client
-        mock_import.return_value = mock_openai
-        
-        # Mock response
-        mock_embedding = MagicMock()
-        mock_embedding.embedding = [0.1, 0.2, 0.3]
-        
-        mock_response = MagicMock()
-        mock_response.data = [mock_embedding]
-        
-        mock_async_client.embeddings.create = AsyncMock(return_value=mock_response)
-        
-        # Test
-        provider = OpenAIEmbeddingProvider(
-            model="text-embedding-3-small",
-            api_key="sk-test"
-        )
-        
-        result = await provider.aencode("hello")
-        
-        # Verify
+    async def test_aencode_single_text(self) -> None:
+        with patch(POST, return_value=_embeddings([0.1, 0.2, 0.3], [0.4, 0.5, 0.6])) as post:
+            provider = OpenAIEmbeddingProvider(model="text-embedding-3-small", api_key="sk-test")
+            result = await provider.aencode("hello")
+
         assert result == [0.1, 0.2, 0.3]
+        assert post.call_args.args[0] == URL
+        assert post.call_args.args[1] == {"model": "text-embedding-3-small", "input": ["hello"]}
+        assert post.call_args.kwargs["headers"] == {"Authorization": "Bearer sk-test"}
 
 
 class TestOpenAIEmbeddingProviderVectorDimensions:

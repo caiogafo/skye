@@ -25,7 +25,7 @@ class ProviderArchitectureValidator:
     def __init__(self, root_dir: Path):
         """Initialize validator with project root directory."""
         self.root_dir = root_dir
-        self.src_dir = root_dir / "src" / "nimbus"
+        self.src_dir = root_dir / "src" / "skye"
         self.errors: list[str] = []
         self.warnings: list[str] = []
         

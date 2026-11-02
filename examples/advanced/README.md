@@ -87,7 +87,7 @@ python examples/advanced/custom_providers.py
 ### Multimodal Processing
 
 ```python
-from nimbus.base.messages import UserMessage
+from skye.base.messages import UserMessage
 
 message = UserMessage(
     content=[
@@ -150,19 +150,19 @@ asyncio.run(main())
 ## Error Handling
 
 ```python
-from nimbus.base.exceptions import NimbusError, RateLimitError
+from skye.base.exceptions import SkyeError, RateLimitError
 
 try:
     response = provider.complete(request)
 except RateLimitError as e:
     print(f"Rate limited: {e}")
-except NimbusError as e:
+except SkyeError as e:
     print(f"Error: {e}")
 ```
 
 ## Next Steps
 
-- Explore the Nimbus documentation
+- Explore the Skye documentation
 - Check out the provider-specific examples
 - Implement custom providers for your use case
 - Contribute examples back to the community

@@ -8,7 +8,7 @@ from pathlib import Path
 src_path = Path(__file__).parent.parent.parent / "src"
 sys.path.insert(0, str(src_path))
 
-from nimbus.prompts import BasePromptBuilder
+from skye.prompts import BasePromptBuilder
 
 
 def test_simple_templates():

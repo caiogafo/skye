@@ -1,18 +1,19 @@
-"""Built-in vs external-library boundary rule (structure spec, Requirement 20, task 15.4).
+"""Built-in vs external-library boundary rule (structure spec, Requirement 16, task 7.4).
 
 Offline and deterministic. No external-library type may be exposed outside its owning
-Component: external types become Nimbus types at one boundary point, and both implementations
-sit behind the same Port returning identical Nimbus types.
+Component: external types become Skye types at one boundary point, and both implementations
+sit behind the same Port returning identical Skye types.
 
-Static (AST) checks over src/nimbus:
-  * provider SDKs (openai, anthropic, boto3/botocore, vertexai, google.cloud.aiplatform, cohere)
-    are imported only by their owning files, and only inside a function (lazy);
+Static (AST) checks over src/skye:
+  * provider SDKs (openai, anthropic, vertexai, google.cloud.aiplatform, cohere) are imported
+    nowhere in src/skye (Requirement 20); boto3/botocore only by the DynamoDB store backend,
+    and only inside a function (lazy);
   * `fastmcp`/`mcp` only by the `tools` MCP files, never at module level;
   * `tools/mcp_boundary.py` imports no third-party library at all;
   * no public function/method annotation names an external-library type.
 Runtime check: the `models` public Port method `complete()` (vendor call mocked) and its single
 boundary helper `_transform_response`, plus the MCP boundary conversions (fed plain dicts and a
-fastmcp-shaped object), all return Nimbus types only. The same MCP check on a live fake server,
+fastmcp-shaped object), all return Skye types only. The same MCP check on a live fake server,
 for both clients, is tests/differential/test_boundary_leak.py.
 """
 
@@ -29,18 +30,20 @@ import pytest
 
 from tests.budget.measure import ROOT
 
-SRC = ROOT / "src" / "nimbus"
+SRC = ROOT / "src" / "skye"
 
 # external top-level module -> src-relative path prefixes of the owning Component's files
 SDK_OWNERS: dict[str, tuple[str, ...]] = {
-    "openai": ("models/llm/openai_compatible.py", "models/embeddings/openai_embeddings.py"),
-    "anthropic": ("models/llm/anthropic.py", "models/transport/token_counter.py"),
-    "boto3": ("models/llm/bedrock.py", "models/embeddings/bedrock_embeddings.py", "store/dynamodb.py"),
-    "botocore": ("models/llm/bedrock.py", "models/embeddings/bedrock_embeddings.py", "store/dynamodb.py"),
-    "vertexai": ("models/llm/google_provider.py",),
-    "google": ("models/llm/google_provider.py", "models/embeddings/google_embeddings.py",
-               "models/embeddings/google_multimodal_embeddings.py"),
-    "cohere": ("models/embeddings/cohere_embeddings.py",),
+    # Model providers have no SDK owner: each has one built-in stdlib REST adapter (Requirement 20),
+    # so a vendor SDK import anywhere under src/skye is a violation.
+    "openai": (),
+    "anthropic": (),
+    "vertexai": (),
+    "google": (),
+    "cohere": (),
+    # boto3 is the DynamoDB store backend's driver (a store, not a model provider).
+    "boto3": ("store/dynamodb.py",),
+    "botocore": ("store/dynamodb.py",),
     "fastmcp": ("tools/mcp_fastmcp.py",),
     "mcp": ("tools/mcp_fastmcp.py",),
 }
@@ -91,13 +94,13 @@ def test_external_libraries_imported_only_by_owning_component():
                 continue
             allowed = set(SDK_OWNERS[mod]) | LEGACY_TOOLS_PROBES.get(mod, set())
             if rel not in allowed:
-                bad.append(f"'{mod}' imported outside its owning Component files: src/nimbus/{rel}:{line}")
+                bad.append(f"'{mod}' imported outside its owning Component files: src/skye/{rel}:{line}")
     assert not bad, "\n".join(bad)
 
 
 def test_external_imports_are_lazy():
-    """Never at module level: `import nimbus` must not load a vendor SDK (Req 17.9, 19.8)."""
-    bad = [f"module-level import of '{mod}': src/nimbus/{rel}:{line}"
+    """Never at module level: `import skye` must not load a vendor SDK (Requirement 20)."""
+    bad = [f"module-level import of '{mod}': src/skye/{rel}:{line}"
            for rel, tree in _files() for mod, line, in_fn in _external_imports(tree)
            if mod in EXTERNAL and not in_fn]
     assert not bad, "\n".join(bad)
@@ -106,12 +109,12 @@ def test_external_imports_are_lazy():
 def test_mcp_boundary_has_no_third_party_import():
     tree = ast.parse((SRC / "tools" / "mcp_boundary.py").read_text(encoding="utf-8"))
     stdlib = sys.stdlib_module_names
-    bad = [f"{m}:{ln}" for m, ln, _ in _external_imports(tree) if m not in stdlib and m != "nimbus"]
+    bad = [f"{m}:{ln}" for m, ln, _ in _external_imports(tree) if m not in stdlib and m != "skye"]
     for node in ast.walk(tree):  # also every plain import
         if isinstance(node, ast.Import):
-            bad += [a.name for a in node.names if a.name.split(".")[0] not in stdlib | {"nimbus"}]
+            bad += [a.name for a in node.names if a.name.split(".")[0] not in stdlib | {"skye"}]
         elif isinstance(node, ast.ImportFrom) and node.level == 0 and node.module \
-                and node.module.split(".")[0] not in stdlib | {"nimbus", "__future__"}:
+                and node.module.split(".")[0] not in stdlib | {"skye", "__future__"}:
             bad.append(node.module)
     assert not bad, f"tools/mcp_boundary.py must import no third-party library: {sorted(set(bad))}"
 
@@ -130,19 +133,19 @@ def _public_annotations():
 
 
 def test_public_annotations_name_no_external_type():
-    bad = [f"src/nimbus/{rel}:{ln} {name}() annotation '{text}'"
+    bad = [f"src/skye/{rel}:{ln} {name}() annotation '{text}'"
            for rel, ln, name, text in _public_annotations() if LIBS_RE.search(text)]
     assert not bad, "\n".join(bad)
 
 
 def _foreign_types(value, seen=None, path="result") -> list[str]:
-    """Types in the value tree that are neither Nimbus nor plain data (e.g. an SDK or a Mock)."""
+    """Types in the value tree that are neither Skye nor plain data (e.g. an SDK or a Mock)."""
     seen = seen if seen is not None else set()
     if id(value) in seen:
         return []
     seen.add(id(value))
     mod = type(value).__module__
-    if mod.startswith("nimbus") or mod in {"builtins", "datetime", "enum", "decimal", "uuid"}:
+    if mod.startswith("skye") or mod in {"builtins", "datetime", "enum", "decimal", "uuid"}:
         out: list[str] = []
         if isinstance(value, dict):
             items = list(value.items())
@@ -168,31 +171,31 @@ def _sdk_shaped_response():
     return resp
 
 
-def test_provider_response_is_nimbus_types_only():
-    """The single boundary point (`_transform_response`) converts an SDK object to a Nimbus type."""
-    from nimbus.models.llm.openai_compatible import OpenAIProvider
+def test_provider_response_is_skye_types_only():
+    """The single boundary point (`_transform_response`) converts an SDK object to a Skye type."""
+    from skye.models.llm.openai_compatible import OpenAIProvider
 
     result = OpenAIProvider(api_key="sk-test")._transform_response(_sdk_shaped_response())
-    assert type(result).__module__.startswith("nimbus")
+    assert type(result).__module__.startswith("skye")
     assert not _foreign_types(result)
 
 
-def test_models_public_port_returns_nimbus_types_only():
-    """The `models` public Port method `complete()` returns Nimbus types, never an SDK object.
+def test_models_public_port_returns_skye_types_only():
+    """The `models` public Port method `complete()` returns Skye types, never an SDK object.
 
     Symmetric with the `tools` runtime check: the only thing mocked is the vendor call
     (`_call_provider`), so the real boundary conversion runs end-to-end on the public API.
-    Guards Req 20.1/20.2 for `models` (REST vs SDK) the same way the MCP checks guard `tools`.
+    Guards Requirement 16 for `models` (REST vs SDK) the same way the MCP checks guard `tools`.
     """
-    from nimbus.base.completion import CompletionRequest
-    from nimbus.base.messages import UserMessage
-    from nimbus.models.llm.openai_compatible import OpenAIProvider
+    from skye.base.completion import CompletionRequest
+    from skye.base.messages import UserMessage
+    from skye.models.llm.openai_compatible import OpenAIProvider
 
     provider = OpenAIProvider(api_key="sk-test")
     provider._call_provider = Mock(return_value=_sdk_shaped_response())  # type: ignore[method-assign]
     request = CompletionRequest(messages=[UserMessage(content="hi")], model="gpt-4")
     result = provider.complete(request)
-    assert type(result).__module__.startswith("nimbus")
+    assert type(result).__module__.startswith("skye")
     assert not _foreign_types(result)
 
 
@@ -208,12 +211,12 @@ class _FastMCPShaped:
 
 
 @pytest.mark.parametrize("wrap", [lambda d: d, _FastMCPShaped])
-def test_mcp_boundary_returns_nimbus_types_for_dict_and_library_objects(wrap):
-    from nimbus.tools import mcp_boundary as b
+def test_mcp_boundary_returns_skye_types_for_dict_and_library_objects(wrap):
+    from skye.tools import mcp_boundary as b
 
     tool = wrap({"name": "add", "description": "d", "inputSchema": {"type": "object", "properties": {}}})
     prompt = wrap({"name": "greet", "arguments": [{"name": "who", "required": True}]})
     resource = wrap({"uri": "file:///a", "name": "a", "mimeType": "text/plain"})
     for out in (b.to_tool_schema(tool), b.to_prompt(prompt), b.to_resource(resource)):
-        assert type(out).__module__.startswith("nimbus"), type(out)
+        assert type(out).__module__.startswith("skye"), type(out)
         assert not _foreign_types(out)

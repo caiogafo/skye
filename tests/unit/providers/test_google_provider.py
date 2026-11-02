@@ -1,1096 +1,276 @@
-"""Unit tests for Google provider implementation.
+"""Unit tests for the Google provider (stdlib REST adapter, no vendor SDK)."""
 
-Tests cover:
-- Client initialization
-- Request transformation
-- Response transformation
-- Streaming
-- Safety settings
-- Grounding features
-- Error handling
-"""
-
-from datetime import datetime, timezone
-from typing import Any
-from unittest.mock import MagicMock, Mock, patch
+import ast
+import asyncio
+from pathlib import Path
+from types import SimpleNamespace
+from unittest.mock import Mock, patch
 
 import pytest
 
-from nimbus.base.completion import CompletionRequest, CompletionResponse, StreamChunk, TokenUsage
-from nimbus.base.exceptions import ProviderError
-from nimbus.base.messages import AssistantMessage, SystemMessage, UserMessage
-from nimbus.models.llm.google_provider import GoogleProvider
+import skye.models.embeddings.google_embeddings as emb_mod
+import skye.models.embeddings.google_multimodal_embeddings as mm_mod
+import skye.models.llm.google_provider as prov_mod
+from skye.auth.google import GoogleBearerAuth
+from skye.base.completion import CapabilityCall, CompletionRequest, CompletionResponse, StreamChunk
+from skye.base.exceptions import ProviderError
+from skye.base.messages import AssistantMessage, CapabilityMessage, SystemMessage, UserMessage
+from skye.models.llm.google_provider import GoogleProvider
+from skye.models.transport.rest import JsonObject
+
+URL = (
+    "https://us-central1-aiplatform.googleapis.com/v1/projects/my-project/locations/us-central1"
+    "/publishers/google/models/gemini-1.5-pro"
+)
 
 
-class TestGoogleProviderInitialization:
-    """Test Google provider initialization."""
-
-    def test_init_with_required_params(self) -> None:
-        """Test initialization with required parameters."""
-        provider = GoogleProvider(
-            project_id="my-project",
-            location="us-central1"
-        )
-        assert provider.project_id == "my-project"
-        assert provider.location == "us-central1"
-        assert provider.credentials is None
-
-    def test_init_with_all_params(self) -> None:
-        """Test initialization with all parameters."""
-        mock_creds = Mock()
-        provider = GoogleProvider(
-            project_id="my-project",
-            location="europe-west1",
-            credentials=mock_creds
-        )
-        assert provider.project_id == "my-project"
-        assert provider.location == "europe-west1"
-        assert provider.credentials is mock_creds
-
-    @patch("nimbus.models.llm.google_provider.LazyImporter.import_module")
-    def test_lazy_client_initialization(self, mock_import: Mock) -> None:
-        """Test that client is lazily initialized."""
-        mock_vertexai = MagicMock()
-        mock_import.return_value = mock_vertexai
-
-        provider = GoogleProvider(
-            project_id="my-project",
-            location="us-central1"
-        )
-
-        # Client should not be initialized yet
-        mock_import.assert_not_called()
-
-        # Access client to trigger initialization
-        _ = provider.client
-
-        # Now it should be initialized
-        mock_import.assert_called_once_with(
-            "google.cloud.aiplatform",
-            package_name="google-cloud-aiplatform",
-            install_extra="google"
-        )
-        mock_vertexai.init.assert_called_once_with(
-            project="my-project",
-            location="us-central1",
-            credentials=None
-        )
+def make(**kw: object) -> GoogleProvider:
+    kw.setdefault("credentials", GoogleBearerAuth("tok"))
+    return GoogleProvider(project_id="my-project", location="us-central1", **kw)
 
 
-class TestGoogleAIRequestTransformation:
-    """Test request transformation to Google format."""
+def req(**kw: object) -> CompletionRequest:
+    kw.setdefault("messages", [UserMessage(content="Hello")])
+    kw.setdefault("model", "gemini-1.5-pro")
+    return CompletionRequest(**kw)
 
-    def test_transform_basic_request(self) -> None:
-        """Test transformation of basic completion request."""
-        provider = GoogleProvider(
-            project_id="my-project",
-            location="us-central1"
-        )
-        request = CompletionRequest(
-            messages=[UserMessage(content="Hello")],
-            model="gemini-1.5-pro",
-            temperature=0.7
+
+def gen_response(parts: list, finish: str = "STOP", usage: dict | None = None) -> JsonObject:
+    data: dict = {
+        "candidates": [{"content": {"role": "model", "parts": parts}, "finishReason": finish}],
+        "responseId": "r1",
+        "modelVersion": "gemini-1.5-pro-002",
+    }
+    if usage is not None:
+        data["usageMetadata"] = usage
+    return JsonObject(data)
+
+
+class TestNoSdk:
+    def test_no_vendor_sdk_imports(self) -> None:
+        for mod in (prov_mod, emb_mod, mm_mod):
+            tree = ast.parse(Path(mod.__file__).read_text())
+            names = [n.module or "" for n in ast.walk(tree) if isinstance(n, ast.ImportFrom)]
+            names += [a.name for n in ast.walk(tree) if isinstance(n, ast.Import) for a in n.names]
+            assert not [n for n in names if n.startswith(("google.cloud", "vertexai", "google.auth"))]
+
+    def test_client_is_none(self) -> None:
+        assert make().client is None
+
+
+class TestInit:
+    def test_required(self) -> None:
+        p = GoogleProvider(project_id="my-project", location="us-central1")
+        assert (p.project_id, p.location, p.credentials) == ("my-project", "us-central1", None)
+
+    def test_credentials_and_registration(self) -> None:
+        from skye.models.registry import ProviderRegistry
+        import skye.models  # noqa: F401
+
+        p = GoogleProvider(project_id="p", location="europe-west1", credentials="token")
+        assert p.credentials == "token"
+        assert ProviderRegistry._model_providers["google"] is GoogleProvider
+
+    def test_str_credentials_become_bearer(self) -> None:
+        auth = GoogleProvider(project_id="p", credentials="abc").authenticator
+        assert auth.apply("POST", "u", {})["Authorization"] == "Bearer abc"
+
+    def test_global_location_host(self) -> None:
+        assert prov_mod._model_url("global", "p", "m", "predict").startswith(
+            "https://aiplatform.googleapis.com/v1/projects/p/locations/global/"
         )
 
-        result = provider._transform_request(request)
 
-        assert result["model"] == "gemini-1.5-pro"
-        assert result["generation_config"]["temperature"] == 0.7
-        assert len(result["messages"]) == 1
-        assert result["messages"][0]["role"] == "user"
-        assert result["messages"][0]["parts"][0]["text"] == "Hello"
+class TestRequestTransformation:
+    def test_basic(self) -> None:
+        r = make()._transform_request(req(temperature=0.7))
+        assert r["model"] == "gemini-1.5-pro"
+        assert r["generationConfig"]["temperature"] == 0.7
+        assert r["contents"] == [{"role": "user", "parts": [{"text": "Hello"}]}]
+        assert "systemInstruction" not in r
 
-    def test_transform_with_system_message(self) -> None:
-        """Test transformation with system message."""
-        provider = GoogleProvider(
-            project_id="my-project",
-            location="us-central1"
+    def test_system_goes_to_system_instruction(self) -> None:
+        r = make()._transform_request(
+            req(messages=[SystemMessage(content="Be nice"), UserMessage(content="Hi"), AssistantMessage(content="Yo")])
         )
-        request = CompletionRequest(
-            messages=[
-                SystemMessage(content="You are helpful"),
-                UserMessage(content="Hello")
-            ],
-            model="gemini-1.5-pro"
+        assert r["systemInstruction"] == {"parts": [{"text": "Be nice"}]}
+        assert [c["role"] for c in r["contents"]] == ["user", "model"]
+
+    def test_generation_config_fields(self) -> None:
+        cfg = make()._transform_request(req(max_tokens=100, top_p=0.9, stop=["END"]))["generationConfig"]
+        assert (cfg["maxOutputTokens"], cfg["topP"], cfg["stopSequences"]) == (100, 0.9, ["END"])
+
+    def test_empty_messages_rejected(self) -> None:
+        with pytest.raises(ValueError):
+            make()._transform_request(SimpleNamespace(messages=[]))  # type: ignore[arg-type]
+
+    def test_safety_grounding_passthrough(self) -> None:
+        safety = [{"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_NONE"}]
+        r = make()._transform_request(
+            req(metadata={"safety_settings": safety, "grounding": {"googleSearchRetrieval": {}}, "google_cachedContent": "c"})
         )
+        assert r["safetySettings"] == safety
+        assert r["tools"] == [{"googleSearchRetrieval": {}}]
+        assert r["cachedContent"] == "c"
 
-        result = provider._transform_request(request)
-
-        assert len(result["messages"]) == 2
-        assert result["messages"][0]["role"] == "system"
-        assert result["messages"][0]["parts"][0]["text"] == "You are helpful"
-        assert result["messages"][1]["role"] == "user"
-
-    def test_transform_with_max_tokens(self) -> None:
-        """Test transformation with max_tokens parameter."""
-        provider = GoogleProvider(
-            project_id="my-project",
-            location="us-central1"
+    def test_capability_messages(self) -> None:
+        msgs = make()._transform_messages(
+            [
+                AssistantMessage(content="", capability_calls=[{"id": "1", "type": "function", "function": {"name": "f", "arguments": '{"a": 1}'}}]),
+                CapabilityMessage(content="ok", capability_name="f", capability_id="1"),
+            ]
         )
-        request = CompletionRequest(
-            messages=[UserMessage(content="Hello")],
-            model="gemini-1.5-pro",
-            max_tokens=100
-        )
+        assert msgs[0]["parts"] == [{"functionCall": {"name": "f", "args": {"a": 1}}}]
+        assert msgs[1]["parts"][0]["functionResponse"]["name"] == "f"
 
-        result = provider._transform_request(request)
-
-        assert result["generation_config"]["max_output_tokens"] == 100
-
-    def test_transform_with_stop_sequences(self) -> None:
-        """Test transformation with stop sequences."""
-        provider = GoogleProvider(
-            project_id="my-project",
-            location="us-central1"
-        )
-        request = CompletionRequest(
-            messages=[UserMessage(content="Hello")],
-            model="gemini-1.5-pro",
-            stop=["END", "STOP"]
-        )
-
-        result = provider._transform_request(request)
-
-        assert result["generation_config"]["stop_sequences"] == ["END", "STOP"]
-
-    def test_transform_with_safety_settings(self) -> None:
-        """Test transformation with safety settings."""
-        provider = GoogleProvider(
-            project_id="my-project",
-            location="us-central1"
-        )
-        safety_settings = [
-            {
-                "category": "HARM_CATEGORY_HATE_SPEECH",
-                "threshold": "BLOCK_MEDIUM_AND_ABOVE"
-            }
-        ]
-        request = CompletionRequest(
-            messages=[UserMessage(content="Hello")],
-            model="gemini-1.5-pro",
-            metadata={"safety_settings": safety_settings}
-        )
-
-        result = provider._transform_request(request)
-
-        assert result["safety_settings"] == safety_settings
-
-    def test_transform_with_grounding(self) -> None:
-        """Test transformation with grounding features."""
-        provider = GoogleProvider(
-            project_id="my-project",
-            location="us-central1"
-        )
-        grounding_config = {
-            "source": "GOOGLE_SEARCH"
+    def test_capabilities_and_choice(self) -> None:
+        caps = [{"type": "function", "function": {"name": "w", "description": "d", "parameters": {"type": "object", "properties": {}}}}]
+        p = make()
+        r = p._transform_request(req(capabilities=caps))
+        assert r["tools"] == [{"functionDeclarations": [{"name": "w", "description": "d", "parameters": {"type": "object", "properties": {}}}]}]
+        assert "toolConfig" not in r
+        cases = {
+            "auto": {"mode": "AUTO"},
+            "required": {"mode": "ANY"},
+            "none": {"mode": "NONE"},
+            "w": {"mode": "ANY", "allowedFunctionNames": ["w"]},
         }
-        request = CompletionRequest(
-            messages=[UserMessage(content="What is the weather?")],
-            model="gemini-1.5-pro",
-            metadata={"grounding": grounding_config}
-        )
+        for choice, cfg in cases.items():
+            r = p._transform_request(req(capabilities=caps, capability_choice=choice))
+            assert r["toolConfig"] == {"functionCallingConfig": cfg}
 
-        result = provider._transform_request(request)
-
-        assert result["grounding"] == grounding_config
-
-    def test_transform_with_function_calling(self) -> None:
-        """Test transformation with function calling (legacy test - now handled by TestGoogleAIToolCalling)."""
-        # This test is now superseded by the more comprehensive TestGoogleAIToolCalling tests
-        # Keeping it for backwards compatibility but updating to use proper CapabilityInterface
-        from nimbus.tools import LocalFunctionCapability
+    def test_capability_interface(self) -> None:
+        from skye.tools import LocalFunctionCapability
 
         def get_weather(location: str) -> str:
             """Get weather for a location."""
-            return f"Weather for {location}"
+            return location
 
-        capability = LocalFunctionCapability(get_weather)
+        r = make()._transform_request(req(capabilities=[LocalFunctionCapability(get_weather)]))
+        decl = r["tools"][0]["functionDeclarations"][0]
+        assert decl["name"] == "get_weather" and decl["parameters"]["type"] == "object"
 
-        provider = GoogleProvider(
-            project_id="my-project",
-            location="us-central1"
+
+class TestResponseTransformation:
+    def test_text_and_usage(self) -> None:
+        resp = make()._transform_response(
+            gen_response([{"text": "Hel"}, {"text": "lo"}], "MAX_TOKENS", {"promptTokenCount": 10, "candidatesTokenCount": 5, "totalTokenCount": 15})
         )
-        request = CompletionRequest(
-            messages=[UserMessage(content="What's the weather?")],
-            model="gemini-1.5-pro",
-            capabilities=[capability]
-        )
-
-        result = provider._transform_request(request)
-
-        assert "tools" in result
-        assert len(result["tools"]) == 1
-        assert "function_declarations" in result["tools"][0]
-        assert len(result["tools"][0]["function_declarations"]) == 1
-        assert result["tools"][0]["function_declarations"][0]["name"] == "get_weather"
-
-    def test_transform_with_provider_metadata(self) -> None:
-        """Test transformation with provider-specific metadata."""
-        provider = GoogleProvider(
-            project_id="my-project",
-            location="us-central1"
-        )
-        request = CompletionRequest(
-            messages=[UserMessage(content="Hello")],
-            model="gemini-1.5-pro",
-            metadata={
-                "google_candidate_count": 1,
-                "google_presence_penalty": 0.5,
-                "other_key": "ignored"
-            }
-        )
-
-        result = provider._transform_request(request)
-
-        assert result["candidate_count"] == 1
-        assert result["presence_penalty"] == 0.5
-        assert "other_key" not in result
-
-
-class TestGoogleAIResponseTransformation:
-    """Test response transformation from Google format."""
-
-    def test_transform_basic_response(self) -> None:
-        """Test transformation of basic Google response."""
-        provider = GoogleProvider(
-            project_id="my-project",
-            location="us-central1"
-        )
-
-        # Mock Google response
-        mock_response = Mock()
-        mock_response.name = "response-123"
-        mock_response.model = "gemini-1.5-pro"
-
-        mock_part = Mock()
-        mock_part.text = "Hello! How can I help?"
-
-        mock_content = Mock()
-        mock_content.parts = [mock_part]
-
-        mock_candidate = Mock()
-        mock_candidate.content = mock_content
-        mock_candidate.finish_reason = "STOP"
-
-        mock_response.candidates = [mock_candidate]
-
-        mock_usage = Mock()
-        mock_usage.prompt_token_count = 10
-        mock_usage.candidates_token_count = 20
-        mock_usage.total_token_count = 30
-        mock_response.usage_metadata = mock_usage
-
-        result = provider._transform_response(mock_response)
-
-        assert isinstance(result, CompletionResponse)
-        assert result.id == "response-123"
-        assert result.model == "gemini-1.5-pro"
-        assert result.provider == "google"
-        assert result.content == "Hello! How can I help?"
-        assert result.role == "assistant"
-        assert result.finish_reason == "stop"
-        assert result.usage.prompt_tokens == 10
-        assert result.usage.completion_tokens == 20
-        assert result.usage.total_tokens == 30
-
-    def test_transform_response_with_function_call(self) -> None:
-        """Test transformation of response with function call (legacy test - now handled by TestGoogleAIToolCalling)."""
-        # This test is now superseded by the more comprehensive TestGoogleAIToolCalling tests
-        # Updating to match new metadata format
-        provider = GoogleProvider(
-            project_id="my-project",
-            location="us-central1"
-        )
-
-        # Mock Google response with function call
-        mock_response = Mock()
-        mock_response.name = "response-123"
-        mock_response.model = "gemini-1.5-pro"
-
-        mock_func_call = Mock()
-        mock_func_call.name = "get_weather"
-        mock_func_call.args = {"location": "NYC"}
-
-        mock_part = Mock()
-        mock_part.function_call = mock_func_call
-        mock_part.text = None
-
-        mock_content = Mock()
-        mock_content.parts = [mock_part]
-
-        mock_candidate = Mock()
-        mock_candidate.content = mock_content
-        mock_candidate.finish_reason = "STOP"
-
-        mock_response.candidates = [mock_candidate]
-
-        mock_usage = Mock()
-        mock_usage.prompt_token_count = 10
-        mock_usage.candidates_token_count = 5
-        mock_usage.total_token_count = 15
-        mock_response.usage_metadata = mock_usage
-
-        result = provider._transform_response(mock_response)
-
-        assert result.content == ""
-        # New format stores tool calls in metadata["candidates"]
-        assert "candidates" in result.metadata
-        assert len(result.metadata["candidates"]) == 1
-        # Also check that capability_calls list is populated
-        assert result.capability_calls is not None
-        assert len(result.capability_calls) == 1
-        assert result.capability_calls[0].name == "get_weather"
-        assert result.capability_calls[0].arguments == {"location": "NYC"}
-
-    def test_transform_response_without_usage(self) -> None:
-        """Test transformation of response without usage metadata."""
-        provider = GoogleProvider(
-            project_id="my-project",
-            location="us-central1"
-        )
-
-        # Mock Google response without usage
-        mock_response = Mock()
-        mock_response.name = "response-123"
-        mock_response.model = "gemini-1.5-pro"
-
-        mock_part = Mock()
-        mock_part.text = "Response"
-
-        mock_content = Mock()
-        mock_content.parts = [mock_part]
-
-        mock_candidate = Mock()
-        mock_candidate.content = mock_content
-        mock_candidate.finish_reason = "STOP"
-
-        mock_response.candidates = [mock_candidate]
-        mock_response.usage_metadata = None
-
-        result = provider._transform_response(mock_response)
-
-        assert result.usage.prompt_tokens == 0
-        assert result.usage.completion_tokens == 0
-        assert result.usage.total_tokens == 0
-
-
-class TestGoogleAIStreamTransformation:
-    """Test stream chunk transformation."""
-
-    def test_transform_stream_chunk(self) -> None:
-        """Test transformation of stream chunk."""
-        provider = GoogleProvider(
-            project_id="my-project",
-            location="us-central1"
-        )
-
-        # Mock Google stream chunk
-        mock_chunk = Mock()
-
-        mock_part = Mock()
-        mock_part.text = "Hello"
-
-        mock_content = Mock()
-        mock_content.parts = [mock_part]
-
-        mock_candidate = Mock()
-        mock_candidate.content = mock_content
-        mock_candidate.finish_reason = "STOP"
-
-        mock_chunk.candidates = [mock_candidate]
-
-        result = provider._transform_stream_chunk(mock_chunk)
-
-        assert isinstance(result, StreamChunk)
-        assert result.delta == "Hello"
-        assert result.finish_reason == "stop"
-
-    def test_transform_final_stream_chunk(self) -> None:
-        """Test transformation of final stream chunk."""
-        provider = GoogleProvider(
-            project_id="my-project",
-            location="us-central1"
-        )
-
-        # Mock final stream chunk
-        mock_chunk = Mock()
-
-        mock_part = Mock()
-        mock_part.text = ""
-
-        mock_content = Mock()
-        mock_content.parts = [mock_part]
-
-        mock_candidate = Mock()
-        mock_candidate.content = mock_content
-        mock_candidate.finish_reason = "STOP"
-
-        mock_chunk.candidates = [mock_candidate]
-
-        result = provider._transform_stream_chunk(mock_chunk)
-
-        assert result.delta == ""
-        assert result.finish_reason == "stop"
-
-
-class TestGoogleProviderCalls:
-    """Test actual provider API calls."""
-
-    @patch("nimbus.models.llm.google_provider.LazyImporter.import_module")
-    def test_complete_success(self, mock_import: Mock) -> None:
-        """Test successful completion call."""
-        # Setup mocks
-        mock_vertexai = MagicMock()
-        mock_import.return_value = mock_vertexai
-
-        mock_generative_models = Mock()
-        mock_vertexai.generative_models = mock_generative_models
-
-        mock_model = Mock()
-        mock_generative_models.GenerativeModel.return_value = mock_model
-
-        # Mock response
-        mock_response = Mock()
-        mock_response.name = "response-123"
-        mock_response.model = "gemini-1.5-pro"
-
-        mock_part = Mock()
-        mock_part.text = "Test response"
-
-        mock_content = Mock()
-        mock_content.parts = [mock_part]
-
-        mock_candidate = Mock()
-        mock_candidate.content = mock_content
-        mock_candidate.finish_reason = "STOP"
-
-        mock_response.candidates = [mock_candidate]
-
-        mock_usage = Mock()
-        mock_usage.prompt_token_count = 10
-        mock_usage.candidates_token_count = 5
-        mock_usage.total_token_count = 15
-        mock_response.usage_metadata = mock_usage
-
-        mock_model.generate_content.return_value = mock_response
-
-        # Execute
-        provider = GoogleProvider(
-            project_id="my-project",
-            location="us-central1"
-        )
-        request = CompletionRequest(
-            messages=[UserMessage(content="Hello")],
-            model="gemini-1.5-pro"
-        )
-
-        result = provider.complete(request)
-
-        # Verify
-        assert isinstance(result, CompletionResponse)
-        assert result.content == "Test response"
-        assert result.provider == "google"
-        mock_model.generate_content.assert_called_once()
-
-    @patch("nimbus.models.llm.google_provider.LazyImporter.import_module")
-    def test_complete_error_handling(self, mock_import: Mock) -> None:
-        """Test error handling in complete."""
-        # Setup mocks
-        mock_vertexai = MagicMock()
-        mock_import.return_value = mock_vertexai
-
-        mock_generative_models = Mock()
-        mock_vertexai.generative_models = mock_generative_models
-
-        mock_model = Mock()
-        mock_generative_models.GenerativeModel.return_value = mock_model
-
-        # Mock error
-        mock_model.generate_content.side_effect = Exception("API Error")
-
-        # Execute and verify error
-        provider = GoogleProvider(
-            project_id="my-project",
-            location="us-central1"
-        )
-        request = CompletionRequest(
-            messages=[UserMessage(content="Hello")],
-            model="gemini-1.5-pro"
-        )
-
-        with pytest.raises(ProviderError) as exc_info:
-            provider.complete(request)
-
-        assert "Provider call failed" in str(exc_info.value)
-        assert exc_info.value.details["provider"] == "google"
-
-    @patch("nimbus.models.llm.google_provider.LazyImporter.import_module")
-    def test_stream_success(self, mock_import: Mock) -> None:
-        """Test successful streaming call."""
-        # Setup mocks
-        mock_vertexai = MagicMock()
-        mock_import.return_value = mock_vertexai
-
-        mock_generative_models = Mock()
-        mock_vertexai.generative_models = mock_generative_models
-
-        mock_model = Mock()
-        mock_generative_models.GenerativeModel.return_value = mock_model
-
-        # Mock stream chunks
-        mock_chunks = []
-        for content in ["Hello", " ", "world"]:
-            mock_chunk = Mock()
-
-            mock_part = Mock()
-            mock_part.text = content
-
-            mock_content = Mock()
-            mock_content.parts = [mock_part]
-
-            mock_candidate = Mock()
-            mock_candidate.content = mock_content
-            mock_candidate.finish_reason = None if content != "world" else "STOP"
-
-            mock_chunk.candidates = [mock_candidate]
-            mock_chunks.append(mock_chunk)
-
-        mock_model.generate_content.return_value = iter(mock_chunks)
-
-        # Execute
-        provider = GoogleProvider(
-            project_id="my-project",
-            location="us-central1"
-        )
-        request = CompletionRequest(
-            messages=[UserMessage(content="Hello")],
-            model="gemini-1.5-pro",
-            stream=True
-        )
-
-        chunks = list(provider.stream(request))
-
-        # Verify
-        assert len(chunks) == 3
-        assert chunks[0].delta == "Hello"
-        assert chunks[1].delta == " "
-        assert chunks[2].delta == "world"
-        assert chunks[2].finish_reason == "stop"
-
-
-class TestGoogleAIAsyncSupport:
-    """Test async completion support."""
-
-    @pytest.mark.asyncio
-    @patch("nimbus.models.llm.google_provider.LazyImporter.import_module")
-    async def test_acomplete_success(self, mock_import: Mock) -> None:
-        """Test successful async completion."""
-        # Setup mocks
-        mock_vertexai = MagicMock()
-        mock_import.return_value = mock_vertexai
-
-        mock_generative_models = Mock()
-        mock_vertexai.generative_models = mock_generative_models
-
-        mock_model = Mock()
-        mock_generative_models.GenerativeModel.return_value = mock_model
-
-        # Mock response
-        mock_response = Mock()
-        mock_response.name = "response-123"
-        mock_response.model = "gemini-1.5-pro"
-
-        mock_part = Mock()
-        mock_part.text = "Async response"
-
-        mock_content = Mock()
-        mock_content.parts = [mock_part]
-
-        mock_candidate = Mock()
-        mock_candidate.content = mock_content
-        mock_candidate.finish_reason = "STOP"
-
-        mock_response.candidates = [mock_candidate]
-
-        mock_usage = Mock()
-        mock_usage.prompt_token_count = 10
-        mock_usage.candidates_token_count = 5
-        mock_usage.total_token_count = 15
-        mock_response.usage_metadata = mock_usage
-
-        mock_model.generate_content.return_value = mock_response
-
-        # Execute
-        provider = GoogleProvider(
-            project_id="my-project",
-            location="us-central1"
-        )
-        request = CompletionRequest(
-            messages=[UserMessage(content="Hello")],
-            model="gemini-1.5-pro"
-        )
-
-        result = await provider.acomplete(request)
-
-        # Verify
-        assert isinstance(result, CompletionResponse)
-        assert result.content == "Async response"
-        assert result.model == "gemini-1.5-pro"
-        assert result.provider == "google"
-
-
-class TestGoogleAIModelInfo:
-    """Test model info retrieval."""
-
-    def test_get_model_info(self) -> None:
-        """Test getting model information."""
-        provider = GoogleProvider(
-            project_id="my-project",
-            location="us-central1"
-        )
-
-        info = provider.get_model_info()
-
-        assert info["provider"] == "google"
-        assert info["supports_streaming"] is True
-        assert info["supports_function_calling"] is True
-        assert info["supports_structured_output"] is False
-        assert info["supports_multimodal"] is True
-
-
-class TestGoogleAIToolCalling:
-    """Test tool calling integration with capabilities."""
-
-    def test_transform_capabilities_with_capability_interface(self) -> None:
-        """Test _transform_capabilities() with CapabilityInterface objects."""
-        from nimbus.tools import LocalFunctionCapability
-
-        def get_weather(location: str) -> str:
-            """Get weather for a location."""
-            return f"Weather for {location}"
-
-        capability = LocalFunctionCapability(get_weather)
-
-        provider = GoogleProvider(
-            project_id="my-project",
-            location="us-central1"
-        )
-
-        # Test internal transformation method
-        result = provider._transform_capabilities([capability])
-
-        # Verify Google format
-        assert len(result) == 1
-        assert result[0]["name"] == "get_weather"
-        assert result[0]["description"] == "Get weather for a location."
-        assert "parameters" in result[0]
-        assert result[0]["parameters"]["type"] == "object"
-    
-    def test_transform_capabilities_with_dict_format(self) -> None:
-        """Test _transform_capabilities() with dict format."""
-        provider = GoogleProvider(
-            project_id="my-project",
-            location="us-central1"
-        )
-        
-        # Already in Google format
-        capabilities = [
-            {
-                "name": "get_weather",
-                "description": "Get weather",
-                "parameters": {"type": "object", "properties": {}}
-            }
+        assert isinstance(resp, CompletionResponse)
+        assert (resp.content, resp.finish_reason, resp.provider) == ("Hello", "max_tokens", "google")
+        assert (resp.id, resp.model) == ("r1", "gemini-1.5-pro-002")
+        assert (resp.usage.prompt_tokens, resp.usage.completion_tokens, resp.usage.total_tokens) == (10, 5, 15)
+        assert resp.capability_calls is None
+
+    def test_no_usage(self) -> None:
+        resp = make()._transform_response(gen_response([{"text": "x"}]))
+        assert resp.usage.total_tokens == 0
+
+    def test_plain_dict_accepted(self) -> None:
+        resp = make()._transform_response({"candidates": [{"content": {"parts": [{"text": "d"}]}}]})
+        assert resp.content == "d" and resp.finish_reason == "stop"
+
+    def test_function_calls(self) -> None:
+        r = gen_response([{"functionCall": {"name": "w", "args": {"city": "NYC"}}}, {"functionCall": {"name": "t", "args": {}}}])
+        resp = make()._transform_response(r)
+        assert resp.capability_calls == [
+            CapabilityCall(id="google_call_0", name="w", arguments={"city": "NYC"}),
+            CapabilityCall(id="google_call_1", name="t", arguments={}),
         ]
-        
-        result = provider._transform_capabilities(capabilities)
-        
-        # Should pass through unchanged
-        assert result == capabilities
-    
-    def test_transform_capabilities_converts_openai_format(self) -> None:
-        """Test _transform_capabilities() converts OpenAI format to Google format."""
-        provider = GoogleProvider(
-            project_id="my-project",
-            location="us-central1"
-        )
-        
-        # OpenAI format
-        capabilities = [
-            {
-                "type": "function",
-                "function": {
-                    "name": "get_weather",
-                    "description": "Get weather",
-                    "parameters": {"type": "object", "properties": {"location": {"type": "string"}}}
-                }
-            }
-        ]
-        
-        result = provider._transform_capabilities(capabilities)
-        
-        # Should convert to Google format
-        assert len(result) == 1
-        assert result[0]["name"] == "get_weather"
-        assert result[0]["description"] == "Get weather"
-        assert result[0]["parameters"]["type"] == "object"
-        assert "location" in result[0]["parameters"]["properties"]
+        assert resp.metadata["candidates"][0]["content"]["parts"][0]["functionCall"]["args"] == {"city": "NYC"}
 
-    def test_transform_request_with_capabilities(self) -> None:
-        """Test transformation of request with capabilities."""
-        from nimbus.tools import LocalFunctionCapability
+    def test_extract_none(self) -> None:
+        p = make()
+        assert p._extract_capability_calls(gen_response([{"text": "x"}])) is None
+        assert p._extract_capability_calls(JsonObject({})) is None
+
+    def test_handler_parses_metadata(self) -> None:
+        from skye.tools import CapabilityRegistry, LocalFunctionCapability
+        from skye.tools.capability_call_handler import CapabilityCallHandler
 
         def get_weather(location: str) -> str:
             """Get weather for a location."""
-            return f"Weather for {location}"
+            return location
 
-        capability = LocalFunctionCapability(get_weather)
-
-        provider = GoogleProvider(
-            project_id="my-project",
-            location="us-central1"
-        )
-        request = CompletionRequest(
-            messages=[UserMessage(content="What's the weather in NYC?")],
-            model="gemini-1.5-pro",
-            capabilities=[capability]
-        )
-
-        result = provider._transform_request(request)
-
-        # Verify tools are present
-        assert "tools" in result
-        assert len(result["tools"]) == 1
-        assert "function_declarations" in result["tools"][0]
-
-        # Verify function declaration format
-        func_decl = result["tools"][0]["function_declarations"][0]
-        assert func_decl["name"] == "get_weather"
-        assert func_decl["description"] == "Get weather for a location."
-        assert "parameters" in func_decl
-
-    def test_transform_request_with_tool_choice_auto(self) -> None:
-        """Test transformation with capability_choice='auto'."""
-        from nimbus.tools import LocalFunctionCapability
-
-        def get_weather(location: str) -> str:
-            """Get weather for a location."""
-            return f"Weather for {location}"
-
-        capability = LocalFunctionCapability(get_weather)
-
-        provider = GoogleProvider(
-            project_id="my-project",
-            location="us-central1"
-        )
-        request = CompletionRequest(
-            messages=[UserMessage(content="What's the weather?")],
-            model="gemini-1.5-pro",
-            capabilities=[capability],
-            capability_choice="auto"
-        )
-
-        result = provider._transform_request(request)
-
-        # Verify tool_config is present
-        assert "tool_config" in result
-        assert result["tool_config"]["function_calling_config"]["mode"] == "AUTO"
-
-    def test_transform_request_with_tool_choice_required(self) -> None:
-        """Test transformation with capability_choice='required'."""
-        from nimbus.tools import LocalFunctionCapability
-
-        def get_weather(location: str) -> str:
-            """Get weather for a location."""
-            return f"Weather for {location}"
-
-        capability = LocalFunctionCapability(get_weather)
-
-        provider = GoogleProvider(
-            project_id="my-project",
-            location="us-central1"
-        )
-        request = CompletionRequest(
-            messages=[UserMessage(content="What's the weather?")],
-            model="gemini-1.5-pro",
-            capabilities=[capability],
-            capability_choice="required"
-        )
-
-        result = provider._transform_request(request)
-
-        # Verify tool_config is present
-        assert "tool_config" in result
-        assert result["tool_config"]["function_calling_config"]["mode"] == "ANY"
-
-    def test_transform_request_with_specific_tool_choice(self) -> None:
-        """Test transformation with specific tool name in capability_choice."""
-        from nimbus.tools import LocalFunctionCapability
-
-        def get_weather(location: str) -> str:
-            """Get weather for a location."""
-            return f"Weather for {location}"
-
-        def get_time(timezone: str) -> str:
-            """Get current time."""
-            return f"Time in {timezone}"
-
-        capability1 = LocalFunctionCapability(get_weather)
-        capability2 = LocalFunctionCapability(get_time)
-
-        provider = GoogleProvider(
-            project_id="my-project",
-            location="us-central1"
-        )
-        request = CompletionRequest(
-            messages=[UserMessage(content="What's the weather?")],
-            model="gemini-1.5-pro",
-            capabilities=[capability1, capability2],
-            capability_choice="get_weather"
-        )
-
-        result = provider._transform_request(request)
-
-        # Verify tool_config with specific function
-        assert "tool_config" in result
-        assert result["tool_config"]["function_calling_config"]["mode"] == "ANY"
-        assert result["tool_config"]["function_calling_config"]["allowed_function_names"] == ["get_weather"]
-
-    def test_transform_response_with_tool_calls(self) -> None:
-        """Test transformation of response with tool calls."""
-        provider = GoogleProvider(
-            project_id="my-project",
-            location="us-central1"
-        )
-
-        # Mock Google response with function call
-        mock_response = Mock()
-        mock_response.name = "response-123"
-        mock_response.model = "gemini-1.5-pro"
-
-        mock_func_call = Mock()
-        mock_func_call.name = "get_weather"
-        mock_func_call.args = {"location": "NYC"}
-
-        mock_part = Mock()
-        mock_part.function_call = mock_func_call
-        mock_part.text = None
-
-        mock_content = Mock()
-        mock_content.parts = [mock_part]
-
-        mock_candidate = Mock()
-        mock_candidate.content = mock_content
-        mock_candidate.finish_reason = "STOP"
-
-        mock_response.candidates = [mock_candidate]
-
-        mock_usage = Mock()
-        mock_usage.prompt_token_count = 10
-        mock_usage.candidates_token_count = 5
-        mock_usage.total_token_count = 15
-        mock_response.usage_metadata = mock_usage
-
-        result = provider._transform_response(mock_response)
-
-        # Verify capability_calls are present
-        assert result.capability_calls is not None
-        assert len(result.capability_calls) == 1
-        assert result.capability_calls[0].name == "get_weather"
-        assert result.capability_calls[0].arguments == {"location": "NYC"}
-        assert result.capability_calls[0].id.startswith("google_call_")
-
-        # Verify metadata contains raw tool calls
-        assert "candidates" in result.metadata
-        assert len(result.metadata["candidates"]) == 1
-
-    def test_transform_response_with_multiple_tool_calls(self) -> None:
-        """Test transformation of response with multiple tool calls."""
-        provider = GoogleProvider(
-            project_id="my-project",
-            location="us-central1"
-        )
-
-        # Mock Google response with multiple function calls
-        mock_response = Mock()
-        mock_response.name = "response-123"
-        mock_response.model = "gemini-1.5-pro"
-
-        mock_func_call1 = Mock()
-        mock_func_call1.name = "get_weather"
-        mock_func_call1.args = {"location": "NYC"}
-
-        mock_func_call2 = Mock()
-        mock_func_call2.name = "get_time"
-        mock_func_call2.args = {"timezone": "EST"}
-
-        mock_part1 = Mock()
-        mock_part1.function_call = mock_func_call1
-        mock_part1.text = None
-
-        mock_part2 = Mock()
-        mock_part2.function_call = mock_func_call2
-        mock_part2.text = None
-
-        mock_content = Mock()
-        mock_content.parts = [mock_part1, mock_part2]
-
-        mock_candidate = Mock()
-        mock_candidate.content = mock_content
-        mock_candidate.finish_reason = "STOP"
-
-        mock_response.candidates = [mock_candidate]
-
-        mock_usage = Mock()
-        mock_usage.prompt_token_count = 10
-        mock_usage.candidates_token_count = 5
-        mock_usage.total_token_count = 15
-        mock_response.usage_metadata = mock_usage
-
-        result = provider._transform_response(mock_response)
-
-        # Verify multiple capability_calls are present
-        assert result.capability_calls is not None
-        assert len(result.capability_calls) == 2
-        assert result.capability_calls[0].name == "get_weather"
-        assert result.capability_calls[0].arguments == {"location": "NYC"}
-        assert result.capability_calls[1].name == "get_time"
-        assert result.capability_calls[1].arguments == {"timezone": "EST"}
-
-    @patch("nimbus.models.llm.google_provider.LazyImporter.import_module")
-    def test_complete_with_tool_calling(self, mock_import: Mock) -> None:
-        """Test complete with tool calling end-to-end."""
-        from nimbus.tools import LocalFunctionCapability
-
-        def get_weather(location: str) -> str:
-            """Get weather for a location."""
-            return f"Weather for {location}"
-
-        capability = LocalFunctionCapability(get_weather)
-
-        # Setup mocks
-        mock_vertexai = MagicMock()
-        mock_import.return_value = mock_vertexai
-
-        mock_generative_models = Mock()
-        mock_vertexai.generative_models = mock_generative_models
-
-        mock_model = Mock()
-        mock_generative_models.GenerativeModel.return_value = mock_model
-
-        # Mock response with function call
-        mock_response = Mock()
-        mock_response.name = "response-123"
-        mock_response.model = "gemini-1.5-pro"
-
-        mock_func_call = Mock()
-        mock_func_call.name = "get_weather"
-        mock_func_call.args = {"location": "San Francisco"}
-
-        mock_part = Mock()
-        mock_part.function_call = mock_func_call
-        mock_part.text = None
-
-        mock_content = Mock()
-        mock_content.parts = [mock_part]
-
-        mock_candidate = Mock()
-        mock_candidate.content = mock_content
-        mock_candidate.finish_reason = "STOP"
-
-        mock_response.candidates = [mock_candidate]
-
-        mock_usage = Mock()
-        mock_usage.prompt_token_count = 15
-        mock_usage.candidates_token_count = 5
-        mock_usage.total_token_count = 20
-        mock_response.usage_metadata = mock_usage
-
-        mock_model.generate_content.return_value = mock_response
-
-        # Execute
-        provider = GoogleProvider(
-            project_id="my-project",
-            location="us-central1"
-        )
-        request = CompletionRequest(
-            messages=[UserMessage(content="What's the weather in San Francisco?")],
-            model="gemini-1.5-pro",
-            capabilities=[capability]
-        )
-
-        result = provider.complete(request)
-
-        # Verify
-        assert isinstance(result, CompletionResponse)
-        assert result.capability_calls is not None
-        assert len(result.capability_calls) == 1
-        assert result.capability_calls[0].name == "get_weather"
-        assert result.capability_calls[0].arguments == {"location": "San Francisco"}
-
-        # Verify the call was made with tools
-        call_kwargs = mock_model.generate_content.call_args[1]
-        assert "tools" in call_kwargs
-        assert len(call_kwargs["tools"]) == 1
-        assert "function_declarations" in call_kwargs["tools"][0]
-
-    def test_tool_call_parsing_with_handler(self) -> None:
-        """Test that tool calls can be parsed by CapabilityCallHandler."""
-        from nimbus.tools import CapabilityRegistry, LocalFunctionCapability
-        from nimbus.tools.capability_call_handler import CapabilityCallHandler
-
-        def get_weather(location: str) -> str:
-            """Get weather for a location."""
-            return f"Weather for {location}"
-
-        # Register capability
-        capability = LocalFunctionCapability(get_weather)
         registry = CapabilityRegistry.get_instance()
-        registry.register(capability)
+        registry.register(LocalFunctionCapability(get_weather))
+        try:
+            p = make()
+            resp = p._transform_response(gen_response([{"functionCall": {"name": "get_weather", "args": {"location": "NYC"}}}]))
+            calls = CapabilityCallHandler(registry).parse_capability_calls(resp, p)
+            assert [(c.name, c.arguments) for c in calls] == [("get_weather", {"location": "NYC"})]
+        finally:
+            registry.unregister("get_weather")
 
-        provider = GoogleProvider(
-            project_id="my-project",
-            location="us-central1"
-        )
+    def test_stream_chunk(self) -> None:
+        p = make()
+        c = p._transform_stream_chunk(gen_response([{"text": "Hi"}], "FINISH_REASON_UNSPECIFIED"))
+        assert isinstance(c, StreamChunk) and c.delta == "Hi" and c.finish_reason is None
+        c = p._transform_stream_chunk(JsonObject({"candidates": [{"content": {"parts": [{"text": "!"}]}, "finishReason": "STOP"}]}))
+        assert c.delta == "!" and c.finish_reason == "stop"
+        assert p._transform_stream_chunk(JsonObject({})).delta == ""
 
-        # Mock Google response with function call
-        mock_response = Mock()
-        mock_response.name = "response-123"
-        mock_response.model = "gemini-1.5-pro"
 
-        mock_func_call = Mock()
-        mock_func_call.name = "get_weather"
-        mock_func_call.args = {"location": "NYC"}
+class TestCalls:
+    def test_complete_rest_call(self) -> None:
+        r = gen_response([{"text": "Hello!"}], usage={"promptTokenCount": 1, "candidatesTokenCount": 2, "totalTokenCount": 3})
+        with patch("skye.models.transport.rest.post_json", return_value=r) as post:
+            resp = make().complete(req(messages=[SystemMessage(content="s"), UserMessage(content="Hello")], temperature=0.5))
+        assert resp.content == "Hello!"
+        url, body = post.call_args[0]
+        assert url == URL + ":generateContent"
+        assert "model" not in body
+        assert body["systemInstruction"] == {"parts": [{"text": "s"}]}
+        assert body["contents"] == [{"role": "user", "parts": [{"text": "Hello"}]}]
+        assert body["generationConfig"]["temperature"] == 0.5
+        auth = post.call_args.kwargs["authenticator"]
+        assert auth.apply("POST", url, {})["Authorization"] == "Bearer tok"
 
-        mock_part = Mock()
-        mock_part.function_call = mock_func_call
-        mock_part.text = None
+    def test_complete_error(self) -> None:
+        with patch("skye.models.transport.rest.post_json", side_effect=Exception("boom")):
+            with pytest.raises(ProviderError):
+                make().complete(req())
 
-        mock_content = Mock()
-        mock_content.parts = [mock_part]
+    def test_stream_rest_call(self) -> None:
+        events = iter([gen_response([{"text": "a"}]), gen_response([{"text": "b"}], "STOP")])
+        with patch("skye.models.transport.rest.stream_sse_json", return_value=events) as sse:
+            chunks = list(make().stream(req()))
+        assert [c.delta for c in chunks] == ["a", "b"]
+        assert chunks[-1].finish_reason == "stop"
+        assert sse.call_args[0][0] == URL + ":streamGenerateContent?alt=sse"
+        assert "model" not in sse.call_args[0][1]
 
-        mock_candidate = Mock()
-        mock_candidate.content = mock_content
-        mock_candidate.finish_reason = "STOP"
+    def test_acomplete(self) -> None:
+        with patch("skye.models.transport.rest.post_json", return_value=gen_response([{"text": "async"}])):
+            resp = asyncio.run(make().acomplete(req()))
+        assert resp.content == "async"
 
-        mock_response.candidates = [mock_candidate]
+    def test_end_to_end_headers_and_body_via_http(self) -> None:
+        """Real post_json over a patched base.http.send_bytes: URL, auth header and JSON body."""
+        import json
 
-        mock_usage = Mock()
-        mock_usage.prompt_token_count = 10
-        mock_usage.candidates_token_count = 5
-        mock_usage.total_token_count = 15
-        mock_response.usage_metadata = mock_usage
+        raw = json.dumps({"candidates": [{"content": {"parts": [{"text": "ok"}]}}]}).encode()
+        with patch("skye.base.http.send_bytes", return_value=raw) as send:
+            resp = make().complete(req())
+        assert resp.content == "ok"
+        assert send.call_args[0][0] == URL + ":generateContent"
+        assert send.call_args.kwargs["headers"]["Authorization"] == "Bearer tok"
+        assert json.loads(send.call_args[0][1])["contents"][0]["parts"][0]["text"] == "Hello"
 
-        # Transform response
-        result = provider._transform_response(mock_response)
 
-        # Parse tool calls using handler with provider instance
-        handler = CapabilityCallHandler(registry)
-        capability_calls = handler.parse_capability_calls(result, provider)
+class TestMisc:
+    def test_model_info(self) -> None:
+        info = make().get_model_info()
+        assert info["provider"] == "google" and info["supports_streaming"] and info["supports_multimodal"]
 
-        # Verify parsing
-        assert len(capability_calls) == 1
-        assert capability_calls[0].name == "get_weather"
-        assert capability_calls[0].arguments == {"location": "NYC"}
-
-        # Clean up
-        registry.unregister("get_weather")
+    def test_format_capability_results(self) -> None:
+        results = [
+            Mock(name_="x", error=None, result={"a": 1}),
+            Mock(error="bad", result=None),
+            Mock(error=None, result='{"b": 2}'),
+            Mock(error=None, result="plain"),
+        ]
+        for i, n in enumerate(["a", "b", "c", "d"]):
+            results[i].name = n
+        out = make().format_capability_results(results)
+        assert [o["functionResponse"]["response"] for o in out] == [{"a": 1}, {"error": "bad"}, {"b": 2}, {"result": "plain"}]

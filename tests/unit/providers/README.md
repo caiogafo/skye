@@ -1,6 +1,6 @@
 # Provider Unit Tests
 
-Unit tests for Nimbus provider implementations.
+Unit tests for Skye provider implementations.
 
 ## Test Coverage
 
@@ -30,7 +30,7 @@ pytest tests/unit/providers/
 pytest tests/unit/providers/test_openai_provider.py
 
 # Run with coverage
-pytest tests/unit/providers/ --cov=src/nimbus/models
+pytest tests/unit/providers/ --cov=src/skye/models
 ```
 
 ## Testing Approach

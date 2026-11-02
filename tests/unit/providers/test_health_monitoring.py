@@ -10,10 +10,10 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from nimbus.base.completion import CompletionRequest, CompletionResponse, TokenUsage
-from nimbus.base.messages import UserMessage
-from nimbus.models.base import BaseModelProvider, BaseEmbeddingProvider
-from nimbus.base.health import HealthMetrics
+from skye.base.completion import CompletionRequest, CompletionResponse, TokenUsage
+from skye.base.messages import UserMessage
+from skye.models.base import BaseModelProvider, BaseEmbeddingProvider
+from skye.base.health import HealthMetrics
 
 
 class TestHealthMetrics:
@@ -196,11 +196,11 @@ class MockModelProvider(BaseModelProvider):
         yield {"choices": [{"delta": {"content": "test"}}]}
     
     def _transform_messages(self, messages: list) -> list[dict]:
-        """Transform Nimbus messages to provider format."""
+        """Transform Skye messages to provider format."""
         return [{"role": msg.role, "content": msg.content} for msg in messages]
     
     def _transform_capabilities(self, capabilities: list) -> list[dict]:
-        """Transform Nimbus capabilities to provider tool format."""
+        """Transform Skye capabilities to provider tool format."""
         return [{"name": "mock_tool", "description": "Mock tool"}]
     
     def _extract_capability_calls(self, response: dict) -> list | None:

@@ -3,7 +3,7 @@
 import pytest
 from typing import Any
 
-from nimbus.models.base import BaseEmbeddingProvider
+from skye.models.base import BaseEmbeddingProvider
 
 
 class MockEmbeddingProvider(BaseEmbeddingProvider):

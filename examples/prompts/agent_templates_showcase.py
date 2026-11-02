@@ -1,4 +1,4 @@
-"""Agent Templates Showcase for Nimbus Prompts Support.
+"""Agent Templates Showcase for Skye Prompts Support.
 
 This script demonstrates the comprehensive agent-focused templates
 inspired by Cheshire Cat and Promptify patterns.
@@ -12,15 +12,15 @@ from pathlib import Path
 src_path = Path(__file__).parent.parent.parent / "src"
 sys.path.insert(0, str(src_path))
 
-from nimbus.prompts import BasePromptBuilder
-from nimbus.models.registry import provider as create_provider
+from skye.prompts import BasePromptBuilder
+from skye.models.registry import provider as create_provider
 
 
 def complete_with_provider(messages, model="gpt-4", temperature=0.7, max_tokens=200, provider_name="openai"):
     """Helper function to complete messages using a provider.
     
     Args:
-        messages: List of NimbusMessage objects from template rendering
+        messages: List of SkyeMessage objects from template rendering
         model: Model name to use (default: gpt-4)
         temperature: Sampling temperature (default: 0.7)
         max_tokens: Maximum tokens to generate (default: 200)
@@ -414,7 +414,7 @@ def showcase_specialized_nlp_templates():
 
 def main():
     """Run all agent template showcase examples."""
-    print("Nimbus Prompts Support - Agent Templates Showcase")
+    print("Skye Prompts Support - Agent Templates Showcase")
     print("=" * 55)
     print()
     

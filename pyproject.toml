@@ -1,47 +1,47 @@
 [project]
-name = "nimbus"
+name = "skyeai"
 version = "0.1.0"
 description = "Modular GenAI library with optional extras for building AI agents and intelligent applications"
 readme = "README.md"
 license = {text = "MIT"}
-authors = [{name = "Nimbus Team"}]
+authors = [{name = "Skye Team"}]
 requires-python = ">=3.10"
 dependencies = [
-    "jinja2>=3.1.6",
     "pydantic>=2.0",
     "pyyaml>=6.0",
     "tenacity>=8.0",
 ]
 
 [project.optional-dependencies]
-# Individual providers
-openai = ["openai>=1.0", "tiktoken>=0.5"]
-anthropic = ["anthropic>=0.25"]
-bedrock = ["boto3>=1.28"]  # Optional in Lambda environments
-google = ["google-cloud-aiplatform>=1.38"]
-cohere = ["cohere>=5.0"]
+# Model providers: each has one built-in stdlib REST adapter (Requirement 20); vendor SDKs are
+# dev/test oracles only. The extras exist so `pip install skyeai[openai]` etc. keep working.
+openai = ["tiktoken>=0.5"]  # optional exact token counting for gpt-*/o1/o3 models; stdlib estimate otherwise
+anthropic = []
+bedrock = []  # SigV4 is in the stdlib (auth/sigv4.py); boto3 is not needed
+google = []
+cohere = []
 
 # Individual components
 # auth: pure-Python RSA for RS256 (Google service-account JWT, Azure certificate assertion).
 auth = ["rsa>=4.9"]
 agents = []
-prompts = ["jinja2>=3.0"]
+prompts = []  # empty extra: the template engine is standard library
 tools = []  # empty extra: a module of the core, no third-party libraries
 # mcp: fastmcp, the optional full-capability substitute for the built-in stdlib MCP client,
-# chosen only by create_mcp_client(target, impl="fastmcp") (Req 25).
+# chosen only by create_mcp_client(target, impl="fastmcp") (Requirement 21).
 mcp = ["fastmcp>=2.0"]
 memory = ["redis>=5.0", "asyncpg>=0.29"]
 guard = []
 teams = []  # empty extra: a module of the core, no third-party libraries
 flows = []  # empty extra: a module of the core, no third-party libraries
-observe = []  # nothing imports a telemetry library yet; declare it with the code that does (task 8.1)
+observe = []  # nothing imports a telemetry library yet; declare it with the code that does
 
 # Convenience bundles
-llm-providers = ["openai>=1.0", "anthropic>=0.25", "boto3>=1.28", "tiktoken>=0.5"]
-embedding-providers = ["openai>=1.0", "cohere>=5.0", "tiktoken>=0.5"]
-all-providers = ["openai>=1.0", "anthropic>=0.25", "boto3>=1.28", "google-cloud-aiplatform>=1.38", "cohere>=5.0", "tiktoken>=0.5"]
-providers = ["openai>=1.0", "anthropic>=0.25", "boto3>=1.28", "google-cloud-aiplatform>=1.38", "cohere>=5.0", "tiktoken>=0.5"]
-all = ["openai>=1.0", "anthropic>=0.25", "boto3>=1.28", "google-cloud-aiplatform>=1.38", "cohere>=5.0", "tiktoken>=0.5", "redis>=5.0", "asyncpg>=0.29", "fastmcp>=2.0", "rsa>=4.9"]
+llm-providers = ["tiktoken>=0.5"]
+embedding-providers = ["tiktoken>=0.5"]
+all-providers = ["tiktoken>=0.5"]
+providers = ["tiktoken>=0.5"]
+all = ["tiktoken>=0.5", "redis>=5.0", "asyncpg>=0.29", "fastmcp>=2.0", "rsa>=4.9"]
 
 [dependency-groups]
 dev = [
@@ -57,11 +57,8 @@ dev = [
     "requests>=2.31",
     "httpx>=0.24",
     "tomli>=2.0; python_version < '3.11'",
-    # Official vendor SDKs + fastmcp: differential-test validation oracles only (Req 18.1).
-    # This dev group is the single validation home: never a runtime dependency, and never
-    # declared as an extra *for the validation purpose*. (The same SDKs appear above under
-    # [project.optional-dependencies] as user opt-in backend extras per Req 17 — that is a
-    # separate, allowed concern: a user choosing nimbus[openai] etc. at runtime, not validation.)
+    # Official vendor SDKs + fastmcp: differential-test validation oracles only (Requirement 14).
+    # This dev group is the single validation home: never a runtime dependency (Requirement 20).
     "openai>=1.0",
     "anthropic>=0.25",
     "boto3>=1.28",
@@ -99,7 +96,7 @@ asyncio_mode = "auto"
 markers = [
     "stress: marks tests as stress tests (deselect with '-m \"not stress\"')",
     "differential: built-in vs official-SDK equivalence tests (dev env only; run with 'make differential')",
-    "budget: installs Nimbus in clean environments to check size budgets (needs uv and network; run with '-m budget')",
+    "budget: installs Skye in clean environments to check size budgets (needs uv and network; run with '-m budget')",
 ]
 addopts = "-m 'not budget'"
 
@@ -117,3 +114,7 @@ exclude_lines = [
     "if TYPE_CHECKING:",
     "@abstractmethod",
 ]
+
+[tool.hatch.build.targets.wheel]
+# The distribution is `skyeai`; the import package is `skye`.
+packages = ["src/skye"]

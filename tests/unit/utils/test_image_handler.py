@@ -4,8 +4,8 @@ import base64
 from pathlib import Path
 import pytest
 
-from nimbus.models.transport.multimodal import ImageHandler
-from nimbus.base.exceptions import ValidationError
+from skye.models.transport.multimodal import ImageHandler
+from skye.base.exceptions import ValidationError
 
 
 class TestImageHandler:

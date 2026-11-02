@@ -1,6 +1,6 @@
 # Capability Unit Tests
 
-Unit tests for the Nimbus capability system.
+Unit tests for the Skye capability system.
 
 ## Test Coverage
 
@@ -28,5 +28,5 @@ pytest tests/unit/capabilities/
 pytest tests/unit/capabilities/test_capability_models.py
 
 # Run with coverage
-pytest tests/unit/capabilities/ --cov=src/nimbus/tools
+pytest tests/unit/capabilities/ --cov=src/skye/tools
 ```

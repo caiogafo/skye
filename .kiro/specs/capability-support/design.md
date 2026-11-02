@@ -364,7 +364,7 @@ class CompletionResponse(BaseModel):
 ### Custom Exceptions
 
 ```python
-class CapabilityError(NimbusError):
+class CapabilityError(SkyeError):
     """Base exception for capability-related errors."""
     pass
 

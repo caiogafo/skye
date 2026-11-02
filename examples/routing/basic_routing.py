@@ -1,6 +1,6 @@
 """Basic Routing Example.
 
-This example demonstrates how to use Nimbus routers for load balancing
+This example demonstrates how to use Skye routers for load balancing
 across multiple model deployments.
 
 Features shown:
@@ -11,8 +11,8 @@ Features shown:
 """
 
 import os
-from nimbus.base.messages import UserMessage
-from nimbus.router import ModelRouter, ModelTarget, RouteConfig, RoutingStrategy
+from skye.base.messages import UserMessage
+from skye.router import ModelRouter, ModelTarget, RouteConfig, RoutingStrategy
 
 
 def basic_router_example():
@@ -367,7 +367,7 @@ def bedrock_multi_region():
 def main():
     """Run all examples."""
     print("\n" + "🔀 " * 20)
-    print("NIMBUS - Basic Routing Examples")
+    print("SKYE - Basic Routing Examples")
     print("🔀 " * 20)
     
     try:

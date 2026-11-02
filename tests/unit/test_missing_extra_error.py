@@ -2,16 +2,16 @@
 
 import pytest
 
-from nimbus.base.exceptions import MissingExtraError, NimbusError
-from nimbus.base.lazy_import import missing_extra
+from skye.base.exceptions import MissingExtraError, SkyeError
+from skye.base.lazy_import import missing_extra
 
 
-def test_is_nimbus_error_and_names_extra():
+def test_is_skye_error_and_names_extra():
     err = MissingExtraError(extra="tools", missing="mcp")
-    assert isinstance(err, NimbusError)
+    assert isinstance(err, SkyeError)
     assert err.extra == "tools"
     assert err.details["extra"] == "tools"
-    assert "nimbus[tools]" in str(err)
+    assert "skyeai[tools]" in str(err)
 
 
 def test_missing_extra_wraps_original_import_error():

@@ -1,6 +1,6 @@
 # Routing Examples
 
-This directory contains examples demonstrating how to use Nimbus routers for load balancing and failover.
+This directory contains examples demonstrating how to use Skye routers for load balancing and failover.
 
 ## What is Routing?
 

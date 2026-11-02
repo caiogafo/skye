@@ -1,52 +1,52 @@
 """Tests for package exports."""
 
-import nimbus
+import skye
 
 
 def test_version_export():
     """Test that __version__ is exported."""
-    assert hasattr(nimbus, "__version__")
-    assert isinstance(nimbus.__version__, str)
+    assert hasattr(skye, "__version__")
+    assert isinstance(skye.__version__, str)
 
 
 def test_all_defined():
     """Test that __all__ is properly defined."""
-    assert hasattr(nimbus, "__all__")
-    assert isinstance(nimbus.__all__, list)
-    assert len(nimbus.__all__) > 0
+    assert hasattr(skye, "__all__")
+    assert isinstance(skye.__all__, list)
+    assert len(skye.__all__) > 0
 
 
 def test_exception_exports():
-    """Test that all exceptions are importable from nimbus.base.exceptions."""
-    from nimbus.base.exceptions import (
+    """Test that all exceptions are importable from skye.base.exceptions."""
+    from skye.base.exceptions import (
         CapabilityExecutionError,
         ConfigurationError,
-        NimbusError,
+        SkyeError,
         ProviderError,
         ValidationError,
     )
 
     # Verify they are exception classes
-    assert issubclass(NimbusError, Exception)
-    assert issubclass(ProviderError, NimbusError)
-    assert issubclass(ConfigurationError, NimbusError)
-    assert issubclass(ValidationError, NimbusError)
-    assert issubclass(CapabilityExecutionError, NimbusError)
+    assert issubclass(SkyeError, Exception)
+    assert issubclass(ProviderError, SkyeError)
+    assert issubclass(ConfigurationError, SkyeError)
+    assert issubclass(ValidationError, SkyeError)
+    assert issubclass(CapabilityExecutionError, SkyeError)
 
 
 def test_message_exports():
-    """Test that all message types are importable from nimbus.base.messages."""
-    from nimbus.base.messages import (
+    """Test that all message types are importable from skye.base.messages."""
+    from skye.base.messages import (
         AssistantMessage,
         CapabilityMessage,
         ContentChunk,
-        NimbusMessage,
+        SkyeMessage,
         SystemMessage,
         UserMessage,
     )
 
     # Verify they are classes
-    assert isinstance(NimbusMessage, type)
+    assert isinstance(SkyeMessage, type)
     assert isinstance(UserMessage, type)
     assert isinstance(AssistantMessage, type)
     assert isinstance(SystemMessage, type)
@@ -55,8 +55,8 @@ def test_message_exports():
 
 
 def test_completion_exports():
-    """Test that completion models are importable from nimbus.base.completion."""
-    from nimbus.base.completion import (
+    """Test that completion models are importable from skye.base.completion."""
+    from skye.base.completion import (
         CompletionRequest,
         CompletionResponse,
         StreamChunk,
@@ -71,12 +71,12 @@ def test_completion_exports():
 
 
 def test_config_exports():
-    """Test that configuration models and loader are importable from nimbus.base.config."""
-    from nimbus.base.config import (
+    """Test that configuration models and loader are importable from skye.base.config."""
+    from skye.base.config import (
         ConfigLoader,
         CooldownConfig,
         ModelConfig,
-        NimbusConfig,
+        SkyeConfig,
         RateLimitConfig,
         RetryConfig,
     )
@@ -86,13 +86,13 @@ def test_config_exports():
     assert isinstance(RetryConfig, type)
     assert isinstance(CooldownConfig, type)
     assert isinstance(ModelConfig, type)
-    assert isinstance(NimbusConfig, type)
+    assert isinstance(SkyeConfig, type)
     assert isinstance(ConfigLoader, type)
 
 
 def test_interface_exports():
-    """Test that all interfaces are importable from nimbus.base.interfaces."""
-    from nimbus.base.interfaces import (
+    """Test that all interfaces are importable from skye.base.interfaces."""
+    from skye.base.interfaces import (
         CapabilityInterface,
         CapabilitySchema,
         ContentReaderInterface,
@@ -134,8 +134,8 @@ CURATED = ["messages", "completion", "exceptions", "config"]
 
 
 def test_all_exports_in_all_list():
-    """__all__ is exactly the version plus the four curated base modules (Req 6.5)."""
-    from nimbus import __all__
+    """__all__ is exactly the version plus the four curated base modules (task 6.1)."""
+    from skye import __all__
 
     assert __all__ == ["__version__", *CURATED]
 
@@ -144,37 +144,37 @@ def test_curated_top_level_modules():
     """The four curated re-exports are the base modules."""
     import types
 
-    import nimbus
+    import skye
 
     for name in CURATED:
-        assert isinstance(getattr(nimbus, name), types.ModuleType), name
+        assert isinstance(getattr(skye, name), types.ModuleType), name
 
 
 def test_combined_import():
     """Multiple symbols can be imported together from their Component paths."""
-    from nimbus.base.config import ConfigLoader
-    from nimbus.base.exceptions import NimbusError
-    from nimbus.base.interfaces import ModelInterface
-    from nimbus.base.messages import UserMessage
+    from skye.base.config import ConfigLoader
+    from skye.base.exceptions import SkyeError
+    from skye.base.interfaces import ModelInterface
+    from skye.base.messages import UserMessage
 
     assert ModelInterface is not None
     assert UserMessage is not None
-    assert NimbusError is not None
+    assert SkyeError is not None
     assert ConfigLoader is not None
 
 
 def test_removed_names_not_reexported():
     """Names re-exported before task 10.1 are no longer on the top-level package."""
-    import nimbus
+    import skye
 
-    for name in ["provider", "ModelRouter", "UserMessage", "NimbusError",
+    for name in ["provider", "ModelRouter", "UserMessage", "SkyeError",
                  "ConfigLoader", "ModelInterface", "MemoryInterface"]:
-        assert not hasattr(nimbus, name), name
+        assert not hasattr(skye, name), name
 
 
 def test_all_exports_exist():
     """Every item in __all__ exists."""
-    import nimbus
+    import skye
 
-    for export_name in nimbus.__all__:
-        assert getattr(nimbus, export_name) is not None, export_name
+    for export_name in skye.__all__:
+        assert getattr(skye, export_name) is not None, export_name

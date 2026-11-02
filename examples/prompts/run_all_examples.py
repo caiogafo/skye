@@ -1,4 +1,4 @@
-"""Run all Nimbus Prompts Support examples.
+"""Run all Skye Prompts Support examples.
 
 This script runs all example modules to demonstrate the complete
 functionality of the prompts support system.
@@ -7,16 +7,16 @@ functionality of the prompts support system.
 import sys
 from pathlib import Path
 
-# Add the src directory to the path so we can import nimbus modules
+# Add the src directory to the path so we can import skye modules
 src_path = Path(__file__).parent.parent.parent / "src"
 sys.path.insert(0, str(src_path))
 
-from nimbus.prompts import BasePromptBuilder
+from skye.prompts import BasePromptBuilder
 
 
 def main():
     """Run all example modules."""
-    print("Nimbus Prompts Support - Complete Examples Suite")
+    print("Skye Prompts Support - Complete Examples Suite")
     print("=" * 60)
     print()
     
@@ -83,10 +83,10 @@ def main():
     print("- Template registration and rendering")
     print("- Default values and variable management")
     print("- Few-shot learning with examples")
-    print("- Compatible with Nimbus completion API")
+    print("- Compatible with Skye completion API")
     print()
     print("Next steps:")
-    print("1. Use BasePromptBuilder in your Nimbus applications")
+    print("1. Use BasePromptBuilder in your Skye applications")
     print("2. Create custom templates for your use cases")
     print("3. Implement the full Jinja2PromptBuilder for advanced features")
 

@@ -1,6 +1,6 @@
 # Configuration Unit Tests
 
-Unit tests for Nimbus configuration loading and management.
+Unit tests for Skye configuration loading and management.
 
 ## Test Coverage
 
@@ -28,7 +28,7 @@ pytest tests/unit/config/
 pytest tests/unit/config/test_env_var_substitution.py
 
 # Run with coverage
-pytest tests/unit/config/ --cov=src/nimbus/base/config
+pytest tests/unit/config/ --cov=src/skye/base/config
 ```
 
 ## Testing Approach

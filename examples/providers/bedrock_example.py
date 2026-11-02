@@ -1,4 +1,4 @@
-"""AWS Bedrock Provider Example (Boto3-style Nimbus API).
+"""AWS Bedrock Provider Example (Boto3-style Skye API).
 
 This version demonstrates:
 - Basic completion with messages (SystemMessage, UserMessage)
@@ -9,8 +9,8 @@ This version demonstrates:
 - Boto3-like provider creation: create_provider("bedrock")
 """
 
-from nimbus.models.registry import provider as create_provider
-from nimbus.base.messages import UserMessage, SystemMessage
+from skye.models.registry import provider as create_provider
+from skye.base.messages import UserMessage, SystemMessage
 
 
 def basic_completion():
@@ -27,7 +27,7 @@ def basic_completion():
         )
     except ImportError as e:
         print(f"⚠️  Error: {e}")
-        print("\nTo use Bedrock, install with: pip install nimbus[bedrock]")
+        print("\nTo use Bedrock, install with: pip install skyeai[bedrock]")
         return
     
     messages = [
@@ -98,11 +98,11 @@ def lambda_deployment_example():
     print("AWS Lambda Deployment Example")
     print("=" * 60)
     
-    print("\nExample AWS Lambda handler using Nimbus:")
+    print("\nExample AWS Lambda handler using Skye:")
     print("-" * 40)
     print("""
-from nimbus.models.registry import provider as create_provider
-from nimbus.base.messages import UserMessage
+from skye.models.registry import provider as create_provider
+from skye.base.messages import UserMessage
 
 # Initialize client once (reused across invocations)
 client = create_provider("bedrock", region="us-east-1")
@@ -135,7 +135,7 @@ def lambda_handler(event, context):
 """)
     
     print("\nDeployment Steps:")
-    print("  1. Create deployment package with nimbus")
+    print("  1. Create deployment package with skye")
     print("  2. Upload to Lambda (boto3 is pre-installed)")
     print("  3. Set IAM permissions for Bedrock access")
     print("  4. Configure environment variables if needed")
@@ -154,7 +154,7 @@ def aws_profile_example():
     print("\nMethod 1: Using AWS Profile in Code")
     print("-" * 40)
     print("""
-from nimbus.models.registry import provider as create_provider
+from skye.models.registry import provider as create_provider
 
 # Use specific AWS profile
 client = create_provider(
@@ -177,7 +177,7 @@ export AWS_PROFILE=my-profile
 export AWS_REGION=us-east-1
 
 # Then in Python
-from nimbus.models.registry import provider as create_provider
+from skye.models.registry import provider as create_provider
 
 client = create_provider("bedrock", region="us-east-1")
 """)
@@ -191,7 +191,7 @@ export AWS_SECRET_ACCESS_KEY=your-secret-key
 export AWS_REGION=us-east-1
 
 # Then in Python
-from nimbus.models.registry import provider as create_provider
+from skye.models.registry import provider as create_provider
 
 client = create_provider("bedrock", region="us-east-1")
 """)
@@ -216,8 +216,8 @@ def router_example():
     print("=" * 60)
     
     try:
-        from nimbus.router import ModelRouter, ModelTarget, RouteConfig
-        from nimbus.base.interfaces.router import RoutingStrategy
+        from skye.router import ModelRouter, ModelTarget, RouteConfig
+        from skye.base.interfaces.router import RoutingStrategy
         
         # Define multi-region setup with ModelRouter
         router = ModelRouter(
@@ -276,14 +276,14 @@ def router_example():
         
     except ImportError as e:
         print(f"⚠️  Error: {e}")
-        print("\nTo use ModelRouter, install with: pip install nimbus")
+        print("\nTo use ModelRouter, install with: pip install skyeai")
         return
 
 
 def main():
     """Run all examples."""
     print("\n" + "🏔️  " * 20)
-    print("NIMBUS - AWS Bedrock Provider Examples")
+    print("SKYE - AWS Bedrock Provider Examples")
     print("🏔️  " * 20)
     
     try:
@@ -301,7 +301,7 @@ def main():
     except Exception as e:
         print(f"\n❌ Error: {e}")
         print("\nMake sure you have:")
-        print("  1. Installed nimbus[bedrock]: pip install nimbus[bedrock]")
+        print("  1. Installed skyeai[bedrock]: pip install skyeai[bedrock]")
         print("  2. AWS credentials configured")
         print("  3. Access to Bedrock models")
 

@@ -2,7 +2,7 @@
 
 ## Introduction
 
-The Agent Runtime feature provides a base class that implements the agent loop and lets users customize it with hooks that run before and after every operation. The default agent that ships with Nimbus is built on this base class and uses the same hook mechanism for its own behaviour (limits, safety, policy, observability). The loop is designed for serverless: its state is serializable, it can stop before a time limit and resume in a later invocation, and it does not use parallel processes.
+The Agent Runtime feature provides a base class that implements the agent loop and lets users customize it with hooks that run before and after every operation. The default agent that ships with Skye is built on this base class and uses the same hook mechanism for its own behaviour (limits, safety, policy, observability). The loop is designed for serverless: its state is serializable, it can stop before a time limit and resume in a later invocation, and it does not use parallel processes.
 
 Status: requirements draft, to be reviewed before design. Items marked OPEN are decisions for the owner.
 
@@ -10,7 +10,7 @@ Status: requirements draft, to be reviewed before design. Items marked OPEN are 
 
 - **Agent loop**: The repeated cycle of building a model request, calling the model, running the tools it asks for, and adding the results to the conversation, until the agent produces a final answer or a stop condition is met
 - **BaseAgent**: The abstract class that implements the agent loop and the hook points
-- **Agent**: The default agent shipped with Nimbus, a BaseAgent with default hooks
+- **Agent**: The default agent shipped with Skye, a BaseAgent with default hooks
 - **Operation**: A step of the loop that has its own pre and post hook point (run, step, toolset selection, model call, tool call, memory read, memory write, safety check, policy check)
 - **Hook**: A user-provided function or object attached to an operation
 - **Interceptor**: A hook that can change, replace, retry or stop an operation. Not to be confused with an observer
@@ -29,7 +29,7 @@ Status: requirements draft, to be reviewed before design. Items marked OPEN are 
 
 #### Acceptance Criteria
 
-1. THE Nimbus library SHALL provide a BaseAgent class that implements the agent loop for both synchronous and asynchronous use
+1. THE Skye library SHALL provide a BaseAgent class that implements the agent loop for both synchronous and asynchronous use
 2. THE BaseAgent SHALL take the model (or the ModelRouter), the ToolProvider, optional memory and optional hook providers as inputs
 3. THE BaseAgent SHALL stop when the model returns a final answer, when the maximum number of steps is reached, when a hook stops the run, or when the run is suspended
 4. THE BaseAgent SHALL return a result that states why the run ended
@@ -44,7 +44,7 @@ Status: requirements draft, to be reviewed before design. Items marked OPEN are 
 1. THE BaseAgent SHALL define these operations, each with a pre hook point and a post hook point: run, step, toolset selection, model call, tool call, memory read, memory write, safety check, policy check
 2. WHEN an operation fails, THE BaseAgent SHALL call the error hooks of that operation
 3. THE BaseAgent SHALL pass each hook a context object with the AgentState, the operation name and the operation payload (request before, result after)
-4. THE Nimbus library SHALL list the operations in one enumeration, so that hooks can be registered by name
+4. THE Skye library SHALL list the operations in one enumeration, so that hooks can be registered by name
 
 ### Requirement 3: Hook semantics
 
@@ -154,8 +154,8 @@ Status: requirements draft, to be reviewed before design. Items marked OPEN are 
 
 #### Acceptance Criteria
 
-1. THE Nimbus library SHALL provide a scripted model for tests that returns prepared responses and tool calls
-2. THE Nimbus test suite SHALL cover each hook outcome (continue, modify, skip, deny, retry, replace, stop), the hook order, fail open and fail closed, suspension and resumption, and concurrent tool calls
+1. THE Skye library SHALL provide a scripted model for tests that returns prepared responses and tool calls
+2. THE Skye test suite SHALL cover each hook outcome (continue, modify, skip, deny, retry, replace, stop), the hook order, fail open and fail closed, suspension and resumption, and concurrent tool calls
 
 ## Note on decision models
 Hooks may call a decision model (Jev, a "System One" model that returns a constrained choice with probabilities) for quick branching decisions: which tools to expose, whether an action is risky, whether to continue. It is a use of the `models` component, not a part of the loop.

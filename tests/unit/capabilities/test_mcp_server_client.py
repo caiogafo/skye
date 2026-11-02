@@ -5,8 +5,8 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from nimbus.tools.exceptions import CapabilityValidationError
-from nimbus.tools.registry import CapabilityRegistry
+from skye.tools.exceptions import CapabilityValidationError
+from skye.tools.registry import CapabilityRegistry
 
 # Mock fastmcp module globally for all tests
 sys.modules["fastmcp"] = MagicMock()
@@ -38,13 +38,13 @@ class TestMCPServerClient:
         sys.modules["fastmcp"] = None
 
         try:
-            from nimbus.tools.mcp_server_client import MCPServerClient
+            from skye.tools.mcp_server_client import MCPServerClient
 
             with pytest.raises(ImportError) as exc_info:
                 MCPServerClient("test_server", sample_server_config)
 
             assert "FastMCP is required" in str(exc_info.value)
-            assert "pip install nimbus[mcp]" in str(exc_info.value)
+            assert "pip install skyeai[mcp]" in str(exc_info.value)
         finally:
             # Restore fastmcp
             if fastmcp_backup is not None:
@@ -54,7 +54,7 @@ class TestMCPServerClient:
 
     def test_initialization_with_valid_config(self, sample_server_config):
         """Test MCPServerClient initialization with valid configuration."""
-        from nimbus.tools.mcp_server_client import MCPServerClient
+        from skye.tools.mcp_server_client import MCPServerClient
 
         client = MCPServerClient("test_server", sample_server_config)
 
@@ -65,7 +65,7 @@ class TestMCPServerClient:
 
     def test_initialization_with_auto_register(self, sample_server_config, registry):
         """Test initialization with auto-registration enabled."""
-        from nimbus.tools.mcp_server_client import MCPServerClient
+        from skye.tools.mcp_server_client import MCPServerClient
 
         client = MCPServerClient(
             "test_server",
@@ -79,7 +79,7 @@ class TestMCPServerClient:
 
     def test_initialization_with_empty_server_name(self, sample_server_config):
         """Test that initialization fails with empty server name."""
-        from nimbus.tools.mcp_server_client import MCPServerClient
+        from skye.tools.mcp_server_client import MCPServerClient
 
         with pytest.raises(CapabilityValidationError) as exc_info:
             MCPServerClient("", sample_server_config)
@@ -88,7 +88,7 @@ class TestMCPServerClient:
 
     def test_initialization_with_invalid_config_type(self):
         """Test that initialization fails with non-dict config."""
-        from nimbus.tools.mcp_server_client import MCPServerClient
+        from skye.tools.mcp_server_client import MCPServerClient
 
         with pytest.raises(CapabilityValidationError) as exc_info:
             MCPServerClient("test_server", "not a dict")
@@ -98,7 +98,7 @@ class TestMCPServerClient:
     @pytest.mark.asyncio
     async def test_context_manager(self, sample_server_config):
         """Test async context manager protocol."""
-        from nimbus.tools.mcp_server_client import MCPServerClient
+        from skye.tools.mcp_server_client import MCPServerClient
 
         client = MCPServerClient("test_server", sample_server_config)
 
@@ -113,7 +113,7 @@ class TestMCPServerClient:
     @pytest.mark.asyncio
     async def test_connect(self, sample_server_config):
         """Test connection to MCP server."""
-        from nimbus.tools.mcp_server_client import MCPServerClient
+        from skye.tools.mcp_server_client import MCPServerClient
 
         client = MCPServerClient("test_server", sample_server_config)
 
@@ -132,7 +132,7 @@ class TestMCPServerClient:
     @pytest.mark.asyncio
     async def test_load_tools(self, sample_server_config):
         """Test loading tools from MCP server."""
-        from nimbus.tools.mcp_server_client import MCPServerClient
+        from skye.tools.mcp_server_client import MCPServerClient
 
         client = MCPServerClient("test_server", sample_server_config)
 
@@ -147,7 +147,7 @@ class TestMCPServerClient:
     @pytest.mark.asyncio
     async def test_load_tools_with_auto_register(self, sample_server_config, registry):
         """Test loading tools with auto-registration."""
-        from nimbus.tools.mcp_server_client import MCPServerClient
+        from skye.tools.mcp_server_client import MCPServerClient
 
         client = MCPServerClient(
             "test_server",
@@ -167,7 +167,7 @@ class TestMCPServerClient:
     @pytest.mark.asyncio
     async def test_get_tool(self, sample_server_config):
         """Test retrieving a specific tool by name."""
-        from nimbus.tools.mcp_server_client import MCPServerClient
+        from skye.tools.mcp_server_client import MCPServerClient
 
         client = MCPServerClient("test_server", sample_server_config)
 
@@ -181,8 +181,8 @@ class TestMCPServerClient:
     @pytest.mark.asyncio
     async def test_get_tool_from_cache(self, sample_server_config):
         """Test retrieving a tool from cache."""
-        from nimbus.tools.mcp_capability import MCPCapability
-        from nimbus.tools.mcp_server_client import MCPServerClient
+        from skye.tools.mcp_capability import MCPCapability
+        from skye.tools.mcp_server_client import MCPServerClient
 
         client = MCPServerClient("test_server", sample_server_config)
 
@@ -207,7 +207,7 @@ class TestMCPServerClient:
     @pytest.mark.asyncio
     async def test_close(self, sample_server_config):
         """Test closing connection to MCP server."""
-        from nimbus.tools.mcp_server_client import MCPServerClient
+        from skye.tools.mcp_server_client import MCPServerClient
 
         client = MCPServerClient("test_server", sample_server_config)
 
@@ -223,7 +223,7 @@ class TestMCPServerClient:
 
     def test_is_connected(self, sample_server_config):
         """Test is_connected method."""
-        from nimbus.tools.mcp_server_client import MCPServerClient
+        from skye.tools.mcp_server_client import MCPServerClient
 
         client = MCPServerClient("test_server", sample_server_config)
 
@@ -231,8 +231,8 @@ class TestMCPServerClient:
 
     def test_get_cached_tools(self, sample_server_config):
         """Test getting list of cached tool names."""
-        from nimbus.tools.mcp_capability import MCPCapability
-        from nimbus.tools.mcp_server_client import MCPServerClient
+        from skye.tools.mcp_capability import MCPCapability
+        from skye.tools.mcp_server_client import MCPServerClient
 
         client = MCPServerClient("test_server", sample_server_config)
 
@@ -265,8 +265,8 @@ class TestMCPServerClient:
 
     def test_clear_cache(self, sample_server_config):
         """Test clearing the tool cache."""
-        from nimbus.tools.mcp_capability import MCPCapability
-        from nimbus.tools.mcp_server_client import MCPServerClient
+        from skye.tools.mcp_capability import MCPCapability
+        from skye.tools.mcp_server_client import MCPServerClient
 
         client = MCPServerClient("test_server", sample_server_config)
 
@@ -289,7 +289,7 @@ class TestMCPServerClient:
 
     def test_server_name_property(self, sample_server_config):
         """Test server_name property."""
-        from nimbus.tools.mcp_server_client import MCPServerClient
+        from skye.tools.mcp_server_client import MCPServerClient
 
         client = MCPServerClient("test_server", sample_server_config)
 
@@ -297,7 +297,7 @@ class TestMCPServerClient:
 
     def test_auto_register_property(self, sample_server_config):
         """Test auto_register property."""
-        from nimbus.tools.mcp_server_client import MCPServerClient
+        from skye.tools.mcp_server_client import MCPServerClient
 
         client_without_auto = MCPServerClient("test_server", sample_server_config)
         assert client_without_auto.auto_register is False
@@ -312,7 +312,7 @@ class TestMCPServerClient:
     @pytest.mark.asyncio
     async def test_multiple_load_tools_calls(self, sample_server_config):
         """Test that multiple load_tools calls work correctly."""
-        from nimbus.tools.mcp_server_client import MCPServerClient
+        from skye.tools.mcp_server_client import MCPServerClient
 
         client = MCPServerClient("test_server", sample_server_config)
 
@@ -329,7 +329,7 @@ class TestMCPServerClient:
     @pytest.mark.asyncio
     async def test_connection_pooling(self, sample_server_config):
         """Test that connection is reused across operations."""
-        from nimbus.tools.mcp_server_client import MCPServerClient
+        from skye.tools.mcp_server_client import MCPServerClient
 
         client = MCPServerClient("test_server", sample_server_config)
 

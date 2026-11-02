@@ -1,8 +1,8 @@
-# Nimbus
+# Skye
 
 **Modular GenAI library with optional extras**
 
-Nimbus provides a foundational layer for building AI agents and intelligent applications with a Clean Architecture approach. The base package includes only interfaces and models, while all implementations are available as optional extras.
+Skye provides a foundational layer for building AI agents and intelligent applications with a Clean Architecture approach. The base package includes only interfaces and models, while all implementations are available as optional extras.
 
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
@@ -23,29 +23,29 @@ Nimbus provides a foundational layer for building AI agents and intelligent appl
 ### Base Package (Interfaces + Models)
 
 ```bash
-pip install nimbus
+pip install skyeai
 ```
 
 Or with uv:
 
 ```bash
-uv pip install nimbus
+uv pip install skyeai
 ```
 
 ### With Optional Extras
 
 ```bash
 # Single provider
-pip install nimbus[bedrock]
-uv pip install nimbus[bedrock]
+pip install skyeai[bedrock]
+uv pip install skyeai[bedrock]
 
 # Multiple extras
-pip install nimbus[bedrock,agents,memory]
-uv pip install nimbus[bedrock,agents,memory]
+pip install skyeai[bedrock,agents,memory]
+uv pip install skyeai[bedrock,agents,memory]
 
 # Everything
-pip install nimbus[all]
-uv pip install nimbus[all]
+pip install skyeai[all]
+uv pip install skyeai[all]
 ```
 
 ### Available Extras
@@ -71,8 +71,8 @@ uv pip install nimbus[all]
 ### Basic Usage
 
 ```python
-from nimbus.models.registry import provider as create_provider
-from nimbus.base.messages import UserMessage
+from skye.models.registry import provider as create_provider
+from skye.base.messages import UserMessage
 
 # Create provider client (boto3-style)
 client = create_provider("bedrock", region="us-east-1")
@@ -91,8 +91,8 @@ print(response.content)
 
 ```python
 import asyncio
-from nimbus.models.registry import provider as create_provider
-from nimbus.base.messages import UserMessage
+from skye.models.registry import provider as create_provider
+from skye.base.messages import UserMessage
 
 async def main():
     client = create_provider("openai", api_key="sk-...")
@@ -110,8 +110,8 @@ asyncio.run(main())
 ### Streaming
 
 ```python
-from nimbus.models.registry import provider as create_provider
-from nimbus.base.messages import UserMessage
+from skye.models.registry import provider as create_provider
+from skye.base.messages import UserMessage
 
 client = create_provider("openai", api_key="sk-...")
 
@@ -126,8 +126,8 @@ for chunk in client.stream(
 
 ```python
 from pydantic import BaseModel
-from nimbus.models.registry import provider as create_provider
-from nimbus.base.messages import UserMessage
+from skye.models.registry import provider as create_provider
+from skye.base.messages import UserMessage
 
 class Person(BaseModel):
     name: str
@@ -154,25 +154,25 @@ Each provider is available as an optional extra:
 
 ```bash
 # OpenAI
-pip install nimbus[openai]
+pip install skyeai[openai]
 
 # Anthropic
-pip install nimbus[anthropic]
+pip install skyeai[anthropic]
 
 # AWS Bedrock
-pip install nimbus[bedrock]
+pip install skyeai[bedrock]
 
 # Azure OpenAI (served by the openai extra)
-pip install nimbus[openai]
+pip install skyeai[openai]
 
 # Google
-pip install nimbus[google]
+pip install skyeai[google]
 
 # Cohere (embeddings)
-pip install nimbus[cohere]
+pip install skyeai[cohere]
 
 # All providers
-pip install nimbus[all-providers]
+pip install skyeai[all-providers]
 ```
 
 ### LLM Providers
@@ -180,8 +180,8 @@ pip install nimbus[all-providers]
 #### OpenAI
 
 ```python
-from nimbus.models.registry import provider as create_provider
-from nimbus.base.messages import UserMessage
+from skye.models.registry import provider as create_provider
+from skye.base.messages import UserMessage
 
 # Create provider client
 client = create_provider("openai", api_key="sk-...")
@@ -198,8 +198,8 @@ print(response.content)
 #### Anthropic
 
 ```python
-from nimbus.models.registry import provider as create_provider
-from nimbus.base.messages import UserMessage
+from skye.models.registry import provider as create_provider
+from skye.base.messages import UserMessage
 
 client = create_provider("anthropic", api_key="sk-ant-...")
 
@@ -212,8 +212,8 @@ response = client.complete(
 #### AWS Bedrock
 
 ```python
-from nimbus.models.registry import provider as create_provider
-from nimbus.base.messages import UserMessage
+from skye.models.registry import provider as create_provider
+from skye.base.messages import UserMessage
 
 # Works with or without boto3 installed
 # In AWS Lambda, boto3 is pre-installed
@@ -228,8 +228,8 @@ response = client.complete(
 #### Azure OpenAI
 
 ```python
-from nimbus.models.registry import provider as create_provider
-from nimbus.base.messages import UserMessage
+from skye.models.registry import provider as create_provider
+from skye.base.messages import UserMessage
 
 client = create_provider(
     "azure",
@@ -247,8 +247,8 @@ response = client.complete(
 #### Google
 
 ```python
-from nimbus.models.registry import provider as create_provider
-from nimbus.base.messages import UserMessage
+from skye.models.registry import provider as create_provider
+from skye.base.messages import UserMessage
 
 client = create_provider(
     "google",
@@ -265,7 +265,7 @@ response = client.complete(
 ### Embedding Providers
 
 ```python
-from nimbus.models.registry import provider as create_provider
+from skye.models.registry import provider as create_provider
 
 # OpenAI embeddings
 embedder = create_provider(
@@ -314,8 +314,8 @@ embeddings = await embedder.aencode_batch(["text1", "text2"])
 ### Multimodal Inputs
 
 ```python
-from nimbus.models.registry import provider as create_provider
-from nimbus.base.messages import UserMessage
+from skye.models.registry import provider as create_provider
+from skye.base.messages import UserMessage
 
 client = create_provider("openai", api_key="sk-...")
 
@@ -361,8 +361,8 @@ response = client.complete(
 
 ```python
 from pydantic import BaseModel
-from nimbus.models.registry import provider as create_provider
-from nimbus.base.messages import UserMessage
+from skye.models.registry import provider as create_provider
+from skye.base.messages import UserMessage
 
 class Person(BaseModel):
     name: str
@@ -385,7 +385,7 @@ print(f"{person.name} is {person.age} years old")
 
 ### Function Calling (Capabilities)
 
-Nimbus supports two ways to provide capabilities to the LLM:
+Skye supports two ways to provide capabilities to the LLM:
 
 1. **Direct list** - Pass capabilities as an array (simple, no registry needed)
 2. **CapabilityRegistry** - Pass a registry for search/discovery (advanced)
@@ -393,9 +393,9 @@ Nimbus supports two ways to provide capabilities to the LLM:
 #### Option 1: Direct Capabilities (Recommended)
 
 ```python
-from nimbus.models.registry import provider as create_provider
-from nimbus.base.messages import UserMessage
-from nimbus.tools import capability
+from skye.models.registry import provider as create_provider
+from skye.base.messages import UserMessage
+from skye.tools import capability
 
 # Define capability using decorator
 @capability
@@ -458,7 +458,7 @@ if response.has_capability_calls():
 Search for relevant tools and pass the results:
 
 ```python
-from nimbus.tools import capability, CapabilityRegistry
+from skye.tools import capability, CapabilityRegistry
 
 # Define multiple capabilities
 @capability
@@ -516,8 +516,8 @@ if response.has_capability_calls():
 ### Streaming
 
 ```python
-from nimbus.models.registry import provider as create_provider
-from nimbus.base.messages import UserMessage
+from skye.models.registry import provider as create_provider
+from skye.base.messages import UserMessage
 
 client = create_provider("openai", api_key="sk-...")
 
@@ -532,8 +532,8 @@ for chunk in client.stream(
 
 ```python
 import asyncio
-from nimbus.models.registry import provider as create_provider
-from nimbus.base.messages import UserMessage
+from skye.models.registry import provider as create_provider
+from skye.base.messages import UserMessage
 
 async def main():
     client = create_provider("openai", api_key="sk-...")
@@ -550,14 +550,14 @@ asyncio.run(main())
 
 ### Lazy Loading and Optional Dependencies
 
-Nimbus uses lazy loading to defer importing provider SDKs until they're actually used. This means:
+Skye uses lazy loading to defer importing provider SDKs until they're actually used. This means:
 
 1. **Minimal startup overhead**: Only import what you use
 2. **Optional dependencies**: Install only the providers you need
 3. **Lambda-friendly**: Bedrock works in AWS Lambda without boto3 as a dependency (it's pre-installed)
 
 ```python
-from nimbus.models.registry import provider as create_provider
+from skye.models.registry import provider as create_provider
 
 # This doesn't import OpenAI SDK until you actually use it
 client = create_provider("openai", api_key="sk-...")
@@ -571,13 +571,13 @@ response = client.complete(
 
 ### AWS Lambda Deployment
 
-Nimbus is Lambda-friendly:
+Skye is Lambda-friendly:
 
 ```python
 # In AWS Lambda, boto3 is pre-installed
 # No need to include it in your deployment package
-from nimbus.models.registry import provider as create_provider
-from nimbus.base.messages import UserMessage
+from skye.models.registry import provider as create_provider
+from skye.base.messages import UserMessage
 
 def lambda_handler(event, context):
     # Bedrock provider works without boto3 in dependencies
@@ -593,20 +593,20 @@ def lambda_handler(event, context):
 
 ### Configuration
 
-Nimbus supports multiple configuration sources with precedence: code > environment > file.
+Skye supports multiple configuration sources with precedence: code > environment > file.
 
 #### Environment Variables
 
 ```bash
-export NIMBUS_LOG_LEVEL=INFO
+export SKYE_LOG_LEVEL=INFO
 export OPENAI_API_KEY=sk-...  # provider credentials use the provider-standard variable
-export NIMBUS_ENABLE_TELEMETRY=true
+export SKYE_ENABLE_TELEMETRY=true
 ```
 
 #### Configuration File
 
 ```yaml
-# nimbus.yaml
+# skye.yaml
 log_level: INFO
 enable_telemetry: true
 
@@ -625,21 +625,21 @@ models:
 
 ```python
 from pathlib import Path
-from nimbus.base.config import ConfigLoader
+from skye.base.config import ConfigLoader
 
 config = ConfigLoader.load(
-    config_path=Path("nimbus.yaml"),
+    config_path=Path("skye.yaml"),
     overrides={"log_level": "DEBUG"}
 )
 ```
 
 ## Architecture
 
-Nimbus follows Clean Architecture principles with a stable core of interfaces:
+Skye follows Clean Architecture principles with a stable core of interfaces:
 
 ```
 ┌─────────────────────────────────────────┐
-│         nimbus (base package)           │
+│         skye (base package)           │
 │  ┌───────────────────────────────────┐  │
 │  │   Interfaces & Contracts          │  │
 │  │   - ModelInterface                │  │
@@ -653,7 +653,7 @@ Nimbus follows Clean Architecture principles with a stable core of interfaces:
 │  │   Data Models (Pydantic)          │  │
 │  │   - CompletionRequest/Response    │  │
 │  │   - UserMessage, AssistantMessage │  │
-│  │   - ModelConfig, NimbusConfig     │  │
+│  │   - ModelConfig, SkyeConfig     │  │
 │  └───────────────────────────────────┘  │
 └─────────────────────────────────────────┘
                   ▲
@@ -677,14 +677,14 @@ Unified interface for all LLM providers:
 ```python
 from abc import ABC, abstractmethod
 from typing import Iterator
-from nimbus.base.completion import CompletionResponse, StreamChunk
-from nimbus.base.messages import NimbusMessage
+from skye.base.completion import CompletionResponse, StreamChunk
+from skye.base.messages import SkyeMessage
 
 class ModelInterface(ABC):
     @abstractmethod
     def complete(
         self,
-        messages: list[NimbusMessage],
+        messages: list[SkyeMessage],
         model: str,
         **kwargs
     ) -> CompletionResponse:
@@ -694,7 +694,7 @@ class ModelInterface(ABC):
     @abstractmethod
     async def acomplete(
         self,
-        messages: list[NimbusMessage],
+        messages: list[SkyeMessage],
         model: str,
         **kwargs
     ) -> CompletionResponse:
@@ -704,7 +704,7 @@ class ModelInterface(ABC):
     @abstractmethod
     def stream(
         self,
-        messages: list[NimbusMessage],
+        messages: list[SkyeMessage],
         model: str,
         **kwargs
     ) -> Iterator[StreamChunk]:
@@ -717,7 +717,7 @@ class ModelInterface(ABC):
 Define tools/functions that agents can use:
 
 ```python
-from nimbus.base.interfaces import CapabilityInterface, CapabilitySchema
+from skye.base.interfaces import CapabilityInterface, CapabilitySchema
 
 class WebSearchCapability(CapabilityInterface):
     def get_schema(self) -> CapabilitySchema:
@@ -743,8 +743,8 @@ class WebSearchCapability(CapabilityInterface):
 Store and retrieve agent memories:
 
 ```python
-from nimbus.base.interfaces import MemoryInterface
-from nimbus.memory import MemoryEntry
+from skye.base.interfaces import MemoryInterface
+from skye.memory import MemoryEntry
 
 class MyMemory(MemoryInterface):
     def store(self, entry: MemoryEntry) -> str:
@@ -763,9 +763,9 @@ class MyMemory(MemoryInterface):
 The router is the main entry point for load balancing across multiple providers and deployments:
 
 ```python
-from nimbus.base.messages import UserMessage
-from nimbus.router import ModelRouter, ModelTarget, RouteConfig
-from nimbus.base.interfaces.router import RoutingStrategy
+from skye.base.messages import UserMessage
+from skye.router import ModelRouter, ModelTarget, RouteConfig
+from skye.base.interfaces.router import RoutingStrategy
 
 # Create router with multiple targets for an alias
 router = ModelRouter(routes=[
@@ -817,7 +817,7 @@ response = router.complete(
 ### Router Configuration from YAML
 
 ```python
-from nimbus.router import ModelRouter
+from skye.router import ModelRouter
 
 # Load router from YAML file with environment variable substitution
 router = ModelRouter.from_yaml("router_config.yaml")
@@ -929,7 +929,7 @@ for info in cooled_down:
 ### Fallbacks and Retry Policies
 
 ```python
-from nimbus.router import ModelRouter, FallbackConfig, RetryPolicyConfig
+from skye.router import ModelRouter, FallbackConfig, RetryPolicyConfig
 
 router = ModelRouter(
     routes=[...],
@@ -951,8 +951,8 @@ router = ModelRouter(
 For serverless environments, use external storage backends:
 
 ```python
-from nimbus.router import ModelRouter
-from nimbus.store import RedisBackend, DynamoDBBackend
+from skye.router import ModelRouter
+from skye.store import RedisBackend, DynamoDBBackend
 
 # Redis backend for persistent state
 redis_storage = RedisBackend("redis://localhost:6379")
@@ -963,7 +963,7 @@ router = ModelRouter(
 
 # DynamoDB backend for AWS Lambda
 dynamodb_storage = DynamoDBBackend(
-    table_name="nimbus-router-state",
+    table_name="skye-router-state",
     region="us-east-1"
 )
 router = ModelRouter(
@@ -978,8 +978,8 @@ router = ModelRouter(
 
 ```bash
 # Clone repository
-git clone https://github.com/your-org/nimbus.git
-cd nimbus
+git clone https://github.com/your-org/skye.git
+cd skye
 
 # Install with dev dependencies
 uv pip install -e ".[dev]"
@@ -992,7 +992,7 @@ uv pip install -e ".[dev]"
 uv run pytest
 
 # Run with coverage
-uv run pytest --cov=src/nimbus --cov-report=term-missing
+uv run pytest --cov=src/skye --cov-report=term-missing
 
 # Run specific test file
 uv run pytest tests/unit/test_completion.py -v
@@ -1008,7 +1008,7 @@ uv run black src/ tests/
 uv run ruff check src/ tests/
 
 # Type check
-uv run mypy src/nimbus --strict
+uv run mypy src/skye --strict
 
 # Run all checks
 make check
@@ -1018,10 +1018,10 @@ make check
 
 For detailed documentation, see:
 
-- [Architecture Guidelines](.kiro/steering/nimbus-architecture.md)
-- [Python Standards](.kiro/steering/python-standards.md)
-- [Design Document](.kiro/specs/nimbus/design.md)
-- [Requirements](.kiro/specs/nimbus/requirements.md)
+- [Architecture Guidelines](.kiro/steering/00-rules.md)
+- [Python Standards](.kiro/steering/00-rules.md)
+- [Design Document](.kiro/specs/skye-structure/design.md)
+- [Requirements](.kiro/specs/skye-structure/requirements.md)
 
 ## Contributing
 
@@ -1039,9 +1039,9 @@ MIT License - see [LICENSE](LICENSE) file for details.
 
 ## Support
 
-- **Issues**: [GitHub Issues](https://github.com/your-org/nimbus/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/your-org/nimbus/discussions)
-- **Documentation**: [Full Documentation](https://nimbus.readthedocs.io)
+- **Issues**: [GitHub Issues](https://github.com/your-org/skye/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/your-org/skye/discussions)
+- **Documentation**: [Full Documentation](https://skye.readthedocs.io)
 
 ## Roadmap
 
@@ -1055,7 +1055,7 @@ MIT License - see [LICENSE](LICENSE) file for details.
 - [ ] Safety filters
 - [ ] Policy engine inspired by [Cedar](https://www.cedarpolicy.com/)
   - Rules are `permit` or `forbid` statements over principal, action, resource and context. Everything is denied unless a `permit` matches, and a `forbid` always wins
-  - Evaluated in pure Python, with no compiled dependency. The official Cedar engine is a Rust library, so Nimbus implements a small subset of the model instead of wrapping it
+  - Evaluated in pure Python, with no compiled dependency. The official Cedar engine is a Rust library, so Skye implements a small subset of the model instead of wrapping it
   - Guards capability and tool calls, model and region routing, memory access and MCP servers. Every decision is sent to observability
 - [ ] Gateway inspired by [Amazon Bedrock AgentCore Gateway](https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/gateway-core-concepts.html)
   - One MCP endpoint (stateless HTTP, runs in a single Lambda function) that exposes Lambda functions, OpenAPI specs, upstream MCP servers and local capabilities as tools
@@ -1066,7 +1066,7 @@ MIT License - see [LICENSE](LICENSE) file for details.
 
 ## Acknowledgments
 
-Nimbus is inspired by:
+Skye is inspired by:
 - **LangChain** - For pioneering LLM application frameworks
 - **LiteLLM** - For provider abstraction patterns
 - **Clean Architecture** - For architectural principles

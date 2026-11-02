@@ -5,22 +5,22 @@ Tests exception creation, messages, and error context preservation.
 
 import pytest
 
-from nimbus.tools.exceptions import (
+from skye.tools.exceptions import (
     CapabilityError,
     CapabilityExecutionError,
     CapabilityNotFoundError,
     CapabilityValidationError,
     CapabilityCallParsingError,
 )
-from nimbus.base.exceptions import NimbusError
+from skye.base.exceptions import SkyeError
 
 
 class TestCapabilityError:
     """Tests for CapabilityError base class."""
 
-    def test_inherits_from_nimbus_error(self):
-        """Test that CapabilityError inherits from NimbusError."""
-        assert issubclass(CapabilityError, NimbusError)
+    def test_inherits_from_skye_error(self):
+        """Test that CapabilityError inherits from SkyeError."""
+        assert issubclass(CapabilityError, SkyeError)
 
     def test_basic_creation(self):
         """Test basic exception creation with message."""

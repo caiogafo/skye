@@ -5,9 +5,9 @@ from typing import Any
 
 import pytest
 
-from nimbus.tools.exceptions import CapabilityValidationError
-from nimbus.tools.remote_api import RemoteAPICapability
-from nimbus.tools.schema import CapabilitySchema
+from skye.tools.exceptions import CapabilityValidationError
+from skye.tools.remote_api import RemoteAPICapability
+from skye.tools.schema import CapabilitySchema
 from tests.unit.capabilities import _urllib_responses as responses
 
 

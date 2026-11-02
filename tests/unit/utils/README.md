@@ -1,6 +1,6 @@
 # Utility Unit Tests
 
-Unit tests for Nimbus utility functions.
+Unit tests for Skye utility functions.
 
 ## Test Coverage
 
@@ -29,7 +29,7 @@ pytest tests/unit/utils/
 pytest tests/unit/utils/test_token_counter.py
 
 # Run with coverage
-pytest tests/unit/utils/ --cov=src/nimbus/utils
+pytest tests/unit/utils/ --cov=src/skye/utils
 ```
 
 ## Testing Approach

@@ -7,7 +7,7 @@ This implementation plan breaks down the development of Capability Support into 
 ## Task List
 
 - [x] 1. Set up capability package structure
-  - Create src/nimbus/capabilities/ directory structure
+  - Create src/skye/capabilities/ directory structure
   - Create __init__.py files for all subdirectories
   - Create tests/unit/capabilities/ and tests/integration/capabilities/ directories
   - Update Makefile to include capability tests
@@ -292,19 +292,19 @@ This implementation plan breaks down the development of Capability Support into 
 
 - [x] 18. Create capability package exports
   - [x] 18.1 Configure package exports
-    - Export CapabilityInterface from nimbus.capabilities
-    - Export CapabilitySchema from nimbus.capabilities
-    - Export CapabilityRegistry from nimbus.capabilities
-    - Export LocalFunctionCapability from nimbus.capabilities
-    - Export RemoteAPICapability from nimbus.capabilities
-    - Export ToolCall and ToolResult from nimbus.capabilities
+    - Export CapabilityInterface from skye.capabilities
+    - Export CapabilitySchema from skye.capabilities
+    - Export CapabilityRegistry from skye.capabilities
+    - Export LocalFunctionCapability from skye.capabilities
+    - Export RemoteAPICapability from skye.capabilities
+    - Export ToolCall and ToolResult from skye.capabilities
     - Export all exception classes
     - Define __all__ in __init__.py
     - Write unit test in tests/unit/test_capability_exports.py
     - Test that all expected symbols are importable
     - Test that __all__ is properly defined
     - Run with `uv run pytest tests/unit/test_capability_exports.py -v`
-    - Verify with `uv run python -c "from nimbus.capabilities import CapabilityInterface, CapabilityRegistry; print('OK')"`
+    - Verify with `uv run python -c "from skye.capabilities import CapabilityInterface, CapabilityRegistry; print('OK')"`
     - _Requirements: 1.1, 1.2_
 
 - [ ]* 20. Write comprehensive integration tests
@@ -348,11 +348,11 @@ This implementation plan breaks down the development of Capability Support into 
     - _Requirements: 12.1, 12.2, 12.3, 12.4, 12.5_
   
   - [ ]* 21.3 Add type hints verification
-    - Run mypy on all capability code with `uv run mypy src/nimbus/capabilities --strict`
+    - Run mypy on all capability code with `uv run mypy src/skye/capabilities --strict`
     - Fix any type hint issues
     - Add mypy to Makefile check target for capabilities
     - Create test script tests/test_capability_type_hints.sh
-    - Run with `uv run mypy src/nimbus/capabilities --strict`
+    - Run with `uv run mypy src/skye/capabilities --strict`
     - _Requirements: All_
 
 ## Implementation Notes
@@ -362,10 +362,10 @@ This implementation plan breaks down the development of Capability Support into 
 All Python commands should be run using UV:
 - **Testing**: `uv run pytest tests/unit/capabilities/ -v`
 - **Integration tests**: `uv run pytest tests/integration/capabilities/ -v -m integration`
-- **Type checking**: `uv run mypy src/nimbus/capabilities --strict`
-- **Linting**: `uv run ruff check src/nimbus/capabilities tests/`
-- **Formatting**: `uv run black src/nimbus/capabilities tests/`
-- **Quick validation**: `uv run python -c "from nimbus.capabilities import CapabilityRegistry; print('OK')"`
+- **Type checking**: `uv run mypy src/skye/capabilities --strict`
+- **Linting**: `uv run ruff check src/skye/capabilities tests/`
+- **Formatting**: `uv run black src/skye/capabilities tests/`
+- **Quick validation**: `uv run python -c "from skye.capabilities import CapabilityRegistry; print('OK')"`
 - **Running examples**: `uv run python examples/capabilities/local_function_example.py`
 
 ### Testing Strategy
@@ -413,7 +413,7 @@ export GOOGLE_APPLICATION_CREDENTIALS="/path/to/credentials.json"
 
 ### Dependencies
 
-**Base Dependencies** (always installed with nimbus):
+**Base Dependencies** (always installed with skye):
 - pydantic>=2.0
 - pyyaml>=6.0
 
@@ -425,13 +425,13 @@ export GOOGLE_APPLICATION_CREDENTIALS="/path/to/credentials.json"
 **Installation**:
 ```bash
 # Base capabilities (local functions, remote APIs)
-pip install nimbus
+pip install skyeai
 
 # With MCP support
-pip install nimbus[mcp]
+pip install skyeai[mcp]
 
 # All capabilities
-pip install nimbus[capabilities]
+pip install skyeai[capabilities]
 ```
 
 **pyproject.toml Configuration**:
@@ -452,9 +452,9 @@ capabilities = ["requests>=2.31", "httpx>=0.24", "fastmcp>=0.1.0"]
 - All public APIs must have docstrings
 - Follow PEP 8 style guidelines (enforced by black and ruff)
 - Maintain test coverage above 80% for non-optional tests
-- Run `uv run mypy src/nimbus/capabilities --strict` before committing
-- Use `uv run black src/nimbus/capabilities tests/` to format code
-- Use `uv run ruff check src/nimbus/capabilities tests/` to lint code
+- Run `uv run mypy src/skye/capabilities --strict` before committing
+- Use `uv run black src/skye/capabilities tests/` to format code
+- Use `uv run ruff check src/skye/capabilities tests/` to lint code
 
 ### Quick Validation Commands
 
@@ -462,22 +462,22 @@ After implementing each task, use these UV commands to validate:
 
 ```bash
 # Import validation
-uv run python -c "from nimbus.capabilities import CapabilityRegistry, CapabilityInterface; print('OK')"
+uv run python -c "from skye.capabilities import CapabilityRegistry, CapabilityInterface; print('OK')"
 
 # Type checking
-uv run mypy src/nimbus/capabilities --strict
+uv run mypy src/skye/capabilities --strict
 
 # Run tests
 uv run pytest tests/unit/capabilities/ -v
 
 # Code formatting
-uv run black src/nimbus/capabilities tests/ --check
+uv run black src/skye/capabilities tests/ --check
 
 # Linting
-uv run ruff check src/nimbus/capabilities tests/
+uv run ruff check src/skye/capabilities tests/
 
 # Full validation
-uv run pytest tests/unit/capabilities/ && uv run mypy src/nimbus/capabilities --strict && uv run ruff check src/nimbus/capabilities tests/
+uv run pytest tests/unit/capabilities/ && uv run mypy src/skye/capabilities --strict && uv run ruff check src/skye/capabilities tests/
 ```
 
 ### Task Dependencies
@@ -543,7 +543,7 @@ When extracting schema from function signatures:
 **FastMCP Lazy Loading**:
 - Import FastMCP only when MCPCapability is instantiated
 - Provide helpful error message if FastMCP not installed
-- Error message should suggest: `pip install nimbus[mcp]`
+- Error message should suggest: `pip install skyeai[mcp]`
 
 **MCP Tool Schema Conversion**:
 - Convert MCP tool format to CapabilitySchema

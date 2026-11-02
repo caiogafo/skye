@@ -1,6 +1,6 @@
 # Stress Tests
 
-This directory contains performance and load tests to verify the Nimbus library handles high-load scenarios correctly.
+This directory contains performance and load tests to verify the Skye library handles high-load scenarios correctly.
 
 ## Purpose
 
@@ -55,9 +55,9 @@ Stress tests track and report:
 import pytest
 import asyncio
 import time
-from nimbus.router import ModelRouter
-from nimbus.base.completion import CompletionRequest
-from nimbus.base.messages import UserMessage
+from skye.router import ModelRouter
+from skye.base.completion import CompletionRequest
+from skye.base.messages import UserMessage
 
 @pytest.mark.stress
 @pytest.mark.asyncio
@@ -80,7 +80,7 @@ async def test_concurrent_routing_100_requests():
         )
         start = time.time()
         try:
-            response = await router.aroute_request(request)
+            response = await router.acomplete(messages=request.messages, model=request.model)
             latency = time.time() - start
             return {"success": True, "latency": latency, "id": request_id}
         except Exception as e:
@@ -129,7 +129,7 @@ async def test_concurrent_routing_100_requests():
 import pytest
 import asyncio
 import time
-from nimbus.router import ModelRouter
+from skye.router import ModelRouter
 
 @pytest.mark.stress
 @pytest.mark.asyncio
@@ -151,7 +151,7 @@ async def test_rate_limiting_enforcement():
     async def make_request():
         """Make a request and track if it was rate limited."""
         try:
-            response = await router.aroute_request(request)
+            response = await router.acomplete(messages=request.messages, model=request.model)
             return {"rate_limited": False}
         except RateLimitError:
             return {"rate_limited": True}
@@ -182,7 +182,7 @@ async def test_rate_limiting_enforcement():
 ```python
 import pytest
 import asyncio
-from nimbus.tools import CapabilityRegistry, capability
+from skye.tools import CapabilityRegistry, capability
 
 @pytest.mark.stress
 @pytest.mark.asyncio
@@ -232,7 +232,7 @@ async def test_capability_concurrent_execution():
 ```python
 import pytest
 import asyncio
-from nimbus.router import ModelRouter
+from skye.router import ModelRouter
 from unittest.mock import patch
 
 @pytest.mark.stress
@@ -254,7 +254,7 @@ async def test_failover_under_load():
         """Make request that may fail."""
         nonlocal failure_count
         try:
-            response = await router.aroute_request(request)
+            response = await router.acomplete(messages=request.messages, model=request.model)
             return {"success": True, "used_fallback": False}
         except Exception as e:
             failure_count += 1
@@ -386,4 +386,4 @@ Stress tests should:
 - [Main Test README](../README.md)
 - [Unit Tests](../unit/README.md)
 - [Integration Tests](../integration/README.md)
-- [Nimbus Architecture](../../.kiro/steering/nimbus-architecture.md)
+- [Skye Architecture](../../.kiro/steering/00-rules.md)

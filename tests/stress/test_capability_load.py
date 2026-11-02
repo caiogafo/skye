@@ -20,14 +20,14 @@ from unittest.mock import Mock, patch
 
 import pytest
 
-from nimbus.tools import (
+from skye.tools import (
     CapabilityInterface,
     CapabilityRegistry,
     CapabilitySchema,
     LocalFunctionCapability,
     capability,
 )
-from nimbus.tools.exceptions import CapabilityNotFoundError, CapabilityValidationError
+from skye.tools.exceptions import CapabilityNotFoundError, CapabilityValidationError
 
 
 class MockCapability(CapabilityInterface):

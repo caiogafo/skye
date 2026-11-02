@@ -1,4 +1,4 @@
-"""Anthropic Provider Example (Boto3-style Nimbus API).
+"""Anthropic Provider Example (Boto3-style Skye API).
 
 This version demonstrates:
 - Basic completion with Claude models
@@ -9,8 +9,8 @@ This version demonstrates:
 """
 
 import os
-from nimbus.models.registry import provider as create_provider
-from nimbus.base.messages import UserMessage, SystemMessage
+from skye.models.registry import provider as create_provider
+from skye.base.messages import UserMessage, SystemMessage
 
 
 def basic_completion():
@@ -29,7 +29,7 @@ def basic_completion():
         client = create_provider("anthropic", api_key=api_key)
     except ImportError as e:
         print(f"⚠️  Error: {e}")
-        print("\nTo use Anthropic, install with: pip install nimbus[anthropic]")
+        print("\nTo use Anthropic, install with: pip install skyeai[anthropic]")
         return
     
     messages = [
@@ -129,8 +129,8 @@ The system message is sent separately from the conversation messages.
 Example:
 
 ```python
-from nimbus.models.registry import provider as create_provider
-from nimbus.base.messages import SystemMessage, UserMessage
+from skye.models.registry import provider as create_provider
+from skye.base.messages import SystemMessage, UserMessage
 
 client = create_provider("anthropic", api_key="sk-ant-...")
 
@@ -142,7 +142,7 @@ messages = [
 response = client.complete(messages=messages, model="claude-3-sonnet-20240229")
 ```
 
-Nimbus automatically handles this difference for you!
+Skye automatically handles this difference for you!
 """)
 
 
@@ -186,7 +186,7 @@ def multi_turn_conversation():
 def main():
     """Run all examples."""
     print("\n" + "🧠 " * 20)
-    print("NIMBUS - Anthropic Provider Examples")
+    print("SKYE - Anthropic Provider Examples")
     print("🧠 " * 20)
     
     try:
@@ -203,7 +203,7 @@ def main():
     except Exception as e:
         print(f"\n❌ Error: {e}")
         print("\nMake sure you have:")
-        print("  1. Installed nimbus[anthropic]: pip install nimbus[anthropic]")
+        print("  1. Installed skyeai[anthropic]: pip install skyeai[anthropic]")
         print("  2. Set ANTHROPIC_API_KEY: export ANTHROPIC_API_KEY='sk-ant-...'")
 
 

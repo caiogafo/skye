@@ -1,6 +1,6 @@
 """Embedding Providers Example.
 
-This example demonstrates how to use embedding providers with Nimbus.
+This example demonstrates how to use embedding providers with Skye.
 
 Features shown:
 - OpenAI embeddings (text-embedding-3-small)
@@ -24,7 +24,7 @@ import asyncio
 import math
 import os
 
-from nimbus.models.registry import provider as create_provider
+from skye.models.registry import provider as create_provider
 
 
 def openai_embeddings():
@@ -48,7 +48,7 @@ def openai_embeddings():
         )
     except ImportError as e:
         print(f"⚠️  Error: {e}")
-        print("\nTo use OpenAI embeddings, install with: pip install nimbus[openai]")
+        print("\nTo use OpenAI embeddings, install with: pip install skyeai[openai]")
         return
     
     texts = [
@@ -90,7 +90,7 @@ def bedrock_embeddings():
         )
     except ImportError as e:
         print(f"⚠️  Error: {e}")
-        print("\nTo use Bedrock embeddings, install with: pip install nimbus[bedrock]")
+        print("\nTo use Bedrock embeddings, install with: pip install skyeai[bedrock]")
         return
     
     texts = [
@@ -136,7 +136,7 @@ def google_embeddings():
         )
     except ImportError as e:
         print(f"⚠️  Error: {e}")
-        print("\nTo use Google embeddings, install with: pip install nimbus[google]")
+        print("\nTo use Google embeddings, install with: pip install skyeai[google]")
         return
     
     texts = [
@@ -303,7 +303,7 @@ def batch_processing():
 def main():
     """Run all examples."""
     print("\n" + "📊 " * 20)
-    print("NIMBUS - Embedding Providers Examples")
+    print("SKYE - Embedding Providers Examples")
     print("📊 " * 20)
     print("\nThis example demonstrates various embedding providers and operations.")
     print("Set the appropriate API keys/credentials as environment variables:")

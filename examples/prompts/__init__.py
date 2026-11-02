@@ -1,4 +1,4 @@
-"""Example scripts and samples for Nimbus Prompts Support.
+"""Example scripts and samples for Skye Prompts Support.
 
 This package contains comprehensive examples demonstrating all features
 of the prompts support module, including:

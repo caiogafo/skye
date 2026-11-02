@@ -1,6 +1,6 @@
-"""Message role management examples for Nimbus Prompts Support."""
+"""Message role management examples for Skye Prompts Support."""
 
-from nimbus.prompts import MockPromptBuilder
+from skye.prompts import MockPromptBuilder
 
 
 def basic_message_roles():
@@ -26,7 +26,7 @@ def basic_message_roles():
 
 def main():
     """Run all message role examples."""
-    print("Nimbus Prompts Support - Message Roles Complete")
+    print("Skye Prompts Support - Message Roles Complete")
     print("=" * 50)
     print()
     

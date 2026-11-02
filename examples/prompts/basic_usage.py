@@ -1,4 +1,4 @@
-"""Basic usage examples for Nimbus BasePromptBuilder.
+"""Basic usage examples for Skye BasePromptBuilder.
 
 This script demonstrates the fundamental features of the BasePromptBuilder.
 """
@@ -11,15 +11,15 @@ from pathlib import Path
 src_path = Path(__file__).parent.parent.parent / "src"
 sys.path.insert(0, str(src_path))
 
-from nimbus.prompts import BasePromptBuilder
-from nimbus.models.registry import provider as create_provider
+from skye.prompts import BasePromptBuilder
+from skye.models.registry import provider as create_provider
 
 
 def complete_with_provider(messages, model="gpt-4", temperature=0.7, max_tokens=200, provider_name="openai"):
     """Helper function to complete messages using a provider.
     
     Args:
-        messages: List of NimbusMessage objects from template rendering
+        messages: List of SkyeMessage objects from template rendering
         model: Model name to use (default: gpt-4)
         temperature: Sampling temperature (default: 0.7)
         max_tokens: Maximum tokens to generate (default: 200)
@@ -68,12 +68,12 @@ def basic_template_registration():
     # Render with variables
     messages = builder.render("greeting", {
         "name": "Alice",
-        "platform": "Nimbus"
+        "platform": "Skye"
     })
     
     print(f"Rendered message: {messages[0].content}")
     print(f"Message type: {type(messages[0]).__name__}")
-    print(f"✓ Compatible with Nimbus completion API")
+    print(f"✓ Compatible with Skye completion API")
     print()
     
     # Direct completion call using provider interface
@@ -129,7 +129,7 @@ def default_templates_demo():
     print(f"Tool agent template: {messages[0].content[:100]}...")
     complete_with_provider(messages, max_tokens=100)
     
-    print("✓ All templates return NimbusMessage objects ready for completion")
+    print("✓ All templates return SkyeMessage objects ready for completion")
     print()
 
 
@@ -252,7 +252,7 @@ def template_metadata():
 
 def main():
     """Run all basic usage examples."""
-    print("Nimbus BasePromptBuilder - Basic Usage Examples")
+    print("Skye BasePromptBuilder - Basic Usage Examples")
     print("=" * 55)
     
     basic_template_registration()
@@ -267,7 +267,7 @@ def main():
     print()
     print("Key features:")
     print("- Default templates automatically available (NER, classification, agents, etc.)")
-    print("- Returns NimbusMessage objects for completion API")
+    print("- Returns SkyeMessage objects for completion API")
     print("- Template versioning and composition")
     print("- Few-shot learning support")
     print("- Variable defaults and validation")

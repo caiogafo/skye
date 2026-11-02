@@ -1,6 +1,6 @@
 """Function Calling Example.
 
-This example demonstrates how to use function calling (capability use) with Nimbus.
+This example demonstrates how to use function calling (capability use) with Skye.
 
 Features shown:
 - Defining capabilities/functions
@@ -17,9 +17,9 @@ Note: Set environment variables for API keys:
 import os
 import json
 import asyncio
-from nimbus.models.registry import provider as create_provider
-from nimbus.base.messages import UserMessage, CapabilityMessage
-from nimbus.tools.registry import CapabilityRegistry
+from skye.models.registry import provider as create_provider
+from skye.base.messages import UserMessage, CapabilityMessage
+from skye.tools.registry import CapabilityRegistry
 
 
 def basic_function_calling():
@@ -287,7 +287,7 @@ def anthropic_tool_use():
     
     print("""
 Anthropic uses "tool use" instead of "function calling".
-Nimbus handles the differences transparently.
+Skye handles the differences transparently.
 
 Example:
 
@@ -325,7 +325,7 @@ if response.capability_calls:
         print(f"Args: {call['function']['arguments']}")
 ```
 
-Nimbus automatically converts between provider formats!
+Skye automatically converts between provider formats!
 """)
 
 
@@ -337,12 +337,12 @@ def bedrock_tool_use():
     
     print("""
 AWS Bedrock also supports tool use through the Converse API.
-Nimbus provides a unified interface across all providers.
+Skye provides a unified interface across all providers.
 
 Example:
 
 ```python
-from nimbus.models.registry import provider as create_provider
+from skye.models.registry import provider as create_provider
 
 provider = create_provider(
     "bedrock",
@@ -384,7 +384,7 @@ Same code works across OpenAI, Anthropic, and Bedrock!
 async def main():
     """Run all examples."""
     print("\n" + "🔧 " * 20)
-    print("NIMBUS - Function Calling Examples")
+    print("SKYE - Function Calling Examples")
     print("🔧 " * 20)
     
     try:
@@ -401,7 +401,7 @@ async def main():
         print("  • Define capabilities using JSON schema")
         print("  • Models can request capability calls")
         print("  • Execute capabilities and send results back")
-        print("  • Nimbus handles provider differences transparently")
+        print("  • Skye handles provider differences transparently")
         print("  • Works with OpenAI, Anthropic, and Bedrock")
         
     except Exception as e:

@@ -13,15 +13,55 @@ Tests cover:
 
 from datetime import datetime, timezone
 from typing import Any
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import Mock, patch
 
 import pytest
 from pydantic import BaseModel
 
-from nimbus.base.completion import CompletionRequest, CompletionResponse, StreamChunk, TokenUsage
-from nimbus.base.exceptions import ProviderError
-from nimbus.base.messages import AssistantMessage, SystemMessage, UserMessage
-from nimbus.models.llm.openai_compatible import AzureOpenAIProvider
+from skye.base.completion import CompletionRequest, CompletionResponse, StreamChunk, TokenUsage
+from skye.base.exceptions import ProviderError
+from skye.base.messages import AssistantMessage, SystemMessage, UserMessage
+from skye.models.transport.rest import JsonObject
+from skye.models.llm.openai_compatible import AzureOpenAIProvider
+
+POST = "skye.models.transport.rest.post_json"
+STREAM = "skye.models.transport.rest.stream_sse_json"
+URL = "https://myresource.openai.azure.com/openai/deployments/gpt-4/chat/completions?api-version=2024-02-15-preview"
+
+
+def _json_response(content: str | None = "Test response", tool_calls: list | None = None,
+                   finish: str = "stop", fingerprint: str | None = None) -> JsonObject:
+    message: dict[str, Any] = {"role": "assistant", "content": content}
+    if tool_calls is not None:
+        message["tool_calls"] = tool_calls
+    body: dict[str, Any] = {
+        "id": "chatcmpl-123",
+        "model": "gpt-4",
+        "created": 1234567890,
+        "choices": [{"index": 0, "finish_reason": finish, "message": message}],
+        "usage": {"prompt_tokens": 10, "completion_tokens": 5, "total_tokens": 15},
+    }
+    if fingerprint:
+        body["system_fingerprint"] = fingerprint
+    return JsonObject(body)
+
+
+def _sse_chunks() -> list[JsonObject]:
+    return [
+        JsonObject({"id": "chatcmpl-123", "choices": [
+            {"index": i, "finish_reason": None if i < 2 else "stop", "delta": {"content": c}}]})
+        for i, c in enumerate(["Hello", " ", "world"])
+    ]
+
+
+def _provider(**kw: Any) -> AzureOpenAIProvider:
+    return AzureOpenAIProvider(
+        azure_endpoint="https://myresource.openai.azure.com/",
+        api_key="test-key",
+        api_version="2024-02-15-preview",
+        deployment_name="gpt-4",
+        **kw,
+    )
 
 
 class TestAzureOpenAIProviderInitialization:
@@ -51,32 +91,28 @@ class TestAzureOpenAIProviderInitialization:
         )
         assert provider.config["custom_param"] == "value"
     
-    @patch("nimbus.models.llm.openai_compatible.LazyImporter.import_module")
-    def test_lazy_client_initialization(self, mock_import: Mock) -> None:
-        """Test that client is lazily initialized."""
-        mock_openai = MagicMock()
-        mock_import.return_value = mock_openai
-        
-        provider = AzureOpenAIProvider(
-            azure_endpoint="https://myresource.openai.azure.com/",
-            api_key="test-key",
-            api_version="2024-02-15-preview",
-            deployment_name="gpt-4"
-        )
-        
-        # Client should not be initialized yet
-        mock_import.assert_not_called()
-        
-        # Access client to trigger initialization
-        _ = provider.client
-        
-        # Now it should be initialized
-        mock_import.assert_called_once_with("openai", install_extra="openai")
-        mock_openai.AzureOpenAI.assert_called_once_with(
-            api_key="test-key",
-            api_version="2024-02-15-preview",
-            azure_endpoint="https://myresource.openai.azure.com/"
-        )
+    def test_lazy_client_initialization(self) -> None:
+        """Construction performs no I/O and holds no vendor client."""
+        with patch(POST) as post:
+            provider = _provider()
+            assert provider.client is None
+        post.assert_not_called()
+
+    def test_endpoint_and_headers(self) -> None:
+        """Azure deployment URL with api-version and api-key header."""
+        provider = _provider()
+        assert provider._endpoint_url() == URL
+        assert provider._auth_headers() == {"api-key": "test-key"}
+
+    def test_module_imports_no_openai_sdk(self) -> None:
+        """The adapter must not import the vendor SDK."""
+        import inspect
+
+        import skye.models.llm.openai_compatible as mod
+
+        source = inspect.getsource(mod)
+        assert "import openai" not in source and "from openai" not in source
+        assert "LazyImporter" not in source
 
 
 class TestAzureOpenAIRequestTransformation:
@@ -440,196 +476,64 @@ class TestAzureOpenAIStreamTransformation:
 class TestAzureOpenAIProviderCalls:
     """Test actual provider API calls."""
     
-    @patch("nimbus.models.llm.openai_compatible.LazyImporter.import_module")
-    def test_complete_success(self, mock_import: Mock) -> None:
+    def test_complete_success(self) -> None:
         """Test successful completion call."""
-        # Setup mocks
-        mock_openai = MagicMock()
-        mock_import.return_value = mock_openai
-        
-        mock_client = Mock()
-        mock_openai.AzureOpenAI.return_value = mock_client
-        
-        # Mock response
-        mock_response = Mock()
-        mock_response.id = "chatcmpl-123"
-        mock_response.model = "gpt-4"
-        mock_response.created = 1234567890
-        
-        mock_choice = Mock()
-        mock_choice.finish_reason = "stop"
-        mock_choice.message = Mock()
-        mock_choice.message.content = "Test response"
-        mock_choice.message.tool_calls = None
-        mock_choice.message.parsed = None
-        mock_response.choices = [mock_choice]
-        
-        mock_usage = Mock()
-        mock_usage.prompt_tokens = 10
-        mock_usage.completion_tokens = 5
-        mock_usage.total_tokens = 15
-        mock_response.usage = mock_usage
-        
-        mock_client.chat.completions.create.return_value = mock_response
-        
-        # Execute
-        provider = AzureOpenAIProvider(
-            azure_endpoint="https://myresource.openai.azure.com/",
-            api_key="test-key",
-            api_version="2024-02-15-preview",
-            deployment_name="gpt-4"
-        )
-        request = CompletionRequest(
-            messages=[UserMessage(content="Hello")],
-            model="gpt-4"
-        )
-        
-        result = provider.complete(request)
-        
-        # Verify
+        with patch(POST, return_value=_json_response()) as post:
+            provider = _provider()
+            request = CompletionRequest(messages=[UserMessage(content="Hello")], model="gpt-4")
+            result = provider.complete(request)
+
         assert isinstance(result, CompletionResponse)
         assert result.content == "Test response"
         assert result.provider == "azure"
-        mock_client.chat.completions.create.assert_called_once()
+        post.assert_called_once()
+        assert post.call_args.args[0] == URL
+        payload = post.call_args.args[1]
+        assert payload["model"] == "gpt-4"
+        assert payload["messages"] == [{"role": "user", "content": "Hello"}]
+        assert post.call_args.kwargs["headers"] == {"api-key": "test-key"}
     
-    @patch("nimbus.models.llm.openai_compatible.LazyImporter.import_module")
-    def test_complete_error_handling(self, mock_import: Mock) -> None:
+    def test_complete_error_handling(self) -> None:
         """Test error handling in complete."""
-        # Setup mocks
-        mock_openai = MagicMock()
-        mock_import.return_value = mock_openai
-        
-        mock_client = Mock()
-        mock_openai.AzureOpenAI.return_value = mock_client
-        
-        # Mock error
-        mock_client.chat.completions.create.side_effect = Exception("API Error")
-        
-        # Execute and verify error
-        provider = AzureOpenAIProvider(
-            azure_endpoint="https://myresource.openai.azure.com/",
-            api_key="test-key",
-            api_version="2024-02-15-preview",
-            deployment_name="gpt-4"
-        )
-        request = CompletionRequest(
-            messages=[UserMessage(content="Hello")],
-            model="gpt-4"
-        )
-        
-        with pytest.raises(ProviderError) as exc_info:
-            provider.complete(request)
-        
+        with patch(POST, side_effect=Exception("API Error")):
+            provider = _provider()
+            request = CompletionRequest(messages=[UserMessage(content="Hello")], model="gpt-4")
+            with pytest.raises(ProviderError) as exc_info:
+                provider.complete(request)
+
         assert "Provider call failed" in str(exc_info.value)
         assert exc_info.value.details["provider"] == "azure"
     
-    @patch("nimbus.models.llm.openai_compatible.LazyImporter.import_module")
-    def test_stream_success(self, mock_import: Mock) -> None:
+    def test_stream_success(self) -> None:
         """Test successful streaming call."""
-        # Setup mocks
-        mock_openai = MagicMock()
-        mock_import.return_value = mock_openai
-        
-        mock_client = Mock()
-        mock_openai.AzureOpenAI.return_value = mock_client
-        
-        # Mock stream chunks
-        mock_chunks = []
-        for i, content in enumerate(["Hello", " ", "world"]):
-            mock_chunk = Mock()
-            mock_chunk.id = "chatcmpl-123"
-            mock_choice = Mock()
-            mock_choice.index = i
-            mock_choice.finish_reason = None if i < 2 else "stop"
-            mock_choice.delta = Mock()
-            mock_choice.delta.content = content
-            mock_chunk.choices = [mock_choice]
-            mock_chunks.append(mock_chunk)
-        
-        mock_client.chat.completions.create.return_value = iter(mock_chunks)
-        
-        # Execute
-        provider = AzureOpenAIProvider(
-            azure_endpoint="https://myresource.openai.azure.com/",
-            api_key="test-key",
-            api_version="2024-02-15-preview",
-            deployment_name="gpt-4"
-        )
-        request = CompletionRequest(
-            messages=[UserMessage(content="Hello")],
-            model="gpt-4",
-            stream=True
-        )
-        
-        chunks = list(provider.stream(request))
-        
-        # Verify
+        with patch(STREAM, return_value=iter(_sse_chunks())) as stream:
+            provider = _provider()
+            request = CompletionRequest(messages=[UserMessage(content="Hello")], model="gpt-4", stream=True)
+            chunks = list(provider.stream(request))
+
         assert len(chunks) == 3
         assert chunks[0].delta == "Hello"
         assert chunks[1].delta == " "
         assert chunks[2].delta == "world"
         assert chunks[2].finish_reason == "stop"
+        assert stream.call_args.args[0] == URL
+        assert stream.call_args.args[1]["stream"] is True
 
 
 class TestAzureOpenAIAsyncSupport:
     """Test async completion support."""
     
-    @pytest.mark.asyncio
-    @patch("nimbus.models.llm.openai_compatible.LazyImporter.import_module")
-    async def test_acomplete_success(self, mock_import: Mock) -> None:
-        """Test successful async completion."""
-        # Setup mocks
-        mock_openai = MagicMock()
-        mock_import.return_value = mock_openai
-        
-        # Mock async client
-        mock_async_client = Mock()
-        mock_openai.AsyncAzureOpenAI.return_value = mock_async_client
-        
-        # Mock response
-        mock_response = Mock()
-        mock_response.id = "chatcmpl-123"
-        mock_response.model = "gpt-4"
-        mock_response.created = 1234567890
-        
-        mock_choice = Mock()
-        mock_choice.finish_reason = "stop"
-        mock_choice.message = Mock()
-        mock_choice.message.content = "Async response"
-        mock_choice.message.tool_calls = None
-        mock_choice.message.parsed = None
-        mock_response.choices = [mock_choice]
-        
-        mock_usage = Mock()
-        mock_usage.prompt_tokens = 10
-        mock_usage.completion_tokens = 5
-        mock_usage.total_tokens = 15
-        mock_response.usage = mock_usage
-        
-        # Make the create method async
-        async def async_create(**kwargs: Any) -> Any:
-            return mock_response
-        
-        mock_async_client.chat.completions.create = async_create
-        
-        # Execute
-        provider = AzureOpenAIProvider(
-            azure_endpoint="https://myresource.openai.azure.com/",
-            api_key="test-key",
-            api_version="2024-02-15-preview",
-            deployment_name="gpt-4"
-        )
-        request = CompletionRequest(
-            messages=[UserMessage(content="Hello")],
-            model="gpt-4"
-        )
-        
-        result = await provider.acomplete(request)
-        
-        # Verify
+    async def test_acomplete_success(self) -> None:
+        """Test successful async completion (sync REST call run in an executor)."""
+        with patch(POST, return_value=_json_response("Async response")) as post:
+            provider = _provider()
+            request = CompletionRequest(messages=[UserMessage(content="Hello")], model="gpt-4")
+            result = await provider.acomplete(request)
+
         assert isinstance(result, CompletionResponse)
         assert result.content == "Async response"
         assert result.provider == "azure"
+        assert post.call_args.args[0] == URL
 
 
 class TestAzureOpenAIToolCalling:
@@ -933,17 +837,8 @@ class TestAzureOpenAIToolCalling:
         assert result["tools"][0]["function"]["name"] == "get_weather"
         assert result["tools"][1]["function"]["name"] == "get_time"
     
-    @patch("nimbus.models.llm.openai_compatible.LazyImporter.import_module")
-    def test_complete_with_tool_calls(self, mock_import: Mock) -> None:
-        """Test end-to-end completion with tool calls."""
-        # Setup mocks
-        mock_openai = MagicMock()
-        mock_import.return_value = mock_openai
-        
-        mock_client = Mock()
-        mock_openai.AzureOpenAI.return_value = mock_client
-        
-        # Mock capability
+    def test_complete_with_tool_calls(self) -> None:
+        """Test end-to-end completion with capability calls."""
         mock_capability = Mock()
         mock_schema = Mock()
         mock_schema.name = "get_weather"
@@ -954,63 +849,31 @@ class TestAzureOpenAIToolCalling:
             "required": ["location"]
         }
         mock_capability.get_schema.return_value = mock_schema
-        
-        # Mock response with tool call
-        mock_response = Mock()
-        mock_response.id = "chatcmpl-123"
-        mock_response.model = "gpt-4"
-        mock_response.created = 1234567890
-        
-        mock_tool_call = Mock()
-        mock_tool_call.id = "call_123"
-        mock_tool_call.type = "function"
-        mock_tool_call.function = Mock()
-        mock_tool_call.function.name = "get_weather"
-        mock_tool_call.function.arguments = '{"location": "Boston"}'
-        
-        mock_choice = Mock()
-        mock_choice.finish_reason = "tool_calls"
-        mock_choice.message = Mock()
-        mock_choice.message.content = None
-        mock_choice.message.tool_calls = [mock_tool_call]
-        mock_choice.message.parsed = None
-        mock_response.choices = [mock_choice]
-        
-        mock_usage = Mock()
-        mock_usage.prompt_tokens = 40
-        mock_usage.completion_tokens = 15
-        mock_usage.total_tokens = 55
-        mock_response.usage = mock_usage
-        
-        mock_client.chat.completions.create.return_value = mock_response
-        
-        # Execute
-        provider = AzureOpenAIProvider(
-            model="gpt-4",
-            azure_endpoint="https://myresource.openai.azure.com/",
-            api_key="test-key",
-            api_version="2024-02-15-preview",
-            deployment_name="gpt-4"
+
+        response = _json_response(
+            content=None, finish="tool_calls",
+            tool_calls=[{"id": "call_123", "type": "function",
+                       "function": {"name": "get_weather", "arguments": "{\"location\": \"Boston\"}"}}],
         )
-        request = CompletionRequest(
-            messages=[UserMessage(content="What's the weather in Boston?")],
-            model="gpt-4",
-            capabilities=[mock_capability],
-            capability_choice="auto"
-        )
-        
-        result = provider.complete(request)
-        
-        # Verify
+        with patch(POST, return_value=response) as post:
+            provider = _provider(model="gpt-4")
+            request = CompletionRequest(
+                messages=[UserMessage(content="What's the weather in Boston?")],
+                model="gpt-4",
+                capabilities=[mock_capability],
+                capability_choice="auto"
+            )
+            result = provider.complete(request)
+
         assert result.finish_reason == "tool_calls"
         assert result.has_capability_calls()
         assert len(result.capability_calls) == 1
         assert result.capability_calls[0].name == "get_weather"
-        
-        # Verify the API was called with tools
-        call_args = mock_client.chat.completions.create.call_args
-        assert "tools" in call_args[1]
-        assert call_args[1]["tool_choice"] == "auto"
+        assert result.capability_calls[0].arguments == {"location": "Boston"}
+
+        payload = post.call_args.args[1]
+        assert "tools" in payload
+        assert payload["tool_choice"] == "auto"
 
 
 class TestAzureOpenAIModelInfo:

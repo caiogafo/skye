@@ -7,8 +7,8 @@ to maintain state across serverless function invocations.
 """
 
 import asyncio
-from nimbus.router import ModelRouter, ModelTarget, RouteConfig
-from nimbus.store import (
+from skye.router import ModelRouter, ModelTarget, RouteConfig
+from skye.store import (
     InMemoryBackend,
     RedisBackend,
     DynamoDBBackend,
@@ -16,9 +16,9 @@ from nimbus.store import (
     FileSystemBackend,
     DurableFunctionBackend,
 )
-from nimbus.base.interfaces.router import RoutingStrategy
-from nimbus.base.completion import CompletionRequest
-from nimbus.base.messages import UserMessage
+from skye.base.interfaces.router import RoutingStrategy
+from skye.base.completion import CompletionRequest
+from skye.base.messages import UserMessage
 
 
 def example_in_memory_storage():
@@ -55,7 +55,7 @@ def example_redis_storage():
     # Use Redis for persistent state
     redis_storage = RedisBackend(
         redis_url="redis://localhost:6379",
-        key_prefix="nimbus:prod:"
+        key_prefix="skye:prod:"
     )
     
     router = ModelRouter(
@@ -86,7 +86,7 @@ def example_dynamodb_storage():
     
     # Use DynamoDB for AWS serverless environments
     dynamodb_storage = DynamoDBBackend(
-        table_name="nimbus-router-state",
+        table_name="skye-router-state",
         region_name="us-east-1"
     )
     
@@ -109,7 +109,7 @@ def example_dynamodb_storage():
     )
     
     print(f"Router created with storage: {type(router.storage_backend).__name__}")
-    print("State will persist in DynamoDB table: nimbus-router-state")
+    print("State will persist in DynamoDB table: skye-router-state")
 
 
 def example_postgresql_storage():
@@ -118,7 +118,7 @@ def example_postgresql_storage():
     
     # Use PostgreSQL for persistent database storage
     postgres_storage = PostgreSQLBackend(
-        connection_string="postgresql://user:password@localhost:5432/nimbus",
+        connection_string="postgresql://user:password@localhost:5432/skye",
         table_name="router_state"
     )
     
@@ -157,7 +157,7 @@ def example_filesystem_storage():
     print("\n=== File System Storage Example ===")
     
     # Use file system for local persistent storage
-    fs_storage = FileSystemBackend(base_path="/tmp/nimbus_router_state")
+    fs_storage = FileSystemBackend(base_path="/tmp/skye_router_state")
     
     router = ModelRouter(
         routes=[
@@ -178,7 +178,7 @@ def example_filesystem_storage():
     )
     
     print(f"Router created with storage: {type(router.storage_backend).__name__}")
-    print("State will persist in /tmp/nimbus_router_state directory")
+    print("State will persist in /tmp/skye_router_state directory")
 
 
 def example_durable_function_storage():
@@ -283,7 +283,7 @@ async def example_async_usage():
 
 def main():
     """Run all examples."""
-    print("Nimbus Router Storage Backend Examples")
+    print("Skye Router Storage Backend Examples")
     print("=" * 50)
     
     # Run sync examples

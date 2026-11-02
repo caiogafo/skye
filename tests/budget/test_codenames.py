@@ -1,8 +1,8 @@
 """Codename watermark rules (structure spec, Requirement 9.2, 9.3, 9.6-9.9).
 
 Deterministic and offline: the 15 Component Codenames match ^[a-z]{3,7}$, are unique, number
-exactly 15, and never appear in a package name, a file name or an import under src/nimbus.
-`vapor` (the Runnable Port's documentation-only codename) is checked separately and is not
+exactly 15, and never appear in a package name, a file name or an import under src/skye.
+`vapor` (the Runnable Port's documentation-only codename) and `nimbus` (the umbrella watermark) are checked separately and are not
 one of the 15.
 
 A name "contains" a Codename when one of its words equals it. Words are the pieces left
@@ -19,7 +19,7 @@ from pathlib import Path
 from tests.budget.measure import ROOT
 
 PATTERN = re.compile(r"^[a-z]{3,7}$")
-SRC = ROOT / "src" / "nimbus"
+SRC = ROOT / "src" / "skye"
 
 # Requirement 9.1 (fixed mapping, taken as given).
 COMPONENT_CODENAMES = {
@@ -49,7 +49,7 @@ def _words(name: str) -> set[str]:
 
 
 def _scan_names(codenames: set[str]) -> list[str]:
-    """Codename hits in directory names and file names under src/nimbus."""
+    """Codename hits in directory names and file names under src/skye."""
     hits = []
     for path in sorted(SRC.rglob("*")):
         if "__pycache__" in path.parts:
@@ -57,7 +57,7 @@ def _scan_names(codenames: set[str]) -> list[str]:
         rel = path.relative_to(SRC).as_posix()
         kind = "package name" if path.is_dir() else "file name"
         for word in sorted(_words(path.name) & codenames):
-            hits.append(f"codename '{word}' in {kind}: src/nimbus/{rel}")
+            hits.append(f"codename '{word}' in {kind}: src/skye/{rel}")
     return hits
 
 
@@ -125,4 +125,35 @@ def test_runnable_codename_vapor():
 
 def test_vapor_not_in_package_file_or_import_names():
     hits = _scan_names({RUNNABLE_CODENAME}) + _scan_imports({RUNNABLE_CODENAME})
+    assert not hits, "\n".join(hits)
+
+
+def test_codename_is_last_line_of_package_docstring():
+    """Requirement 9.2: the last line of each Component's package docstring is `Codename: <name>.`"""
+    import ast
+    import pathlib
+
+    root = pathlib.Path(__file__).resolve().parents[2] / "src" / "skye"
+    bad = []
+    for component, codename in COMPONENT_CODENAMES.items():
+        init = root / component / "__init__.py"
+        doc = ast.get_docstring(ast.parse(init.read_text()), clean=True) or ""
+        if not doc.strip() or doc.strip().splitlines()[-1] != f"Codename: {codename}.":
+            bad.append(f"{component}/__init__.py: last docstring line is not 'Codename: {codename}.'")
+    assert not bad, "\n".join(bad)
+
+
+# After the rename to Skye the freed word `nimbus` is the project-wide umbrella watermark
+# (Req 23.7): documentation only, outside the 15 Component Codenames, like `vapor`.
+UMBRELLA_CODENAME = "nimbus"
+
+
+def test_umbrella_codename_nimbus():
+    assert PATTERN.match(UMBRELLA_CODENAME)
+    assert UMBRELLA_CODENAME not in COMPONENT_CODENAMES.values()
+    assert len(COMPONENT_CODENAMES) == 15  # not counted among the 15
+
+
+def test_nimbus_not_in_package_file_or_import_names():
+    hits = _scan_names({UMBRELLA_CODENAME}) + _scan_imports({UMBRELLA_CODENAME})
     assert not hits, "\n".join(hits)

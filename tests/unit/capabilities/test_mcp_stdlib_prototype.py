@@ -1,9 +1,9 @@
-"""Prototype staging for the standard-library MCP client (structure spec, task 14.4, Req 15.4).
+"""Prototype staging for the standard-library MCP client (structure spec, task 7.2, Requirement 15).
 
-Task 14.3 already shipped :class:`~nimbus.tools.mcp_client.BuiltinMCPClient`: a standard-library
-JSON-RPC 2.0 client over stateless HTTP, built on ``nimbus.base.http`` (the base-layer home of
-the shared stdlib transport, re-exported by ``nimbus.models.transport.http``), behind the one
-:class:`~nimbus.tools.mcp_client.MCPClientPort` alongside the fastmcp implementation.
+Task 14.3 already shipped :class:`~skye.tools.mcp_client.BuiltinMCPClient`: a standard-library
+JSON-RPC 2.0 client over stateless HTTP, built on ``skye.base.http`` (the base-layer home of
+the shared stdlib transport, re-exported by ``skye.models.transport.http``), behind the one
+:class:`~skye.tools.mcp_client.MCPClientPort` alongside the fastmcp implementation.
 
 Task 14.4 is the *future target*: driving the MCP extra toward **zero third-party libraries** so
 the built-in client can stand alone, while the ``fastmcp`` extra stays until that lands. This
@@ -32,21 +32,21 @@ from unittest.mock import patch
 
 import pytest
 
-from nimbus.base import http
-from nimbus.base.exceptions import ProviderError, ValidationError
-from nimbus.base.messages import AssistantMessage, UserMessage
-from nimbus.tools.interface import CapabilityInterface
-from nimbus.tools.mcp_client import BuiltinMCPClient
-from nimbus.tools.mcp_resource import Resource
+from skye.base import http
+from skye.base.exceptions import ProviderError, ValidationError
+from skye.base.messages import AssistantMessage, UserMessage
+from skye.tools.interface import CapabilityInterface
+from skye.tools.mcp_client import BuiltinMCPClient
+from skye.tools.mcp_resource import Resource
 
 # The MCP protocol/transport libraries the future target drives to zero for the built-in path.
 MCP_THIRD_PARTY = ("fastmcp", "mcp", "httpx", "requests")
 
 # The modules that make up the standard-library built-in MCP client path.
 BUILTIN_PATH_MODULES = (
-    "src/nimbus/tools/mcp_client.py",
-    "src/nimbus/tools/mcp_boundary.py",
-    "src/nimbus/tools/mcp_resource.py",
+    "src/skye/tools/mcp_client.py",
+    "src/skye/tools/mcp_boundary.py",
+    "src/skye/tools/mcp_resource.py",
 )
 
 _REPO_ROOT = Path(__file__).resolve().parents[3]
@@ -82,14 +82,14 @@ def test_builtin_client_importable_with_mcp_third_party_absent() -> None:
     """A fresh import of the built-in path works with fastmcp/mcp/httpx/requests blocked."""
     blocked = {name: None for name in MCP_THIRD_PARTY}
     builtin_modules = [
-        "nimbus.tools.mcp_client",
-        "nimbus.tools.mcp_boundary",
-        "nimbus.tools.mcp_resource",
+        "skye.tools.mcp_client",
+        "skye.tools.mcp_boundary",
+        "skye.tools.mcp_resource",
     ]
     saved = {name: sys.modules.pop(name, None) for name in builtin_modules}
     try:
         with patch.dict(sys.modules, blocked):
-            module = importlib.import_module("nimbus.tools.mcp_client")
+            module = importlib.import_module("skye.tools.mcp_client")
             assert module.BuiltinMCPClient is not None
             # Each name stays blocked (value None): importing the built-in path never pulled in
             # a real fastmcp/mcp/httpx/requests module.
@@ -100,11 +100,11 @@ def test_builtin_client_importable_with_mcp_third_party_absent() -> None:
         for name, mod in saved.items():
             if mod is not None:
                 sys.modules[name] = mod
-        importlib.import_module("nimbus.tools.mcp_client")
+        importlib.import_module("skye.tools.mcp_client")
 
 
 class _FakeTransport:
-    """Mocked ``nimbus.base.http.request`` recording calls and replying with canned JSON-RPC."""
+    """Mocked ``skye.base.http.request`` recording calls and replying with canned JSON-RPC."""
 
     def __init__(self, handler: Any) -> None:
         self._handler = handler
@@ -166,7 +166,7 @@ def fake_transport() -> _FakeTransport:
     # While the client runs, fastmcp/mcp/httpx/requests are blocked (value None in sys.modules):
     # any attempt to import one of them would raise, proving the stdlib path needs none of them.
     with patch.dict(sys.modules, {name: None for name in MCP_THIRD_PARTY}):
-        with patch("nimbus.tools.mcp_client.http.request", transport):
+        with patch("skye.tools.mcp_client.http.request", transport):
             yield transport
 
 
@@ -190,7 +190,7 @@ async def test_stdlib_client_tools_facet(fake_transport: _FakeTransport) -> None
 
 @pytest.mark.asyncio
 async def test_stdlib_client_prompt_and_resource_facets(fake_transport: _FakeTransport) -> None:
-    """prompts->Nimbus messages and resources->Resource convert at the single boundary."""
+    """prompts->Skye messages and resources->Resource convert at the single boundary."""
     client = BuiltinMCPClient("https://server/mcp")
 
     messages = await client.get_prompt("greet", {"who": "x"})
@@ -204,9 +204,9 @@ async def test_stdlib_client_prompt_and_resource_facets(fake_transport: _FakeTra
 
 
 @pytest.mark.asyncio
-async def test_stdlib_client_tool_error_maps_to_nimbus(fake_transport: _FakeTransport) -> None:
-    """A tool-level MCP error surfaces as a Nimbus error, not a protocol type."""
-    from nimbus.tools.exceptions import CapabilityExecutionError
+async def test_stdlib_client_tool_error_maps_to_skye(fake_transport: _FakeTransport) -> None:
+    """A tool-level MCP error surfaces as a Skye error, not a protocol type."""
+    from skye.tools.exceptions import CapabilityExecutionError
 
     client = BuiltinMCPClient("https://server/mcp")
     tools = await client.list_tools()
@@ -242,6 +242,6 @@ async def test_stdlib_client_rejects_malformed_result(fake_transport: _FakeTrans
             text=json.dumps({"jsonrpc": "2.0", "id": json_body["id"]}),
         )
 
-    with patch("nimbus.tools.mcp_client.http.request", _bare):
+    with patch("skye.tools.mcp_client.http.request", _bare):
         with pytest.raises(ValidationError, match="result"):
             await asyncio.to_thread(client._rpc, "tools/list")

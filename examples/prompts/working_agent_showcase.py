@@ -1,4 +1,4 @@
-"""Working Agent Templates Showcase for Nimbus Prompts Support.
+"""Working Agent Templates Showcase for Skye Prompts Support.
 
 This script demonstrates agent templates that work with the current
 BasePromptBuilder implementation, avoiding complex Jinja2 syntax.
@@ -12,8 +12,8 @@ from pathlib import Path
 src_path = Path(__file__).parent.parent.parent / "src"
 sys.path.insert(0, str(src_path))
 
-from nimbus.prompts import BasePromptBuilder
-from nimbus.models.registry import provider as create_provider
+from skye.prompts import BasePromptBuilder
+from skye.models.registry import provider as create_provider
 
 
 def complete_with_provider(messages, model="gpt-4", temperature=0.7, max_tokens=200, provider_name="openai"):
@@ -215,7 +215,7 @@ def showcase_few_shot_learning():
 
 def main():
     """Run all working agent template examples."""
-    print("Nimbus Prompts Support - Working Agent Templates")
+    print("Skye Prompts Support - Working Agent Templates")
     print("=" * 55)
     print()
     
@@ -229,7 +229,7 @@ def main():
     print("✓ Basic templates (NER, classification, QA, summarization, explanation)")
     print("✓ Custom agent templates with simple syntax")
     print("✓ Few-shot learning with examples")
-    print("✓ Compatible with Nimbus completion API")
+    print("✓ Compatible with Skye completion API")
     print()
     print("Note: Complex Jinja2 templates need proper Jinja2 dependency")
     print("Consider adding 'jinja2>=3.0' to prompts extra for full functionality")

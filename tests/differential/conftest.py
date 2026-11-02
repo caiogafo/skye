@@ -1,4 +1,4 @@
-"""Differential tests: built-in vs official-SDK implementation (dev environment only, Req 18).
+"""Differential tests: built-in vs official-SDK implementation (dev environment only, Requirement 14).
 
 Everything here is marked ``differential`` and skips (never fails) when the SDK is not installed.
 """

@@ -1,6 +1,6 @@
-# Nimbus Test Suite
+# Skye Test Suite
 
-This directory contains the comprehensive test suite for the Nimbus library. Tests are organized into three main categories to ensure clarity and maintainability.
+This directory contains the comprehensive test suite for the Skye library. Tests are organized into three main categories to ensure clarity and maintainability.
 
 ## Test Organization
 
@@ -90,7 +90,7 @@ pytest tests/unit/providers/
 
 ### Run with Coverage
 ```bash
-pytest tests/ --cov=src/nimbus --cov-report=html
+pytest tests/ --cov=src/skye --cov-report=html
 ```
 
 ### Run in Parallel
@@ -110,7 +110,7 @@ pytest tests/ -n auto
 ### Unit Test Example
 ```python
 import pytest
-from nimbus.tools import CapabilityCall
+from skye.tools import CapabilityCall
 
 def test_capability_call_creation():
     """Test creating a capability call."""
@@ -127,7 +127,7 @@ def test_capability_call_creation():
 ### Integration Test Example
 ```python
 import pytest
-from nimbus.router import ModelRouter
+from skye.router import ModelRouter
 
 @pytest.mark.integration
 def test_router_with_yaml_config():
@@ -141,7 +141,7 @@ def test_router_with_yaml_config():
 ```python
 import pytest
 import asyncio
-from nimbus.router import ModelRouter
+from skye.router import ModelRouter
 
 @pytest.mark.stress
 async def test_concurrent_routing():
@@ -226,5 +226,5 @@ When adding new tests:
 
 - [pytest Documentation](https://docs.pytest.org/)
 - [pytest-asyncio Documentation](https://pytest-asyncio.readthedocs.io/)
-- [Nimbus Architecture Guidelines](../.kiro/steering/nimbus-architecture.md)
-- [Python Standards](../.kiro/steering/python-standards.md)
+- [Skye Architecture Guidelines](../.kiro/steering/00-rules.md)
+- [Python Standards](../.kiro/steering/00-rules.md)

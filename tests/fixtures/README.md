@@ -58,7 +58,7 @@ Example JSON configuration file for testing JSON configuration loading.
 
 **Usage:**
 ```python
-from nimbus.base.config import load_config
+from skye.base.config import load_config
 
 config = load_config("tests/fixtures/sample_config.json")
 ```
@@ -68,7 +68,7 @@ Example YAML configuration file for testing YAML configuration loading.
 
 **Usage:**
 ```python
-from nimbus.router import ModelRouter
+from skye.router import ModelRouter
 
 router = ModelRouter.from_yaml("tests/fixtures/sample_config.yaml")
 ```

@@ -5,8 +5,8 @@ from pathlib import Path
 
 import pytest
 
-from nimbus.base.config import ConfigLoader, substitute_env_vars
-from nimbus.base.exceptions import ConfigurationError
+from skye.base.config import ConfigLoader, substitute_env_vars
+from skye.base.exceptions import ConfigurationError
 
 
 class TestSubstituteEnvVars:
@@ -14,7 +14,7 @@ class TestSubstituteEnvVars:
 
     def setup_method(self):
         """Clear the environment variable cache before each test."""
-        from nimbus.base.config import _env_var_cache
+        from skye.base.config import _env_var_cache
         _env_var_cache.clear()
 
     def test_substitute_simple_string(self, monkeypatch):
@@ -200,7 +200,7 @@ class TestSubstituteEnvVars:
     def test_caching_behavior(self, monkeypatch):
         """Test that environment variable values are cached."""
         # Import the cache to verify it's being used
-        from nimbus.base.config import _env_var_cache
+        from skye.base.config import _env_var_cache
 
         # Clear cache before test
         _env_var_cache.clear()
@@ -222,7 +222,7 @@ class TestSubstituteEnvVars:
 
     def test_multiple_substitutions_use_cache(self, monkeypatch):
         """Test that multiple substitutions of same variable use cache."""
-        from nimbus.base.config import _env_var_cache
+        from skye.base.config import _env_var_cache
 
         _env_var_cache.clear()
 
@@ -248,7 +248,7 @@ class TestConfigLoaderWithEnvVarSubstitution:
 
     def setup_method(self):
         """Clear the environment variable cache before each test."""
-        from nimbus.base.config import _env_var_cache
+        from skye.base.config import _env_var_cache
         _env_var_cache.clear()
 
     def test_yaml_config_with_env_vars(self, monkeypatch, tmp_path):

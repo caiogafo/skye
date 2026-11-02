@@ -4,8 +4,8 @@ import asyncio
 
 import pytest
 
-from nimbus.agents import registry
-from nimbus.agents.registry import (
+from skye.agents import registry
+from skye.agents.registry import (
     REACT,
     ReActAgent,
     create_agent,
@@ -13,8 +13,8 @@ from nimbus.agents.registry import (
     list_agent_types,
     register_agent_type,
 )
-from nimbus.base.exceptions import ConfigurationError, NimbusError
-from nimbus.base.interfaces.runnable import Runnable
+from skye.base.exceptions import ConfigurationError, SkyeError
+from skye.base.interfaces.runnable import Runnable
 
 
 @pytest.fixture(autouse=True)
@@ -49,11 +49,11 @@ def test_list_is_sorted():
     assert names == sorted(names)
 
 
-def test_duplicate_name_raises_nimbus_error():
+def test_duplicate_name_raises_skye_error():
     register_agent_type("dup", _Echo)
     with pytest.raises(ConfigurationError) as exc:
         register_agent_type("dup", _Echo)
-    assert isinstance(exc.value, NimbusError)
+    assert isinstance(exc.value, SkyeError)
 
 
 def test_duplicate_allowed_with_replace():
@@ -62,10 +62,10 @@ def test_duplicate_allowed_with_replace():
     assert get_agent_type("dup") is ReActAgent
 
 
-def test_unknown_name_raises_nimbus_error():
+def test_unknown_name_raises_skye_error():
     with pytest.raises(ConfigurationError) as exc:
         get_agent_type("nope")
-    assert isinstance(exc.value, NimbusError)
+    assert isinstance(exc.value, SkyeError)
     assert REACT in exc.value.details["available"]
 
 

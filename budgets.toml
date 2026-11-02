@@ -1,13 +1,13 @@
-# Size and load budgets for Nimbus. Checked by tests/budget and by the "budgets"
+# Size and load budgets for Skye. Checked by tests/budget and by the "budgets"
 # GitHub workflow on every pull request. See docs/budgets.md.
 #
-# Principles, in this order of preference, for everything Nimbus imports:
+# Principles, in this order of preference, for everything Skye imports:
 #   1. the Python standard library;
 #   2. libraries the AWS Lambda Python runtime already contains (see [lambda] below);
 #   3. pure-Python packages (wheel tagged py3-none-any), only when 1 and 2 cannot do the job;
 #   4. never a compiled package (C or Rust extension) in the core: the library is I/O bound,
 #      and a compiled wheel forces a container build for the right architecture and Python.
-# The lists below record where Nimbus stands today. They only shrink.
+# The lists below record where Skye stands today. They only shrink.
 #
 # Rule: a budget only goes DOWN. Raising a number needs a reason in the PR and a
 # review from the owner of this file (.github/CODEOWNERS).
@@ -20,36 +20,35 @@
 # Install with no extras.
 max_distributions = 12              # now 10
 max_installed_mb = 11               # now 9.0
-allowed_dependencies = ["jinja2", "pydantic", "pyyaml", "tenacity"]
+allowed_dependencies = ["pydantic", "pyyaml", "tenacity"]
 # Modules that fail to import on a core-only install. Each entry must be fixed
 # (move the import behind LazyImporter, or declare the dependency) and removed.
 # The test fails if an entry starts working, so the list cannot go stale.
 # Compiled (non pure-Python) distributions in the core install. Target: none.
 # The test fails if the set changes, in either direction.
-known_compiled = ["markupsafe", "pydantic-core", "pyyaml"]
+known_compiled = ["pydantic-core", "pyyaml"]
 known_import_failures = []
 
-# Third-party libraries imported at module level in src/nimbus, with the number of
+# Third-party libraries imported at module level in src/skye, with the number of
 # files that import them. Standard library and Lambda libraries are always allowed.
 # Anything else must be listed here; the count must match exactly, so every fix lowers
 # it (and removes the dependency when it reaches zero). Target: empty.
 [imports.max_files]
 pydantic = 10
 yaml = 1
-jinja2 = 1
 tenacity = 1
 
 [load]
-# `import nimbus` in a fresh interpreter. Module count, time and memory are measured
+# `import skye` in a fresh interpreter. Module count, time and memory are measured
 # in a clean core-only environment (tests/budget/test_footprint_budget.py), because a
 # development environment has extra libraries installed. The forbidden-import check
 # also runs in every normal test run.
 max_modules_loaded = 340            # now 293
 max_import_ms = 250                 # best of 5, now about 95 on a laptop (CI runners are slower)
 max_rss_delta_mb = 32               # now about 24
-# Importing nimbus must not import any provider SDK or optional dependency.
-# Known leaks: libraries that `import nimbus` still imports when they are installed.
-# Empty: tools/remote_api.py now uses the stdlib transport (nimbus.base.http). The test
+# Importing skye must not import any provider SDK or optional dependency.
+# Known leaks: libraries that `import skye` still imports when they are installed.
+# Empty: tools/remote_api.py now uses the stdlib transport (skye.base.http). The test
 # fails if a listed library stops leaking, so only add an entry for a real, known leak.
 known_leaks = []
 forbidden_at_import = [
@@ -68,15 +67,10 @@ max_profile_mb = 30                 # core + bedrock without the preinstalled li
 
 # Megabytes added over the core install, preinstalled libraries excluded, and the number of
 # compiled distributions added over the core install (target 0 for every extra).
-[extras.bedrock]
-max_compiled_over_core = 0
-max_over_core_mb = 1
-target_over_core_mb = 1
-
 # The mcp Extra provides fastmcp, the optional substitute for the built-in stdlib MCP client
 # (create_mcp_client(target, impl="fastmcp")). fastmcp is heavy: +43.4 MB, 7 compiled (caio, cffi,
 # cryptography, jsonref, rpds-py, watchfiles, websockets). Accepted by the owner (2026-11-01).
-# The tools Extra carries no third-party library (Req 25.7).
+# The tools Extra carries no third-party library (Requirement 15).
 [extras.mcp]
 max_compiled_over_core = 7
 max_over_core_mb = 48
@@ -88,11 +82,6 @@ max_compiled_over_core = 0
 max_over_core_mb = 1
 target_over_core_mb = 1
 
-[extras.anthropic]
-max_compiled_over_core = 1
-max_over_core_mb = 12
-target_over_core_mb = 3
-
 [extras.memory]
 max_compiled_over_core = 1
 max_over_core_mb = 13
@@ -103,20 +92,10 @@ max_compiled_over_core = 4
 max_over_core_mb = 20
 target_over_core_mb = 4
 
-[extras.cohere]
-max_compiled_over_core = 4
-max_over_core_mb = 35
-target_over_core_mb = 3
-
-[extras.google]
-max_compiled_over_core = 9
-max_over_core_mb = 180
-target_over_core_mb = 10
-
 # Extras that have no dependencies today. They are modules, not extras: remove them
 # from pyproject.toml and from this list. The test fails if an extra is empty and
 # not listed here, and if a listed extra stops being empty.
 [extras_policy]
-known_empty = ["agents", "guard", "observe", "prompts", "teams", "flows", "tools"]   # "prompts" only repeats jinja2, already a core dependency; "observe" has no telemetry import yet. "tools" carries no third-party library: fastmcp lives in the separate "mcp" extra (Req 25.7).
+known_empty = ["agents", "guard", "observe", "prompts", "teams", "flows", "tools", "bedrock", "anthropic", "google", "cohere"]   # provider extras are empty: one built-in stdlib REST adapter each (Requirement 20); "observe" has no telemetry import yet. "tools" carries no third-party library: fastmcp lives in the separate "mcp" extra (Requirement 15).
 # Convenience bundles. They are not budgeted one by one: each member extra is.
 bundles = ["llm-providers", "embedding-providers", "all-providers", "providers", "all"]

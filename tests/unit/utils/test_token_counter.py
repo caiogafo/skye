@@ -5,8 +5,8 @@ Tests token counting functionality for various models and scenarios.
 
 import pytest
 
-from nimbus.base.messages import AssistantMessage, SystemMessage, UserMessage
-from nimbus.models.transport.token_counter import TokenCounter
+from skye.base.messages import AssistantMessage, SystemMessage, UserMessage
+from skye.models.transport.token_counter import TokenCounter
 
 
 class TestTokenCounter:
@@ -183,21 +183,24 @@ class TestTokenCounterWithTiktoken:
             pytest.skip("tiktoken not installed")
 
 
-class TestTokenCounterWithAnthropic:
-    """Test suite for TokenCounter with Anthropic tokenizer (if available)."""
+class TestTokenCounterNoVendorSdk:
+    """Claude counting is a stdlib estimate; no ``anthropic`` SDK is imported."""
 
-    def test_count_tokens_claude_with_anthropic(self):
-        """Test token counting for Claude with Anthropic tokenizer if available."""
-        try:
-            import anthropic  # noqa: F401
+    def test_count_tokens_claude_uses_estimate(self):
+        TokenCounter._tokenizers.pop("claude-3-sonnet", None)
+        assert TokenCounter.count_tokens("Hello, Claude! " * 4, "claude-3-sonnet") == 15
 
-            # Check if get_tokenizer method exists
-            if hasattr(anthropic, "get_tokenizer"):
-                text = "Hello, Claude!"
-                count = TokenCounter.count_tokens(text, "claude-3-sonnet")
-                assert count > 0
-                assert isinstance(count, int)
-            else:
-                pytest.skip("anthropic.get_tokenizer not available")
-        except ImportError:
-            pytest.skip("anthropic not installed")
+    def test_token_counter_imports_no_anthropic(self):
+        import ast
+        import inspect
+
+        from skye.models.transport import token_counter
+
+        tree = ast.parse(inspect.getsource(token_counter))
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Import):
+                assert all(a.name.split(".")[0] != "anthropic" for a in node.names)
+            elif isinstance(node, ast.ImportFrom):
+                assert (node.module or "").split(".")[0] != "anthropic"
+            elif isinstance(node, ast.Constant) and isinstance(node.value, str):
+                assert node.value != "anthropic"

@@ -2,12 +2,12 @@
 
 import pytest
 
-from nimbus.base.completion import CompletionRequest, CompletionResponse, StreamChunk
-from nimbus.base.exceptions import ConfigurationError
-from nimbus.base.interfaces.model import ModelInterface
-from nimbus.base.interfaces.vector_encoder import VectorEncoderInterface
-from nimbus.base.messages import UserMessage
-from nimbus.models.registry import ProviderRegistry
+from skye.base.completion import CompletionRequest, CompletionResponse, StreamChunk
+from skye.base.exceptions import ConfigurationError
+from skye.base.interfaces.model import ModelInterface
+from skye.base.interfaces.vector_encoder import VectorEncoderInterface
+from skye.base.messages import UserMessage
+from skye.models.registry import ProviderRegistry
 
 
 # Mock provider implementations for testing
@@ -19,7 +19,7 @@ class MockModelProvider(ModelInterface):
         self.config = kwargs
 
     def complete(self, request: CompletionRequest) -> CompletionResponse:
-        from nimbus.base.completion import TokenUsage
+        from skye.base.completion import TokenUsage
 
         return CompletionResponse(
             id="test-id",
@@ -121,7 +121,7 @@ class TestProviderRegistry:
         error_msg = str(exc_info.value)
         assert "Model provider 'nonexistent' not found" in error_msg
         assert "Available providers: none" in error_msg
-        assert "pip install nimbus[nonexistent]" in error_msg
+        assert "pip install skyeai[nonexistent]" in error_msg
 
     def test_get_model_provider_not_found_with_available(self):
         """Test error message includes available providers."""
@@ -164,7 +164,7 @@ class TestProviderRegistry:
         error_msg = str(exc_info.value)
         assert "Embedding provider 'nonexistent' not found" in error_msg
         assert "Available providers: none" in error_msg
-        assert "pip install nimbus[nonexistent]" in error_msg
+        assert "pip install skyeai[nonexistent]" in error_msg
 
     def test_get_embedding_provider_not_found_with_available(self):
         """Test error message includes available embedding providers."""

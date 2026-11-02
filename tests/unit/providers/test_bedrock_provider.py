@@ -1,7 +1,7 @@
 """Unit tests for BedrockProvider.
 
 These tests verify the Bedrock provider implementation including:
-- Optional boto3 import (pre-installed vs lazy import)
+- Built-in REST transport (no boto3)
 - Request transformation to Bedrock Converse API format
 - Response transformation from Bedrock to CompletionResponse
 - Tool use format handling
@@ -9,14 +9,16 @@ These tests verify the Bedrock provider implementation including:
 """
 
 import sys
+from pathlib import Path
 from datetime import datetime, timezone
 from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 
-from nimbus.base.completion import CompletionRequest, CompletionResponse, StreamChunk, TokenUsage
-from nimbus.base.messages import AssistantMessage, SystemMessage, UserMessage
-from nimbus.models.llm.bedrock import BedrockProvider
+from skye.base.completion import CompletionRequest, CompletionResponse, StreamChunk, TokenUsage
+from skye.base.messages import AssistantMessage, SystemMessage, UserMessage
+from skye.models.llm.bedrock import BedrockProvider
+from skye.models.transport import rest
 
 
 class TestBedrockProviderInitialization:
@@ -38,65 +40,22 @@ class TestBedrockProviderInitialization:
         provider = BedrockProvider(region_name="us-east-1", profile_name="my-profile")
         assert provider.profile_name == "my-profile"
     
-    @patch("nimbus.models.llm.bedrock.LazyImporter.import_module")
-    def test_initialize_client_with_lazy_import(self, mock_import):
-        """Test client initialization with lazy boto3 import."""
-        # Setup mock boto3
-        mock_boto3 = MagicMock()
-        mock_session = MagicMock()
-        mock_client = MagicMock()
-        
-        mock_boto3.Session.return_value = mock_session
-        mock_session.client.return_value = mock_client
-        mock_import.return_value = mock_boto3
-        
-        # Ensure boto3 is not in sys.modules
-        if "boto3" in sys.modules:
-            del sys.modules["boto3"]
-        
-        provider = BedrockProvider(region_name="us-west-2", profile_name="test-profile")
-        client = provider.client
-        
-        # Verify lazy import was called
-        mock_import.assert_called_once_with(
-            "boto3",
-            package_name="boto3",
-            install_extra="bedrock"
-        )
-        
-        # Verify session was created with correct parameters
-        mock_boto3.Session.assert_called_once_with(
-            region_name="us-west-2",
-            profile_name="test-profile"
-        )
-        
-        # Verify bedrock-runtime client was created
-        mock_session.client.assert_called_once_with("bedrock-runtime")
-        assert client == mock_client
-    
-    def test_initialize_client_with_preinstalled_boto3(self):
-        """Test client initialization with pre-installed boto3 (Lambda scenario)."""
-        # Setup mock boto3 in sys.modules
-        mock_boto3 = MagicMock()
-        mock_session = MagicMock()
-        mock_client = MagicMock()
-        
-        mock_boto3.Session.return_value = mock_session
-        mock_session.client.return_value = mock_client
-        
-        with patch.dict(sys.modules, {"boto3": mock_boto3}):
-            provider = BedrockProvider(region_name="us-east-1")
-            client = provider.client
-            
-            # Verify session was created
-            mock_boto3.Session.assert_called_once_with(
-                region_name="us-east-1",
-                profile_name=None
-            )
-            
-            # Verify bedrock-runtime client was created
-            mock_session.client.assert_called_once_with("bedrock-runtime")
-            assert client == mock_client
+    def test_initialize_client_is_none_and_no_boto3(self):
+        """No vendor SDK client is created and boto3 is not imported."""
+        provider = BedrockProvider(region_name="us-west-2")
+        assert provider.client is None
+        assert "boto3" not in sys.modules
+        assert "botocore" not in sys.modules
+
+    def test_sources_do_not_import_boto3(self):
+        """Bedrock sources contain no boto3/botocore import."""
+        import skye.models.embeddings.bedrock_embeddings as emb
+        import skye.models.llm.bedrock as llm
+
+        for mod in (llm, emb):
+            text = Path(mod.__file__).read_text()
+            assert "import boto3" not in text and "import botocore" not in text
+            assert "LazyImporter" not in text
 
 
 class TestBedrockRequestTransformation:
@@ -421,67 +380,84 @@ class TestBedrockStreamTransformation:
         assert stream_chunk.finish_reason is None
 
 
+KEYS = {
+    "aws_access_key_id": "AKIDEXAMPLE",
+    "aws_secret_access_key": "secret",
+}
+
+
 class TestBedrockProviderCalls:
-    """Test provider API calls."""
-    
-    @patch("nimbus.models.llm.bedrock.LazyImporter.import_module")
-    def test_call_provider(self, mock_import):
-        """Test synchronous provider call."""
-        # Setup mock client
-        mock_boto3 = MagicMock()
-        mock_session = MagicMock()
-        mock_client = MagicMock()
-        mock_response = {"output": {"message": {"content": [{"text": "Response"}]}}}
-        
-        mock_boto3.Session.return_value = mock_session
-        mock_session.client.return_value = mock_client
-        mock_client.converse.return_value = mock_response
-        mock_import.return_value = mock_boto3
-        
-        # Ensure boto3 is not in sys.modules
-        if "boto3" in sys.modules:
-            del sys.modules["boto3"]
-        
-        provider = BedrockProvider()
-        request = {"modelId": "test-model", "messages": []}
-        
-        response = provider._call_provider(request)
-        
-        mock_client.converse.assert_called_once_with(**request)
-        assert response == mock_response
-    
-    @patch("nimbus.models.llm.bedrock.LazyImporter.import_module")
-    def test_call_provider_stream(self, mock_import):
-        """Test streaming provider call."""
-        # Setup mock client
-        mock_boto3 = MagicMock()
-        mock_session = MagicMock()
-        mock_client = MagicMock()
-        mock_stream = [
+    """Test provider API calls over the REST transport."""
+
+    @patch("skye.models.transport.rest.post_json")
+    def test_call_provider(self, mock_post):
+        mock_post.return_value = rest.JsonObject({"output": {"message": {"content": [{"text": "Response"}]}}})
+        provider = BedrockProvider(region_name="eu-west-1", **KEYS)
+
+        response = provider._call_provider({"modelId": "anthropic.claude-3:0", "messages": []})
+
+        args, kwargs = mock_post.call_args
+        assert args[0] == "https://bedrock-runtime.eu-west-1.amazonaws.com/model/anthropic.claude-3%3A0/converse"
+        assert args[1] == {"messages": []}
+        assert kwargs["authenticator"] is not None
+        assert response.output.message.content[0].text == "Response"
+
+    def test_signed_headers_present(self):
+        provider = BedrockProvider(**KEYS)
+        hdrs = provider._authenticator().apply("POST", "https://bedrock-runtime.us-east-1.amazonaws.com/model/m/converse", {}, b"{}")
+        assert hdrs["Authorization"].startswith("AWS4-HMAC-SHA256 Credential=AKIDEXAMPLE/")
+        assert "x-amz-date" in {k.lower() for k in hdrs}
+
+    def test_api_key_uses_bearer(self):
+        provider = BedrockProvider(api_key="abc")
+        hdrs = provider._authenticator().apply("POST", "https://x", {}, b"")
+        assert hdrs["Authorization"] == "Bearer abc"
+
+    @patch("skye.models.transport.rest.post_json")
+    def test_complete_end_to_end(self, mock_post):
+        mock_post.return_value = rest.JsonObject({
+            "output": {"message": {"role": "assistant", "content": [
+                {"text": "Hi"},
+                {"toolUse": {"toolUseId": "t1", "name": "f", "input": {"a": 1}}},
+            ]}},
+            "stopReason": "tool_use",
+            "usage": {"inputTokens": 1, "outputTokens": 2, "totalTokens": 3},
+        })
+        provider = BedrockProvider(**KEYS)
+        resp = provider.complete(CompletionRequest(messages=[UserMessage(content="x")], model="m"))
+        assert isinstance(resp, CompletionResponse)
+        assert resp.content == "Hi"
+        assert resp.finish_reason == "tool_calls"
+        assert resp.capability_calls[0].arguments == {"a": 1}
+        assert resp.usage.total_tokens == 3
+
+    @patch("skye.models.llm.bedrock.post_eventstream_json")
+    def test_call_provider_stream(self, mock_stream):
+        events = [
             {"contentBlockDelta": {"delta": {"text": "Hello"}}},
-            {"messageStop": {"stopReason": "end_turn"}}
+            {"messageStop": {"stopReason": "end_turn"}},
         ]
-        mock_response = {"stream": mock_stream}
-        
-        mock_boto3.Session.return_value = mock_session
-        mock_session.client.return_value = mock_client
-        mock_client.converse_stream.return_value = mock_response
-        mock_import.return_value = mock_boto3
-        
-        # Ensure boto3 is not in sys.modules
-        if "boto3" in sys.modules:
-            del sys.modules["boto3"]
-        
-        provider = BedrockProvider()
-        request = {"modelId": "test-model", "messages": []}
-        
-        stream = provider._call_provider_stream(request)
-        chunks = list(stream)
-        
-        mock_client.converse_stream.assert_called_once_with(**request)
-        assert len(chunks) == 2
-        assert chunks[0] == mock_stream[0]
-        assert chunks[1] == mock_stream[1]
+        mock_stream.return_value = iter(events)
+        provider = BedrockProvider(**KEYS)
+
+        chunks = list(provider._call_provider_stream({"modelId": "test-model", "messages": []}))
+
+        args, _ = mock_stream.call_args
+        assert args[0].endswith("/model/test-model/converse-stream")
+        assert args[1] == {"messages": []}
+        assert chunks == events
+
+    @patch("skye.models.transport.rest.post_json")
+    def test_acomplete(self, mock_post):
+        import asyncio
+
+        mock_post.return_value = rest.JsonObject({
+            "output": {"message": {"content": [{"text": "async"}]}},
+            "usage": {},
+        })
+        provider = BedrockProvider(**KEYS)
+        resp = asyncio.run(provider.acomplete(CompletionRequest(messages=[UserMessage(content="x")], model="m")))
+        assert resp.content == "async"
 
 
 class TestBedrockModelInfo:
@@ -518,7 +494,7 @@ class TestBedrockToolCalling:
         }
         mock_capability.get_schema.return_value = mock_schema
         
-        provider = BedrockProvider(model="anthropic.claude-3-sonnet-20240229-v1:0")
+        provider = BedrockProvider(model="anthropic.claude-3-sonnet-20240229-v1:0", **KEYS)
         request = CompletionRequest(
             messages=[UserMessage(content="What's the weather in NYC?")],
             model="anthropic.claude-3-sonnet-20240229-v1:0",
@@ -555,7 +531,7 @@ class TestBedrockToolCalling:
         mock_schema.parameters = {"type": "object", "properties": {}}
         mock_capability.get_schema.return_value = mock_schema
         
-        provider = BedrockProvider(model="anthropic.claude-3-sonnet-20240229-v1:0")
+        provider = BedrockProvider(model="anthropic.claude-3-sonnet-20240229-v1:0", **KEYS)
         request = CompletionRequest(
             messages=[UserMessage(content="What's the weather?")],
             model="anthropic.claude-3-sonnet-20240229-v1:0",
@@ -580,7 +556,7 @@ class TestBedrockToolCalling:
         mock_schema.parameters = {"type": "object", "properties": {}}
         mock_capability.get_schema.return_value = mock_schema
         
-        provider = BedrockProvider(model="anthropic.claude-3-sonnet-20240229-v1:0")
+        provider = BedrockProvider(model="anthropic.claude-3-sonnet-20240229-v1:0", **KEYS)
         request = CompletionRequest(
             messages=[UserMessage(content="Calculate 2+2")],
             model="anthropic.claude-3-sonnet-20240229-v1:0",
@@ -596,7 +572,7 @@ class TestBedrockToolCalling:
     
     def test_transform_response_with_tool_calls_creates_tool_call_objects(self):
         """Test that tool calls in response are converted to CapabilityCall objects."""
-        provider = BedrockProvider(model="anthropic.claude-3-sonnet-20240229-v1:0")
+        provider = BedrockProvider(model="anthropic.claude-3-sonnet-20240229-v1:0", **KEYS)
         
         # Mock Bedrock response with tool use
         bedrock_response = {
@@ -646,7 +622,7 @@ class TestBedrockToolCalling:
     
     def test_transform_response_with_parallel_tool_calls(self):
         """Test handling of parallel tool calls in response."""
-        provider = BedrockProvider(model="anthropic.claude-3-sonnet-20240229-v1:0")
+        provider = BedrockProvider(model="anthropic.claude-3-sonnet-20240229-v1:0", **KEYS)
         
         # Mock Bedrock response with multiple parallel tool calls
         bedrock_response = {
@@ -701,7 +677,7 @@ class TestBedrockToolCalling:
     
     def test_transform_response_with_text_and_tool_use(self):
         """Test handling of response with both text and tool use."""
-        provider = BedrockProvider(model="anthropic.claude-3-sonnet-20240229-v1:0")
+        provider = BedrockProvider(model="anthropic.claude-3-sonnet-20240229-v1:0", **KEYS)
         
         # Mock Bedrock response with text and tool use
         bedrock_response = {
@@ -742,7 +718,7 @@ class TestBedrockToolCalling:
     
     def test_transform_request_with_multiple_capabilities(self):
         """Test transformation with multiple capabilities."""
-        provider = BedrockProvider(model="anthropic.claude-3-sonnet-20240229-v1:0")
+        provider = BedrockProvider(model="anthropic.claude-3-sonnet-20240229-v1:0", **KEYS)
         
         # Mock multiple capabilities
         mock_capability_1 = Mock()
@@ -774,21 +750,11 @@ class TestBedrockToolCalling:
         assert result["toolConfig"]["tools"][0]["toolSpec"]["name"] == "get_weather"
         assert result["toolConfig"]["tools"][1]["toolSpec"]["name"] == "get_time"
     
-    @patch("nimbus.models.llm.bedrock.LazyImporter.import_module")
-    def test_complete_with_tool_calls(self, mock_import):
+    @patch("skye.models.transport.rest.post_json")
+    def test_complete_with_tool_calls(self, mock_post):
         """Test end-to-end completion with tool calls."""
-        # Setup mocks
-        mock_boto3 = MagicMock()
-        mock_session = MagicMock()
-        mock_client = MagicMock()
         
-        mock_boto3.Session.return_value = mock_session
-        mock_session.client.return_value = mock_client
-        mock_import.return_value = mock_boto3
         
-        # Ensure boto3 is not in sys.modules
-        if "boto3" in sys.modules:
-            del sys.modules["boto3"]
         
         # Mock capability
         mock_capability = Mock()
@@ -830,10 +796,10 @@ class TestBedrockToolCalling:
             }
         }
         
-        mock_client.converse.return_value = mock_response
+        mock_post.return_value = rest.JsonObject(mock_response)
         
         # Execute
-        provider = BedrockProvider(model="anthropic.claude-3-sonnet-20240229-v1:0")
+        provider = BedrockProvider(model="anthropic.claude-3-sonnet-20240229-v1:0", **KEYS)
         request = CompletionRequest(
             messages=[UserMessage(content="What's the weather in Boston?")],
             model="anthropic.claude-3-sonnet-20240229-v1:0",
@@ -850,7 +816,7 @@ class TestBedrockToolCalling:
         assert result.capability_calls[0].name == "get_weather"
         
         # Verify the API was called with tools
-        call_args = mock_client.converse.call_args[1]
+        call_args = mock_post.call_args.args[1]
         assert "toolConfig" in call_args
         assert "tools" in call_args["toolConfig"]
         assert "toolChoice" in call_args["toolConfig"]
@@ -859,13 +825,10 @@ class TestBedrockToolCalling:
 class TestBedrockIntegration:
     """Integration tests for complete request/response flow."""
     
-    @patch("nimbus.models.llm.bedrock.LazyImporter.import_module")
-    def test_complete_request_flow(self, mock_import):
+    @patch("skye.models.transport.rest.post_json")
+    def test_complete_request_flow(self, mock_post):
         """Test complete request flow from CompletionRequest to CompletionResponse."""
         # Setup mock client
-        mock_boto3 = MagicMock()
-        mock_session = MagicMock()
-        mock_client = MagicMock()
         mock_response = {
             "output": {
                 "message": {
@@ -887,16 +850,10 @@ class TestBedrockIntegration:
             }
         }
         
-        mock_boto3.Session.return_value = mock_session
-        mock_session.client.return_value = mock_client
-        mock_client.converse.return_value = mock_response
-        mock_import.return_value = mock_boto3
+        mock_post.return_value = rest.JsonObject(mock_response)
         
-        # Ensure boto3 is not in sys.modules
-        if "boto3" in sys.modules:
-            del sys.modules["boto3"]
         
-        provider = BedrockProvider(region_name="us-west-2")
+        provider = BedrockProvider(region_name="us-west-2", **KEYS)
         request = CompletionRequest(
             messages=[UserMessage(content="Hello")],
             model="anthropic.claude-3-sonnet-20240229-v1:0",
@@ -912,7 +869,8 @@ class TestBedrockIntegration:
         assert response.usage.total_tokens == 25
         
         # Verify the client was called with correct parameters
-        call_args = mock_client.converse.call_args[1]
-        assert call_args["modelId"] == "anthropic.claude-3-sonnet-20240229-v1:0"
+        call_args = mock_post.call_args.args[1]
+        assert "modelId" not in call_args
+        assert mock_post.call_args.args[0].endswith("/model/anthropic.claude-3-sonnet-20240229-v1%3A0/converse")
         assert call_args["inferenceConfig"]["temperature"] == 0.7
         assert call_args["inferenceConfig"]["maxTokens"] == 1000

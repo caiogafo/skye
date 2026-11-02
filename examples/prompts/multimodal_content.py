@@ -1,4 +1,4 @@
-"""Multimodal content examples for Nimbus Prompts Support.
+"""Multimodal content examples for Skye Prompts Support.
 
 This script demonstrates multimodal content support using the
 comprehensive agent templates and enhanced prompt system.
@@ -11,7 +11,7 @@ from pathlib import Path
 src_path = Path(__file__).parent.parent.parent / "src"
 sys.path.insert(0, str(src_path))
 
-from nimbus.prompts import MockPromptBuilder
+from skye.prompts import MockPromptBuilder
 
 
 def basic_image_content():
@@ -338,7 +338,7 @@ Analysis:"""
 
 def main():
     """Run all multimodal content examples."""
-    print("Nimbus Prompts Support - Multimodal Content Examples")
+    print("Skye Prompts Support - Multimodal Content Examples")
     print("=" * 58)
     
     basic_image_content()

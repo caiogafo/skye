@@ -2,19 +2,19 @@
 
 ## Introduction
 
-The Gateway feature lets a Nimbus agent use tools without carrying a fixed list of them. The agent talks to one endpoint that speaks the Model Context Protocol (MCP). For each operation in progress, the Gateway registers and exposes only the tools that operation needs, and checks every listing and every call against the policy engine. It is inspired by Amazon Bedrock AgentCore Gateway (targets, inbound and outbound authorization, tool search, policy on every call) and is designed to run in a single AWS Lambda function.
+The Gateway feature lets a Skye agent use tools without carrying a fixed list of them. The agent talks to one endpoint that speaks the Model Context Protocol (MCP). For each operation in progress, the Gateway registers and exposes only the tools that operation needs, and checks every listing and every call against the policy engine. It is inspired by Amazon Bedrock AgentCore Gateway (targets, inbound and outbound authorization, tool search, policy on every call) and is designed to run in a single AWS Lambda function.
 
 Status: requirements draft, to be reviewed before design. Items marked OPEN are decisions for the owner.
 
 ## Glossary
 
-- **Gateway**: The Nimbus component that exposes tools through one MCP endpoint
+- **Gateway**: The Skye component that exposes tools through one MCP endpoint
 - **Target**: A source of tools behind the Gateway: a Lambda function, an OpenAPI document, an upstream MCP server, or a local capability
-- **Tool**: A callable operation with a name, a description and a JSON Schema for its arguments (a Capability, in Nimbus terms)
+- **Tool**: A callable operation with a name, a description and a JSON Schema for its arguments (a Capability, in Skye terms)
 - **Registry**: The catalogue of all tools the Gateway knows, with their target, tags and version
 - **Operation**: The unit of work an agent is carrying out, described by a short text, optional tags, and the principal on whose behalf it runs
 - **Toolset**: The tools exposed to one operation
-- **Selector**: A strategy that ranks the tools of the Registry for an operation. Nimbus ships two: hybrid search and Jev
+- **Selector**: A strategy that ranks the tools of the Registry for an operation. Skye ships two: hybrid search and Jev
 - **Scope token**: A signed, expiring token that names the toolset of an operation, so the Gateway needs no server-side session
 - **Principal**: The caller, identified from IAM or from a JWT
 - **Policy engine**: The component specified in `.kiro/specs/policy-engine`
@@ -77,7 +77,7 @@ Status: requirements draft, to be reviewed before design. Items marked OPEN are 
 
 #### Acceptance Criteria
 
-1. THE Gateway SHALL always expose a discovery tool named nimbus_find_tools that takes a query and returns matching tools
+1. THE Gateway SHALL always expose a discovery tool named skye_find_tools that takes a query and returns matching tools
 2. WHEN the discovery tool returns tools, THE Gateway SHALL return an extended scope token that includes them
 3. THE Gateway SHALL apply the policy engine to the results, so that a caller never learns about tools it may not use
 

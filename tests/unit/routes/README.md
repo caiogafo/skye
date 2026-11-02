@@ -1,6 +1,6 @@
 # Router Unit Tests
 
-Unit tests for Nimbus routing functionality.
+Unit tests for Skye routing functionality.
 
 ## Test Coverage
 
@@ -30,7 +30,7 @@ pytest tests/unit/routes/
 pytest tests/unit/routes/test_model_router.py
 
 # Run with coverage
-pytest tests/unit/routes/ --cov=src/nimbus/router
+pytest tests/unit/routes/ --cov=src/skye/router
 ```
 
 ## Testing Approach

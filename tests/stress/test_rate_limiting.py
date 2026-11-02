@@ -19,12 +19,12 @@ from unittest.mock import Mock, patch
 
 import pytest
 
-from nimbus.base.completion import CompletionRequest, CompletionResponse, TokenUsage
-from nimbus.base.exceptions import ProviderError
-from nimbus.base.interfaces.model import ModelInterface
-from nimbus.base.interfaces.router import RoutingStrategy
-from nimbus.base.messages import UserMessage
-from nimbus.router.model_router import ModelRouter
+from skye.base.completion import CompletionRequest, CompletionResponse, TokenUsage
+from skye.base.exceptions import ProviderError
+from skye.base.interfaces.model import ModelInterface
+from skye.base.interfaces.router import RoutingStrategy
+from skye.base.messages import UserMessage
+from skye.router.model_router import ModelRouter
 
 
 class MockModel(ModelInterface):
@@ -73,7 +73,7 @@ class MockModel(ModelInterface):
 
     def stream(self, request: CompletionRequest):
         """Stream completion (not implemented for mock)."""
-        from nimbus.base.completion import StreamChunk
+        from skye.base.completion import StreamChunk
 
         yield StreamChunk(delta="Test", model=self.model_id)
 
@@ -83,7 +83,7 @@ class MockModel(ModelInterface):
 
     async def astream(self, request: CompletionRequest):
         """Async stream completion (not implemented for mock)."""
-        from nimbus.base.completion import StreamChunk
+        from skye.base.completion import StreamChunk
 
         yield StreamChunk(delta="Test", model=self.model_id)
 
@@ -130,7 +130,7 @@ class TestRateLimiting:
         def make_request(request_id: int):
             """Make a request and track result."""
             try:
-                response = router.route_request(request)
+                response = router.complete(messages=request.messages, model=request.model)
                 with lock:
                     results.append({"id": request_id, "success": True})
             except ProviderError as e:
@@ -209,7 +209,7 @@ class TestRateLimiting:
         def make_request(request_id: int):
             """Make a request."""
             try:
-                response = router.route_request(request)
+                response = router.complete(messages=request.messages, model=request.model)
                 with lock:
                     results.append({"id": request_id, "success": True})
             except ProviderError:
@@ -279,7 +279,7 @@ class TestRateLimiting:
 
         # Make some requests
         for _ in range(10):
-            router.route_request(request)
+            router.complete(messages=request.messages, model=request.model)
 
         # Check usage
         stats_before = router.get_usage_stats("model-1")
@@ -290,19 +290,15 @@ class TestRateLimiting:
         print(f"  RPM used:  {stats_before.rpm_used}")
         print(f"  TPM used:  {stats_before.tpm_used}")
 
-        # Manually set last_reset to 61 seconds ago to trigger reset
+        # Counters live in per-window storage keys: once the 60 s window has passed, the next
+        # read looks at a fresh window and every counter is back to zero.
         tracker = router.rate_limits["model-1"]
-        tracker.last_reset = time.time() - 61
-
-        # Call reset_if_needed which should reset counters
-        tracker.reset_if_needed()
-
-        # Check usage after reset
-        stats_after = router.get_usage_stats("model-1")
+        later = time.time() + tracker.window_seconds + 1
+        with patch("skye.router.health_tracker.time.time", return_value=later):
+            stats_after = router.get_usage_stats("model-1")
         print(f"\nAfter reset:")
         print(f"  RPM used:  {stats_after.rpm_used}")
         print(f"  TPM used:  {stats_after.tpm_used}")
-        print(f"  Last reset: {tracker.last_reset}")
         print(f"{'=' * 60}")
 
         # Verify reset worked
@@ -343,7 +339,7 @@ class TestRateLimiting:
         accepted_with_checks = 0
         for i in range(20):
             try:
-                router_with_checks.route_request(request)
+                router_with_checks.complete(messages=request.messages, model=request.model)
                 accepted_with_checks += 1
             except ProviderError:
                 pass
@@ -352,7 +348,7 @@ class TestRateLimiting:
         accepted_without_checks = 0
         for i in range(20):
             try:
-                router_without_checks.route_request(request)
+                router_without_checks.complete(messages=request.messages, model=request.model)
                 accepted_without_checks += 1
             except ProviderError:
                 pass
@@ -411,7 +407,7 @@ class TestRateLimiting:
             """Make a request."""
             req_start = time.time()
             try:
-                response = router.route_request(request)
+                response = router.complete(messages=request.messages, model=request.model)
                 latency = time.time() - req_start
                 results.append({"id": request_id, "latency": latency})
             except Exception as e:
@@ -493,7 +489,7 @@ class TestRateLimiting:
         # Execute exactly 50 requests
         num_requests = 50
         for _ in range(num_requests):
-            router.route_request(request)
+            router.complete(messages=request.messages, model=request.model)
 
         # Check tracking accuracy
         stats = router.get_usage_stats("model-1")
@@ -556,7 +552,7 @@ class TestRateLimiting:
 
             for _ in range(30):
                 try:
-                    router.route_request(request)
+                    router.complete(messages=request.messages, model=request.model)
                 except Exception:
                     pass
 
@@ -614,7 +610,7 @@ class TestRateLimiting:
 
             for _ in range(40):
                 try:
-                    router.route_request(request)
+                    router.complete(messages=request.messages, model=request.model)
                 except Exception:
                     pass
 
@@ -662,7 +658,7 @@ class TestRateLimiting:
         def make_request(request_id: int):
             """Make a request."""
             try:
-                router.route_request(request)
+                router.complete(messages=request.messages, model=request.model)
                 with lock:
                     results.append({"id": request_id, "success": True})
             except Exception as e:

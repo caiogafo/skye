@@ -1,4 +1,4 @@
-"""Google Provider Example (Boto3-style Nimbus API).
+"""Google Provider Example (Boto3-style Skye API).
 
 This version demonstrates:
 - Basic completion with Google (Gemini models)
@@ -8,8 +8,8 @@ This version demonstrates:
 """
 
 import os
-from nimbus.models.registry import provider as create_provider
-from nimbus.base.messages import UserMessage, SystemMessage
+from skye.models.registry import provider as create_provider
+from skye.base.messages import UserMessage, SystemMessage
 
 
 def basic_completion():
@@ -34,7 +34,7 @@ def basic_completion():
         )
     except ImportError as e:
         print(f"⚠️  Error: {e}")
-        print("\nTo use Google, install with: pip install nimbus[google]")
+        print("\nTo use Google, install with: pip install skyeai[google]")
         return
     
     messages = [
@@ -131,11 +131,11 @@ def cloud_run_example():
     print("=" * 60)
     
     print("""
-Example Cloud Run service using Nimbus with Google:
+Example Cloud Run service using Skye with Google:
 
 ```python
-from nimbus.models.registry import provider as create_provider
-from nimbus.base.messages import UserMessage
+from skye.models.registry import provider as create_provider
+from skye.base.messages import UserMessage
 from flask import Flask, request, jsonify
 
 app = Flask(__name__)
@@ -167,7 +167,7 @@ if __name__ == "__main__":
 ```
 
 Deployment:
-1. Create Dockerfile with nimbus[google]
+1. Create Dockerfile with skyeai[google]
 2. Deploy to Cloud Run
 3. Set service account with Google permissions
 4. Cloud Run provides authentication automatically
@@ -184,7 +184,7 @@ def configuration_example():
 Google configuration options:
 
 ```python
-from nimbus.models.registry import provider as create_provider
+from skye.models.registry import provider as create_provider
 
 # Basic configuration
 client = create_provider(
@@ -219,7 +219,7 @@ Authentication methods:
 def main():
     """Run all examples."""
     print("\n" + "🌐 " * 20)
-    print("NIMBUS - Google Provider Examples")
+    print("SKYE - Google Provider Examples")
     print("🌐 " * 20)
     
     try:
@@ -236,7 +236,7 @@ def main():
     except Exception as e:
         print(f"\n❌ Error: {e}")
         print("\nMake sure you have:")
-        print("  1. Installed nimbus[google]: pip install nimbus[google]")
+        print("  1. Installed skyeai[google]: pip install skyeai[google]")
         print("  2. Set GCP_PROJECT_ID environment variable")
         print("  3. Configured GCP authentication (gcloud auth or service account)")
         print("  4. Enabled Google API in your GCP project")

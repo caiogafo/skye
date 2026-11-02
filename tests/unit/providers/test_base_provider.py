@@ -4,10 +4,10 @@ import pytest
 from typing import Any, Iterator
 from datetime import datetime, timezone
 
-from nimbus.models.base import BaseModelProvider
-from nimbus.base.completion import CompletionRequest, CompletionResponse, StreamChunk, TokenUsage
-from nimbus.base.messages import UserMessage
-from nimbus.base.exceptions import ProviderError
+from skye.models.base import BaseModelProvider
+from skye.base.completion import CompletionRequest, CompletionResponse, StreamChunk, TokenUsage
+from skye.base.messages import UserMessage
+from skye.base.exceptions import ProviderError
 
 
 class MockProvider(BaseModelProvider):
@@ -72,11 +72,11 @@ class MockProvider(BaseModelProvider):
         yield {"delta": "response", "finish_reason": "stop"}
     
     def _transform_messages(self, messages: list[Any]) -> list[dict[str, Any]]:
-        """Transform Nimbus messages to mock format."""
+        """Transform Skye messages to mock format."""
         return [{"role": msg.role, "content": msg.content} for msg in messages]
     
     def _transform_capabilities(self, capabilities: list[Any]) -> list[dict[str, Any]]:
-        """Transform Nimbus capabilities to mock tool format."""
+        """Transform Skye capabilities to mock tool format."""
         return [{"name": "mock_tool", "description": "Mock tool"}]
     
     def _extract_capability_calls(self, response: Any) -> list[Any] | None:

@@ -1,4 +1,4 @@
-"""OpenAI Provider Example (Boto3-style Nimbus API).
+"""OpenAI Provider Example (Boto3-style Skye API).
 
 This version demonstrates:
 - Basic completion with messages
@@ -10,8 +10,8 @@ This version demonstrates:
 
 import asyncio
 import os
-from nimbus.models.registry import provider as create_provider
-from nimbus.base.messages import UserMessage, SystemMessage
+from skye.models.registry import provider as create_provider
+from skye.base.messages import UserMessage, SystemMessage
 
 
 def basic_completion():
@@ -129,9 +129,9 @@ def router_example():
 Use RouterRegistry for load balancing across deployments:
 
 ```python
-from nimbus.models.registry import provider as create_provider
-import nimbus.router as rt
-from nimbus.base.messages import UserMessage
+from skye.models.registry import provider as create_provider
+import skye.router as rt
+from skye.base.messages import UserMessage
 
 # Define load balancing setup
 registry = rt.RouterRegistry([
@@ -181,7 +181,7 @@ Benefits:
 def main():
     """Run all examples."""
     print("\n" + "🤖 " * 20)
-    print("NIMBUS - OpenAI Provider Examples")
+    print("SKYE - OpenAI Provider Examples")
     print("🤖 " * 20)
     
     try:
@@ -203,7 +203,7 @@ def main():
     except Exception as e:
         print(f"\n❌ Error: {e}")
         print("\nMake sure you have:")
-        print("  1. Installed nimbus[openai]: pip install nimbus[openai]")
+        print("  1. Installed skyeai[openai]: pip install skyeai[openai]")
         print("  2. Set OPENAI_API_KEY: export OPENAI_API_KEY='sk-...'")
 
 

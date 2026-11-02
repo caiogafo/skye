@@ -19,12 +19,12 @@ from unittest.mock import Mock, patch
 
 import pytest
 
-from nimbus.base.completion import CompletionRequest, CompletionResponse, TokenUsage
-from nimbus.base.exceptions import ProviderError
-from nimbus.base.interfaces.model import ModelInterface
-from nimbus.base.interfaces.router import RoutingStrategy
-from nimbus.base.messages import UserMessage
-from nimbus.router.model_router import (
+from skye.base.completion import CompletionRequest, CompletionResponse, TokenUsage
+from skye.base.exceptions import ProviderError
+from skye.base.interfaces.model import ModelInterface
+from skye.base.interfaces.router import RoutingStrategy
+from skye.base.messages import UserMessage
+from skye.router.model_router import (
     FallbackConfig,
     ModelRouter,
     ModelTarget,
@@ -90,7 +90,7 @@ class FailingMockModel(ModelInterface):
 
     def stream(self, request: CompletionRequest):
         """Stream completion (not implemented for mock)."""
-        from nimbus.base.completion import StreamChunk
+        from skye.base.completion import StreamChunk
 
         yield StreamChunk(delta="Test", model=self.model_id)
 
@@ -100,7 +100,7 @@ class FailingMockModel(ModelInterface):
 
     async def astream(self, request: CompletionRequest):
         """Async stream completion (not implemented for mock)."""
-        from nimbus.base.completion import StreamChunk
+        from skye.base.completion import StreamChunk
 
         yield StreamChunk(delta="Test", model=self.model_id)
 
@@ -152,7 +152,7 @@ class TestFailoverScenarios:
         def make_request(request_id: int):
             """Make a request."""
             try:
-                response = router.route_request(request)
+                response = router.complete(messages=request.messages, model=request.model)
                 with lock:
                     results.append({"id": request_id, "success": True, "model": response.model})
             except Exception as e:
@@ -236,7 +236,7 @@ class TestFailoverScenarios:
         router.set_fallbacks([FallbackConfig(primary="primary", fallbacks=["fallback"])])
 
         # Set allowed fails policy to trigger cooldown quickly
-        from nimbus.router.model_router import AllowedFailsPolicyConfig
+        from skye.router.model_router import AllowedFailsPolicyConfig
 
         router.set_allowed_fails_policy(
             [AllowedFailsPolicyConfig(error_type="ProviderError", allowed_fails_per_minute=1)]
@@ -253,7 +253,7 @@ class TestFailoverScenarios:
         def make_request(request_id: int):
             """Make a request."""
             try:
-                response = router.route_request(request)
+                response = router.complete(messages=request.messages, model=request.model)
                 with lock:
                     results.append({"id": request_id, "success": True})
             except Exception as e:
@@ -338,7 +338,7 @@ class TestFailoverScenarios:
             """Make a request and measure latency."""
             req_start = time.time()
             try:
-                response = router.route_request(request)
+                response = router.complete(messages=request.messages, model=request.model)
                 latency = time.time() - req_start
                 with lock:
                     results.append({"id": request_id, "success": True, "model": response.model})
@@ -430,7 +430,7 @@ class TestFailoverScenarios:
             """Make a request and measure latency."""
             req_start = time.time()
             try:
-                router.route_request(request)
+                router.complete(messages=request.messages, model=request.model)
                 latency = time.time() - req_start
                 with lock:
                     latencies.append(latency)
@@ -510,7 +510,7 @@ class TestFailoverScenarios:
         router.set_fallbacks([FallbackConfig(primary="primary", fallbacks=["fallback"])])
 
         # Set allowed fails policy to trigger cooldown quickly
-        from nimbus.router.model_router import AllowedFailsPolicyConfig
+        from skye.router.model_router import AllowedFailsPolicyConfig
 
         router.set_allowed_fails_policy(
             [AllowedFailsPolicyConfig(error_type="ProviderError", allowed_fails_per_minute=1)]
@@ -527,7 +527,7 @@ class TestFailoverScenarios:
 
         for _ in range(5):
             try:
-                router.route_request(request)
+                router.complete(messages=request.messages, model=request.model)
             except Exception:
                 pass
 
@@ -600,7 +600,7 @@ class TestFailoverScenarios:
                 messages=[UserMessage(content="Test message")], model=model_id
             )
             try:
-                response = router.route_request(request)
+                response = router.complete(messages=request.messages, model=request.model)
                 with lock:
                     results.append(
                         {
@@ -692,7 +692,7 @@ class TestFailoverScenarios:
         def make_request(request_id: int):
             """Make a request."""
             try:
-                response = router.route_request(request)
+                response = router.complete(messages=request.messages, model=request.model)
                 with lock:
                     results.append({"id": request_id, "success": True, "model": response.model})
             except Exception as e:

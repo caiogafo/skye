@@ -19,9 +19,9 @@ Note: Set environment variables for API keys:
 import os
 import json
 import asyncio
-from nimbus.models.registry import provider as create_provider
-from nimbus.base.messages import UserMessage, CapabilityMessage
-from nimbus.tools import capability
+from skye.models.registry import provider as create_provider
+from skye.base.messages import UserMessage, CapabilityMessage
+from skye.tools import capability
 
 
 # Define capabilities using the @capability decorator
@@ -282,7 +282,7 @@ def capability_schema_example():
 async def main():
     """Run all examples."""
     print("\n" + "🔧 " * 20)
-    print("NIMBUS - Local Function Capability Examples")
+    print("SKYE - Local Function Capability Examples")
     print("🔧 " * 20)
     
     try:

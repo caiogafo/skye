@@ -2,8 +2,8 @@
 
 import pytest
 
-from nimbus.tools.interface import CapabilityInterface
-from nimbus.tools.schema import CapabilitySchema
+from skye.tools.interface import CapabilityInterface
+from skye.tools.schema import CapabilitySchema
 
 
 class MockCapability(CapabilityInterface):

@@ -1,6 +1,6 @@
 # Basic Examples
 
-This directory contains basic examples demonstrating core Nimbus concepts.
+This directory contains basic examples demonstrating core Skye concepts.
 
 ## Examples
 
@@ -36,7 +36,7 @@ python examples/basic/streaming_example.py
 ## Key Concepts
 
 - **CompletionRequest**: The main request object for LLM calls
-- **NimbusMessage**: Base message class with UserMessage, AssistantMessage, SystemMessage
+- **SkyeMessage**: Base message class with UserMessage, AssistantMessage, SystemMessage
 - **CompletionResponse**: Response from the model with content and metadata
 - **TokenUsage**: Tracks prompt, completion, and total tokens used
 - **Streaming**: Real-time token-by-token responses

@@ -5,14 +5,14 @@ from typing import Any
 
 import pytest
 
-from nimbus.tools import (
+from skye.tools import (
     CapabilityInterface,
     CapabilityNotFoundError,
     CapabilityRegistry,
     CapabilitySchema,
     CapabilityValidationError,
 )
-from nimbus.base.messages import CapabilityMessage
+from skye.base.messages import CapabilityMessage
 
 
 class MockCapability(CapabilityInterface):

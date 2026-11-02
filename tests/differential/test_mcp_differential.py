@@ -1,6 +1,6 @@
-"""MCP client: BuiltinMCPClient vs FastMCPClient (real fastmcp) against a local fake server (Req 18).
+"""MCP client: BuiltinMCPClient vs FastMCPClient (real fastmcp) against a local fake server (Requirement 14).
 
-Only the subset Nimbus consumes is compared: exact field-subset equality for structured values,
+Only the subset Skye consumes is compared: exact field-subset equality for structured values,
 epsilon for numeric/timing values, category-level equivalence for errors.
 """
 
@@ -10,10 +10,10 @@ import pytest
 
 pytest.importorskip("fastmcp", reason="fastmcp not installed (dev/test dependency group)")
 
-from nimbus.base.exceptions import ProviderError  # noqa: E402
-from nimbus.tools.exceptions import CapabilityExecutionError  # noqa: E402
-from nimbus.tools.mcp_client import BuiltinMCPClient  # noqa: E402
-from nimbus.tools.mcp_fastmcp import FastMCPClient  # noqa: E402
+from skye.base.exceptions import ProviderError  # noqa: E402
+from skye.tools.exceptions import CapabilityExecutionError  # noqa: E402
+from skye.tools.mcp_client import BuiltinMCPClient  # noqa: E402
+from skye.tools.mcp_fastmcp import FastMCPClient  # noqa: E402
 
 EPS = 1e-9
 

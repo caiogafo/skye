@@ -1,7 +1,7 @@
 """Local fake MCP server: stdlib ``http.server`` in a thread, JSON-RPC over HTTP POST.
 
 Stateless (no session id), enough for the built-in client and for the real ``fastmcp`` client
-(``initialize`` handshake + ``notifications/initialized`` + the calls Nimbus makes).
+(``initialize`` handshake + ``notifications/initialized`` + the calls Skye makes).
 """
 
 from __future__ import annotations

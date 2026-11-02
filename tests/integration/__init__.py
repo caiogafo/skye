@@ -1,1 +1,1 @@
-"""Integration tests for Nimbus components."""
+"""Integration tests for Skye components."""

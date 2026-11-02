@@ -1,4 +1,4 @@
-"""Unit tests for Nimbus interfaces.
+"""Unit tests for Skye interfaces.
 
 This module tests all core interfaces to ensure they define the correct
 abstract methods and that implementations must satisfy the interface contracts.
@@ -9,21 +9,21 @@ from typing import Any
 
 import pytest
 
-from nimbus.base.completion import CompletionRequest, CompletionResponse, StreamChunk, TokenUsage
-from nimbus.base.interfaces.capability import CapabilityInterface, CapabilitySchema
-from nimbus.base.interfaces.content_reader import ContentReaderInterface
-from nimbus.base.interfaces.event_handler import EventHandlerInterface
-from nimbus.base.interfaces.memory import MemoryInterface
-from nimbus.base.interfaces.model import ModelInterface
-from nimbus.base.interfaces.observer import EventType, ObserverInterface
-from nimbus.base.interfaces.plugin import PluginInterface
-from nimbus.base.interfaces.prompt import PromptBuilderInterface
-from nimbus.base.interfaces.router import ModelRouterInterface, RoutingStrategy
-from nimbus.base.interfaces.safety import SafetyFilterInterface, SafetyResult
-from nimbus.base.interfaces.storage import StorageAdapterInterface
-from nimbus.base.interfaces.vector_encoder import VectorEncoderInterface
-from nimbus.memory import MemoryEntry
-from nimbus.base.messages import ContentChunk, NimbusMessage, UserMessage
+from skye.base.completion import CompletionRequest, CompletionResponse, StreamChunk, TokenUsage
+from skye.base.interfaces.capability import CapabilityInterface, CapabilitySchema
+from skye.base.interfaces.content_reader import ContentReaderInterface
+from skye.base.interfaces.event_handler import EventHandlerInterface
+from skye.base.interfaces.memory import MemoryInterface
+from skye.base.interfaces.model import ModelInterface
+from skye.base.interfaces.observer import EventType, ObserverInterface
+from skye.base.interfaces.plugin import PluginInterface
+from skye.base.interfaces.prompt import PromptBuilderInterface
+from skye.base.interfaces.router import ModelRouterInterface, RoutingStrategy
+from skye.base.interfaces.safety import SafetyFilterInterface, SafetyResult
+from skye.base.interfaces.storage import StorageAdapterInterface
+from skye.base.interfaces.vector_encoder import VectorEncoderInterface
+from skye.memory import MemoryEntry
+from skye.base.messages import ContentChunk, SkyeMessage, UserMessage
 
 
 class TestModelInterface:
@@ -245,7 +245,7 @@ class TestPromptBuilderInterface:
             self.defaults = {}
             self.allowed_missing = []
 
-        def render(self, template_name: str, variables: dict) -> list[NimbusMessage]:
+        def render(self, template_name: str, variables: dict) -> list[SkyeMessage]:
             template = self.get_template(template_name)
             merged = {**self.defaults, **variables}
             content = template.format(**merged)
@@ -277,7 +277,7 @@ class TestPromptBuilderInterface:
             new_builder.allowed_missing = self.allowed_missing.copy()
             return new_builder
 
-        def invoke(self, template_name: str, variables: dict) -> list[NimbusMessage]:
+        def invoke(self, template_name: str, variables: dict) -> list[SkyeMessage]:
             return self.render(template_name, variables)
 
         def format(self, template_name: str, variables: dict) -> str:
@@ -386,7 +386,7 @@ class TestPromptBuilderInterface:
         """Test that incomplete implementations raise TypeError."""
 
         class IncompleteBuilder(PromptBuilderInterface):
-            def render(self, template_name: str, variables: dict) -> list[NimbusMessage]:
+            def render(self, template_name: str, variables: dict) -> list[SkyeMessage]:
                 pass
 
         with pytest.raises(TypeError, match="Can't instantiate abstract class"):

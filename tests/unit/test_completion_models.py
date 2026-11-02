@@ -4,8 +4,8 @@
 import pytest
 from pydantic import BaseModel, ValidationError
 
-from nimbus.base.completion import CompletionRequest, CompletionResponse, StreamChunk, TokenUsage
-from nimbus.base.messages import UserMessage
+from skye.base.completion import CompletionRequest, CompletionResponse, StreamChunk, TokenUsage
+from skye.base.messages import UserMessage
 
 
 def test_token_usage():
@@ -77,7 +77,7 @@ def test_stream_chunk():
 
 def test_completion_response_capability_calls():
     """Test CompletionResponse with capability calls."""
-    from nimbus.tools.capability_models import CapabilityCall
+    from skye.tools.capability_models import CapabilityCall
 
     usage = TokenUsage(prompt_tokens=50, completion_tokens=20, total_tokens=70)
 
@@ -125,9 +125,9 @@ def test_completion_response_capability_calls():
 @pytest.mark.asyncio
 async def test_completion_response_execute_capability_calls():
     """Test executing capability calls from CompletionResponse without registry."""
-    from nimbus.tools.local_function import LocalFunctionCapability
-    from nimbus.tools.capability_models import CapabilityCall
-    from nimbus.base.messages import CapabilityMessage
+    from skye.tools.local_function import LocalFunctionCapability
+    from skye.tools.capability_models import CapabilityCall
+    from skye.base.messages import CapabilityMessage
 
     # Create a test capability
     def get_weather(location: str) -> dict:
@@ -180,10 +180,10 @@ async def test_completion_response_execute_capability_calls():
 @pytest.mark.asyncio
 async def test_completion_response_execute_capability_calls_error():
     """Test executing capability calls with errors."""
-    from nimbus.tools.local_function import LocalFunctionCapability
-    from nimbus.tools.registry import CapabilityRegistry
-    from nimbus.tools.capability_models import CapabilityCall
-    from nimbus.base.messages import CapabilityMessage
+    from skye.tools.local_function import LocalFunctionCapability
+    from skye.tools.registry import CapabilityRegistry
+    from skye.tools.capability_models import CapabilityCall
+    from skye.base.messages import CapabilityMessage
 
     # Create a test capability that raises an error
     def failing_function(value: str) -> str:
@@ -232,7 +232,7 @@ async def test_completion_response_execute_capability_calls_error():
 @pytest.mark.asyncio
 async def test_completion_response_execute_capability_calls_no_capabilities():
     """Test executing capability calls when response has no capability calls."""
-    from nimbus.tools.registry import CapabilityRegistry
+    from skye.tools.registry import CapabilityRegistry
 
     registry = CapabilityRegistry()
     usage = TokenUsage(prompt_tokens=10, completion_tokens=5, total_tokens=15)
@@ -253,10 +253,10 @@ async def test_completion_response_execute_capability_calls_no_capabilities():
 @pytest.mark.asyncio
 async def test_completion_response_execute_multiple_capability_calls():
     """Test executing multiple capability calls."""
-    from nimbus.tools.local_function import LocalFunctionCapability
-    from nimbus.tools.registry import CapabilityRegistry
-    from nimbus.tools.capability_models import CapabilityCall
-    from nimbus.base.messages import CapabilityMessage
+    from skye.tools.local_function import LocalFunctionCapability
+    from skye.tools.registry import CapabilityRegistry
+    from skye.tools.capability_models import CapabilityCall
+    from skye.base.messages import CapabilityMessage
 
     # Create test capabilities
     def get_weather(location: str) -> dict:
@@ -328,10 +328,10 @@ async def test_completion_response_execute_multiple_capability_calls():
 @pytest.mark.asyncio
 async def test_completion_response_execute_capability_calls_with_overrides():
     """Test executing capability calls with argument overrides."""
-    from nimbus.tools.local_function import LocalFunctionCapability
-    from nimbus.tools.registry import CapabilityRegistry
-    from nimbus.tools.capability_models import CapabilityCall
-    from nimbus.base.messages import CapabilityMessage
+    from skye.tools.local_function import LocalFunctionCapability
+    from skye.tools.registry import CapabilityRegistry
+    from skye.tools.capability_models import CapabilityCall
+    from skye.base.messages import CapabilityMessage
 
     # Create a test capability
     def get_weather(location: str, units: str = "fahrenheit") -> dict:

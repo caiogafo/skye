@@ -5,7 +5,7 @@ from unittest.mock import patch
 
 import pytest
 
-from nimbus.models.lazy_import import LazyImporter
+from skye.models.lazy_import import LazyImporter
 
 
 class TestLazyImporter:
@@ -27,7 +27,7 @@ class TestLazyImporter:
         error_message = str(exc_info.value)
         assert "nonexistent_module_xyz" in error_message
         assert "pip install nonexistent_module_xyz" in error_message
-        assert "pip install nimbus[nonexistent_module_xyz]" in error_message
+        assert "pip install skyeai[nonexistent_module_xyz]" in error_message
 
     def test_import_module_with_custom_package_name(self):
         """Test import with custom package name in error message."""
@@ -51,7 +51,7 @@ class TestLazyImporter:
 
         error_message = str(exc_info.value)
         assert "fake_module" in error_message
-        assert "pip install nimbus[custom-extra]" in error_message
+        assert "pip install skyeai[custom-extra]" in error_message
 
     def test_import_module_with_both_custom_names(self):
         """Test import with both custom package name and install extra."""
@@ -65,7 +65,7 @@ class TestLazyImporter:
         error_message = str(exc_info.value)
         assert "fake_module" in error_message
         assert "pip install real-package" in error_message
-        assert "pip install nimbus[custom-extra]" in error_message
+        assert "pip install skyeai[custom-extra]" in error_message
 
     def test_is_available_for_existing_module(self):
         """Test is_available returns True for existing modules."""
@@ -127,7 +127,7 @@ class TestLazyImporter:
         assert "test_module" in error_message
         assert "not installed" in error_message
         assert "pip install test-package" in error_message
-        assert "pip install nimbus[test-extra]" in error_message
+        assert "pip install skyeai[test-extra]" in error_message
 
 
 class TestLazyImporterLambdaEnvironment:
@@ -151,7 +151,7 @@ class TestLazyImporterLambdaEnvironment:
 
             error_message = str(exc_info.value)
             assert "boto3" in error_message
-            assert "pip install nimbus[bedrock]" in error_message
+            assert "pip install skyeai[bedrock]" in error_message
 
     def test_other_providers_fail_gracefully_without_sdks(self):
         """Test that other providers fail gracefully when SDKs are missing."""
@@ -169,7 +169,7 @@ class TestLazyImporterLambdaEnvironment:
 
                 error_message = str(exc_info.value)
                 assert module_name in error_message
-                assert f"pip install nimbus[{extra_name}]" in error_message
+                assert f"pip install skyeai[{extra_name}]" in error_message
 
     @patch("sys.modules", new_callable=dict)
     def test_detects_preloaded_module(self, mock_sys_modules):
@@ -217,7 +217,7 @@ class TestLazyImporterLambdaEnvironment:
 
             error_message = str(exc_info.value)
             assert "boto3" in error_message
-            assert "pip install nimbus[bedrock]" in error_message
+            assert "pip install skyeai[bedrock]" in error_message
 
     def test_providers_without_sdks_fail_gracefully(self):
         """Test that providers fail gracefully when their SDKs are not installed.
@@ -243,4 +243,4 @@ class TestLazyImporterLambdaEnvironment:
             error_message = str(exc_info.value)
             assert module_name in error_message
             assert "not installed" in error_message
-            assert f"pip install nimbus[{extra_name}]" in error_message
+            assert f"pip install skyeai[{extra_name}]" in error_message

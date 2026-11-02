@@ -1,4 +1,4 @@
-"""Few-shot learning examples for Nimbus Prompts Support.
+"""Few-shot learning examples for Skye Prompts Support.
 
 This script demonstrates the few-shot learning capabilities:
 - Adding examples to templates
@@ -7,7 +7,7 @@ This script demonstrates the few-shot learning capabilities:
 - Dynamic example selection based on input
 """
 
-from nimbus.prompts import MockPromptBuilder
+from skye.prompts import MockPromptBuilder
 
 
 def basic_few_shot_example():
@@ -285,7 +285,7 @@ Answer: {answer}
 
 def main():
     """Run all few-shot learning examples."""
-    print("Nimbus Prompts Support - Few-Shot Learning Examples")
+    print("Skye Prompts Support - Few-Shot Learning Examples")
     print("=" * 55)
     
     basic_few_shot_example()

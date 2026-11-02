@@ -1,4 +1,4 @@
-# Nimbus Prompts Examples Status - UPDATED
+# Skye Prompts Examples Status - UPDATED
 
 ## 🎉 SIGNIFICANT IMPROVEMENT: 73% Success Rate!
 
@@ -57,7 +57,7 @@
 ## Key Fixes Applied 🔧
 
 ### 1. **MockPromptBuilder Alias** ✅
-- **File**: `src/nimbus/prompts/__init__.py`
+- **File**: `src/skye/prompts/__init__.py`
 - **Change**: Added `MockPromptBuilder = BasePromptBuilder`
 - **Impact**: Fixed 3 examples
 
@@ -102,4 +102,4 @@ All 3 remaining broken examples fail due to **complex Jinja2 syntax** that the c
 ✅ **73% success rate** - highly usable system  
 ❌ **3 examples** need Jinja2 dependency for advanced features  
 
-The Nimbus prompts system is **production-ready** for most use cases!
+The Skye prompts system is **production-ready** for most use cases!

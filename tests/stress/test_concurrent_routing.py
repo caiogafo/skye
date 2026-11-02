@@ -20,12 +20,12 @@ from unittest.mock import Mock, patch
 
 import pytest
 
-from nimbus.base.completion import CompletionRequest, CompletionResponse, TokenUsage
-from nimbus.base.exceptions import ProviderError
-from nimbus.base.interfaces.model import ModelInterface
-from nimbus.base.interfaces.router import RoutingStrategy
-from nimbus.base.messages import AssistantMessage, UserMessage
-from nimbus.router.model_router import ModelRouter, ModelTarget, RouteConfig
+from skye.base.completion import CompletionRequest, CompletionResponse, TokenUsage
+from skye.base.exceptions import ProviderError
+from skye.base.interfaces.model import ModelInterface
+from skye.base.interfaces.router import RoutingStrategy
+from skye.base.messages import AssistantMessage, UserMessage
+from skye.router.model_router import ModelRouter, ModelTarget, RouteConfig
 
 
 class MockModel(ModelInterface):
@@ -91,7 +91,7 @@ class MockModel(ModelInterface):
 
     def stream(self, request: CompletionRequest):
         """Stream completion (not implemented for mock)."""
-        from nimbus.base.completion import StreamChunk
+        from skye.base.completion import StreamChunk
 
         yield StreamChunk(delta="Test", model=self.model_id)
 
@@ -103,7 +103,7 @@ class MockModel(ModelInterface):
 
     async def astream(self, request: CompletionRequest):
         """Async stream completion (not implemented for mock)."""
-        from nimbus.base.completion import StreamChunk
+        from skye.base.completion import StreamChunk
 
         yield StreamChunk(delta="Test", model=self.model_id)
 
@@ -158,7 +158,7 @@ class TestConcurrentRouting:
             """Make a single request and track result."""
             req_start = time.time()
             try:
-                response = router.route_request(request)
+                response = router.complete(messages=request.messages, model=request.model)
                 latency = time.time() - req_start
                 results.append(
                     {
@@ -236,7 +236,7 @@ class TestConcurrentRouting:
 
         # Verify no race conditions - active requests should be 0 after all complete
         for model_id in ["model-1", "model-2", "model-3"]:
-            active = router.rate_limits[model_id].active_requests
+            active = router.get_usage_stats(model_id).active_requests
             assert active == 0, f"Model {model_id} has {active} active requests after completion"
 
     def test_concurrent_routing_with_rate_limits(self):
@@ -274,7 +274,7 @@ class TestConcurrentRouting:
         def make_request(request_id: int):
             """Make a single request."""
             try:
-                response = router.route_request(request)
+                response = router.complete(messages=request.messages, model=request.model)
                 results.append({"id": request_id, "model": response.model})
             except ProviderError as e:
                 if "rate limit" in str(e).lower() or "no available" in str(e).lower():
@@ -359,7 +359,7 @@ class TestConcurrentRouting:
             """Monitor active request counts."""
             while not stop_monitoring.is_set():
                 for model_id in ["model-1", "model-2"]:
-                    active = router.rate_limits[model_id].active_requests
+                    active = router.get_usage_stats(model_id).active_requests
                     active_counts_during.append((model_id, active))
                 time.sleep(0.001)  # Check every 1ms
 
@@ -371,7 +371,7 @@ class TestConcurrentRouting:
         def make_request(request_id: int):
             """Make a request."""
             try:
-                router.route_request(request)
+                router.complete(messages=request.messages, model=request.model)
             except Exception:
                 pass  # Ignore errors for this test
 
@@ -391,7 +391,7 @@ class TestConcurrentRouting:
 
         # Verify final state
         for model_id in ["model-1", "model-2"]:
-            active = router.rate_limits[model_id].active_requests
+            active = router.get_usage_stats(model_id).active_requests
             assert active == 0, f"{model_id} has {active} active requests (should be 0)"
 
             # Verify health metrics are consistent
@@ -456,7 +456,7 @@ class TestConcurrentRouting:
                 """Make a request."""
                 try:
                     req_start = time.time()
-                    response = router.route_request(request)
+                    response = router.complete(messages=request.messages, model=request.model)
                     latency = time.time() - req_start
                     results.append({"id": request_id, "latency": latency, "model": response.model})
                 except Exception as e:
@@ -534,7 +534,7 @@ class TestConcurrentRouting:
         def make_request(request_id: int):
             """Make a request."""
             try:
-                response = router.route_request(request)
+                response = router.complete(messages=request.messages, model=request.model)
                 results.append({"id": request_id, "success": True, "model": response.model})
             except Exception as e:
                 results.append({"id": request_id, "success": False, "error": str(e)})
@@ -610,7 +610,7 @@ class TestConcurrentRouting:
         def make_request(request_id: int):
             """Make a request."""
             try:
-                router.route_request(request)
+                router.complete(messages=request.messages, model=request.model)
             except Exception:
                 pass
 

@@ -1,6 +1,6 @@
 name: budgets
 
-# Size and load budgets for Nimbus (see budgets.toml and docs/budgets.md).
+# Size and load budgets for Skye (see budgets.toml and docs/budgets.md).
 # A pull request that makes the library heavier, slower to load, or dependent on a
 # compiled package fails here.
 
@@ -60,10 +60,10 @@ jobs:
       - run: uv sync --group dev --python 3.13
       - name: Install into clean environments and measure
         env:
-          NIMBUS_BUDGET_REPORT: ${{ runner.temp }}/budget-report.md
+          SKYE_BUDGET_REPORT: ${{ runner.temp }}/budget-report.md
         run: |
-          echo "| what | packages / modules | size / time | memory / compiled |" >> "$NIMBUS_BUDGET_REPORT"
-          echo "|---|---|---|---|" >> "$NIMBUS_BUDGET_REPORT"
+          echo "| what | packages / modules | size / time | memory / compiled |" >> "$SKYE_BUDGET_REPORT"
+          echo "|---|---|---|---|" >> "$SKYE_BUDGET_REPORT"
           uv run --python 3.13 pytest tests/budget -m budget -q -k "${{ matrix.target }}"
       - name: Job summary
         if: always()

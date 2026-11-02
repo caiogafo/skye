@@ -1,1 +1,1 @@
-"""Test suite for Nimbus."""
+"""Test suite for Skye."""

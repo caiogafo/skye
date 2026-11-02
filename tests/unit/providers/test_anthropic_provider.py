@@ -11,14 +11,15 @@ Tests cover:
 
 from datetime import datetime, timezone
 from typing import Any
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import Mock, patch
 
 import pytest
 
-from nimbus.base.completion import CompletionRequest, CompletionResponse, StreamChunk, TokenUsage
-from nimbus.base.exceptions import ProviderError
-from nimbus.base.messages import AssistantMessage, SystemMessage, UserMessage
-from nimbus.models.llm.anthropic import AnthropicProvider
+from skye.base.completion import CompletionRequest, CompletionResponse, StreamChunk, TokenUsage
+from skye.base.exceptions import ProviderError
+from skye.base.messages import AssistantMessage, SystemMessage, UserMessage
+from skye.models.llm.anthropic import AnthropicProvider
+from skye.models.transport.rest import JsonObject
 
 
 class TestAnthropicProviderInitialization:
@@ -29,23 +30,28 @@ class TestAnthropicProviderInitialization:
         provider = AnthropicProvider(model="claude-3-opus-20240229", api_key="sk-ant-test")
         assert provider.api_key == "sk-ant-test"
     
-    @patch("nimbus.models.llm.anthropic.LazyImporter.import_module")
-    def test_lazy_client_initialization(self, mock_import: Mock) -> None:
-        """Test that client is lazily initialized."""
-        mock_anthropic = MagicMock()
-        mock_import.return_value = mock_anthropic
-        
+    def test_no_sdk_client(self) -> None:
+        """No vendor SDK client is created; the REST transport is used."""
         provider = AnthropicProvider(model="claude-3-opus-20240229", api_key="sk-ant-test")
-        
-        # Client should not be initialized yet
-        mock_import.assert_not_called()
-        
-        # Access client to trigger initialization
-        _ = provider.client
-        
-        # Now it should be initialized
-        mock_import.assert_called_once_with("anthropic", install_extra="anthropic")
-        mock_anthropic.Anthropic.assert_called_once_with(api_key="sk-ant-test")
+        assert provider.client is None
+
+    def test_api_base_override(self) -> None:
+        provider = AnthropicProvider(model="m", api_key="k", api_base="http://localhost:9/")
+        assert provider._url == "http://localhost:9/v1/messages"
+
+    def test_modules_import_no_anthropic(self) -> None:
+        import ast
+        import inspect
+
+        from skye.models.llm import anthropic as mod
+
+        for node in ast.walk(ast.parse(inspect.getsource(mod))):
+            if isinstance(node, ast.Import):
+                assert all(a.name.split(".")[0] != "anthropic" for a in node.names)
+            elif isinstance(node, ast.ImportFrom):
+                assert (node.module or "").split(".")[0] != "anthropic"
+            elif isinstance(node, ast.Constant) and isinstance(node.value, str):
+                pass
 
 
 class TestAnthropicRequestTransformation:
@@ -364,184 +370,105 @@ class TestAnthropicStreamTransformation:
         assert result.finish_reason is None
 
 
+URL = "https://api.anthropic.com/v1/messages"
+POST = "skye.models.transport.rest.post_json"
+STREAM = "skye.models.transport.rest.stream_sse_json"
+
+
+def _msg(blocks: list[dict[str, Any]], stop: str = "end_turn", i: int = 10, o: int = 5) -> JsonObject:
+    return JsonObject({
+        "id": "msg_123", "model": "claude-3-opus-20240229", "type": "message",
+        "role": "assistant", "content": blocks, "stop_reason": stop,
+        "stop_sequence": None, "usage": {"input_tokens": i, "output_tokens": o},
+    })
+
+
+def _text(t: str) -> dict[str, Any]:
+    return {"type": "text", "text": t}
+
+
 class TestAnthropicProviderCalls:
-    """Test actual provider API calls."""
-    
-    @patch("nimbus.models.llm.anthropic.LazyImporter.import_module")
-    def test_complete_success(self, mock_import: Mock) -> None:
-        """Test successful completion call."""
-        # Setup mocks
-        mock_anthropic = MagicMock()
-        mock_import.return_value = mock_anthropic
-        
-        mock_client = Mock()
-        mock_anthropic.Anthropic.return_value = mock_client
-        
-        # Mock response
-        mock_response = Mock()
-        mock_response.id = "msg_123"
-        mock_response.model = "claude-3-opus-20240229"
-        mock_response.stop_reason = "end_turn"
-        mock_response.stop_sequence = None
-        
-        mock_content = Mock()
-        mock_content.type = "text"
-        mock_content.text = "Test response"
-        mock_response.content = [mock_content]
-        
-        mock_usage = Mock()
-        mock_usage.input_tokens = 10
-        mock_usage.output_tokens = 5
-        mock_response.usage = mock_usage
-        
-        mock_client.messages.create.return_value = mock_response
-        
-        # Execute
-        provider = AnthropicProvider(model="claude-3-opus-20240229", api_key="sk-ant-test")
-        request = CompletionRequest(
-            messages=[UserMessage(content="Hello")],
-            model="claude-3-opus-20240229"
-        )
-        
-        result = provider.complete(request)
-        
-        # Verify
+    """Test actual provider API calls over the stdlib REST transport."""
+
+    def test_complete_success(self) -> None:
+        with patch(POST, return_value=_msg([_text("Test response")])) as post:
+            provider = AnthropicProvider(model="claude-3-opus-20240229", api_key="sk-ant-test")
+            result = provider.complete(CompletionRequest(
+                messages=[UserMessage(content="Hello")], model="claude-3-opus-20240229"
+            ))
+
         assert isinstance(result, CompletionResponse)
         assert result.content == "Test response"
         assert result.provider == "anthropic"
-        mock_client.messages.create.assert_called_once()
-    
-    @patch("nimbus.models.llm.anthropic.LazyImporter.import_module")
-    def test_complete_error_handling(self, mock_import: Mock) -> None:
-        """Test error handling in complete."""
-        # Setup mocks
-        mock_anthropic = MagicMock()
-        mock_import.return_value = mock_anthropic
-        
-        mock_client = Mock()
-        mock_anthropic.Anthropic.return_value = mock_client
-        
-        # Mock error
-        mock_client.messages.create.side_effect = Exception("API Error")
-        
-        # Execute and verify error
-        provider = AnthropicProvider(model="claude-3-opus-20240229", api_key="sk-ant-test")
-        request = CompletionRequest(
-            messages=[UserMessage(content="Hello")],
-            model="claude-3-opus-20240229"
-        )
-        
-        with pytest.raises(ProviderError) as exc_info:
-            provider.complete(request)
-        
+        assert result.usage.total_tokens == 15
+        post.assert_called_once()
+        assert post.call_args.args[0] == URL
+        headers = post.call_args.kwargs["headers"]
+        assert headers["x-api-key"] == "sk-ant-test"
+        assert headers["anthropic-version"] == "2023-06-01"
+        payload = post.call_args.args[1]
+        assert payload["model"] == "claude-3-opus-20240229"
+        assert payload["messages"] == [{"role": "user", "content": "Hello"}]
+        assert payload["max_tokens"] == 4096
+
+    def test_complete_error_handling(self) -> None:
+        with patch(POST, side_effect=Exception("API Error")):
+            provider = AnthropicProvider(model="claude-3-opus-20240229", api_key="sk-ant-test")
+            request = CompletionRequest(
+                messages=[UserMessage(content="Hello")], model="claude-3-opus-20240229"
+            )
+            with pytest.raises(ProviderError) as exc_info:
+                provider.complete(request)
+
         assert "Provider call failed" in str(exc_info.value)
         assert exc_info.value.details["provider"] == "anthropic"
-    
-    @patch("nimbus.models.llm.anthropic.LazyImporter.import_module")
-    def test_stream_success(self, mock_import: Mock) -> None:
-        """Test successful streaming call."""
-        # Setup mocks
-        mock_anthropic = MagicMock()
-        mock_import.return_value = mock_anthropic
-        
-        mock_client = Mock()
-        mock_anthropic.Anthropic.return_value = mock_client
-        
-        # Mock stream events
-        mock_events = []
-        for i, text in enumerate(["Hello", " ", "world"]):
-            mock_event = Mock()
-            mock_event.type = "content_block_delta"
-            mock_event.message_id = "msg_123"
-            mock_event.index = i
-            mock_event.delta = Mock()
-            mock_event.delta.text = text
-            mock_events.append(mock_event)
-        
-        # Add final event
-        mock_final = Mock()
-        mock_final.type = "message_delta"
-        mock_final.message_id = "msg_123"
-        mock_final.index = 3
-        mock_final.delta = Mock()
-        mock_final.delta.stop_reason = "end_turn"
-        mock_events.append(mock_final)
-        
-        # Mock stream context manager
-        mock_stream = Mock()
-        mock_stream.__enter__ = Mock(return_value=iter(mock_events))
-        mock_stream.__exit__ = Mock(return_value=False)
-        mock_client.messages.stream.return_value = mock_stream
-        
-        # Execute
-        provider = AnthropicProvider(model="claude-3-opus-20240229", api_key="sk-ant-test")
-        request = CompletionRequest(
-            messages=[UserMessage(content="Hello")],
-            model="claude-3-opus-20240229",
-            stream=True
-        )
-        
-        chunks = list(provider.stream(request))
-        
-        # Verify
-        assert len(chunks) == 4
-        assert chunks[0].delta == "Hello"
-        assert chunks[1].delta == " "
-        assert chunks[2].delta == "world"
-        assert chunks[3].finish_reason == "end_turn"
+
+    def test_stream_success(self) -> None:
+        events = [
+            JsonObject({"type": "message_start", "message": {"id": "msg_123"}}),
+            *(
+                JsonObject({"type": "content_block_delta", "index": i,
+                            "delta": {"type": "text_delta", "text": t}})
+                for i, t in enumerate(["Hello", " ", "world"])
+            ),
+            JsonObject({"type": "message_delta", "delta": {"stop_reason": "end_turn"}}),
+        ]
+        with patch(STREAM, return_value=iter(events)) as stream:
+            provider = AnthropicProvider(model="claude-3-opus-20240229", api_key="sk-ant-test")
+            chunks = list(provider.stream(CompletionRequest(
+                messages=[UserMessage(content="Hello")],
+                model="claude-3-opus-20240229", stream=True,
+            )))
+
+        assert stream.call_args.args[0] == URL
+        assert stream.call_args.args[1]["stream"] is True
+        assert stream.call_args.kwargs["headers"]["x-api-key"] == "sk-ant-test"
+        assert [c.delta for c in chunks[1:4]] == ["Hello", " ", "world"]
+        assert all(isinstance(c, StreamChunk) for c in chunks)
+        assert chunks[-1].finish_reason == "end_turn"
+
+    def test_transform_stream_chunk_missing_attrs(self) -> None:
+        provider = AnthropicProvider(model="m", api_key="k")
+        chunk = provider._transform_stream_chunk(JsonObject({"type": "ping"}))
+        assert chunk.delta == ""
+        assert chunk.finish_reason is None
 
 
 class TestAnthropicAsyncSupport:
     """Test async completion support."""
-    
+
     @pytest.mark.asyncio
-    @patch("nimbus.models.llm.anthropic.LazyImporter.import_module")
-    async def test_acomplete_success(self, mock_import: Mock) -> None:
-        """Test successful async completion."""
-        # Setup mocks
-        mock_anthropic = MagicMock()
-        mock_import.return_value = mock_anthropic
-        
-        # Mock async client
-        mock_async_client = Mock()
-        mock_anthropic.AsyncAnthropic.return_value = mock_async_client
-        
-        # Mock response
-        mock_response = Mock()
-        mock_response.id = "msg_123"
-        mock_response.model = "claude-3-opus-20240229"
-        mock_response.stop_reason = "end_turn"
-        mock_response.stop_sequence = None
-        
-        mock_content = Mock()
-        mock_content.type = "text"
-        mock_content.text = "Async response"
-        mock_response.content = [mock_content]
-        
-        mock_usage = Mock()
-        mock_usage.input_tokens = 10
-        mock_usage.output_tokens = 5
-        mock_response.usage = mock_usage
-        
-        # Make the create method async
-        async def async_create(**kwargs: Any) -> Any:
-            return mock_response
-        
-        mock_async_client.messages.create = async_create
-        
-        # Execute
-        provider = AnthropicProvider(model="claude-3-opus-20240229", api_key="sk-ant-test")
-        request = CompletionRequest(
-            messages=[UserMessage(content="Hello")],
-            model="claude-3-opus-20240229"
-        )
-        
-        result = await provider.acomplete(request)
-        
-        # Verify
+    async def test_acomplete_success(self) -> None:
+        with patch(POST, return_value=_msg([_text("Async response")])) as post:
+            provider = AnthropicProvider(model="claude-3-opus-20240229", api_key="sk-ant-test")
+            result = await provider.acomplete(CompletionRequest(
+                messages=[UserMessage(content="Hello")], model="claude-3-opus-20240229"
+            ))
+
         assert isinstance(result, CompletionResponse)
         assert result.content == "Async response"
         assert result.provider == "anthropic"
+        assert post.call_args.args[0] == URL
 
 
 class TestAnthropicModelInfo:
@@ -804,17 +731,8 @@ class TestAnthropicToolCalling:
         assert result["tools"][0]["name"] == "get_weather"
         assert result["tools"][1]["name"] == "get_time"
     
-    @patch("nimbus.models.llm.anthropic.LazyImporter.import_module")
-    def test_complete_with_capability_calls(self, mock_import: Mock) -> None:
+    def test_complete_with_capability_calls(self) -> None:
         """Test end-to-end completion with capability calls."""
-        # Setup mocks
-        mock_anthropic = MagicMock()
-        mock_import.return_value = mock_anthropic
-        
-        mock_client = Mock()
-        mock_anthropic.Anthropic.return_value = mock_client
-        
-        # Mock capability
         mock_capability = Mock()
         mock_schema = Mock()
         mock_schema.name = "get_weather"
@@ -825,47 +743,24 @@ class TestAnthropicToolCalling:
             "required": ["location"]
         }
         mock_capability.get_schema.return_value = mock_schema
-        
-        # Mock response with tool use
-        mock_response = Mock()
-        mock_response.id = "msg_123"
-        mock_response.model = "claude-3-opus-20240229"
-        mock_response.stop_reason = "tool_use"
-        mock_response.stop_sequence = None
-        
-        mock_tool_use = Mock()
-        mock_tool_use.type = "tool_use"
-        mock_tool_use.id = "toolu_123"
-        mock_tool_use.name = "get_weather"
-        mock_tool_use.input = {"location": "Boston"}
-        
-        mock_response.content = [mock_tool_use]
-        
-        mock_usage = Mock()
-        mock_usage.input_tokens = 40
-        mock_usage.output_tokens = 15
-        mock_response.usage = mock_usage
-        
-        mock_client.messages.create.return_value = mock_response
-        
-        # Execute
-        provider = AnthropicProvider(model="claude-3-opus-20240229", api_key="sk-ant-test")
-        request = CompletionRequest(
-            messages=[UserMessage(content="What's the weather in Boston?")],
-            model="claude-3-opus-20240229",
-            capabilities=[mock_capability],
-            capability_choice="auto"
-        )
-        
-        result = provider.complete(request)
-        
-        # Verify
+
+        response = _msg([{"type": "tool_use", "id": "toolu_123", "name": "get_weather",
+                          "input": {"location": "Boston"}}], stop="tool_use", i=40, o=15)
+        with patch(POST, return_value=response) as post:
+            provider = AnthropicProvider(model="claude-3-opus-20240229", api_key="sk-ant-test")
+            result = provider.complete(CompletionRequest(
+                messages=[UserMessage(content="What's the weather in Boston?")],
+                model="claude-3-opus-20240229",
+                capabilities=[mock_capability],
+                capability_choice="auto"
+            ))
+
         assert result.finish_reason == "tool_use"
         assert result.has_capability_calls()
         assert len(result.capability_calls) == 1
         assert result.capability_calls[0].name == "get_weather"
-        
-        # Verify the API was called with tools
-        call_args = mock_client.messages.create.call_args
-        assert "tools" in call_args[1]
-        assert call_args[1]["tool_choice"] == {"type": "auto"}
+        assert result.capability_calls[0].arguments == {"location": "Boston"}
+
+        payload = post.call_args.args[1]
+        assert payload["tools"][0]["name"] == "get_weather"
+        assert payload["tool_choice"] == {"type": "auto"}

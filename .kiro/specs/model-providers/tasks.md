@@ -7,7 +7,7 @@ This implementation plan breaks down the development of the Model Providers comp
 ## Task List
 
 - [x] 1. Set up provider package structure
-  - Create src/nimbus/providers/ directory structure
+  - Create src/skye/providers/ directory structure
   - Create __init__.py files for all subdirectories
   - Update pyproject.toml with provider-specific optional dependencies
   - Add openai, anthropic, bedrock, azure, vertex, cohere extras
@@ -26,7 +26,7 @@ This implementation plan breaks down the development of the Model Providers comp
     - Write unit test in tests/unit/test_lazy_import.py
     - Test successful imports, missing modules, and error messages
     - Run with `uv run pytest tests/unit/test_lazy_import.py -v`
-    - Verify with `uv run python -c "from nimbus.providers.lazy_import import LazyImporter; print('OK')"`
+    - Verify with `uv run python -c "from skye.providers.lazy_import import LazyImporter; print('OK')"`
     - _Requirements: 1.3, 1.4, 1.5, 12.1, 12.2, 12.3, 12.4_
   
   - [x] 2.2 Test lazy loading in Lambda-like environment
@@ -93,7 +93,7 @@ This implementation plan breaks down the development of the Model Providers comp
     - Test message overhead calculations
     - Test fallback tokenizer
     - Run with `uv run pytest tests/unit/test_token_counter.py -v`
-    - Verify with `uv run python -c "from nimbus.providers.token_counter import TokenCounter; print(TokenCounter.count_tokens('hello', 'gpt-4'))"`
+    - Verify with `uv run python -c "from skye.providers.token_counter import TokenCounter; print(TokenCounter.count_tokens('hello', 'gpt-4'))"`
     - _Requirements: 8.1, 8.5_
   
   - [x] 5.2 Create CostCalculator utility
@@ -182,7 +182,7 @@ This implementation plan breaks down the development of the Model Providers comp
     - Test structured outputs
     - Test function calling
     - Run with `uv run pytest tests/unit/providers/test_openai_provider.py -v`
-    - Verify with `uv run python -c "from nimbus.providers.openai_provider import OpenAIProvider; print('OK')"`
+    - Verify with `uv run python -c "from skye.providers.openai_provider import OpenAIProvider; print('OK')"`
     - _Requirements: 2.1, 2.2, 2.3, 2.4, 2.5, 5.1, 5.2, 5.3, 5.4, 5.5, 6.1, 6.2, 6.3, 6.4, 6.5_
   
   - [ ]* 8.2 Write OpenAI integration tests
@@ -462,7 +462,7 @@ This implementation plan breaks down the development of the Model Providers comp
     - _Requirements: 10.1, 10.2, 10.5_
   
   - [x] 16.2 Configure package exports
-    - Export ProviderRegistry from nimbus.providers
+    - Export ProviderRegistry from skye.providers
     - Export all provider classes
     - Export utility classes (TokenCounter, CostCalculator, ImageHandler)
     - Export LazyImporter
@@ -471,7 +471,7 @@ This implementation plan breaks down the development of the Model Providers comp
     - Test that all expected symbols are importable
     - Test that __all__ is properly defined
     - Run with `uv run pytest tests/unit/test_provider_exports.py -v`
-    - Verify with `uv run python -c "from nimbus.providers import ProviderRegistry, OpenAIProvider; print('OK')"`
+    - Verify with `uv run python -c "from skye.providers import ProviderRegistry, OpenAIProvider; print('OK')"`
     - _Requirements: All_
 
 - [x] 17. Write documentation and examples
@@ -500,11 +500,11 @@ This implementation plan breaks down the development of the Model Providers comp
     - _Requirements: All_
   
   - [x] 17.3 Add type hints verification
-    - Run mypy on all provider code with `uv run mypy src/nimbus/providers --strict`
+    - Run mypy on all provider code with `uv run mypy src/skye/providers --strict`
     - Fix any type hint issues
     - Add mypy to Makefile check target for providers
     - Create test script tests/test_provider_type_hints.sh
-    - Run with `uv run mypy src/nimbus/providers --strict`
+    - Run with `uv run mypy src/skye/providers --strict`
     - _Requirements: All_
 
 - [ ]* 18. Write comprehensive integration tests
@@ -533,10 +533,10 @@ This implementation plan breaks down the development of the Model Providers comp
 All Python commands should be run using UV:
 - **Testing**: `uv run pytest tests/unit/providers/ -v`
 - **Integration tests**: `uv run pytest tests/integration/providers/ -v -m integration`
-- **Type checking**: `uv run mypy src/nimbus/providers --strict`
-- **Linting**: `uv run ruff check src/nimbus/providers tests/`
-- **Formatting**: `uv run black src/nimbus/providers tests/`
-- **Quick validation**: `uv run python -c "from nimbus.providers import ProviderRegistry; print(ProviderRegistry.list_model_providers())"`
+- **Type checking**: `uv run mypy src/skye/providers --strict`
+- **Linting**: `uv run ruff check src/skye/providers tests/`
+- **Formatting**: `uv run black src/skye/providers tests/`
+- **Quick validation**: `uv run python -c "from skye.providers import ProviderRegistry; print(ProviderRegistry.list_model_providers())"`
 - **Running examples**: `uv run python examples/providers/openai_example.py`
 
 ### MCP Reference Implementation
@@ -594,7 +594,7 @@ export COHERE_API_KEY="..."
 
 ### Dependencies
 
-**Base Dependencies** (always installed with nimbus):
+**Base Dependencies** (always installed with skye):
 - pydantic>=2.0
 - pyyaml>=6.0
 - tenacity>=8.0 (for retry logic)
@@ -621,9 +621,9 @@ all-providers = ["openai>=1.0", "anthropic>=0.25", "boto3>=1.28", "azure-ai-infe
 - All public APIs must have docstrings
 - Follow PEP 8 style guidelines (enforced by black and ruff)
 - Maintain test coverage above 80% for non-optional tests
-- Run `uv run mypy src/nimbus/providers --strict` before committing
-- Use `uv run black src/nimbus/providers tests/` to format code
-- Use `uv run ruff check src/nimbus/providers tests/` to lint code
+- Run `uv run mypy src/skye/providers --strict` before committing
+- Use `uv run black src/skye/providers tests/` to format code
+- Use `uv run ruff check src/skye/providers tests/` to lint code
 
 ### Quick Validation Commands
 
@@ -631,22 +631,22 @@ After implementing each task, use these UV commands to validate:
 
 ```bash
 # Import validation
-uv run python -c "from nimbus.providers import ProviderRegistry, OpenAIProvider; print('OK')"
+uv run python -c "from skye.providers import ProviderRegistry, OpenAIProvider; print('OK')"
 
 # Type checking
-uv run mypy src/nimbus/providers --strict
+uv run mypy src/skye/providers --strict
 
 # Run tests
 uv run pytest tests/unit/providers/ -v
 
 # Code formatting
-uv run black src/nimbus/providers tests/ --check
+uv run black src/skye/providers tests/ --check
 
 # Linting
-uv run ruff check src/nimbus/providers tests/
+uv run ruff check src/skye/providers tests/
 
 # Full validation
-uv run pytest tests/unit/providers/ && uv run mypy src/nimbus/providers --strict && uv run ruff check src/nimbus/providers tests/
+uv run pytest tests/unit/providers/ && uv run mypy src/skye/providers --strict && uv run ruff check src/skye/providers tests/
 ```
 
 ### Lambda Deployment Notes
@@ -698,7 +698,7 @@ uv run pytest tests/unit/providers/test_openai_provider.py -v
 uv run pytest tests/unit/providers/ -v
 
 # Run with coverage
-uv run pytest tests/unit/providers/ --cov=src/nimbus/providers --cov-report=term-missing
+uv run pytest tests/unit/providers/ --cov=src/skye/providers --cov-report=term-missing
 ```
 
 **Test Quality Standards**:

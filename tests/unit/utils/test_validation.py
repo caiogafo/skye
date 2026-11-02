@@ -5,11 +5,11 @@ from abc import ABC, abstractmethod
 import pytest
 from pydantic import BaseModel, Field
 
-from nimbus.base.completion import CompletionRequest
-from nimbus.base.exceptions import ValidationError
-from nimbus.base.interfaces import ModelInterface
-from nimbus.base.messages import AssistantMessage, ContentChunk, UserMessage
-from nimbus.utils.validation import generate_schema, validate_interface_compliance
+from skye.base.completion import CompletionRequest
+from skye.base.exceptions import ValidationError
+from skye.base.interfaces import ModelInterface
+from skye.base.messages import AssistantMessage, ContentChunk, UserMessage
+from skye.utils.validation import generate_schema, validate_interface_compliance
 
 
 # Test fixtures - Mock interfaces and implementations
@@ -93,7 +93,7 @@ def test_interface_compliance_with_non_inheriting_class():
 
 
 def test_interface_compliance_with_model_interface():
-    """Test validation with a real Nimbus interface."""
+    """Test validation with a real Skye interface."""
 
     # Create a partial implementation of ModelInterface
     class PartialModel(ModelInterface):

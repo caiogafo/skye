@@ -1,12 +1,12 @@
-"""SDK compatibility at the data level (Req 26): OpenAI-shaped dicts in, Nimbus types out."""
+"""SDK compatibility at the data level (Requirement 22): OpenAI-shaped dicts in, Skye types out."""
 
 import copy
 
 import pytest
 
-from nimbus.base.exceptions import ValidationError
-from nimbus.base.messages import AssistantMessage, CapabilityMessage, SystemMessage, UserMessage
-from nimbus.base.openai_shape import capabilities_from_openai_tools, messages_from_openai
+from skye.base.exceptions import ValidationError
+from skye.base.messages import AssistantMessage, CapabilityMessage, SystemMessage, UserMessage
+from skye.base.openai_shape import capabilities_from_openai_tools, messages_from_openai
 
 MSGS = [
     {"role": "system", "content": "be brief"},
@@ -26,7 +26,7 @@ TOOL = {
 }
 
 
-def test_messages_become_nimbus_types():
+def test_messages_become_skye_types():
     out = messages_from_openai(MSGS)
     assert [type(m) for m in out] == [SystemMessage, UserMessage, AssistantMessage, CapabilityMessage]
     assert out[2].capability_calls == [{"id": "c1", "name": "get_weather", "args": {"city": "NYC"}}]

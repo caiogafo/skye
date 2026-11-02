@@ -1,6 +1,6 @@
 """Multimodal Input Example.
 
-This example demonstrates how to use multimodal inputs (images) with Nimbus.
+This example demonstrates how to use multimodal inputs (images) with Skye.
 
 Features shown:
 - Image from URL
@@ -12,9 +12,9 @@ Features shown:
 import os
 import base64
 from pathlib import Path
-from nimbus.base.completion import CompletionRequest
-from nimbus.base.messages import UserMessage
-from nimbus.models import ProviderRegistry
+from skye.base.completion import CompletionRequest
+from skye.base.messages import UserMessage
+from skye.models import ProviderRegistry
 
 
 def image_from_url():
@@ -202,7 +202,7 @@ You can mix different image sources:
 - File paths
 - Base64 data URLs
 
-All are handled transparently by Nimbus.
+All are handled transparently by Skye.
 """)
 
 
@@ -237,7 +237,7 @@ Different providers support different vision models:
 Example with Anthropic:
 
 ```python
-from nimbus.models import ProviderRegistry
+from skye.models import ProviderRegistry
 
 provider = ProviderRegistry.get_model_provider(
     "anthropic",
@@ -282,9 +282,9 @@ Complete workflow for image analysis:
 
 ```python
 from pathlib import Path
-from nimbus.base.completion import CompletionRequest
-from nimbus.base.messages import UserMessage
-from nimbus.models import ProviderRegistry
+from skye.base.completion import CompletionRequest
+from skye.base.messages import UserMessage
+from skye.models import ProviderRegistry
 
 # Initialize provider
 provider = ProviderRegistry.get_model_provider(
@@ -357,7 +357,7 @@ print(f"Element: {element.name} ({element.type})")
 def main():
     """Run all examples."""
     print("\n" + "🖼️  " * 20)
-    print("NIMBUS - Multimodal Input Examples")
+    print("SKYE - Multimodal Input Examples")
     print("🖼️  " * 20)
     
     try:
@@ -373,7 +373,7 @@ def main():
         print("=" * 60)
         print("\nKey points:")
         print("  • Images can be from URLs, file paths, or base64")
-        print("  • Nimbus handles format conversion automatically")
+        print("  • Skye handles format conversion automatically")
         print("  • Different providers support different vision models")
         print("  • Combine with structured outputs for data extraction")
         

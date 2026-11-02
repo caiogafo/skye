@@ -1,6 +1,6 @@
 # Capability Examples
 
-This directory contains examples demonstrating how to use capabilities (tools/functions) with Nimbus.
+This directory contains examples demonstrating how to use capabilities (tools/functions) with Skye.
 
 ## What are Capabilities?
 
@@ -10,7 +10,7 @@ Capabilities are functions or tools that language models can invoke to perform a
 - Access databases
 - Perform real-world actions
 
-Nimbus uses the term "Capability" instead of "Tool" to better represent this concept.
+Skye uses the term "Capability" instead of "Tool" to better represent this concept.
 
 ## Examples
 
@@ -79,7 +79,7 @@ Using Model Context Protocol (MCP) servers as capabilities.
 **Topics covered:**
 - Overview of MCP (Model Context Protocol)
 - Creating MCPCapability instances from MCP tool definitions
-- Automatic schema conversion from MCP to Nimbus format
+- Automatic schema conversion from MCP to Skye format
 - Using MCP capabilities with language models
 - Error handling and best practices
 - Performance optimization with schema caching
@@ -90,10 +90,10 @@ python examples/capabilities/mcp_server.py
 ```
 
 **Requirements:**
-- FastMCP library: `pip install nimbus[mcp]` or `pip install fastmcp>=0.1.0`
+- FastMCP library: `pip install skyeai[mcp]` or `pip install fastmcp>=0.1.0`
 
 **Key Features:**
-- Automatic MCP to Nimbus schema conversion
+- Automatic MCP to Skye schema conversion
 - Schema caching for performance
 - Support for complex MCP tool definitions
 - OpenAPI-based tool support
@@ -153,7 +153,7 @@ Capabilities work across all supported providers:
 - **AWS Bedrock**: Tool use via Converse API
 - **Azure OpenAI**: Function calling
 
-Nimbus handles the differences transparently!
+Skye handles the differences transparently!
 
 ## Next Steps
 

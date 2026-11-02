@@ -1,4 +1,4 @@
-"""Azure OpenAI Provider Example (Boto3-style Nimbus API).
+"""Azure OpenAI Provider Example (Boto3-style Skye API).
 
 This version demonstrates:
 - Basic completion with Azure OpenAI
@@ -8,8 +8,8 @@ This version demonstrates:
 """
 
 import os
-from nimbus.models.registry import provider as create_provider
-from nimbus.base.messages import UserMessage, SystemMessage
+from skye.models.registry import provider as create_provider
+from skye.base.messages import UserMessage, SystemMessage
 
 
 def basic_completion():
@@ -37,7 +37,7 @@ def basic_completion():
         )
     except ImportError as e:
         print(f"⚠️  Error: {e}")
-        print("\nTo use Azure OpenAI, install with: pip install nimbus[azure]")
+        print("\nTo use Azure OpenAI, install with: pip install skyeai[azure]")
         return
     
     messages = [
@@ -140,7 +140,7 @@ def configuration_example():
 Azure OpenAI requires specific configuration:
 
 ```python
-from nimbus.models.registry import provider as create_provider
+from skye.models.registry import provider as create_provider
 
 client = create_provider(
     "azure",
@@ -167,7 +167,7 @@ export AZURE_OPENAI_ENDPOINT="https://your-resource.openai.azure.com"
 def main():
     """Run all examples."""
     print("\n" + "☁️  " * 20)
-    print("NIMBUS - Azure OpenAI Provider Examples")
+    print("SKYE - Azure OpenAI Provider Examples")
     print("☁️  " * 20)
     
     try:
@@ -183,7 +183,7 @@ def main():
     except Exception as e:
         print(f"\n❌ Error: {e}")
         print("\nMake sure you have:")
-        print("  1. Installed nimbus[azure]: pip install nimbus[azure]")
+        print("  1. Installed skyeai[azure]: pip install skyeai[azure]")
         print("  2. Set AZURE_OPENAI_API_KEY and AZURE_OPENAI_ENDPOINT")
         print("  3. Created deployments in your Azure OpenAI resource")
 

@@ -1,8 +1,8 @@
 """Unit tests for BasePromptBuilder."""
 
 import pytest
-from nimbus.prompts import BasePromptBuilder
-from nimbus.base.messages import UserMessage, SystemMessage, AssistantMessage
+from skye.prompts import BasePromptBuilder
+from skye.base.messages import UserMessage, SystemMessage, AssistantMessage
 
 # Import test data from the proper location
 import sys

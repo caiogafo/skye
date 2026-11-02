@@ -1,4 +1,4 @@
-# Nimbus Router Configuration Example
+# Skye Router Configuration Example
 # =====================================
 # This file demonstrates comprehensive router configuration using YAML.
 # It showcases multiple routing strategies, environment variable substitution,
@@ -396,7 +396,7 @@ enable_pre_call_checks: true
 # =============
 # Load this configuration in your Python code:
 #
-#   from nimbus.router import ModelRouter
+#   from skye.router import ModelRouter
 #   
 #   router = ModelRouter.from_yaml("router_config.yaml")
 #   

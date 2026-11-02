@@ -4,17 +4,18 @@ Tests cover:
 - Client initialization
 - Batch encoding
 - Vector dimensions
-- Optional boto3 import
+- No boto3 import
 - Error handling
 """
 
-import json
-from io import BytesIO
-from unittest.mock import MagicMock, Mock, patch
+import sys
+from pathlib import Path
+from unittest.mock import Mock, patch
 
 import pytest
 
-from nimbus.models.embeddings.bedrock_embeddings import BedrockEmbeddingProvider
+from skye.models.embeddings.bedrock_embeddings import BedrockEmbeddingProvider
+from skye.models.transport import rest
 
 
 class TestBedrockEmbeddingProviderInitialization:
@@ -40,135 +41,51 @@ class TestBedrockEmbeddingProviderInitialization:
         assert provider.region_name == "us-west-2"
         assert provider.config["profile_name"] == "custom-profile"
     
-    @patch("nimbus.models.embeddings.bedrock_embeddings.LazyImporter.is_available")
-    @patch("nimbus.models.embeddings.bedrock_embeddings.LazyImporter.import_module")
-    def test_lazy_client_initialization_with_lazy_import(
-        self, mock_import: Mock, mock_is_available: Mock
-    ) -> None:
-        """Test client initialization using lazy import."""
-        mock_is_available.return_value = False
-        mock_boto3 = MagicMock()
-        mock_client = MagicMock()
-        mock_boto3.client.return_value = mock_client
-        mock_import.return_value = mock_boto3
-        
-        provider = BedrockEmbeddingProvider(
-            model="amazon.titan-embed-text-v1",
-            region_name="us-east-1"
-        )
-        
-        # Client should not be initialized yet
-        mock_import.assert_not_called()
-        
-        # Access client to trigger initialization
-        _ = provider.client
-        
-        # Now it should be initialized
-        mock_import.assert_called_once_with("boto3", install_extra="bedrock")
-        mock_boto3.client.assert_called_once_with(
-            "bedrock-runtime",
-            region_name="us-east-1"
-        )
-    
-    @patch("nimbus.models.embeddings.bedrock_embeddings.LazyImporter.is_available")
-    @patch("nimbus.models.embeddings.bedrock_embeddings.LazyImporter.import_module")
-    def test_lazy_client_initialization_with_preinstalled_boto3(
-        self, mock_import: Mock, mock_is_available: Mock
-    ) -> None:
-        """Test client initialization using pre-installed boto3."""
-        mock_is_available.return_value = True
-        
-        # When is_available returns True, import_module should not be called
-        mock_boto3 = MagicMock()
-        mock_client = MagicMock()
-        
-        # We need to mock the import statement inside the method
-        with patch("builtins.__import__") as mock_builtin_import:
-            mock_builtin_import.return_value = mock_boto3
-            mock_boto3.client.return_value = mock_client
-            
-            provider = BedrockEmbeddingProvider(
-                model="amazon.titan-embed-text-v1",
-                region_name="us-east-1"
-            )
-            
-            # Access client to trigger initialization
-            _ = provider.client
-            
-            # is_available should have been called
-            mock_is_available.assert_called_once_with("boto3")
-            
-            # import_module should NOT have been called since is_available returned True
-            mock_import.assert_not_called()
+    def test_client_is_none_and_no_boto3(self) -> None:
+        provider = BedrockEmbeddingProvider(model="amazon.titan-embed-text-v1", region_name="us-east-1")
+        assert provider.client is None
+        assert "boto3" not in sys.modules
+
+    def test_source_has_no_boto3_import(self) -> None:
+        import skye.models.embeddings.bedrock_embeddings as mod
+
+        text = Path(mod.__file__).read_text()
+        assert "import boto3" not in text and "LazyImporter" not in text
+
+
+KEYS = {"aws_access_key_id": "AKIDEXAMPLE", "aws_secret_access_key": "secret"}
 
 
 class TestBedrockEmbeddingProviderBatchEncoding:
     """Test batch encoding functionality."""
-    
-    @patch("nimbus.models.embeddings.bedrock_embeddings.LazyImporter.is_available")
-    @patch("nimbus.models.embeddings.bedrock_embeddings.LazyImporter.import_module")
-    def test_encode_batch(self, mock_import: Mock, mock_is_available: Mock) -> None:
-        """Test batch encoding."""
-        mock_is_available.return_value = False
-        mock_boto3 = MagicMock()
-        mock_client = MagicMock()
-        mock_boto3.client.return_value = mock_client
-        mock_import.return_value = mock_boto3
-        
-        # Mock responses for each text
-        responses = [
-            {
-                "body": BytesIO(json.dumps({"embedding": [0.1, 0.2, 0.3]}).encode())
-            },
-            {
-                "body": BytesIO(json.dumps({"embedding": [0.4, 0.5, 0.6]}).encode())
-            }
+
+    @patch("skye.models.transport.rest.post_json")
+    def test_encode_batch(self, mock_post: Mock) -> None:
+        mock_post.side_effect = [
+            rest.JsonObject({"embedding": [0.1, 0.2, 0.3]}),
+            rest.JsonObject({"embedding": [0.4, 0.5, 0.6]}),
         ]
-        mock_client.invoke_model.side_effect = responses
-        
-        # Test
-        provider = BedrockEmbeddingProvider(
-            model="amazon.titan-embed-text-v1",
-            region_name="us-east-1"
+        provider = BedrockEmbeddingProvider(model="amazon.titan-embed-text-v2:0", region_name="us-east-1", **KEYS)
+
+        result = provider.encode_batch(["text1", 'te"xt2'])
+
+        assert result == [[0.1, 0.2, 0.3], [0.4, 0.5, 0.6]]
+        assert mock_post.call_count == 2
+        first, second = mock_post.call_args_list
+        assert first.args[0] == (
+            "https://bedrock-runtime.us-east-1.amazonaws.com/model/amazon.titan-embed-text-v2%3A0/invoke"
         )
-        
-        result = provider.encode_batch(["text1", "text2"])
-        
-        # Verify
-        assert len(result) == 2
-        assert result[0] == [0.1, 0.2, 0.3]
-        assert result[1] == [0.4, 0.5, 0.6]
-        
-        assert mock_client.invoke_model.call_count == 2
-    
-    @patch("nimbus.models.embeddings.bedrock_embeddings.LazyImporter.is_available")
-    @patch("nimbus.models.embeddings.bedrock_embeddings.LazyImporter.import_module")
-    def test_encode_single_text(self, mock_import: Mock, mock_is_available: Mock) -> None:
-        """Test encoding single text."""
-        mock_is_available.return_value = False
-        mock_boto3 = MagicMock()
-        mock_client = MagicMock()
-        mock_boto3.client.return_value = mock_client
-        mock_import.return_value = mock_boto3
-        
-        # Mock response
-        mock_response = {
-            "body": BytesIO(json.dumps({"embedding": [0.1, 0.2, 0.3]}).encode())
-        }
-        mock_client.invoke_model.return_value = mock_response
-        
-        # Test
-        provider = BedrockEmbeddingProvider(
-            model="amazon.titan-embed-text-v1",
-            region_name="us-east-1"
-        )
-        
-        result = provider.encode("hello")
-        
-        # Verify
-        assert result == [0.1, 0.2, 0.3]
-        
-        mock_client.invoke_model.assert_called_once()
+        assert first.args[1] == {"inputText": "text1"}
+        assert second.args[1] == {"inputText": 'te"xt2'}
+        assert first.kwargs["authenticator"] is not None
+
+    @patch("skye.models.transport.rest.post_json")
+    def test_encode_single_text(self, mock_post: Mock) -> None:
+        mock_post.return_value = rest.JsonObject({"embedding": [0.1, 0.2, 0.3]})
+        provider = BedrockEmbeddingProvider(model="amazon.titan-embed-text-v1", region_name="us-east-1", **KEYS)
+
+        assert provider.encode("hello") == [0.1, 0.2, 0.3]
+        mock_post.assert_called_once()
 
 
 class TestBedrockEmbeddingProviderVectorDimensions:

@@ -18,10 +18,10 @@ Note: Set environment variables for API keys:
 import os
 import json
 import asyncio
-from nimbus.models.registry import provider as create_provider
-from nimbus.base.messages import UserMessage, CapabilityMessage
-from nimbus.tools import RemoteAPICapability
-from nimbus.tools.schema import CapabilitySchema
+from skye.models.registry import provider as create_provider
+from skye.base.messages import UserMessage, CapabilityMessage
+from skye.tools import RemoteAPICapability
+from skye.tools.schema import CapabilitySchema
 
 
 def basic_remote_api_example():
@@ -271,7 +271,7 @@ def api_configuration_example():
         method="GET",
         headers={
             "Accept": "application/vnd.github.v3+json",
-            "User-Agent": "Nimbus"
+            "User-Agent": "Skye"
         }
     )
     """)
@@ -325,7 +325,7 @@ def api_configuration_example():
 async def main():
     """Run all examples."""
     print("\n" + "🔧 " * 20)
-    print("NIMBUS - Remote API Capability Examples")
+    print("SKYE - Remote API Capability Examples")
     print("🔧 " * 20)
     
     try:

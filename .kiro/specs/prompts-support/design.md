@@ -1,10 +1,10 @@
-# Design Document: Nimbus Prompts Support
+# Design Document: Skye Prompts Support
 
 ## Overview
 
-This design document specifies the implementation of comprehensive prompts support for Nimbus using Jinja2 templating. The feature provides a production-ready implementation of the existing `PromptBuilderInterface`, enabling sophisticated template management, few-shot learning, multimodal content support, and structured output generation.
+This design document specifies the implementation of comprehensive prompts support for Skye using Jinja2 templating. The feature provides a production-ready implementation of the existing `PromptBuilderInterface`, enabling sophisticated template management, few-shot learning, multimodal content support, and structured output generation.
 
-The implementation follows Nimbus's clean architecture principles, with the core functionality available as an optional extra (`nimbus[prompts]`). The design emphasizes performance, flexibility, and seamless integration with existing Nimbus components while maintaining provider agnosticism.
+The implementation follows Skye's clean architecture principles, with the core functionality available as an optional extra (`skyeai[prompts]`). The design emphasizes performance, flexibility, and seamless integration with existing Skye components while maintaining provider agnosticism.
 
 ## Architecture
 
@@ -12,13 +12,13 @@ The implementation follows Nimbus's clean architecture principles, with the core
 
 ```mermaid
 graph TB
-    subgraph "Nimbus Core"
+    subgraph "Skye Core"
         PI[PromptBuilderInterface]
-        NM[NimbusMessage Types]
+        NM[SkyeMessage Types]
         EH[Exception Hierarchy]
     end
     
-    subgraph "Nimbus Prompts Module"
+    subgraph "Skye Prompts Module"
         JPB[Jinja2PromptBuilder]
         TR[TemplateRegistry]
         VV[VariableValidator]
@@ -56,7 +56,7 @@ graph TB
 
 **ExampleSelector**: Implements different strategies for selecting few-shot examples (semantic, random, fixed).
 
-**MessageFormatter**: Converts rendered template strings into appropriate `NimbusMessage` objects with role management.
+**MessageFormatter**: Converts rendered template strings into appropriate `SkyeMessage` objects with role management.
 
 **ContentHandler**: Processes multimodal content (images, audio, video) and formats them for different providers.
 
@@ -202,26 +202,26 @@ class FixedExampleSelector(ExampleSelector):
 
 ### MessageFormatter
 
-Converts rendered templates into `NimbusMessage` objects with proper roles.
+Converts rendered templates into `SkyeMessage` objects with proper roles.
 
 ```python
 class MessageFormatter:
-    """Formats rendered templates into NimbusMessage objects."""
+    """Formats rendered templates into SkyeMessage objects."""
     
     def format_messages(
         self,
         rendered_content: str,
         role_mapping: dict[str, str] | None = None,
         multimodal_content: dict[str, Any] | None = None
-    ) -> list[NimbusMessage]:
-        """Convert rendered template to NimbusMessage objects."""
+    ) -> list[SkyeMessage]:
+        """Convert rendered template to SkyeMessage objects."""
     
     def create_message_by_role(
         self, 
         content: str, 
         role: str,
         metadata: dict[str, Any] | None = None
-    ) -> NimbusMessage:
+    ) -> SkyeMessage:
         """Create appropriate message type based on role."""
 ```
 
@@ -563,8 +563,8 @@ def process_role_sections(
 def create_messages_from_sections(
     sections: list[tuple[str, str]],
     multimodal_content: dict[str, Any] | None = None
-) -> list[NimbusMessage]:
-    """Create NimbusMessage objects from role sections."""
+) -> list[SkyeMessage]:
+    """Create SkyeMessage objects from role sections."""
     
     messages = []
     
@@ -597,7 +597,7 @@ def create_messages_from_sections(
 ### Exception Hierarchy
 
 ```python
-class PromptBuilderError(NimbusError):
+class PromptBuilderError(SkyeError):
     """Base exception for prompt builder errors."""
     pass
 
@@ -658,7 +658,7 @@ def safe_template_render(
 
 ### Unit Testing Approach
 
-The testing strategy follows Nimbus standards with comprehensive unit tests for each component and property-based tests for universal correctness properties.
+The testing strategy follows Skye standards with comprehensive unit tests for each component and property-based tests for universal correctness properties.
 
 **Unit Test Coverage:**
 - Template registration and retrieval
@@ -683,7 +683,7 @@ tests/
 ├── integration/
 │   ├── test_end_to_end_rendering.py
 │   ├── test_multimodal_integration.py
-│   └── test_nimbus_integration.py
+│   └── test_skye_integration.py
 └── fixtures/
     ├── sample_templates/
     └── test_data/

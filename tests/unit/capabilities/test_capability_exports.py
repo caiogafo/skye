@@ -1,7 +1,7 @@
 """Tests for capability package exports.
 
 This module verifies that all expected symbols are properly exported from
-the nimbus.tools package and that __all__ is correctly defined.
+the skye.tools package and that __all__ is correctly defined.
 """
 
 import pytest
@@ -9,7 +9,7 @@ import pytest
 
 def test_capability_interface_import():
     """Test that CapabilityInterface can be imported."""
-    from nimbus.tools import CapabilityInterface
+    from skye.tools import CapabilityInterface
     
     assert CapabilityInterface is not None
     assert hasattr(CapabilityInterface, "get_schema")
@@ -19,14 +19,14 @@ def test_capability_interface_import():
 
 def test_capability_schema_import():
     """Test that CapabilitySchema can be imported."""
-    from nimbus.tools import CapabilitySchema
+    from skye.tools import CapabilitySchema
     
     assert CapabilitySchema is not None
 
 
 def test_capability_registry_import():
     """Test that CapabilityRegistry can be imported."""
-    from nimbus.tools import CapabilityRegistry
+    from skye.tools import CapabilityRegistry
     
     assert CapabilityRegistry is not None
     assert hasattr(CapabilityRegistry, "register")
@@ -37,35 +37,35 @@ def test_capability_registry_import():
 
 def test_local_function_capability_import():
     """Test that LocalFunctionCapability can be imported."""
-    from nimbus.tools import LocalFunctionCapability
+    from skye.tools import LocalFunctionCapability
     
     assert LocalFunctionCapability is not None
 
 
 def test_remote_api_capability_import():
     """Test that RemoteAPICapability can be imported."""
-    from nimbus.tools import RemoteAPICapability
+    from skye.tools import RemoteAPICapability
     
     assert RemoteAPICapability is not None
 
 
 def test_capability_call_import():
     """Test that CapabilityCall can be imported."""
-    from nimbus.tools import CapabilityCall
+    from skye.tools import CapabilityCall
     
     assert CapabilityCall is not None
 
 
 def test_capability_result_import():
     """Test that CapabilityResult can be imported."""
-    from nimbus.tools import CapabilityResult
+    from skye.tools import CapabilityResult
     
     assert CapabilityResult is not None
 
 
 def test_exception_imports():
     """Test that all exception classes can be imported."""
-    from nimbus.tools import (
+    from skye.tools import (
         CapabilityError,
         CapabilityExecutionError,
         CapabilityNotFoundError,
@@ -88,15 +88,15 @@ def test_exception_imports():
 
 def test_capability_transformer_import():
     """Test that CapabilityTransformer is no longer exported (removed in consolidation)."""
-    import nimbus.tools
+    import skye.tools
     
     # CapabilityTransformer has been removed as part of provider consolidation
-    assert not hasattr(nimbus.tools, "CapabilityTransformer")
+    assert not hasattr(skye.tools, "CapabilityTransformer")
 
 
 def test_capability_call_handler_import():
     """Test that CapabilityCallHandler can be imported."""
-    from nimbus.tools import CapabilityCallHandler
+    from skye.tools import CapabilityCallHandler
     
     assert CapabilityCallHandler is not None
     assert hasattr(CapabilityCallHandler, "parse_capability_calls")
@@ -106,21 +106,21 @@ def test_capability_call_handler_import():
 
 def test_mcp_capability_import():
     """Test that MCPCapability can be imported."""
-    from nimbus.tools import MCPCapability
+    from skye.tools import MCPCapability
     
     assert MCPCapability is not None
 
 
 def test_mcp_server_client_import():
     """Test that MCPServerClient can be imported."""
-    from nimbus.tools import MCPServerClient
+    from skye.tools import MCPServerClient
     
     assert MCPServerClient is not None
 
 
 def test_capability_decorator_import():
     """Test that capability decorator can be imported."""
-    from nimbus.tools import capability
+    from skye.tools import capability
     
     assert capability is not None
     assert callable(capability)
@@ -128,16 +128,16 @@ def test_capability_decorator_import():
 
 def test_all_defined():
     """Test that __all__ is properly defined."""
-    import nimbus.tools
+    import skye.tools
     
-    assert hasattr(nimbus.tools, "__all__")
-    assert isinstance(nimbus.tools.__all__, list)
-    assert len(nimbus.tools.__all__) > 0
+    assert hasattr(skye.tools, "__all__")
+    assert isinstance(skye.tools.__all__, list)
+    assert len(skye.tools.__all__) > 0
 
 
 def test_all_contains_expected_symbols():
     """Test that __all__ contains all expected symbols."""
-    import nimbus.tools
+    import skye.tools
     
     expected_symbols = [
         "CapabilityInterface",
@@ -159,22 +159,22 @@ def test_all_contains_expected_symbols():
     ]
     
     for symbol in expected_symbols:
-        assert symbol in nimbus.tools.__all__, f"{symbol} not in __all__"
+        assert symbol in skye.tools.__all__, f"{symbol} not in __all__"
 
 
 def test_all_symbols_are_importable():
     """Test that all symbols in __all__ can be imported."""
-    import nimbus.tools
+    import skye.tools
     
-    for symbol in nimbus.tools.__all__:
-        assert hasattr(nimbus.tools, symbol), f"{symbol} not importable"
+    for symbol in skye.tools.__all__:
+        assert hasattr(skye.tools, symbol), f"{symbol} not importable"
 
 
 def test_star_import():
     """Test that star import works correctly."""
-    # This test verifies that 'from nimbus.tools import *' works
+    # This test verifies that 'from skye.tools import *' works
     namespace = {}
-    exec("from nimbus.tools import *", namespace)
+    exec("from skye.tools import *", namespace)
     
     expected_symbols = [
         "CapabilityInterface",
@@ -197,7 +197,7 @@ def test_star_import():
 
 def test_combined_import():
     """Test that multiple symbols can be imported together."""
-    from nimbus.tools import (
+    from skye.tools import (
         CapabilityInterface,
         CapabilityRegistry,
         CapabilitySchema,
@@ -218,16 +218,16 @@ def test_combined_import():
 
 def test_no_private_symbols_in_all():
     """Test that __all__ doesn't contain private symbols."""
-    import nimbus.tools
+    import skye.tools
     
-    for symbol in nimbus.tools.__all__:
+    for symbol in skye.tools.__all__:
         assert not symbol.startswith("_"), f"Private symbol {symbol} in __all__"
 
 
 def test_package_docstring():
     """Test that the package has a docstring."""
-    import nimbus.tools
+    import skye.tools
     
-    assert nimbus.tools.__doc__ is not None
-    assert len(nimbus.tools.__doc__) > 0
-    assert "capability" in nimbus.tools.__doc__.lower()
+    assert skye.tools.__doc__ is not None
+    assert len(skye.tools.__doc__) > 0
+    assert "capability" in skye.tools.__doc__.lower()

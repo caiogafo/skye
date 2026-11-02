@@ -1,4 +1,4 @@
-"""Test data and sample datasets for Nimbus Prompts Support.
+"""Test data and sample datasets for Skye Prompts Support.
 
 This module provides sample datasets for testing and demonstrating
 the prompts support functionality, including:
@@ -73,7 +73,7 @@ def get_sample_templates() -> Dict[str, str]:
         Dictionary mapping template names to file paths
     """
     # Navigate to the prompts templates directory from test location
-    templates_dir = Path(__file__).parent.parent.parent.parent / "src" / "nimbus" / "prompts" / "templates"
+    templates_dir = Path(__file__).parent.parent.parent.parent / "src" / "skye" / "prompts" / "templates"
     
     templates = {}
     if templates_dir.exists():

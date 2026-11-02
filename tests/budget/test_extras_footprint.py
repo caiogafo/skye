@@ -1,12 +1,12 @@
-"""Extras declare exactly what their Component imports, and `import nimbus` stays clean.
+"""Extras declare exactly what their Component imports, and `import skye` stays clean.
 
-Task 1.3 of .kiro/specs/structure. No network, no install; a few subprocesses.
+Task 1.3 of .kiro/specs/skye-structure. No network, no install; a few subprocesses.
 
 * Extras: for each Extra in pyproject.toml, the third-party libraries declared must be the
   third-party libraries the Component's code imports (module level, lazy, or through
   LazyImporter), core dependencies excluded. Missing and unused declarations are reported.
   The [imports.max_files] list in budgets.toml is cross-checked against the same data.
-* Footprint: a fresh `import nimbus` in a subprocess follows [load] in budgets.toml. Module
+* Footprint: a fresh `import skye` in a subprocess follows [load] in budgets.toml. Module
   count and time are measured here, with the development libraries installed, so the limits
   are the same as the clean-environment ones in test_footprint_budget.py (which stays the
   authority for core-only installs).
@@ -31,10 +31,10 @@ from tests.budget.measure import (
     requirement_name,
 )
 
-SRC = ROOT / "src" / "nimbus"
+SRC = ROOT / "src" / "skye"
 BUDGETS = load_budgets()
 
-# Extra -> files or directories (relative to src/nimbus) forming its Component. Current layout;
+# Extra -> files or directories (relative to src/skye) forming its Component. Current layout;
 # update when the structure moves.
 EXTRA_PATHS: dict[str, list[str]] = {
     # auth: authentication and credentials (Layer 0). `rsa` is declared for RS256 signing, which
@@ -50,7 +50,7 @@ EXTRA_PATHS: dict[str, list[str]] = {
     ],
     "cohere": ["models/embeddings/cohere_embeddings.py"],
     # tools carries no third-party library (known_empty). fastmcp, the optional MCP substitute,
-    # belongs to the separate `mcp` extra (Req 25.7).
+    # belongs to the separate `mcp` extra (Requirement 15).
     "tools": [
         "tools/__init__.py",
         "tools/capability_call_handler.py",
@@ -88,8 +88,8 @@ IMPORT_NAMES: dict[str, set[str]] = {
     "pyyaml": {"yaml"},
     }
 
-# Libraries that stay out of the comparison: the standard library and Nimbus itself.
-CORE_IMPORTS = {"nimbus"} | set(sys.stdlib_module_names)
+# Libraries that stay out of the comparison: the standard library and Skye itself.
+CORE_IMPORTS = {"skye"} | set(sys.stdlib_module_names)
 
 
 def _import_names(dist: str) -> set[str]:
@@ -182,7 +182,7 @@ def _declared() -> dict[str, set[str]]:
 # Reasons the current tree does not satisfy the declare-exactly rule yet (auth: rsa is not imported yet).
 EXTRA_XFAIL: dict[str, str] = {
     "auth": "rsa is declared for RS256 (Google/Azure assertions); the strategy code that imports it "
-    "is the auth milestone, not this phase (Req 22.9).",
+    "is the auth milestone, not this phase (Requirement 18).",
 }
 
 
@@ -201,7 +201,7 @@ def test_extra_declares_exactly_what_its_component_imports(extra: str, request: 
 
 
 def test_auth_extra_declares_exactly_rsa() -> None:
-    """Req 22.9: the auth extra declares only `rsa`; the google extra does not declare it."""
+    """Requirement 18: the auth extra declares only `rsa`; the google extra does not declare it."""
     extras = pyproject()["project"]["optional-dependencies"]
     assert {requirement_name(r) for r in extras["auth"]} == {"rsa"}
     assert "rsa" not in {requirement_name(r) for r in extras["google"]}
@@ -215,7 +215,7 @@ def test_every_extra_with_a_component_is_checked() -> None:
 
 
 def test_every_third_party_import_belongs_to_an_extra_or_core() -> None:
-    """Counterpart of [imports.max_files]: no library imported by src/nimbus is unowned."""
+    """Counterpart of [imports.max_files]: no library imported by src/skye is unowned."""
     owned = {lib for libs in _code_libraries().values() for lib in libs}
     preinstalled = {n for d in BUDGETS["lambda"]["preinstalled"] for n in _import_names(d)}
     mapped = {str(f.relative_to(SRC)) for f in _files([p for ps in EXTRA_PATHS.values() for p in ps])}
@@ -249,7 +249,7 @@ def fresh_import() -> dict:
 def test_import_loads_nothing_forbidden(fresh_import: dict) -> None:
     forbidden, known = set(LOAD["forbidden_at_import"]), set(LOAD["known_leaks"])
     leaked = sorted((forbidden & set(fresh_import["loaded"])) - known)
-    assert not leaked, f"`import nimbus` imports {leaked}; keep optional libraries behind a lazy import."
+    assert not leaked, f"`import skye` imports {leaked}; keep optional libraries behind a lazy import."
 
 
 def test_import_has_no_known_leak(fresh_import: dict) -> None:
@@ -262,7 +262,7 @@ def test_known_leaks_are_current(fresh_import: dict) -> None:
 
     installed = {k for k in LOAD["known_leaks"] if importlib.util.find_spec(k)}
     fixed = sorted(installed - set(fresh_import["loaded"]))
-    assert not fixed, f"`import nimbus` no longer imports {fixed}: remove them from known_leaks in budgets.toml."
+    assert not fixed, f"`import skye` no longer imports {fixed}: remove them from known_leaks in budgets.toml."
 
 
 @pytest.mark.xfail(
@@ -271,11 +271,11 @@ def test_known_leaks_are_current(fresh_import: dict) -> None:
     strict=False,
 )
 def test_import_stays_within_module_budget(fresh_import: dict) -> None:
-    assert fresh_import["modules"] <= LOAD["max_modules_loaded"], f"`import nimbus` loads {fresh_import['modules']} modules"
+    assert fresh_import["modules"] <= LOAD["max_modules_loaded"], f"`import skye` loads {fresh_import['modules']} modules"
 
 
 def test_import_stays_within_time_budget(fresh_import: dict) -> None:
-    assert fresh_import["ms"] <= LOAD["max_import_ms"], f"`import nimbus` takes {fresh_import['ms']:.0f} ms"
+    assert fresh_import["ms"] <= LOAD["max_import_ms"], f"`import skye` takes {fresh_import['ms']:.0f} ms"
 
 
 def test_known_import_failures_are_current() -> None:

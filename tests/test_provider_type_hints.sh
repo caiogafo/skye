@@ -10,7 +10,7 @@ echo "=============================================="
 # Run mypy with strict mode
 echo ""
 echo "Running mypy with --strict mode..."
-uv run mypy src/nimbus/models --strict
+uv run mypy src/skye/models --strict
 
 echo ""
 echo "✅ Type hints verification passed!"

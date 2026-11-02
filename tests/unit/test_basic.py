@@ -1,22 +1,22 @@
 """Basic test to verify test infrastructure."""
 
 
-def test_import_nimbus():
-    """Test that nimbus package can be imported."""
-    import nimbus
+def test_import_skye():
+    """Test that skye package can be imported."""
+    import skye
 
-    assert nimbus.__version__ == "0.1.0"
+    assert skye.__version__ == "0.1.0"
 
 
 def test_import_interfaces():
     """Test that interfaces module can be imported."""
-    import nimbus.base.interfaces
+    import skye.base.interfaces
 
-    assert nimbus.base.interfaces is not None
+    assert skye.base.interfaces is not None
 
 
 def test_import_providers():
     """Test that providers module can be imported."""
-    import nimbus.models
+    import skye.models
 
-    assert nimbus.models is not None
+    assert skye.models is not None

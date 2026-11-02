@@ -2,13 +2,13 @@
 
 ## Overview
 
-The Model Providers component implements concrete provider integrations for the ModelInterface and VectorEncoderInterface defined in nimbus-core. This design follows patterns from litellm and llmio while maintaining Nimbus's modular architecture and naming conventions.
+The Model Providers component implements concrete provider integrations for the ModelInterface and VectorEncoderInterface defined in skye-core. This design follows patterns from litellm and llmio while maintaining Skye's modular architecture and naming conventions.
 
 ### Key Design Principles
 
 1. **Lazy Loading**: Provider SDKs are imported only when instantiated
 2. **Modular Dependencies**: Each provider is an optional extra with minimal dependencies
-3. **Transformation Pattern**: Clean separation between nimbus models and provider formats
+3. **Transformation Pattern**: Clean separation between skye models and provider formats
 4. **Provider Agnostic**: Unified interface regardless of underlying provider
 5. **Environment Awareness**: Detect and use pre-installed SDKs (e.g., boto3 in Lambda)
 
@@ -34,11 +34,11 @@ The Model Providers component implements concrete provider integrations for the 
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                    nimbus-core (base)                       │
+│                    skye-core (base)                       │
 │  - ModelInterface                                           │
 │  - VectorEncoderInterface                                   │
 │  - CompletionRequest/Response                               │
-│  - NimbusMessage types                                      │
+│  - SkyeMessage types                                      │
 └─────────────────────────────────────────────────────────────┘
                           ▲
                           │ implements
@@ -86,7 +86,7 @@ The Model Providers component implements concrete provider integrations for the 
 ```
 User Code
     │
-    ├─> CompletionRequest (nimbus model)
+    ├─> CompletionRequest (skye model)
     │
     ▼
 ProviderRegistry.get("openai")
@@ -104,7 +104,7 @@ OpenAIProvider (implements ModelInterface)
     │   └─> Convert OpenAI response → CompletionResponse
     │
     ▼
-CompletionResponse (nimbus model)
+CompletionResponse (skye model)
 ```
 
 ## Components and Interfaces
@@ -116,9 +116,9 @@ CompletionResponse (nimbus model)
 **Implementation**:
 ```python
 from typing import Dict, Type, Optional
-from nimbus.interfaces.model import ModelInterface
-from nimbus.interfaces.vector_encoder import VectorEncoderInterface
-from nimbus.exceptions import ConfigurationError
+from skye.interfaces.model import ModelInterface
+from skye.interfaces.vector_encoder import VectorEncoderInterface
+from skye.exceptions import ConfigurationError
 
 class ProviderRegistry:
     """Registry for model and embedding providers."""
@@ -143,7 +143,7 @@ class ProviderRegistry:
             available = ", ".join(cls._model_providers.keys())
             raise ConfigurationError(
                 f"Provider '{name}' not found. Available: {available}. "
-                f"Install with: pip install nimbus[{name}]"
+                f"Install with: pip install skyeai[{name}]"
             )
         return cls._model_providers[name](**config)
     
@@ -154,7 +154,7 @@ class ProviderRegistry:
             available = ", ".join(cls._embedding_providers.keys())
             raise ConfigurationError(
                 f"Embedding provider '{name}' not found. Available: {available}. "
-                f"Install with: pip install nimbus[{name}]"
+                f"Install with: pip install skyeai[{name}]"
             )
         return cls._embedding_providers[name](**config)
     
@@ -190,7 +190,7 @@ class LazyImporter:
         Args:
             module_name: The module to import (e.g., 'openai')
             package_name: The package name for pip (e.g., 'openai')
-            install_extra: The nimbus extra to install (e.g., 'openai')
+            install_extra: The skye extra to install (e.g., 'openai')
         """
         try:
             return importlib.import_module(module_name)
@@ -200,7 +200,7 @@ class LazyImporter:
             raise ImportError(
                 f"The '{module_name}' package is required but not installed. "
                 f"Install it with: pip install {pkg} "
-                f"or install the nimbus extra: pip install nimbus[{extra}]"
+                f"or install the skye extra: pip install skyeai[{extra}]"
             ) from e
     
     @staticmethod
@@ -226,9 +226,9 @@ class OpenAIProvider(BaseModelProvider):
 ```python
 from abc import ABC, abstractmethod
 from typing import Iterator, Optional, Dict, Any
-from nimbus.interfaces.model import ModelInterface
-from nimbus.completion import CompletionRequest, CompletionResponse, StreamChunk
-from nimbus.exceptions import ProviderError
+from skye.interfaces.model import ModelInterface
+from skye.completion import CompletionRequest, CompletionResponse, StreamChunk
+from skye.exceptions import ProviderError
 
 class BaseModelProvider(ModelInterface, ABC):
     """Abstract base class for model providers."""
@@ -317,7 +317,7 @@ class BaseModelProvider(ModelInterface, ABC):
 ```python
 from abc import ABC, abstractmethod
 from typing import List
-from nimbus.interfaces.vector_encoder import VectorEncoderInterface
+from skye.interfaces.vector_encoder import VectorEncoderInterface
 
 class BaseEmbeddingProvider(VectorEncoderInterface, ABC):
     """Abstract base class for embedding providers."""
@@ -367,18 +367,18 @@ class BaseEmbeddingProvider(VectorEncoderInterface, ABC):
 
 ### 4. Request/Response Transformers
 
-**Purpose**: Convert between nimbus models and provider-specific formats.
+**Purpose**: Convert between skye models and provider-specific formats.
 
 **Message Transformation**:
 ```python
 from typing import List, Dict, Any
-from nimbus.messages import NimbusMessage, UserMessage, AssistantMessage, SystemMessage, CapabilityMessage
+from skye.messages import SkyeMessage, UserMessage, AssistantMessage, SystemMessage, CapabilityMessage
 
 class MessageTransformer:
-    """Transform nimbus messages to provider formats."""
+    """Transform skye messages to provider formats."""
     
     @staticmethod
-    def to_openai_format(messages: List[NimbusMessage]) -> List[Dict[str, Any]]:
+    def to_openai_format(messages: List[SkyeMessage]) -> List[Dict[str, Any]]:
         """Convert to OpenAI message format."""
         result = []
         for msg in messages:
@@ -397,7 +397,7 @@ class MessageTransformer:
         return result
     
     @staticmethod
-    def to_anthropic_format(messages: List[NimbusMessage]) -> tuple[Optional[str], List[Dict[str, Any]]]:
+    def to_anthropic_format(messages: List[SkyeMessage]) -> tuple[Optional[str], List[Dict[str, Any]]]:
         """Convert to Anthropic format (separate system message)."""
         system = None
         anthropic_messages = []
@@ -431,7 +431,7 @@ class MessageTransformer:
         return system, anthropic_messages
     
     @staticmethod
-    def to_bedrock_format(messages: List[NimbusMessage]) -> List[Dict[str, Any]]:
+    def to_bedrock_format(messages: List[SkyeMessage]) -> List[Dict[str, Any]]:
         """Convert to Bedrock Converse API format."""
         result = []
         for msg in messages:
@@ -470,7 +470,7 @@ class MessageTransformer:
 import base64
 from pathlib import Path
 from typing import Union, Dict, Any
-from nimbus.exceptions import ValidationError
+from skye.exceptions import ValidationError
 
 class ImageHandler:
     """Handle image inputs for multimodal models."""
@@ -596,8 +596,8 @@ class ImageHandler:
 **TokenCounter**:
 ```python
 from typing import List, Optional
-from nimbus.messages import NimbusMessage
-from nimbus.exceptions import ConfigurationError
+from skye.messages import SkyeMessage
+from skye.exceptions import ConfigurationError
 
 class TokenCounter:
     """Calculate token counts for different models."""
@@ -612,7 +612,7 @@ class TokenCounter:
         return len(tokenizer.encode(text))
     
     @classmethod
-    def count_message_tokens(cls, messages: List[NimbusMessage], model: str) -> int:
+    def count_message_tokens(cls, messages: List[SkyeMessage], model: str) -> int:
         """Count tokens for a list of messages."""
         total = 0
         for msg in messages:
@@ -660,7 +660,7 @@ class TokenCounter:
 **CostCalculator**:
 ```python
 from typing import Dict, Optional
-from nimbus.completion import TokenUsage
+from skye.completion import TokenUsage
 
 class CostCalculator:
     """Calculate API costs based on token usage."""
@@ -710,8 +710,8 @@ class CostCalculator:
 **OpenAI Provider**:
 ```python
 from typing import Dict, Any, Iterator, Optional
-from nimbus.completion import CompletionRequest, CompletionResponse, StreamChunk, TokenUsage
-from nimbus.messages import AssistantMessage
+from skye.completion import CompletionRequest, CompletionResponse, StreamChunk, TokenUsage
+from skye.messages import AssistantMessage
 from datetime import datetime
 
 class OpenAIProvider(BaseModelProvider):
@@ -970,7 +970,7 @@ class OpenAIEmbeddingProvider(BaseEmbeddingProvider):
 
 ## Data Models
 
-All data models are defined in nimbus-core. This component only implements transformations between nimbus models and provider-specific formats.
+All data models are defined in skye-core. This component only implements transformations between skye models and provider-specific formats.
 
 ## Error Handling
 
@@ -1059,9 +1059,9 @@ tests/
 ## Package Structure
 
 ```
-nimbus/
+skye/
 └── src/
-    └── nimbus/
+    └── skye/
         └── providers/
             ├── __init__.py              # Provider registry, exports
             ├── base.py                  # Base provider classes
@@ -1106,7 +1106,7 @@ all-providers = ["openai>=1.0", "anthropic>=0.25", "boto3>=1.28", "azure-ai-infe
 ## Design Decisions
 
 1. **Lazy Loading**: Providers are only imported when instantiated, reducing startup time and memory
-2. **Transformation Pattern**: Clean separation between nimbus and provider formats makes adding providers easier
+2. **Transformation Pattern**: Clean separation between skye and provider formats makes adding providers easier
 3. **Optional boto3**: Bedrock provider works without boto3 dependency in Lambda environments
 4. **Unified Multimodal**: ImageHandler provides consistent interface across providers
 5. **Cost Tracking**: Built-in cost estimation helps developers monitor spending

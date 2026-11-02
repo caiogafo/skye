@@ -1,10 +1,10 @@
-"""Import-direction checks over src/nimbus: Layer ceiling, allowed sets, orchestrator isolation.
+"""Import-direction checks over src/skye: Layer ceiling, allowed sets, orchestrator isolation.
 
 Pure static analysis with `ast`: no network, no install, same result for the same tree.
-Spec: .kiro/specs/structure/design.md (Allowed_Imports_Matrix), Requirements 2.3, 2.5, 2.6,
+Spec: .kiro/steering/11-design.md (allowed imports); history in .kiro/specs/skye-structure/design.md (Allowed_Imports_Matrix), Requirements 2.3, 2.5, 2.6,
 2.7, 12.3, 12.6, 12.8, 12.9.
 
-Every top-level name below nimbus is mapped to its Component before the matrix is applied.
+Every top-level name below skye is mapped to its Component before the matrix is applied.
 """
 
 from __future__ import annotations
@@ -12,7 +12,7 @@ from __future__ import annotations
 import ast
 from pathlib import Path
 
-SRC = Path(__file__).resolve().parents[2] / "src" / "nimbus"
+SRC = Path(__file__).resolve().parents[2] / "src" / "skye"
 
 LAYERS = {"base": 0, "adapters": 1, "services": 2, "runtime": 3}
 COMPONENT_LAYER = {
@@ -67,7 +67,7 @@ NON_COMPONENT_TO_COMPONENT = {
 
 
 def component_of(parts: tuple[str, ...]) -> str | None:
-    """Component owning a module path below nimbus (('models', 'base') -> 'models')."""
+    """Component owning a module path below skye (('models', 'base') -> 'models')."""
     if not parts:
         return None
     head = parts[0]
@@ -83,7 +83,7 @@ def _module_parts(path: Path) -> tuple[str, ...]:
 
 
 def _imports(path: Path) -> list[tuple[str, ...]]:
-    """Every nimbus-internal import in the file, as a path below nimbus."""
+    """Every skye-internal import in the file, as a path below skye."""
     package = _module_parts(path)
     if path.name != "__init__.py":
         package = package[:-1]
@@ -92,20 +92,20 @@ def _imports(path: Path) -> list[tuple[str, ...]]:
         if isinstance(node, ast.Import):
             for alias in node.names:
                 p = alias.name.split(".")
-                if p[0] == "nimbus":
+                if p[0] == "skye":
                     found.append(tuple(p[1:]))
         elif isinstance(node, ast.ImportFrom):
             if node.level:
                 base = package[: len(package) - (node.level - 1)] if node.level > 1 else package
                 mod = tuple(node.module.split(".")) if node.module else ()
                 target = tuple(base) + mod
-            elif node.module and node.module.split(".")[0] == "nimbus":
+            elif node.module and node.module.split(".")[0] == "skye":
                 target = tuple(node.module.split(".")[1:])
             else:
                 continue
             if target:
                 found.append(target)
-            else:  # `from nimbus import x, y`: each name may be a Component
+            else:  # `from skye import x, y`: each name may be a Component
                 found.extend((a.name,) for a in node.names)
     return found
 
@@ -119,7 +119,7 @@ def collect_violations() -> list[dict[str, str]]:
     for path in sorted(SRC.rglob("*.py")):
         parts = _module_parts(path)
         importer = component_of(parts)
-        if importer is None:  # nimbus/__init__.py: the public façade, not a Component
+        if importer is None:  # skye/__init__.py: the public façade, not a Component
             continue
         for target in _imports(path):
             imported = component_of(target)
@@ -181,7 +181,7 @@ def test_every_module_resolves_to_a_component() -> None:
         for p in SRC.rglob("*.py")
         if len(_module_parts(p)) > 0 and component_of(_module_parts(p)) is None
     ]
-    assert not unmapped, f"Modules under src/nimbus owned by no Component: {unmapped}"
+    assert not unmapped, f"Modules under src/skye owned by no Component: {unmapped}"
 
 
 def test_no_import_violates_the_matrix() -> None:

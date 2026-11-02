@@ -2,7 +2,7 @@
 
 ## Introduction
 
-This document specifies the requirements for adding comprehensive prompts support to Nimbus using Jinja2 templating. The feature will provide a robust, production-ready implementation of the existing `PromptBuilderInterface`, enabling template management, few-shot learning, multimodal content support, and structured output generation. The implementation will follow Nimbus's clean architecture principles and be available as an optional extra (`nimbus[prompts]`).
+This document specifies the requirements for adding comprehensive prompts support to Skye using Jinja2 templating. The feature will provide a robust, production-ready implementation of the existing `PromptBuilderInterface`, enabling template management, few-shot learning, multimodal content support, and structured output generation. The implementation will follow Skye's clean architecture principles and be available as an optional extra (`skyeai[prompts]`).
 
 ## Glossary
 
@@ -11,7 +11,7 @@ This document specifies the requirements for adding comprehensive prompts suppor
 - **Template_Registry**: Internal storage system for managing templates with versioning
 - **Variable_Validator**: Component that validates template variables against requirements
 - **Example_Selector**: Component that selects relevant few-shot examples dynamically
-- **Message_Formatter**: Component that converts rendered templates to `NimbusMessage` objects
+- **Message_Formatter**: Component that converts rendered templates to `SkyeMessage` objects
 - **Content_Handler**: Component that processes multimodal content (text, images, audio, etc.)
 - **Schema_Validator**: Component that validates and formats output schemas
 - **Jinja_Environment**: Configured Jinja2 environment with custom filters and macros
@@ -37,7 +37,7 @@ This document specifies the requirements for adding comprehensive prompts suppor
 
 #### Acceptance Criteria
 
-1. WHEN a developer renders a template with all required variables, THE Prompt_Builder SHALL return a list of `NimbusMessage` objects
+1. WHEN a developer renders a template with all required variables, THE Prompt_Builder SHALL return a list of `SkyeMessage` objects
 2. WHEN a developer renders a template with missing required variables, THE Prompt_Builder SHALL raise a ValueError unless the variable is in the allowed missing list
 3. WHEN a developer renders a template with extra variables, THE Prompt_Builder SHALL ignore the extra variables without error
 4. WHEN a developer renders a template, THE Prompt_Builder SHALL merge provided variables with default values, giving priority to provided variables
@@ -86,7 +86,7 @@ This document specifies the requirements for adding comprehensive prompts suppor
 
 #### Acceptance Criteria
 
-1. WHEN a developer sets message roles for template sections, THE Prompt_Builder SHALL create separate `NimbusMessage` objects for each role
+1. WHEN a developer sets message roles for template sections, THE Prompt_Builder SHALL create separate `SkyeMessage` objects for each role
 2. WHEN a developer adds message placeholders, THE Prompt_Builder SHALL allow dynamic insertion of conversation history
 3. WHEN a developer renders a template with role mappings, THE Prompt_Builder SHALL create `SystemMessage`, `UserMessage`, and `AssistantMessage` objects as appropriate
 4. WHEN no role mapping is specified, THE Prompt_Builder SHALL default to creating `UserMessage` objects
@@ -140,17 +140,17 @@ This document specifies the requirements for adding comprehensive prompts suppor
 4. WHEN invalid content types are provided, THE Prompt_Builder SHALL raise a `ValueError` with supported format information
 5. WHEN template validation fails, THE Prompt_Builder SHALL return detailed error information without raising exceptions
 
-### Requirement 11: Integration with Nimbus Architecture
+### Requirement 11: Integration with Skye Architecture
 
-**User Story:** As a developer, I want prompts support to integrate seamlessly with existing Nimbus components, so that I can use it alongside other Nimbus features without conflicts.
+**User Story:** As a developer, I want prompts support to integrate seamlessly with existing Skye components, so that I can use it alongside other Skye features without conflicts.
 
 #### Acceptance Criteria
 
 1. WHEN the prompts module is imported, THE system SHALL only require Jinja2 as an additional dependency
-2. WHEN prompts are rendered, THE Prompt_Builder SHALL create standard `NimbusMessage` objects compatible with all providers
+2. WHEN prompts are rendered, THE Prompt_Builder SHALL create standard `SkyeMessage` objects compatible with all providers
 3. WHEN used with capabilities, THE Prompt_Builder SHALL support `CapabilityMessage` creation and formatting
-4. WHEN configuration is loaded, THE Prompt_Builder SHALL support Nimbus configuration patterns with environment variable substitution
-5. WHEN errors occur, THE Prompt_Builder SHALL use Nimbus exception hierarchy and logging patterns
+4. WHEN configuration is loaded, THE Prompt_Builder SHALL support Skye configuration patterns with environment variable substitution
+5. WHEN errors occur, THE Prompt_Builder SHALL use Skye exception hierarchy and logging patterns
 
 ### Requirement 12: Performance and Caching
 

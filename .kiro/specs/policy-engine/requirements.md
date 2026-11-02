@@ -2,7 +2,7 @@
 
 ## Introduction
 
-The Policy Engine decides whether a principal may perform an action on a resource. Its model is inspired by Cedar, the authorization language from AWS: rules are permit or forbid statements over a principal, an action, a resource and a context. Anything that is not permitted is denied, and a forbid always wins. Nimbus implements a small subset of that model in pure Python with no dependency, so it fits in a Lambda package and can run inside the Gateway, the agent loop and the model router.
+The Policy Engine decides whether a principal may perform an action on a resource. Its model is inspired by Cedar, the authorization language from AWS: rules are permit or forbid statements over a principal, an action, a resource and a context. Anything that is not permitted is denied, and a forbid always wins. Skye implements a small subset of that model in pure Python with no dependency, so it fits in a Lambda package and can run inside the Gateway, the agent loop and the model router.
 
 Status: requirements draft, to be reviewed before design. Items marked OPEN are decisions for the owner.
 

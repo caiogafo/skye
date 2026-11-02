@@ -1,4 +1,4 @@
-"""YAML Configuration for Nimbus Routers.
+"""YAML Configuration for Skye Routers.
 
 This example demonstrates how to configure ModelRouter using YAML files with:
 - Environment variable substitution for secure credential management
@@ -14,8 +14,8 @@ without hardcoding credentials or deployment details in your code.
 import os
 from pathlib import Path
 
-from nimbus.base.messages import UserMessage
-from nimbus.router import ModelRouter
+from skye.base.messages import UserMessage
+from skye.router import ModelRouter
 
 
 def basic_yaml_config():
@@ -116,7 +116,7 @@ def multiple_routing_strategies():
     print("=" * 70)
     
     print("""
-Nimbus supports multiple routing strategies, each optimized for different goals:
+Skye supports multiple routing strategies, each optimized for different goals:
 
 1. ROUND_ROBIN
    - Distributes requests evenly across all targets
@@ -546,7 +546,7 @@ YAML Configuration Best Practices:
 def main():
     """Run all YAML configuration examples."""
     print("\n" + "🔧 " * 25)
-    print("NIMBUS - YAML Configuration Examples")
+    print("SKYE - YAML Configuration Examples")
     print("🔧 " * 25)
     
     try:
@@ -573,7 +573,7 @@ Next Steps:
 For more information:
 - See examples/routing/router_config.yaml for full configuration
 - See examples/routing/README.md for routing documentation
-- See .kiro/steering/nimbus-architecture.md for architecture details
+- See .kiro/steering/00-rules.md for architecture details
 """)
     
     except Exception as e:

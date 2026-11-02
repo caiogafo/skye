@@ -1,4 +1,4 @@
-"""What Nimbus weighs when it is installed.
+"""What Skye weighs when it is installed.
 
 Builds the wheel, installs it in clean virtual environments (core alone, then one extra
 at a time) and compares package count and size with budgets.toml. Needs `uv` and network
@@ -28,7 +28,7 @@ EXTRAS = sorted(e for e in BUDGETS["extras"])
 def workdir():
     if shutil.which("uv") is None:
         pytest.skip("uv is required for footprint budgets")
-    path = Path(tempfile.mkdtemp(prefix="nimbus-budget-"))
+    path = Path(tempfile.mkdtemp(prefix="skye-budget-"))
     yield path
     measure.cleanup(path)
 
@@ -71,7 +71,7 @@ def test_core_modules_import_without_extras(core_env) -> None:
     python, _site, _size = core_env
     known = set(BUDGETS["core"]["known_import_failures"])
     broken, fixed = [], []
-    for module in measure.nimbus_subpackages():
+    for module in measure.skye_subpackages():
         ok = measure.importable(python, module)
         if not ok and module not in known:
             broken.append(module)
@@ -89,11 +89,11 @@ def test_core_load_in_clean_environment(core_env) -> None:
     data = measure.load_metrics(python)
     budget = BUDGETS["load"]
     assert not (set(budget["forbidden_at_import"]) & set(data["loaded"]))
-    assert data["modules"] <= budget["max_modules_loaded"], f"`import nimbus` loads {data['modules']} modules"
-    assert data["ms"] <= budget["max_import_ms"], f"`import nimbus` takes {data['ms']:.0f} ms"
-    assert data["rss_mb"] <= budget["max_rss_delta_mb"], f"`import nimbus` adds {data['rss_mb']:.0f} MB"
+    assert data["modules"] <= budget["max_modules_loaded"], f"`import skye` loads {data['modules']} modules"
+    assert data["ms"] <= budget["max_import_ms"], f"`import skye` takes {data['ms']:.0f} ms"
+    assert data["rss_mb"] <= budget["max_rss_delta_mb"], f"`import skye` adds {data['rss_mb']:.0f} MB"
     report(
-        f"| import nimbus (clean core) | {data['modules']} modules (max {budget['max_modules_loaded']}) | "
+        f"| import skye (clean core) | {data['modules']} modules (max {budget['max_modules_loaded']}) | "
         f"{data['ms']:.0f} ms (max {budget['max_import_ms']}) | {data['rss_mb']:.0f} MB RSS (max {budget['max_rss_delta_mb']}) |"
     )
 

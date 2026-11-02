@@ -8,7 +8,7 @@ echo "Running mypy type checking with strict mode..."
 echo "=============================================="
 
 # Run mypy with strict mode
-uv run mypy src/nimbus --strict
+uv run mypy src/skye --strict
 
 # If we get here, no errors were found
 echo ""

@@ -1,6 +1,6 @@
-"""Basic Nimbus Usage Example.
+"""Basic Skye Usage Example.
 
-This example demonstrates the core concepts of Nimbus:
+This example demonstrates the core concepts of Skye:
 - Creating completion requests with messages
 - Using different message types
 - Working with token usage
@@ -13,10 +13,10 @@ Note: Set environment variables for API keys:
 """
 
 import os
-from nimbus.models.registry import provider as create_provider
+from skye.models.registry import provider as create_provider
 from pydantic import BaseModel
 
-from nimbus.base.messages import UserMessage, AssistantMessage, SystemMessage
+from skye.base.messages import UserMessage, AssistantMessage, SystemMessage
 
 
 def basic_completion_example():
@@ -184,7 +184,7 @@ def capability_message_example():
     print("Capability Message Example")
     print("=" * 60)
     
-    from nimbus.base.messages import CapabilityMessage
+    from skye.base.messages import CapabilityMessage
     
     # Assistant calls a capability
     assistant_msg = AssistantMessage(
@@ -286,7 +286,7 @@ def bedrock_example():
 def main():
     """Run all examples."""
     print("\n" + "🌥️  " * 20)
-    print("NIMBUS - Basic Examples")
+    print("SKYE - Basic Examples")
     print("🌥️  " * 20)
     
     basic_completion_example()

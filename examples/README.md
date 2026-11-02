@@ -1,20 +1,20 @@
-# Nimbus Examples
+# Skye Examples
 
-Welcome to the Nimbus examples directory! This collection demonstrates how to use Nimbus for building GenAI applications.
+Welcome to the Skye examples directory! This collection demonstrates how to use Skye for building GenAI applications.
 
 ## Quick Start
 
 ### Installation
 
 ```bash
-# Install Nimbus with OpenAI support
-pip install nimbus[openai]
+# Install Skye with OpenAI support
+pip install skyeai[openai]
 
 # Install with multiple providers
-pip install nimbus[openai,anthropic,bedrock]
+pip install skyeai[openai,anthropic,bedrock]
 
 # Install everything
-pip install nimbus[all]
+pip install skyeai[all]
 ```
 
 ### Set Up API Keys
@@ -118,8 +118,8 @@ python examples/advanced/streaming.py
 ### Basic Completion
 
 ```python
-from nimbus.models.registry import provider as create_provider
-from nimbus.base.messages import UserMessage
+from skye.models.registry import provider as create_provider
+from skye.base.messages import UserMessage
 
 client = create_provider("openai", api_key="sk-...")
 
@@ -134,8 +134,8 @@ print(response.content)
 ### With Capabilities
 
 ```python
-from nimbus.models.registry import provider as create_provider
-from nimbus.base.messages import UserMessage
+from skye.models.registry import provider as create_provider
+from skye.base.messages import UserMessage
 
 client = create_provider("openai", api_key="sk-...")
 
@@ -166,7 +166,7 @@ response = client.complete(
 ### With Routing
 
 ```python
-from nimbus.router import ModelRouter, ModelTarget, RouteConfig
+from skye.router import ModelRouter, ModelTarget, RouteConfig
 
 router = ModelRouter(
     routes=[
@@ -208,7 +208,7 @@ routes:
 ```
 
 ```python
-from nimbus.router import ModelRouter
+from skye.router import ModelRouter
 
 router = ModelRouter.from_yaml("router_config.yaml")
 response = router.complete(
@@ -264,26 +264,26 @@ export OPENAI_API_KEY="sk-..."
 
 ```bash
 # Install provider extras
-pip install nimbus[openai]
-pip install nimbus[anthropic]
-pip install nimbus[bedrock]
+pip install skyeai[openai]
+pip install skyeai[anthropic]
+pip install skyeai[bedrock]
 ```
 
 ### Import Errors
 
 ```bash
-# Make sure Nimbus is installed
-pip install nimbus
+# Make sure Skye is installed
+pip install skyeai
 
 # Check installation
-python -c "import nimbus; print(nimbus.__version__)"
+python -c "import skye; print(skye.__version__)"
 ```
 
 ## Documentation
 
-- [Nimbus Documentation](https://github.com/nimbus-ai/nimbus)
-- [API Reference](https://github.com/nimbus-ai/nimbus/docs)
-- [Architecture Guide](https://github.com/nimbus-ai/nimbus/docs/architecture.md)
+- [Skye Documentation](https://github.com/skyeai/skye)
+- [API Reference](https://github.com/skyeai/skye/docs)
+- [Architecture Guide](https://github.com/skyeai/skye/docs/architecture.md)
 
 ## Contributing
 
@@ -296,14 +296,14 @@ Found a bug or want to add an example? Contributions are welcome!
 
 ## License
 
-These examples are part of Nimbus and are licensed under the same license as the main project.
+These examples are part of Skye and are licensed under the same license as the main project.
 
 ## Support
 
-- 📖 [Documentation](https://github.com/nimbus-ai/nimbus)
-- 💬 [Discussions](https://github.com/nimbus-ai/nimbus/discussions)
-- 🐛 [Issues](https://github.com/nimbus-ai/nimbus/issues)
-- 📧 [Email](mailto:support@nimbus-ai.com)
+- 📖 [Documentation](https://github.com/skyeai/skye)
+- 💬 [Discussions](https://github.com/skyeai/skye/discussions)
+- 🐛 [Issues](https://github.com/skyeai/skye/issues)
+- 📧 [Email](mailto:support@skyeai.com)
 
 ---
 

@@ -1,6 +1,6 @@
 # Integration Tests
 
-This directory contains integration tests that verify interactions between multiple Nimbus components.
+This directory contains integration tests that verify interactions between multiple Skye components.
 
 ## Purpose
 
@@ -75,9 +75,9 @@ export AWS_REGION="us-east-1"
 
 ```python
 import pytest
-from nimbus.router import ModelRouter
-from nimbus.base.completion import CompletionRequest
-from nimbus.base.messages import UserMessage
+from skye.router import ModelRouter
+from skye.base.completion import CompletionRequest
+from skye.base.messages import UserMessage
 
 @pytest.mark.integration
 def test_router_with_yaml_config():
@@ -117,7 +117,7 @@ import os
 )
 def test_openai_provider_real_api():
     """Test OpenAI provider with real API call."""
-    from nimbus.models.llm.openai import OpenAIProvider
+    from skye.models.llm.openai import OpenAIProvider
     
     provider = OpenAIProvider(api_key=os.getenv("OPENAI_API_KEY"))
     
@@ -137,8 +137,8 @@ def test_openai_provider_real_api():
 
 ```python
 import pytest
-from nimbus.router import ModelRouter
-from nimbus.tools import CapabilityRegistry, capability
+from skye.router import ModelRouter
+from skye.tools import CapabilityRegistry, capability
 
 @pytest.mark.integration
 def test_router_with_capabilities():
@@ -174,8 +174,8 @@ def test_router_with_capabilities():
 
 ```python
 import pytest
-from nimbus.router import ModelRouter
-from nimbus.base.exceptions import ProviderError
+from skye.router import ModelRouter
+from skye.base.exceptions import ProviderError
 
 @pytest.mark.integration
 def test_fallback_chain_execution():
@@ -235,7 +235,7 @@ def test_slow_integration():
 
 ```python
 import pytest
-from nimbus.router import ModelRouter
+from skye.router import ModelRouter
 
 @pytest.fixture
 def configured_router():
@@ -279,7 +279,7 @@ async def test_async_routing():
 
 ```python
 import pytest
-from nimbus.router import ModelRouter
+from skye.router import ModelRouter
 
 @pytest.mark.integration
 def test_yaml_config_loading():
@@ -324,4 +324,4 @@ Integration tests should verify:
 - [Main Test README](../README.md)
 - [Unit Tests](../unit/README.md)
 - [Stress Tests](../stress/README.md)
-- [Nimbus Architecture](../../.kiro/steering/nimbus-architecture.md)
+- [Skye Architecture](../../.kiro/steering/00-rules.md)

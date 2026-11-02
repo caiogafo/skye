@@ -1,6 +1,6 @@
 # Unit Tests
 
-This directory contains fast, isolated unit tests for individual Nimbus components.
+This directory contains fast, isolated unit tests for individual Skye components.
 
 ## Purpose
 
@@ -51,7 +51,7 @@ pytest tests/unit/providers/
 pytest tests/unit/routes/
 
 # Run with coverage
-pytest tests/unit/ --cov=src/nimbus --cov-report=html
+pytest tests/unit/ --cov=src/skye --cov-report=html
 
 # Run in parallel
 pytest tests/unit/ -n auto
@@ -63,7 +63,7 @@ pytest tests/unit/ -n auto
 
 ```python
 import pytest
-from nimbus.tools import CapabilityCall, CapabilityResult
+from skye.tools import CapabilityCall, CapabilityResult
 
 def test_capability_call_creation():
     """Test creating a capability call with valid data."""
@@ -87,7 +87,7 @@ def test_capability_call_validation():
 
 ```python
 import pytest
-from nimbus.router import ModelRouter, ModelTarget
+from skye.router import ModelRouter, ModelTarget
 
 @pytest.fixture
 def sample_router():
@@ -118,7 +118,7 @@ def test_router_selection(sample_router):
 from unittest.mock import Mock, patch
 import pytest
 
-@patch('nimbus.models.llm.openai_compatible.OpenAI')
+@patch('skye.models.llm.openai_compatible.OpenAI')
 def test_openai_provider_completion(mock_openai):
     """Test OpenAI provider with mocked API."""
     # Setup mock
@@ -246,4 +246,4 @@ def test_error_handling():
 - [Main Test README](../README.md)
 - [Integration Tests](../integration/README.md)
 - [Stress Tests](../stress/README.md)
-- [Python Standards](../../.kiro/steering/python-standards.md)
+- [Python Standards](../../.kiro/steering/00-rules.md)

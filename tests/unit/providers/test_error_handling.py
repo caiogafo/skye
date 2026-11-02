@@ -14,8 +14,8 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from nimbus.base.exceptions import ProviderError
-from nimbus.models.transport.error_mapping import ErrorHandler
+from skye.base.exceptions import ProviderError
+from skye.models.transport.error_mapping import ErrorHandler
 
 
 class TestOpenAIErrorHandling:

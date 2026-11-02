@@ -7,7 +7,7 @@ This document summarizes the additions made to the Capability Support spec to in
 ## Key Features Added
 
 ### 1. MCPCapability Class
-- Wraps MCP server tools as Nimbus capabilities
+- Wraps MCP server tools as Skye capabilities
 - Automatic schema conversion from MCP format to CapabilitySchema
 - Support for OpenAPI-based MCP tools
 - Schema caching for performance optimization
@@ -35,7 +35,7 @@ This document summarizes the additions made to the Capability Support spec to in
 **Acceptance Criteria:**
 1. Support loading tools from MCP servers via FastMCP library
 2. Provide MCPCapability class for wrapping MCP tools
-3. Automatically convert MCP tool schemas to Nimbus CapabilitySchema format
+3. Automatically convert MCP tool schemas to Skye CapabilitySchema format
 4. Support both local and remote MCP servers
 5. Make FastMCP an optional dependency (not required for base functionality)
 6. Provide helpful error messages when FastMCP is not installed
@@ -116,13 +116,13 @@ class MCPServerClient:
 
 ```bash
 # Base capabilities (local functions, remote APIs)
-pip install nimbus
+pip install skyeai
 
 # With MCP support
-pip install nimbus[mcp]
+pip install skyeai[mcp]
 
 # All capabilities
-pip install nimbus[capabilities]
+pip install skyeai[capabilities]
 ```
 
 ### pyproject.toml Configuration
@@ -138,7 +138,7 @@ capabilities = ["requests>=2.31", "httpx>=0.24", "fastmcp>=0.1.0"]
 ### FastMCP Lazy Loading
 - Import FastMCP only when MCPCapability is instantiated
 - Provide helpful error message if FastMCP not installed
-- Error message suggests: `pip install nimbus[mcp]`
+- Error message suggests: `pip install skyeai[mcp]`
 
 ### MCP Tool Schema Conversion
 - Convert MCP tool format to CapabilitySchema

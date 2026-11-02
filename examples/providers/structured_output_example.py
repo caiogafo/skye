@@ -1,6 +1,6 @@
 """Structured Output Example.
 
-This example demonstrates how to use structured outputs with Nimbus.
+This example demonstrates how to use structured outputs with Skye.
 
 Features shown:
 - Basic structured output
@@ -11,9 +11,9 @@ Features shown:
 
 import os
 from pydantic import BaseModel, Field
-from nimbus.base.completion import CompletionRequest
-from nimbus.base.messages import UserMessage
-from nimbus.models import ProviderRegistry
+from skye.base.completion import CompletionRequest
+from skye.base.messages import UserMessage
+from skye.models import ProviderRegistry
 
 
 def basic_structured_output():
@@ -362,7 +362,7 @@ def optional_fields():
 def main():
     """Run all examples."""
     print("\n" + "📋 " * 20)
-    print("NIMBUS - Structured Output Examples")
+    print("SKYE - Structured Output Examples")
     print("📋 " * 20)
     
     try:
@@ -378,14 +378,14 @@ def main():
         print("=" * 60)
         print("\nKey points:")
         print("  • Define schemas using Pydantic BaseModel")
-        print("  • Nimbus handles schema validation automatically")
+        print("  • Skye handles schema validation automatically")
         print("  • Responses are type-safe Python objects")
         print("  • Supports nested schemas, lists, enums, and validation")
         
     except Exception as e:
         print(f"\n❌ Error: {e}")
         print("\nMake sure you have:")
-        print("  1. Installed nimbus[openai]: pip install nimbus[openai]")
+        print("  1. Installed skyeai[openai]: pip install skyeai[openai]")
         print("  2. Set OPENAI_API_KEY: export OPENAI_API_KEY='sk-...'")
 
 

@@ -1,9 +1,9 @@
-"""Message role management examples for Nimbus Prompts Support.
+"""Message role management examples for Skye Prompts Support.
 
 This script demonstrates message role management and template composition.
 """
 
-from nimbus.prompts import MockPromptBuilder
+from skye.prompts import MockPromptBuilder
 
 
 def basic_message_roles():
@@ -53,7 +53,7 @@ def template_composition():
 
 def main():
     """Run all message role examples."""
-    print("Nimbus Prompts Support - Message Role Examples")
+    print("Skye Prompts Support - Message Role Examples")
     print("=" * 50)
     
     basic_message_roles()

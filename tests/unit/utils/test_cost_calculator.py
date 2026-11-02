@@ -5,8 +5,8 @@ Tests cost calculation functionality for various models and scenarios.
 
 import pytest
 
-from nimbus.base.completion import TokenUsage
-from nimbus.models.transport.cost import CostCalculator
+from skye.base.completion import TokenUsage
+from skye.models.transport.cost import CostCalculator
 
 
 class TestCostCalculator:
