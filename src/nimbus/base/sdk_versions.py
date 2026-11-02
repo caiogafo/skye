@@ -21,7 +21,7 @@ class SdkRef(NamedTuple):
 
 
 SDK_REFERENCE: dict[str, SdkRef] = {
-    "mcp": SdkRef("fastmcp", "fastmcp", "mcp", "4.1.4"),
+    "mcp": SdkRef("fastmcp", "fastmcp", "tools", "4.1.4"),
     "openai": SdkRef("openai", "openai", "openai", "2.8.1"),
     "anthropic": SdkRef("anthropic", "anthropic", "anthropic", "0.73.0"),
     "bedrock": SdkRef("boto3", "boto3", "bedrock", "1.40.75"),

@@ -25,6 +25,16 @@ from nimbus.base.interfaces.prompt import PromptBuilderInterface
 from nimbus.prompts.loaders import load_default_templates
 from nimbus.base.messages import NimbusMessage, UserMessage, SystemMessage, AssistantMessage
 
+# The role-based message types are re-exported from here so peers (e.g. the `tools` MCP client's
+# prompt facet, Req 19.2) can consume the `prompts` prompt type without reaching into `base`.
+__all__ = [
+    "BasePromptBuilder",
+    "NimbusMessage",
+    "UserMessage",
+    "SystemMessage",
+    "AssistantMessage",
+]
+
 
 class BasePromptBuilder(PromptBuilderInterface):
     """Base implementation of PromptBuilderInterface.

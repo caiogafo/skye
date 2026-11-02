@@ -46,6 +46,8 @@ EXTRA_PATHS: dict[str, list[str]] = {
         "models/embeddings/google_multimodal_embeddings.py",
     ],
     "cohere": ["models/embeddings/cohere_embeddings.py"],
+    # The tools Component owns the MCP client (built-in + fastmcp); fastmcp moved from the removed
+    # `mcp` extra into `tools` (Req 19.7), so all tools/mcp_*.py files belong to this extra.
     "tools": [
         "tools/__init__.py",
         "tools/capability_call_handler.py",
@@ -55,13 +57,15 @@ EXTRA_PATHS: dict[str, list[str]] = {
         "tools/interface.py",
         "tools/local_function.py",
         "tools/mcp_boundary.py",
+        "tools/mcp_capability.py",
         "tools/mcp_client.py",
+        "tools/mcp_fastmcp.py",
         "tools/mcp_resource.py",
+        "tools/mcp_server_client.py",
         "tools/registry.py",
         "tools/remote_api.py",
         "tools/schema.py",
     ],
-    "mcp": ["tools/mcp_capability.py", "tools/mcp_server_client.py", "tools/mcp_fastmcp.py"],
     "memory": ["memory", "store/redis.py", "store/postgres.py"],
     "observe": ["observe"],
 }

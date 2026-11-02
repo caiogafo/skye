@@ -4,14 +4,23 @@ This module provides Pydantic models for representing capability calls from LLMs
 and the results of executing those capability calls.
 """
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from pydantic import BaseModel, Field
 
-from nimbus.base.completion import (  # noqa: F401  (re-export)
+from nimbus.base.completion import (
     CapabilityCall,
     ExecutableCapabilityCall,
 )
+
+if TYPE_CHECKING:
+    from nimbus.base.messages import CapabilityMessage
+
+__all__ = [
+    "CapabilityCall",
+    "ExecutableCapabilityCall",
+    "CapabilityResult",
+]
 
 
 class CapabilityResult(BaseModel):
@@ -33,7 +42,7 @@ class CapabilityResult(BaseModel):
         ...     name="weather.get_current",
         ...     result={"temperature": 72, "condition": "sunny"}
         ... )
-        
+
         >>> error_result = CapabilityResult(
         ...     capability_call_id="call_124",
         ...     name="weather.get_current",
@@ -77,8 +86,9 @@ class CapabilityResult(BaseModel):
             >>> msg.capability_name
             'get_weather'
         """
-        from nimbus.base.messages import CapabilityMessage
         import json
+
+        from nimbus.base.messages import CapabilityMessage
 
         # Format the content based on whether there's an error
         if self.error:
@@ -93,7 +103,5 @@ class CapabilityResult(BaseModel):
                 content = str(self.result)
 
         return CapabilityMessage(
-            content=content,
-            capability_id=self.capability_call_id,
-            capability_name=self.name
+            content=content, capability_id=self.capability_call_id, capability_name=self.name
         )

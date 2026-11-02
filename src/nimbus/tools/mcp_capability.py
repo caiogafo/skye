@@ -31,7 +31,7 @@ class MCPCapability(CapabilityInterface):
 
     The FastMCP library is required to use this class. If FastMCP is not installed,
     a helpful error message will be displayed directing users to install it with:
-    `pip install nimbus[mcp]` or `pip install fastmcp>=0.1.0`
+    `pip install nimbus[tools]` or `pip install fastmcp>=0.1.0`
 
     Attributes:
         mcp_tool: The MCP tool definition dictionary
@@ -81,7 +81,7 @@ class MCPCapability(CapabilityInterface):
         except ImportError as e:
             raise ImportError(
                 "FastMCP is required to use MCPCapability. "
-                "Install it with: pip install nimbus[mcp] or pip install fastmcp>=0.1.0"
+                "Install it with: pip install nimbus[tools] or pip install fastmcp>=0.1.0"
             ) from e
 
         # Validate MCP tool definition
@@ -116,45 +116,6 @@ class MCPCapability(CapabilityInterface):
                 "cache_enabled": cache_schema,
             },
         )
-
-    def get_schema(self) -> CapabilitySchema:
-        """Get the capability schema converted from MCP format.
-
-        Converts the MCP tool definition to Nimbus CapabilitySchema format.
-        If caching is enabled, the schema is cached after the first conversion.
-
-        Returns:
-            CapabilitySchema: The converted capability schema
-
-        Raises:
-            CapabilityValidationError: If schema conversion fails
-
-        Example:
-            >>> capability = MCPCapability(mcp_tool)
-            >>> schema = capability.get_schema()
-            >>> print(schema.name)
-            "get_weather"
-        """
-        # Return cached schema if available
-        if self._cache_schema and self._cached_schema is not None:
-            return self._cached_schema
-
-        try:
-            # Convert MCP tool to CapabilitySchema
-            schema = self._convert_mcp_to_schema(self._mcp_tool)
-
-            # Cache if enabled
-            if self._cache_schema:
-                self._cached_schema = schema
-
-            return schema
-
-        except Exception as e:
-            raise CapabilityValidationError(
-                f"Failed to convert MCP tool schema: {e}",
-                capability_name=self._mcp_tool.get("name", "<unknown>"),
-                original_error=str(e),
-            ) from e
 
     def execute(self, **kwargs: Any) -> Any:
         """Execute the MCP tool synchronously.
@@ -216,8 +177,8 @@ class MCPCapability(CapabilityInterface):
         tool_name = self._mcp_tool.get("name", "<unknown>")
 
         try:
-            # Import FastMCP client
-            from fastmcp import FastMCP
+            # Import FastMCP client (availability probe only; raises below if absent)
+            from fastmcp import FastMCP  # noqa: F401
 
             # Note: In a real implementation, this would use an actual MCP client
             # connection that was established when the tool was loaded from the server.
@@ -232,7 +193,7 @@ class MCPCapability(CapabilityInterface):
         except ImportError as e:
             raise CapabilityExecutionError(
                 f"FastMCP is required to execute MCP tool '{tool_name}'. "
-                "Install it with: pip install nimbus[mcp]",
+                "Install it with: pip install nimbus[tools]",
                 capability_name=tool_name,
                 original_error=str(e),
             ) from e

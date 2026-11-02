@@ -8,7 +8,6 @@ Note: MCP uses the term "tool" in its specification, so you'll see references to
 These are wrapped as Nimbus capabilities for use in the framework.
 """
 
-import asyncio
 import logging
 from typing import Any
 
@@ -28,7 +27,7 @@ class MCPServerClient:
 
     The FastMCP library is required to use this class. If FastMCP is not installed,
     a helpful error message will be displayed directing users to install it with:
-    `pip install nimbus[mcp]` or `pip install fastmcp>=0.1.0`
+    `pip install nimbus[tools]` or `pip install fastmcp>=0.1.0`
 
     Note: MCP uses the term "tool" in its specification. This client wraps MCP tools
     as Nimbus capabilities for seamless integration with the Nimbus framework.
@@ -82,7 +81,7 @@ class MCPServerClient:
         except ImportError as e:
             raise ImportError(
                 "FastMCP is required to use MCPServerClient. "
-                "Install it with: pip install nimbus[mcp] or pip install fastmcp>=0.1.0"
+                "Install it with: pip install nimbus[tools] or pip install fastmcp>=0.1.0"
             ) from e
 
         if not server_name or not server_name.strip():
@@ -132,7 +131,12 @@ class MCPServerClient:
         await self._connect()
         return self
 
-    async def __aexit__(self, exc_type, exc_val, exc_tb) -> None:
+    async def __aexit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: object | None,
+    ) -> None:
         """Async context manager exit.
 
         Args:

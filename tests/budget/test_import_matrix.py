@@ -38,7 +38,7 @@ ALLOWED: dict[str, set[str]] = {
     "models": {"base"},
     "store": {"base"},
     "router": {"base", "models", "store"},
-    "tools": {"base", "prompts"},  # prompts: peer, for the MCP client prompt facet (Req 19.2)
+    "tools": {"base"},  # the MCP prompt facet uses the message types and Port in base, not the prompts component
     "prompts": {"base"},
     "memory": {"base", "store"},
     "guard": {"base", "models"},

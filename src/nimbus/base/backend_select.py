@@ -22,6 +22,7 @@ from __future__ import annotations
 import importlib
 import importlib.metadata
 import os
+import sys
 import warnings
 from collections.abc import Collection, Mapping
 from dataclasses import dataclass
@@ -68,9 +69,16 @@ def _norm(value: Any, where: str) -> str | None:
 
 def _config_section(config: Mapping[str, Any] | None) -> Mapping[str, Any]:
     if config is None:
-        from nimbus.base.config import load_impl_config  # deferred: reads nimbus.yaml only now
+        # Kept out of module scope so this module stays import-cheap. When ``nimbus.base.config``
+        # is already loaded (the normal case once ``nimbus`` is imported) reuse the live module
+        # object directly, which avoids issuing an import statement — robust even when a caller has
+        # patched ``builtins.__import__`` during backend construction.
+        config_mod = sys.modules.get("nimbus.base.config")
+        if config_mod is None:
+            from nimbus.base import config as _config_cold  # cold path: first touch of the loader
 
-        config = load_impl_config()
+            config_mod = _config_cold
+        config = config_mod.load_impl_config()
     section = config.get(CONFIG_KEY) or {}
     if not isinstance(section, Mapping):
         raise ConfigurationError(f"Config key {CONFIG_KEY!r} must be a mapping of backend -> builtin|sdk")

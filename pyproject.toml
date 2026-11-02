@@ -24,8 +24,10 @@ cohere = ["cohere>=5.0"]
 # Individual components
 agents = []
 prompts = ["jinja2>=3.0"]
-tools = []  # remote_api uses the stdlib transport
-mcp = ["fastmcp>=2.0"]  # MCP client (tools/mcp_*.py); heavy and compiled, so kept apart from tools
+# The tools Component owns the MCP client. remote_api uses the stdlib transport; the built-in
+# MCP client is stdlib JSON-RPC over HTTP; fastmcp is the optional full-capability alternative,
+# imported lazily and only when selected. Installing nimbus[tools] provides MCP (Req 19.7).
+tools = ["fastmcp>=2.0"]
 memory = ["redis>=5.0", "asyncpg>=0.29"]
 guard = []
 teams = []  # empty extra: a module of the core, no third-party libraries
@@ -53,8 +55,11 @@ dev = [
     "requests>=2.31",
     "httpx>=0.24",
     "tomli>=2.0; python_version < '3.11'",
-    # Official vendor SDKs + fastmcp: differential-test references only (Req 18.1).
-    # Never a runtime dependency, never an extra for validation.
+    # Official vendor SDKs + fastmcp: differential-test validation oracles only (Req 18.1).
+    # This dev group is the single validation home: never a runtime dependency, and never
+    # declared as an extra *for the validation purpose*. (The same SDKs appear above under
+    # [project.optional-dependencies] as user opt-in backend extras per Req 17 — that is a
+    # separate, allowed concern: a user choosing nimbus[openai] etc. at runtime, not validation.)
     "openai>=1.0",
     "anthropic>=0.25",
     "boto3>=1.28",

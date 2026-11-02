@@ -172,7 +172,7 @@ class CompletionRequest(BaseModel):
             (requires nimbus[capabilities]).
         capability_choice: How the model should choose capabilities ('auto', 'required', or specific capability name).
         mcp_servers: List of MCP server configurations to load capabilities from
-            (requires nimbus[mcp]). Each config should contain server connection details.
+            (requires nimbus[tools]). Each config should contain server connection details.
         response_format: Format specification for structured outputs.
         response_schema: Pydantic model class for structured output validation.
         metadata: Additional metadata for the request.
@@ -219,8 +219,8 @@ class CompletionRequest(BaseModel):
         >>> len(request.capabilities)
         1
 
-    Example (With nimbus[mcp]):
-        >>> # Using MCP servers (requires nimbus[mcp])
+    Example (With nimbus[tools]):
+        >>> # Using MCP servers (requires nimbus[tools])
         >>> request = CompletionRequest(
         ...     messages=[UserMessage(content="What's the weather in NYC?")],
         ...     model="gpt-4",
@@ -252,7 +252,7 @@ class CompletionRequest(BaseModel):
     # 2. CapabilityRegistry instance (enables search/discovery)
     capabilities: list[Any] | Any | None = None  # List[CapabilityInterface] or CapabilityRegistry
     capability_choice: str | None = None  # "auto", "required", or specific capability name
-    # MCP server configurations (requires nimbus[mcp])
+    # MCP server configurations (requires nimbus[tools])
     mcp_servers: list[dict[str, Any]] | None = None
     response_format: dict[str, Any] | None = None
     response_schema: type[BaseModel] | None = None

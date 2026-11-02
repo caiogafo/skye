@@ -156,49 +156,49 @@ This plan executes the target module and folder structure defined in `design.md`
     - Run `make budget-fast` and `make budget`; the whole suite green (all guardrail tests plus budgets) is the definition of done.
     - _Requirements: 2.6, 7.3, 8.6_
 
-- [ ] 14. teams/flows extras and MCP client (decided parts only)
-  - [ ] 14.1 Declare the `teams` and `flows` extras as empty extras
+- [x] 14. teams/flows extras and MCP client (decided parts only)
+  - [x] 14.1 Declare the `teams` and `flows` extras as empty extras
     - Add `[project.optional-dependencies].teams` and `[project.optional-dependencies].flows` to `pyproject.toml`, each with zero third-party libraries, installable as `nimbus[teams]` / `nimbus[flows]`.
     - Add `teams` and `flows` to `[extras_policy].known_empty` in `budgets.toml` (joining agents/guard/prompts).
     - Add `teams` and `flows` rows to the extras table / packaging surface so they are covered by the optional-module packaging rules like every other extra.
     - Verify installing `teams` does not pull `flows` and vice versa; the extras-declare-exactly and known_empty budget tests pass.
     - _Requirements: 14.1, 14.2, 14.4, 14.5, 14.6_
-  - [ ] 14.2 Confirm core works with neither teams nor flows installed
+  - [x] 14.2 Confirm core works with neither teams nor flows installed
     - Verify `import nimbus` never imports the `teams` or `flows` implementation modules, and that the clean-import and AST import-matrix tests pass with neither extra present (they are optional exactly like `agents`).
     - _Requirements: 14.7_
-  - [ ] 14.3 Build the tri-faceted MCP client in `tools` (built-in + fastmcp behind one Port)
+  - [x] 14.3 Build the tri-faceted MCP client in `tools` (built-in + fastmcp behind one Port)
     - Implement the MCP client inside the `tools` Component exposing tools, prompts, and resources: return Nimbus `Capability` objects for tools, Nimbus prompt objects reusing the `prompts` prompt type, and a `Resource` type defined internal to `tools` (no base Port, no new Component).
     - Provide a built-in standard-library JSON-RPC-over-HTTP MCP client and a `fastmcp`-backed implementation behind the same Port, returning identical Nimbus types; convert any `mcp.types.*`/`fastmcp` protocol type to the Nimbus type at exactly one boundary point so no protocol type leaks outside `tools`. Cover 100% of the fields/behaviors Nimbus consumes; reject malformed/absent required fields at the boundary with an error naming the type and field.
     - Associate the MCP dependency (`fastmcp` today) with the `tools` Extra: installing `nimbus[tools]` provides MCP and `fastmcp` is the optional full-capability alternative to the built-in client. There is no separate `mcp` extra and MCP is not folded into `gateway` (supersedes the interim gateway decision).
     - Extend the AST import-matrix test: `tools → prompts` is an allowed peer import (for the MCP prompt facet); `gateway → prompts` is not required for MCP. Selection between built-in and fastmcp follows task 15.1 (import-time, env/config).
     - _Requirements: 19.1, 19.2, 19.3, 19.4, 19.5, 19.6, 19.7, 19.8, 19.9, 19.10_
-  - [ ]* 14.4 Prototype the standard-library MCP client (future target, optional)
+  - [x] 14.4 Prototype the standard-library MCP client (future target, optional)
     - Optionally stage a standard-library MCP client (JSON-RPC over stateless HTTP) on top of `models/transport/http.py`, aiming to drive the `mcp` extra toward zero third-party libraries. Optional because it is a future target, not a current requirement; the `fastmcp` extra remains until this lands.
     - _Requirements: 15.4_
-  - [ ] 14.5 Final budgets checkpoint for the appended work
+  - [x] 14.5 Final budgets checkpoint for the appended work
     - Run `make budget-fast` and `make budget`; the whole suite green (new empty-extra entries plus the MCP decided-scope matrix rule) is the definition of done for this group.
     - _Requirements: 14.1, 15.6_
 
-- [ ] 15. Backend selection, dev/test SDK validation, MCP tri-faceted client, boundary adapters
-  - [ ] 15.1 Implement import-time backend selection via env + config (no user code change)
+- [x] 15. Backend selection, dev/test SDK validation, MCP tri-faceted client, boundary adapters
+  - [x] 15.1 Implement import-time backend selection via env + config (no user code change)
     - Add a single selection mechanism, per backend, choosing the built-in standard-library implementation or a vendor/external implementation behind the same Port; both expose identical signatures/return types.
     - Read the choice from an environment variable (e.g. `NIMBUS_<BACKEND>_IMPL` = `builtin`|`sdk`) and from the config file (e.g. `nimbus.yaml`), with the environment variable taking precedence and an optional global default; default to `builtin` when unspecified.
     - Decide once at import/construction; use one implementation for the whole life of the instance; no per-call fallback and no runtime switching. A selected SDK's runtime error maps to a Nimbus error and propagates.
     - Emit exactly one import-time warning if the installed SDK version differs from the dev-validated reference version; emit a warning on fallback when a requested SDK fails to import; never import a vendor SDK unless selected.
     - _Requirements: 17.1, 17.2, 17.3, 17.4, 17.5, 17.6, 17.7, 17.8, 17.9, 17.10_
-  - [ ] 15.2 Add official SDKs as dev/test-only dependencies and write differential tests
+  - [x] 15.2 Add official SDKs as dev/test-only dependencies and write differential tests
     - Declare official vendor SDKs (and `fastmcp`) in a dev/test dependency group (e.g. `[dependency-groups].dev`), never in `[project.optional-dependencies]` for validation and never as a runtime dependency.
     - Write differential tests that run the same input through the built-in implementation and the SDK implementation and assert equivalence on the subset Nimbus consumes: exact structured fields (field-subset), numeric epsilon for numeric/timing values, error-category-level equivalence; not 1:1 with the full SDK surface.
     - Keep the core-only footprint/clean-import/forbidden_at_import tests in a separate SDK-free environment; ensure SDK presence in dev/CI does not fail them. Allow differential tests needing live credentials/network to skip without failing the suite.
     - _Requirements: 18.1, 18.2, 18.3, 18.4, 18.5, 18.6, 18.7_
-  - [ ] 15.4 Enforce the general built-in-vs-external-library boundary rule
+  - [x] 15.4 Enforce the general built-in-vs-external-library boundary rule
     - Add a test/check asserting no external-library type (provider SDK types, `mcp`/`fastmcp` protocol types) is exposed outside its owning Component — external types are converted to Nimbus types at a single boundary point; both impls sit behind the same Port returning identical Nimbus types.
     - Confirm the rule holds for `models` (REST vs SDK) and `tools` (built-in vs fastmcp); document it as the pattern for future `observe`/`store`/`prompts`/`agents` external backends without new Component/Port.
     - _Requirements: 20.1, 20.2, 20.3, 20.4, 20.5_
-  - [ ] 15.5 Expose agent types via the agents registry behind the Runnable/agent Port
+  - [x] 15.5 Expose agent types via the agents registry behind the Runnable/agent Port
     - Ensure `agents` exposes its agent types (e.g. a ReAct agent) through the agents registry behind the `Runnable`/agent Port, extensible per the extension-point rule; concrete agent-type implementations are deferred to the future `agents` spec (only the registry/boundary is set up here).
     - _Requirements: 20.6, 13.1_
-  - [ ] 15.6 Final budgets checkpoint for this group
+  - [x] 15.6 Final budgets checkpoint for this group
     - Run `make budget-fast` and `make budget`; the full suite green (selection mechanism, differential tests in dev env, MCP client, boundary-leak check) is the definition of done for this group.
     - _Requirements: 17.3, 18.4, 19.8_
 

@@ -19,7 +19,11 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from nimbus.base.exceptions import ValidationError
-from nimbus.prompts.messages import AssistantMessage, NimbusMessage, UserMessage  # the `prompts` prompt/message type (peer import)
+from nimbus.base.messages import (  # the message types live in `base`; `tools` never imports `prompts`
+    AssistantMessage,
+    NimbusMessage,
+    UserMessage,
+)
 from nimbus.tools.mcp_resource import Resource
 from nimbus.tools.schema import CapabilitySchema
 
@@ -52,7 +56,9 @@ class MCPToolResult:
 
 def _fail(type_name: str, field_name: str, problem: str, value: Any = None) -> ValidationError:
     return ValidationError(
-        f"MCP {type_name}: field '{field_name}' {problem}", field=f"{type_name}.{field_name}", value=value
+        f"MCP {type_name}: field '{field_name}' {problem}",
+        field=f"{type_name}.{field_name}",
+        value=value,
     )
 
 
@@ -60,7 +66,8 @@ def _as_dict(raw: Any, type_name: str) -> dict[str, Any]:
     if isinstance(raw, dict):
         return raw
     if hasattr(raw, "model_dump"):
-        return raw.model_dump(by_alias=True, mode="json")
+        dumped: dict[str, Any] = raw.model_dump(by_alias=True, mode="json")
+        return dumped
     if dataclasses.is_dataclass(raw) and not isinstance(raw, type):
         return {f.name: getattr(raw, f.name) for f in dataclasses.fields(raw)}
     raise ValidationError(
@@ -118,7 +125,9 @@ def to_tool_schema(raw: Any) -> CapabilitySchema:
         raise _fail("Tool", "inputSchema", "is required but absent")
     if not isinstance(schema, dict):
         raise _fail("Tool", "inputSchema", "must be an object (JSON Schema)", schema)
-    description = _optional_str(d, "Tool", "description") or _optional_str(d, "Tool", "title") or name
+    description = (
+        _optional_str(d, "Tool", "description") or _optional_str(d, "Tool", "title") or name
+    )
     return CapabilitySchema(
         name=name,
         description=description,
@@ -190,7 +199,12 @@ def to_prompt_messages(raw: Any) -> list[NimbusMessage]:
             raise _fail("PromptMessage", "content", "is required but absent")
         cd = _as_dict(content, "PromptMessage.content")
         if _required_str(cd, where + ".content", "type") != "text":
-            raise _fail("PromptMessage", "content.type", "must be 'text' (other content is not consumed)", cd.get("type"))
+            raise _fail(
+                "PromptMessage",
+                "content.type",
+                "must be 'text' (other content is not consumed)",
+                cd.get("type"),
+            )
         text = _required_str(cd, "PromptMessage.content", "text")
         out.append((UserMessage if role == "user" else AssistantMessage)(content=text))
     return out
@@ -211,7 +225,7 @@ def to_resource(raw: Any) -> Resource:
 
 
 def to_resource_contents(raw: Any) -> Resource:
-    """``mcp.types.TextResourceContents | BlobResourceContents`` -> :class:`Resource` with content."""
+    """``Text`` / ``BlobResourceContents`` -> :class:`Resource` with content."""
     d = _as_dict(raw, "ResourceContents")
     uri = str(_required_str(d, "ResourceContents", "uri"))
     mime = _optional_str(d, "ResourceContents", "mimeType", "mime_type")
@@ -237,7 +251,9 @@ def to_read_resource(raw: Any) -> Resource:
     """``ReadResourceResult`` (``{"contents": [...]}``) or a bare contents list -> first content."""
     contents = raw
     if not isinstance(raw, (list, tuple)):
-        contents = _items(_as_dict(raw, "ReadResourceResult"), "ReadResourceResult", "contents", required=True)
+        contents = _items(
+            _as_dict(raw, "ReadResourceResult"), "ReadResourceResult", "contents", required=True
+        )
     if not contents:
         raise _fail("ReadResourceResult", "contents", "is empty")
     return to_resource_contents(contents[0])

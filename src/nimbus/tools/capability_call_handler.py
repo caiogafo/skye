@@ -21,14 +21,14 @@ See docs/provider-transformation-architecture.md for complete architecture docum
 import logging
 from typing import Any
 
+from nimbus.base.completion import CompletionResponse
+from nimbus.tools.capability_models import CapabilityCall, CapabilityResult
 from nimbus.tools.exceptions import (
+    CapabilityCallParsingError,
     CapabilityNotFoundError,
     CapabilityValidationError,
-    CapabilityCallParsingError,
 )
 from nimbus.tools.registry import CapabilityRegistry
-from nimbus.tools.capability_models import CapabilityCall, CapabilityResult
-from nimbus.base.completion import CompletionResponse
 
 logger = logging.getLogger(__name__)
 
@@ -94,7 +94,7 @@ class CapabilityCallHandler:
             List of CapabilityCall objects parsed from the response
 
         Raises:
-            CapabilityCallParsingError: If parsing fails or provider doesn't support capability calls
+            CapabilityCallParsingError: If parsing fails or the provider cannot format calls
 
         Example:
             >>> handler = CapabilityCallHandler(registry)
@@ -109,10 +109,10 @@ class CapabilityCallHandler:
                     f"Provider {type(provider).__name__} does not support capability call parsing",
                     provider=type(provider).__name__,
                 )
-            
+
             capability_calls = provider.parse_capability_calls(response)
             return capability_calls or []
-            
+
         except CapabilityCallParsingError:
             raise
         except Exception as e:
@@ -332,7 +332,7 @@ class CapabilityCallHandler:
             List of formatted result dictionaries
 
         Raises:
-            CapabilityCallParsingError: If formatting fails or provider doesn't support capability results
+            CapabilityCallParsingError: If formatting fails or the provider cannot format results
 
         Example:
             >>> handler = CapabilityCallHandler(registry)
@@ -349,12 +349,14 @@ class CapabilityCallHandler:
         try:
             if not hasattr(provider, 'format_capability_results'):
                 raise CapabilityCallParsingError(
-                    f"Provider {type(provider).__name__} does not support capability result formatting",
+                    f"Provider {type(provider).__name__} does not support "
+                    "capability result formatting",
                     provider=type(provider).__name__,
                 )
-            
-            return provider.format_capability_results(results)
-            
+
+            formatted: list[dict[str, Any]] = provider.format_capability_results(results)
+            return formatted
+
         except CapabilityCallParsingError:
             raise
         except Exception as e:

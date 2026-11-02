@@ -1,5 +1,6 @@
 """Unit tests for MCPCapability class."""
 
+import asyncio
 import json
 import sys
 from unittest.mock import MagicMock, patch
@@ -12,13 +13,30 @@ from nimbus.tools.exceptions import (
 )
 from nimbus.tools.schema import CapabilitySchema
 
-
 # Mock fastmcp module globally for all tests
 sys.modules["fastmcp"] = MagicMock()
 
 
 class TestMCPCapability:
     """Test suite for MCPCapability class."""
+
+    @pytest.fixture(autouse=True)
+    def ensure_event_loop(self):
+        """Guarantee a current event loop on the main thread for sync execute().
+
+        MCPCapability.execute() calls asyncio.get_event_loop(), which on Python
+        3.10+ raises RuntimeError when no current loop is set rather than creating
+        one. That state depends on test execution order, so these tests must not
+        rely on a loop left behind by a prior test. Install a fresh loop and
+        restore the previous state afterwards.
+        """
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        try:
+            yield
+        finally:
+            loop.close()
+            asyncio.set_event_loop(None)
 
     @pytest.fixture
     def sample_mcp_tool(self):
@@ -77,7 +95,7 @@ class TestMCPCapability:
                     MCPCapability(sample_mcp_tool)
 
                 assert "FastMCP is required" in str(exc_info.value)
-                assert "pip install nimbus[mcp]" in str(exc_info.value)
+                assert "pip install nimbus[tools]" in str(exc_info.value)
         finally:
             # Restore fastmcp
             if fastmcp_backup is not None:

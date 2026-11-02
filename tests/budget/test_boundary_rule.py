@@ -10,9 +10,10 @@ Static (AST) checks over src/nimbus:
   * `fastmcp`/`mcp` only by the `tools` MCP files, never at module level;
   * `tools/mcp_boundary.py` imports no third-party library at all;
   * no public function/method annotation names an external-library type.
-Runtime check: a provider response built from SDK-shaped mocks and the MCP boundary
-conversions (fed plain dicts and a fastmcp-shaped object) return Nimbus types only.
-The same check on a live fake server, for both MCP clients, is tests/differential/test_boundary_leak.py.
+Runtime check: the `models` public Port method `complete()` (vendor call mocked) and its single
+boundary helper `_transform_response`, plus the MCP boundary conversions (fed plain dicts and a
+fastmcp-shaped object), all return Nimbus types only. The same MCP check on a live fake server,
+for both clients, is tests/differential/test_boundary_leak.py.
 """
 
 from __future__ import annotations
@@ -157,15 +158,40 @@ def _foreign_types(value, seen=None, path="result") -> list[str]:
     return [f"{path}: {type(value).__module__}.{type(value).__qualname__}"]
 
 
-def test_provider_response_is_nimbus_types_only():
-    from nimbus.models.llm.openai_compatible import OpenAIProvider
-
+def _sdk_shaped_response():
+    """An SDK-shaped completion response (a Mock, standing in for an openai object)."""
     resp = Mock(id="c1", model="gpt-4", created=1, system_fingerprint="fp")
     choice = Mock(finish_reason="stop")
     choice.message = Mock(content="hi", tool_calls=None, parsed=None)
     resp.choices = [choice]
     resp.usage = Mock(prompt_tokens=1, completion_tokens=2, total_tokens=3)
-    result = OpenAIProvider(api_key="sk-test")._transform_response(resp)
+    return resp
+
+
+def test_provider_response_is_nimbus_types_only():
+    """The single boundary point (`_transform_response`) converts an SDK object to a Nimbus type."""
+    from nimbus.models.llm.openai_compatible import OpenAIProvider
+
+    result = OpenAIProvider(api_key="sk-test")._transform_response(_sdk_shaped_response())
+    assert type(result).__module__.startswith("nimbus")
+    assert not _foreign_types(result)
+
+
+def test_models_public_port_returns_nimbus_types_only():
+    """The `models` public Port method `complete()` returns Nimbus types, never an SDK object.
+
+    Symmetric with the `tools` runtime check: the only thing mocked is the vendor call
+    (`_call_provider`), so the real boundary conversion runs end-to-end on the public API.
+    Guards Req 20.1/20.2 for `models` (REST vs SDK) the same way the MCP checks guard `tools`.
+    """
+    from nimbus.base.completion import CompletionRequest
+    from nimbus.base.messages import UserMessage
+    from nimbus.models.llm.openai_compatible import OpenAIProvider
+
+    provider = OpenAIProvider(api_key="sk-test")
+    provider._call_provider = Mock(return_value=_sdk_shaped_response())  # type: ignore[method-assign]
+    request = CompletionRequest(messages=[UserMessage(content="hi")], model="gpt-4")
+    result = provider.complete(request)
     assert type(result).__module__.startswith("nimbus")
     assert not _foreign_types(result)
 

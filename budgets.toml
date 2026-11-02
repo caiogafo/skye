@@ -73,10 +73,12 @@ max_compiled_over_core = 0
 max_over_core_mb = 1
 target_over_core_mb = 1
 
-# The MCP client is its own extra because fastmcp is heavy: +43.4 MB, 7 compiled (caio, cffi,
-# cryptography, jsonref, rpds-py, watchfiles, websockets). Accepted for now by the owner
-# (2026-11-01); the plan is an MCP transport on the stdlib that brings this back to zero.
-[extras.mcp]
+# The tools Extra owns the MCP client (Req 19.7). Installing nimbus[tools] pulls fastmcp, the
+# optional full-capability alternative to the built-in stdlib JSON-RPC-over-HTTP client. fastmcp
+# is heavy: +43.4 MB, 7 compiled (caio, cffi, cryptography, jsonref, rpds-py, watchfiles,
+# websockets). Accepted for now by the owner (2026-11-01); the plan is the stdlib built-in MCP
+# client (already present) becoming the default so this comes back toward zero.
+[extras.tools]
 max_compiled_over_core = 7
 max_over_core_mb = 48
 target_over_core_mb = 2
@@ -110,6 +112,6 @@ target_over_core_mb = 10
 # from pyproject.toml and from this list. The test fails if an extra is empty and
 # not listed here, and if a listed extra stops being empty.
 [extras_policy]
-known_empty = ["agents", "guard", "observe", "prompts", "teams", "flows", "tools"]   # "prompts" only repeats jinja2, already a core dependency; "observe" has no telemetry import yet
+known_empty = ["agents", "guard", "observe", "prompts", "teams", "flows"]   # "prompts" only repeats jinja2, already a core dependency; "observe" has no telemetry import yet. "tools" now declares fastmcp for the MCP client (Req 19.7), so it is budgeted under [extras.tools].
 # Convenience bundles. They are not budgeted one by one: each member extra is.
 bundles = ["llm-providers", "embedding-providers", "all-providers", "providers", "all"]

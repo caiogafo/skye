@@ -487,6 +487,190 @@
         "chatSessionId": "sess_696a272c-3ccb-4801-a772-0f814a451e4a",
         "timestamp": 1793565780341
       }
+    ],
+    "14.1 Declare the `teams` and `flows` extras as empty extras": [
+      {
+        "executionId": "02386563-258d-4f28-966d-ed9d0ccd2959",
+        "chatSessionId": "sess_696a272c-3ccb-4801-a772-0f814a451e4a",
+        "timestamp": 1793574953436
+      },
+      {
+        "executionId": "02386563-258d-4f28-966d-ed9d0ccd2959",
+        "chatSessionId": "sess_696a272c-3ccb-4801-a772-0f814a451e4a",
+        "timestamp": 1793574979150
+      },
+      {
+        "executionId": "02386563-258d-4f28-966d-ed9d0ccd2959",
+        "chatSessionId": "sess_696a272c-3ccb-4801-a772-0f814a451e4a",
+        "timestamp": 1793576283043
+      }
+    ],
+    "14.2 Confirm core works with neither teams nor flows installed": [
+      {
+        "executionId": "02386563-258d-4f28-966d-ed9d0ccd2959",
+        "chatSessionId": "sess_696a272c-3ccb-4801-a772-0f814a451e4a",
+        "timestamp": 1793574953514
+      },
+      {
+        "executionId": "02386563-258d-4f28-966d-ed9d0ccd2959",
+        "chatSessionId": "sess_696a272c-3ccb-4801-a772-0f814a451e4a",
+        "timestamp": 1793576290054
+      },
+      {
+        "executionId": "02386563-258d-4f28-966d-ed9d0ccd2959",
+        "chatSessionId": "sess_696a272c-3ccb-4801-a772-0f814a451e4a",
+        "timestamp": 1793576531675
+      }
+    ],
+    "14.3 Build the tri-faceted MCP client in `tools` (built-in + fastmcp behind one Port)": [
+      {
+        "executionId": "02386563-258d-4f28-966d-ed9d0ccd2959",
+        "chatSessionId": "sess_696a272c-3ccb-4801-a772-0f814a451e4a",
+        "timestamp": 1793574953550
+      },
+      {
+        "executionId": "02386563-258d-4f28-966d-ed9d0ccd2959",
+        "chatSessionId": "sess_696a272c-3ccb-4801-a772-0f814a451e4a",
+        "timestamp": 1793574980498
+      },
+      {
+        "executionId": "02386563-258d-4f28-966d-ed9d0ccd2959",
+        "chatSessionId": "sess_696a272c-3ccb-4801-a772-0f814a451e4a",
+        "timestamp": 1793576284469
+      }
+    ],
+    "14.5 Final budgets checkpoint for the appended work": [
+      {
+        "executionId": "02386563-258d-4f28-966d-ed9d0ccd2959",
+        "chatSessionId": "sess_696a272c-3ccb-4801-a772-0f814a451e4a",
+        "timestamp": 1793574953589
+      },
+      {
+        "executionId": "02386563-258d-4f28-966d-ed9d0ccd2959",
+        "chatSessionId": "sess_696a272c-3ccb-4801-a772-0f814a451e4a",
+        "timestamp": 1793576550791
+      },
+      {
+        "executionId": "02386563-258d-4f28-966d-ed9d0ccd2959",
+        "chatSessionId": "sess_696a272c-3ccb-4801-a772-0f814a451e4a",
+        "timestamp": 1793577359327
+      }
+    ],
+    "15.1 Implement import-time backend selection via env + config (no user code change)": [
+      {
+        "executionId": "02386563-258d-4f28-966d-ed9d0ccd2959",
+        "chatSessionId": "sess_696a272c-3ccb-4801-a772-0f814a451e4a",
+        "timestamp": 1793574953630
+      },
+      {
+        "executionId": "02386563-258d-4f28-966d-ed9d0ccd2959",
+        "chatSessionId": "sess_696a272c-3ccb-4801-a772-0f814a451e4a",
+        "timestamp": 1793577387217
+      },
+      {
+        "executionId": "02386563-258d-4f28-966d-ed9d0ccd2959",
+        "chatSessionId": "sess_696a272c-3ccb-4801-a772-0f814a451e4a",
+        "timestamp": 1793578215768
+      }
+    ],
+    "15.2 Add official SDKs as dev/test-only dependencies and write differential tests": [
+      {
+        "executionId": "02386563-258d-4f28-966d-ed9d0ccd2959",
+        "chatSessionId": "sess_696a272c-3ccb-4801-a772-0f814a451e4a",
+        "timestamp": 1793574953663
+      },
+      {
+        "executionId": "02386563-258d-4f28-966d-ed9d0ccd2959",
+        "chatSessionId": "sess_696a272c-3ccb-4801-a772-0f814a451e4a",
+        "timestamp": 1793578224621
+      },
+      {
+        "executionId": "02386563-258d-4f28-966d-ed9d0ccd2959",
+        "chatSessionId": "sess_696a272c-3ccb-4801-a772-0f814a451e4a",
+        "timestamp": 1793578494398
+      }
+    ],
+    "15.4 Enforce the general built-in-vs-external-library boundary rule": [
+      {
+        "executionId": "02386563-258d-4f28-966d-ed9d0ccd2959",
+        "chatSessionId": "sess_696a272c-3ccb-4801-a772-0f814a451e4a",
+        "timestamp": 1793574953697
+      },
+      {
+        "executionId": "02386563-258d-4f28-966d-ed9d0ccd2959",
+        "chatSessionId": "sess_696a272c-3ccb-4801-a772-0f814a451e4a",
+        "timestamp": 1793578501359
+      },
+      {
+        "executionId": "02386563-258d-4f28-966d-ed9d0ccd2959",
+        "chatSessionId": "sess_696a272c-3ccb-4801-a772-0f814a451e4a",
+        "timestamp": 1793578835409
+      }
+    ],
+    "15.5 Expose agent types via the agents registry behind the Runnable/agent Port": [
+      {
+        "executionId": "02386563-258d-4f28-966d-ed9d0ccd2959",
+        "chatSessionId": "sess_696a272c-3ccb-4801-a772-0f814a451e4a",
+        "timestamp": 1793574953731
+      },
+      {
+        "executionId": "02386563-258d-4f28-966d-ed9d0ccd2959",
+        "chatSessionId": "sess_696a272c-3ccb-4801-a772-0f814a451e4a",
+        "timestamp": 1793578502380
+      },
+      {
+        "executionId": "02386563-258d-4f28-966d-ed9d0ccd2959",
+        "chatSessionId": "sess_696a272c-3ccb-4801-a772-0f814a451e4a",
+        "timestamp": 1793578836257
+      }
+    ],
+    "15.6 Final budgets checkpoint for this group": [
+      {
+        "executionId": "02386563-258d-4f28-966d-ed9d0ccd2959",
+        "chatSessionId": "sess_696a272c-3ccb-4801-a772-0f814a451e4a",
+        "timestamp": 1793574953765
+      },
+      {
+        "executionId": "02386563-258d-4f28-966d-ed9d0ccd2959",
+        "chatSessionId": "sess_696a272c-3ccb-4801-a772-0f814a451e4a",
+        "timestamp": 1793578842407
+      },
+      {
+        "executionId": "47e5af1d-f84b-400c-b8bb-d196ec08d4ac",
+        "chatSessionId": "sess_696a272c-3ccb-4801-a772-0f814a451e4a",
+        "timestamp": 1793579532668
+      },
+      {
+        "executionId": "47e5af1d-f84b-400c-b8bb-d196ec08d4ac",
+        "chatSessionId": "sess_696a272c-3ccb-4801-a772-0f814a451e4a",
+        "timestamp": 1793579807438
+      }
+    ],
+    "14.4 Prototype the standard-library MCP client (future target, optional)": [
+      {
+        "executionId": "f3132496-9546-4aab-86fd-0cd15cf7eb66",
+        "chatSessionId": "sess_ff2ed48b-919a-4415-a326-8b67bf8c3caa",
+        "timestamp": 1793578871455
+      },
+      {
+        "executionId": "f3132496-9546-4aab-86fd-0cd15cf7eb66",
+        "chatSessionId": "sess_ff2ed48b-919a-4415-a326-8b67bf8c3caa",
+        "timestamp": 1793579397122
+      }
+    ],
+    "14. teams/flows extras and MCP client (decided parts only)": [
+      {
+        "executionId": "f3132496-9546-4aab-86fd-0cd15cf7eb66",
+        "chatSessionId": "sess_ff2ed48b-919a-4415-a326-8b67bf8c3caa",
+        "timestamp": 1793579397172
+      }
+    ],
+    "15. Backend selection, dev/test SDK validation, MCP tri-faceted client, boundary adapters": [
+      {
+        "executionId": "47e5af1d-f84b-400c-b8bb-d196ec08d4ac",
+        "chatSessionId": "sess_696a272c-3ccb-4801-a772-0f814a451e4a",
+        "timestamp": 1793579807566
+      }
     ]
   }
 }

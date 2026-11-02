@@ -8,31 +8,31 @@ fastmcp is imported lazily when a client is constructed, never at ``import nimbu
 from __future__ import annotations
 
 import functools
-from collections.abc import Awaitable, Callable
-from typing import Any, TypeVar
+from collections.abc import Awaitable, Callable, Coroutine
+from typing import Any, ParamSpec, TypeVar
 
 from nimbus.base.exceptions import NimbusError, ProviderError
 from nimbus.base.lazy_import import missing_extra
-from nimbus.prompts.messages import NimbusMessage
+from nimbus.base.messages import NimbusMessage
 from nimbus.tools import mcp_boundary as boundary
 from nimbus.tools.interface import CapabilityInterface
 from nimbus.tools.mcp_boundary import MCPPrompt
-from nimbus.tools.mcp_client import MCPClientPort, _ToolsFacet, _tool_value
+from nimbus.tools.mcp_client import MCPClientPort, _tool_value, _ToolsFacet
 from nimbus.tools.mcp_resource import Resource
 
-
 _T = TypeVar("_T")
+_P = ParamSpec("_P")
 
 
-def _nimbus_errors(fn: Callable[..., Awaitable[_T]]) -> Callable[..., Awaitable[_T]]:
-    """Convert anything the fastmcp/mcp/httpx stack raises into ``ProviderError`` (the built-in's category).
+def _nimbus_errors(fn: Callable[_P, Awaitable[_T]]) -> Callable[_P, Coroutine[Any, Any, _T]]:
+    """Convert what the fastmcp/mcp/httpx stack raises into ``ProviderError`` (built-in category).
 
     Without this a protocol error surfaces as ``mcp.shared.exceptions.MCPError`` (a library type
     leaking past the boundary); found by the differential tests.
     """
 
     @functools.wraps(fn)
-    async def wrapper(*args: Any, **kwargs: Any) -> _T:
+    async def wrapper(*args: _P.args, **kwargs: _P.kwargs) -> _T:
         try:
             return await fn(*args, **kwargs)
         except NimbusError:
@@ -47,8 +47,10 @@ def _nimbus_errors(fn: Callable[..., Awaitable[_T]]) -> Callable[..., Awaitable[
 class FastMCPClient(_ToolsFacet, MCPClientPort):
     """Each call opens a short-lived ``fastmcp.Client`` session (stateless, like the built-in)."""
 
-    def __init__(self, target: Any, *, headers: dict[str, str] | None = None, timeout: float = 30.0) -> None:
-        self._fastmcp = missing_extra("fastmcp", extra="mcp")
+    def __init__(
+        self, target: Any, *, headers: dict[str, str] | None = None, timeout: float = 30.0
+    ) -> None:
+        self._fastmcp = missing_extra("fastmcp", extra="tools")
         self._target = target
         self._kwargs: dict[str, Any] = {"timeout": timeout}
         if headers:
@@ -77,7 +79,9 @@ class FastMCPClient(_ToolsFacet, MCPClientPort):
             return [boundary.to_prompt(p) for p in await c.list_prompts()]
 
     @_nimbus_errors
-    async def get_prompt(self, name: str, arguments: dict[str, str] | None = None) -> list[NimbusMessage]:
+    async def get_prompt(
+        self, name: str, arguments: dict[str, str] | None = None
+    ) -> list[NimbusMessage]:
         async with self._client() as c:
             return boundary.to_prompt_messages(await c.get_prompt(name, arguments or {}))
 

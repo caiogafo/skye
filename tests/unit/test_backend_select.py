@@ -141,6 +141,17 @@ def test_providers_decide_once_at_construction(monkeypatch):
         OpenAIProvider(api_key="k")
 
 
+def test_embedding_providers_decide_once_at_construction(monkeypatch):
+    """Req 17: embedding adapters select builtin-vs-SDK through the same mechanism, once."""
+    from nimbus.models.embeddings.openai_embeddings import OpenAIEmbeddingProvider
+
+    emb = OpenAIEmbeddingProvider(model="text-embedding-3-small", api_key="k")
+    assert emb.selection is not None and emb.selection.impl == "sdk"
+    monkeypatch.setenv("NIMBUS_OPENAI_IMPL", "builtin")  # no REST path -> explicit builtin rejected
+    with pytest.raises(ConfigurationError):
+        OpenAIEmbeddingProvider(model="text-embedding-3-small", api_key="k")
+
+
 def test_mcp_factory_uses_selection(monkeypatch):
     from nimbus.tools.mcp_client import BuiltinMCPClient, create_mcp_client
 
@@ -149,3 +160,37 @@ def test_mcp_factory_uses_selection(monkeypatch):
     monkeypatch.setenv("NIMBUS_MCP_IMPL", "sdk")  # fastmcp not installed: warn + fall back
     with pytest.warns(bs.SDKSelectionWarning):
         assert isinstance(create_mcp_client("http://x"), BuiltinMCPClient)
+
+
+def test_sdk_runtime_error_maps_to_nimbus_error_and_does_not_reset(monkeypatch):
+    """Req 17.8: a selected SDK's runtime error maps to a Nimbus error and propagates; the
+    instance is NOT reset to the built-in implementation for that call or afterwards."""
+    import tenacity.nap
+
+    from nimbus.base.completion import CompletionRequest
+    from nimbus.base.exceptions import ProviderError
+    from nimbus.base.messages import UserMessage
+    from nimbus.models.llm import OpenAIProvider
+
+    # Skip the retry backoff waits so the mapped error surfaces immediately.
+    monkeypatch.setattr(tenacity.nap.time, "sleep", lambda *_a, **_k: None)
+
+    provider = OpenAIProvider(api_key="k")
+    assert provider.selection is not None and provider.selection.impl == "sdk"
+
+    class _SdkApiError(RuntimeError):
+        """Stands in for an incompatible-SDK runtime failure."""
+
+    def _boom(_request):
+        raise _SdkApiError("SDK changed its API")
+
+    monkeypatch.setattr(provider, "_call_provider", _boom)
+
+    request = CompletionRequest(messages=[UserMessage(content="hi")], model="gpt-4")
+    with pytest.raises(ProviderError) as excinfo:
+        provider.complete(request)
+
+    # Mapped to a Nimbus error that preserves the underlying cause (not silently swallowed).
+    assert isinstance(excinfo.value.__cause__, _SdkApiError)
+    # The instance keeps the SDK selection for its whole life: no reset to builtin.
+    assert provider.selection.impl == "sdk"

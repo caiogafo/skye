@@ -32,7 +32,9 @@ class ReActAgent:
 
     async def invoke(self, input: Any) -> Any:
         """Not implemented: the ReAct loop belongs to the future agents spec."""
-        raise NotImplementedError("ReActAgent is a placeholder; the agent loop is not implemented yet")
+        raise NotImplementedError(
+            "ReActAgent is a placeholder; the agent loop is not implemented yet"
+        )
 
 
 def register_agent_type(name: str, factory: AgentFactory, *, replace: bool = False) -> None:
@@ -42,7 +44,9 @@ def register_agent_type(name: str, factory: AgentFactory, *, replace: bool = Fal
         ConfigurationError: if ``name`` is already registered and ``replace`` is False.
     """
     if not name or not isinstance(name, str):
-        raise ConfigurationError("Agent type name must be a non-empty string", details={"name": name})
+        raise ConfigurationError(
+            "Agent type name must be a non-empty string", details={"name": name}
+        )
     if name in _REGISTRY and not replace:
         raise ConfigurationError(f"Agent type already registered: {name!r}", details={"name": name})
     _REGISTRY[name] = factory
