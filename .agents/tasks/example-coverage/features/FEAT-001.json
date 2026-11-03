@@ -1,0 +1,30 @@
+{
+  "id": "FEAT-001",
+  "type": "docs",
+  "description": "base + models examples (7 files). Demonstrate base content/error types and the models token-counting, cost, and three proposed-interface model capabilities. Independent of the other FEATs except that all FEATs share one worktree and run sequentially. Read .agents/tasks/example-coverage/context.json and this file FIRST; the full per-file Digest with exact signatures is in .agents/tasks/example-coverage/plan.md.",
+  "status": "completed",
+  "steps": [
+    "Create examples/base/content_chunks.py (Live). Build and inspect ContentChunk(text, metadata={}, chunk_id=None, source=None) from skye.base.messages (str(chunk)->text) and StreamChunk(id, delta, finish_reason=None, index=0) from skye.base.completion; show accumulating a few StreamChunk deltas into a final string. No client needed. main() + if __name__ guard.",
+    "Create examples/base/errors.py (Live). Import from skye.base.exceptions and raise+catch each: SkyeError(message, details=None), ProviderError(message, provider, status_code=None), ConfigurationError(message), ValidationError(message, field, value), CapabilityExecutionError(message, capability_name); catch SkyeError as the umbrella. Also raise MissingExtraError('postgres', 'asyncpg') and print its message. Print these as normal informative lines \u2014 do NOT include any FAILURE_MARKER substring (no 'ValidationError:' etc. literally printed on a normal line, and no 'Traceback').",
+    "Create examples/models/token_counting.py (Live). Use skye.models TokenCounter.count_tokens(text, model) and count_message_tokens([UserMessage(...)], model). Note in the docstring that exact counts need the openai extra (tiktoken, absent offline) and that the stdlib approximate path is what runs here; print the approximate numbers.",
+    "Create examples/models/cost_tracking.py (Live). Use CostCalculator.calculate_cost(model, usage), add_custom_pricing(model, prompt, completion), get_pricing(model). Create client = skye.provider('openai', api_key=os.environ.get('OPENAI_API_KEY')) (guard-return if unset), do one complete(), and compute the per-request cost from response.usage (TokenUsage).",
+    "Create examples/models/cohere.py (proposed-interface, guarded). Top docstring: cohere is registered today only as an embedding provider, not a language model provider; this shows the intended skye.provider('cohere') completion call. Guard by checking skye.models.ProviderRegistry for a cohere MODEL provider; if absent, print a short 'not yet implemented in src' note and return. Do not invent a completion result.",
+    "Create examples/models/decision_model.py (proposed-interface, guarded). Import DecisionModel and DecisionResult from skye.base.interfaces.decision. Define a tiny local class implementing the Port (async decide(prompt, options)->DecisionResult) to show the call shape (choice + probabilities summing to 1.0, reject empty options with a Skye error). Docstring notes no concrete decision model ships in src yet. Run it with asyncio.run.",
+    "Create examples/models/retry_and_errors.py (proposed-interface, guarded). Show catching a real skye.base.exceptions.ProviderError and the SkyeError hierarchy, and explain that transient-error retry is configured at the router level (reference examples/routing). Do not fake a retry switch. Any intentionally shown error line must contain the word 'Expected'.",
+    "Run uv run black on the new files and fix any ruff findings (sorted imports, remove unused imports) so both are clean on examples/base and examples/models."
+  ],
+  "acceptance_criteria": [
+    "uv run pytest tests/examples -q -k 'base or models' passes (new files discovered and green)",
+    "uv run ruff check examples/base examples/models reports no errors",
+    "uv run black --check examples/base examples/models reports nothing to reformat",
+    "No new file prints a FAILURE_MARKER on a normal path; any deliberate error line contains 'Expected'",
+    "No pydantic used for any user-facing shape; no top-level import of a forbidden-at-import library"
+  ],
+  "verification": [
+    "uv run pytest tests/examples -q -k 'base or models'",
+    "uv run ruff check examples/base examples/models",
+    "uv run black --check examples/base examples/models"
+  ],
+  "blocked_reason": null,
+  "findings": "Created 7 files. Live (run real library code): base/content_chunks.py (ContentChunk/StreamChunk), base/errors.py (full SkyeError hierarchy + MissingExtraError), models/token_counting.py (TokenCounter approximate path; tiktoken absent offline), models/cost_tracking.py (skye.provider('openai').complete() then CostCalculator on response.usage). Proposed-interface, guarded: models/cohere.py (guards on ProviderRegistry.list_model_providers() lacking cohere, which is embedding-only), models/decision_model.py (local FirstOptionDecider implementing the DecisionModel Port, run via asyncio.run, rejects empty options with ValidationError shown as an 'Expected' line), models/retry_and_errors.py (real ProviderError + SkyeError umbrella; notes retry is router-level, references examples/routing). Notes for later FEATs: (1) FAILURE_MARKER avoidance works even though SkyeError.__init__ calls logger.error with 'ProviderError:'-style text; the default logging lastResort handler output is NOT captured by capsys, so those log lines do not trip the harness. Still, never print a bare 'ErrorName: message' on a normal stdout line. (2) Any deliberately-provoked error line must contain the word 'Expected'. (3) README.md was NOT touched (that is FEAT step 11 / a later FEAT); add a base and models category entry there. (4) House style followed quickstart.py: module docstring, def main()/async main + asyncio.run, early return with printed skip note, if __name__ guard. Verification on new paths only (whole-tree ruff/black fail on pre-existing out-of-scope files, left untouched)."
+}
