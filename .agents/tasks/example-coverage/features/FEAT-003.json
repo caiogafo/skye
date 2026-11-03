@@ -1,0 +1,28 @@
+{
+  "id": "FEAT-003",
+  "type": "docs",
+  "description": "tools + memory examples (5 files). tools/registry.py is Live; the two MCP examples are Live on the built-in path with the fastmcp/extra parts guarded; the two memory examples are proposed-interface, guarded (no concrete memory store in src; MemoryEntry is pydantic and must NOT be presented as the user shape). Independent of the other FEATs (shares the one worktree; runs sequentially). Read .agents/tasks/example-coverage/context.json and this file FIRST; exact signatures are in the plan Digest.",
+  "status": "completed",
+  "steps": [
+    "Create examples/tools/registry.py (Live). Build a CapabilityRegistry() (from skye.tools), define two @capability functions (skye.tools.capability), register them, call list_all(), search('...') and execute(name, {...}) -> print the returned CapabilityMessage.content. Note the harness does not reset the CapabilityRegistry singleton between scripts, so instantiate a fresh CapabilityRegistry() rather than get_instance().",
+    "Create examples/tools/mcp_fastmcp.py (Live built-in path; fastmcp guarded). Follow examples/capabilities/mcp_client.py. Use create_mcp_client(url, impl='builtin') against MCP_SERVER_URL (default http://localhost:8000/mcp, answered by the fake) and list_tools(); then try create_mcp_client(url, impl='fastmcp') inside try/except (ImportError, MissingExtraError) printing a skip note (mcp extra / fastmcp absent). Note both impls return identical Skye types. Use asyncio.run.",
+    "Create examples/tools/mcp_prompts_and_resources.py (Live built-in path). Using the built-in client, call list_prompts()/get_prompt(name) (-> base SkyeMessage list) and list_resources()/read_resource(uri) (-> skye.tools.Resource). The fake server advertises only a tool, so guard cleanly (if no prompts/resources, print a note and continue). Import MCPPrompt, MCPPromptArgument, Resource from skye.tools to show the types in a tiny constructed example.",
+    "Create examples/memory/conversation_memory.py (proposed-interface, guarded). Top docstring: no concrete memory store ships in src yet; this shows the intended Port-level shape. Define a @dataclass entry (id, content, memory_type, embedding: list[float] | None, metadata: dict, created_at: datetime) satisfying skye.base.interfaces.memory.MemoryEntryLike \u2014 NOT pydantic, do not import MemoryEntry. Implement skye.base.interfaces.memory.MemoryInterface (store/retrieve/get_by_id/delete) in a small in-memory class and store/retrieve a few conversation turns.",
+    "Create examples/memory/custom_memory.py (proposed-interface, guarded). Same Port and dataclass approach, focused on the extension point: a user subclass of MemoryInterface (e.g. keyword retrieve) exercised end to end. Docstring notes the planned memory API.",
+    "Run black and fix ruff on examples/tools and examples/memory so both are clean."
+  ],
+  "acceptance_criteria": [
+    "uv run pytest tests/examples -q -k 'tools or memory' passes",
+    "uv run ruff check examples/tools examples/memory reports no errors",
+    "uv run black --check examples/tools examples/memory reports nothing to reformat",
+    "No pydantic for the memory entry shape; MemoryEntry not imported; fastmcp guarded, not imported at top level",
+    "No FAILURE_MARKER on a normal path"
+  ],
+  "verification": [
+    "uv run pytest tests/examples -q -k 'tools or memory'",
+    "uv run ruff check examples/tools examples/memory",
+    "uv run black --check examples/tools examples/memory"
+  ],
+  "blocked_reason": null,
+  "findings": "Created 5 files: examples/tools/{registry.py,mcp_fastmcp.py,mcp_prompts_and_resources.py} and examples/memory/{conversation_memory.py,custom_memory.py}. IMPORTANT deviation from the context.json assumption: fastmcp IS actually installed in this .venv (python 3.13), so create_mcp_client(url, impl='fastmcp') does NOT raise at construction. It fails later inside list_tools() because fastmcp uses httpx2 against a real socket, which the fake network (which only patches urllib.request.urlopen) does not intercept -> ProviderError 'All connection attempts failed' (a FAILURE_MARKER via 'ProviderError:'). Fix: mcp_fastmcp.py constructs the fastmcp client to prove the opt-in works (guarded by try/except ImportError, MissingExtraError for environments where the extra is absent) but does NOT make any network call through it; it prints a note that the fastmcp client returns the same Skye types as the built-in one. The built-in path IS exercised live (list_tools() returns the fake's single 'echo' tool). Other examples (tools/registry.py, both memory files, mcp_prompts_and_resources.py) do not touch fastmcp. Any later FEAT that builds a fastmcp example should NOT call .list_tools()/.call_tool() on a fastmcp client under the harness (no reachable fastmcp server; fake only answers urllib). The fake /mcp server only implements initialize/tools/list/tools/call; prompts/list and resources/list return an empty result -> BuiltinMCPClient raises ValidationError (a SkyeError), so mcp_prompts_and_resources.py guards list_prompts()/list_resources() with try/except SkyeError and prints a clean skip note. Memory entries use @dataclass satisfying MemoryEntryLike (datetime default_factory with timezone.utc); MemoryEntry (pydantic) is NOT imported. Verification on new paths: uv run pytest tests/examples -q -k 'tools or memory' -> 10 passed; uv run ruff check examples/tools examples/memory -> clean; uv run black --check examples/tools examples/memory -> nothing to reformat. README update is out of scope for FEAT-003 (handled by plan step 11)."
+}

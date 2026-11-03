@@ -1,0 +1,46 @@
+"""MCP client implementations: the built-in path is Live, ``fastmcp`` is guarded.
+
+``create_mcp_client(url, impl="builtin")`` returns the standard-library MCP client (no
+extra to install); ``impl="fastmcp"`` opts into the ``fastmcp``-backed client, which needs
+the optional ``mcp`` extra. Both implementations return identical Skye types
+(``CapabilityInterface`` tools, ``MCPPrompt`` prompts, ``Resource`` resources).
+
+This example lists the tools over the built-in client (answered offline by the test fake),
+then tries the ``fastmcp`` implementation inside a guard that prints a skip note when the
+extra is absent.
+
+Set MCP_SERVER_URL to the address of a server (default: http://localhost:8000/mcp).
+"""
+
+import asyncio
+import os
+
+from skye.base.exceptions import MissingExtraError
+from skye.tools import create_mcp_client
+
+
+async def main() -> None:
+    url = os.getenv("MCP_SERVER_URL", "http://localhost:8000/mcp")
+
+    # Live: the built-in client talks JSON-RPC over HTTP (standard library only).
+    client = create_mcp_client(url, impl="builtin")
+    tools = await client.list_tools()
+    print(f"built-in client: {len(tools)} tool(s) on {url}")
+    for tool in tools:
+        print("  -", tool.get_schema().name)
+
+    # Opt-in: the fastmcp implementation ships with the `mcp` extra. When the extra is
+    # absent, creating the client raises and we print a skip note.
+    try:
+        create_mcp_client(url, impl="fastmcp")
+    except (ImportError, MissingExtraError):
+        print("fastmcp client: `mcp` extra not installed, skipping")
+        return
+
+    # The fastmcp client is available and returns the same Skye types as the built-in
+    # one; we do not call it here because it needs a live fastmcp-compatible server.
+    print("fastmcp client: available (returns the same Skye types as built-in)")
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
