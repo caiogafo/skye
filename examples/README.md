@@ -133,6 +133,28 @@ python examples/advanced/streaming.py
 python examples/advanced/custom_providers.py
 ```
 
+### Authentication (`examples/auth/`)
+
+Authenticate outgoing requests behind the `AuthenticationInterface` Port:
+- `credential_sources.py` (Live): `BedrockApiKeyAuthenticator`, `SigV4Authenticator` and `AwsCredentials` from `skye.auth.aws`, with `CredentialProvider` resolution order
+- `custom_credential_source.py` (Live): your own authenticator satisfying the runtime-checkable `AuthenticationInterface`
+
+**Run:**
+```bash
+python examples/auth/credential_sources.py
+```
+
+### Store (`examples/store/`)
+
+Durable, external state behind the `StorageBackend` Port:
+- `backends.py` (Live): `InMemoryBackend` and `FileSystemBackend` end to end; `DynamoDBBackend`, `RedisBackend` and `PostgreSQLBackend` guarded on their optional extras
+- `custom_backend.py` (Live): your own `StorageBackend` subclass
+
+**Run:**
+```bash
+python examples/store/backends.py
+```
+
 ### 6. Serverless (`examples/serverless/`)
 
 Patterns for serverless runtimes, where the size of the library and its cold start matter:
