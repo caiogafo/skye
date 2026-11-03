@@ -15,10 +15,15 @@ from datetime import datetime
 from typing import Any
 
 from skye.agents import REACT, create_agent
-from skye.base.interfaces.memory import MemoryEntryLike, MemoryInterface
-from skye.base.interfaces.observer import EventType, ObserverInterface
-from skye.base.interfaces.runnable import Runnable
-from skye.base.interfaces.safety import SafetyFilterInterface, SafetyResult
+from skye.interfaces import (
+    EventType,
+    MemoryEntryLike,
+    MemoryInterface,
+    ObserverInterface,
+    Runnable,
+    SafetyFilterInterface,
+    SafetyResult,
+)
 
 
 class InMemoryStore(MemoryInterface):
