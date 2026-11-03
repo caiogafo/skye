@@ -1,6 +1,6 @@
-"""Safety filters: implement the guard Port and screen input and output.
+"""Safety filters: implement the guard Port and screen input and output (Live, Port-level).
 
-Live (Port-level). The ``guard`` component exports nothing concrete yet, but the
+The ``guard`` component exports nothing concrete yet, but the
 ``SafetyFilterInterface`` Port and its ``SafetyResult`` shape are real
 (``skye.base.interfaces.safety``). A user implements the Port; this example defines
 its own blocked-words filter and runs it end to end, no client needed.

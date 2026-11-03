@@ -1,4 +1,4 @@
-"""MCP client implementations: the built-in path is Live, ``fastmcp`` is guarded.
+"""MCP client implementations: built-in vs ``fastmcp`` (Live, ``fastmcp`` branch guarded).
 
 ``create_mcp_client(url, impl="builtin")`` returns the standard-library MCP client (no
 extra to install); ``impl="fastmcp"`` opts into the ``fastmcp``-backed client, which needs

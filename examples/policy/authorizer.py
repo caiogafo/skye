@@ -1,6 +1,6 @@
-"""Authorizer: implement the policy Port and decide permit or forbid.
+"""Authorizer: implement the policy Port and decide permit or forbid (Live, Port-level).
 
-Live (Port-level). The ``policy`` component is minimal, but the
+The ``policy`` component is minimal, but the
 ``AuthorizerInterface`` Port and its ``Decision`` outcome are real
 (``skye.base.interfaces.authorizer``). A user implements the Port; this example
 defines a tiny rule set and shows one permit and one forbid, no client needed.

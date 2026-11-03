@@ -1,6 +1,6 @@
 """Compose a team from the Runnable Port (proposed-interface, guarded).
 
-Classification: proposed-interface, guarded. The ``teams`` component is declared
+The ``teams`` component is declared
 but minimal: there is no public teams orchestration API yet. What is real and
 composable today is the ``Runnable`` Port (``async invoke(input) -> output``), so
 this example builds a team purely from user ``Runnable``s and a tiny local

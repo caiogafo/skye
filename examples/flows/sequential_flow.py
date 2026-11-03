@@ -1,6 +1,6 @@
 """Chain Runnables in sequence with cycle detection (proposed-interface, guarded).
 
-Classification: proposed-interface, guarded. The ``flows`` component is declared
+The ``flows`` component is declared
 but minimal: there is no public flows API yet. What is real and composable today
 is the ``Runnable`` Port (``async invoke(input) -> output``), so this example
 chains user ``Runnable``s in order (each step's output feeds the next step's

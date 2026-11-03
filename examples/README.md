@@ -185,7 +185,7 @@ python examples/models/token_counting.py
 The capability registry and MCP client paths:
 - `registry.py` (Live): register, discover and execute capabilities
 - `mcp_fastmcp.py` (Live, `fastmcp` branch guarded): built-in vs `fastmcp` MCP client
-- `mcp_prompts_and_resources.py` (Live): MCP prompts and resources via the built-in client
+- `mcp_prompts_and_resources.py` (Live, guarded where empty): MCP prompts and resources via the built-in client
 
 **Run:**
 ```bash

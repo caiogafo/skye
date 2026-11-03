@@ -1,6 +1,6 @@
-"""Skye as an MCP server: the intended gateway shape, built from real parts.
+"""Skye as an MCP server: the intended gateway shape (proposed-interface, guarded).
 
-Proposed-interface, guarded. This example targets the planned ``gateway`` API
+Built from real parts. This example targets the planned ``gateway`` API
 (R44-48) that would expose Skye capabilities over MCP with an authorizer checked
 on every list and every call. That server entry point does not exist in ``src``
 yet, so this example shows the intended shape from real parts only — a

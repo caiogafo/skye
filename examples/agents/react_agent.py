@@ -1,6 +1,6 @@
 """Wire a ReAct agent with a model and capabilities (proposed-interface, guarded).
 
-Classification: proposed-interface, guarded. This shows the intended wiring shape
+This shows the intended wiring shape
 built from the real ``agents`` registry, but it does NOT run an agent loop: the
 ``ReActAgent`` that ships today is a placeholder whose ``invoke`` raises
 ``NotImplementedError``. The ReAct loop arrives with the future agents spec.

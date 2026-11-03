@@ -1,6 +1,6 @@
 """Inject optional services into an agent (proposed-interface, guarded).
 
-Classification: proposed-interface, guarded. This shows the intended shape for
+This shows the intended shape for
 giving an agent its optional services -- memory, guard (safety) and observe
 (telemetry) -- through the real Ports, never by import of a concrete component.
 The services below are small local classes that satisfy the real Port contracts

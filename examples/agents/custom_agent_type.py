@@ -1,6 +1,6 @@
 """Register and run your own agent type (Live).
 
-Classification: Live. This runs real library code end to end.
+This runs real library code end to end.
 
 An agent type is a factory (usually a class) that produces a ``Runnable`` -- any
 object with ``async def invoke(self, input) -> output``. You register the factory

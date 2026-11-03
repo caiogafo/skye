@@ -1,6 +1,6 @@
-"""Custom exporter: implement the observe event-handler Port as an exporter.
+"""Custom exporter: implement the observe event-handler Port as an exporter (Live, Port-level).
 
-Live (Port-level). ``EventHandlerInterface`` (``skye.base.interfaces.event_handler``)
+``EventHandlerInterface`` (``skye.base.interfaces.event_handler``)
 is a real Port with eight lifecycle hooks. A user implements all of them; this
 example appends each hook call to an export buffer and fires the model-invoke and
 capability-invoke pairs, no client needed.

@@ -1,6 +1,6 @@
-"""Telemetry: implement the observe Port and collect events, metrics and traces.
+"""Telemetry: implement the observe Port and collect events, metrics and traces (Live, Port-level).
 
-Live (Port-level). The ``observe`` component exports nothing concrete yet, but the
+The ``observe`` component exports nothing concrete yet, but the
 ``ObserverInterface`` Port and its ``EventType`` enum are real
 (``skye.base.interfaces.observer``). A user implements the Port; this example
 collects everything into in-memory lists and drives a model-invoke pair, no client
