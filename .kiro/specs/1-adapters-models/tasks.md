@@ -51,8 +51,8 @@ honors.
   - [x] 3.4 Google adapter (formerly "Vertex AI", renamed `google`)
     - Evidence: `src/skye/models/llm/google_provider.py` (`GoogleProvider`), registered as `"google"` in `src/skye/models/__init__.py`; `tests/unit/models/test_google_provider.py`.
     - _Requirements: 9.3; D19_
-  - [ ] 3.5 Google adapter authentication through the `auth` component
-    - Note: `GoogleProvider` must obtain Google service-account / metadata / ADC credentials through the `auth` authentication Port (RS256 with `rsa`, impersonation, metadata server, WIF, API key) rather than any in-adapter credential handling. Depends on the `auth` component and its credential sources; wire `GoogleProvider._initialize_client` to accept an `AuthenticationInterface` and sign over `base/http.py`.
+  - [x] 3.5 Google adapter authentication through the `auth` component
+    - Evidence: `src/skye/models/llm/google_provider.py` imports `AuthenticationInterface` from `skye.base.interfaces.authentication`, resolves credentials via `skye.auth.google.resolve_google_auth`, has `_initialize_client` return `None` (no vendor SDK), and exposes a lazy `authenticator` property that signs requests over the shared transport; `src/skye/auth/google.py`.
     - _Requirements: 9.3, 11.1, 11.9_
 
 - [ ] 4. Embedding adapters behind the `vector_encoder` Port
@@ -67,13 +67,16 @@ honors.
   - [x] 5.1 `ImageHandler`: URL / data URL / path / bytes -> provider shape
     - Evidence: `src/skye/models/transport/multimodal.py`.
     - _Requirements: 26.1, 26.2, 26.3_
+  - [ ] 5.2 Carry images in a message and convert them in each adapter
+    - Note: found on 2026-11-03 when the base messages became dataclasses. `UserMessage` has no `images` field; the example `examples/advanced/multimodal.py` used `UserMessage(content=..., images=[...])` and the old pydantic model silently dropped the argument, so no image ever reached a provider. No adapter calls `ImageHandler` yet. Decide where images live in a message (a field of `UserMessage`, or `ContentChunk` parts), convert them in the OpenAI, Anthropic and Bedrock adapters, test with the fake network, then restore the end-to-end example.
+    - _Requirements: 26.1, 26.2, 26.3_
 
 - [ ] 6. Token counting and cost
   - [x] 6.1 Cost estimation and custom pricing
     - Evidence: `src/skye/models/transport/cost.py` (`CostCalculator`); `tests/unit` cost coverage.
     - _Requirements: 19.1, 19.2_
   - [ ] 6.2 Tokenizer per D25: stdlib approximate by default, lazy `tiktoken` extra
-    - Note: `src/skye/models/transport/token_counter.py` already defaults to a stdlib approximation and falls back when `tiktoken` is absent, but it imports `tiktoken` via `LazyImporter.import_module("tiktoken", install_extra="openai")`. Change `install_extra` to the dedicated `tiktoken` extra (D25) so the extra name matches `budgets.toml`, and add a test asserting `import skye` imports no tokenizer and that counting works without the extra installed.
+    - Note: `src/skye/models/transport/token_counter.py` already defaults to a stdlib approximation and falls back when `tiktoken` is absent, and it imports `tiktoken` via `LazyImporter.import_module("tiktoken", install_extra="openai")`. The `install_extra` value must be aligned with whatever open decision O22 settles for the exact-token-counting extra (currently `openai` in `budgets.toml`, whose `[extras.openai]` declares only `tiktoken`; O22 options are rename to `tokens`, remove the extra, or drop `tiktoken`). This task is blocked on O22 and must not hard-code a `tiktoken` extra name. Independently of O22, add a test asserting `import skye` imports no tokenizer and that counting works without the extra installed.
     - _Requirements: 28.1, 28.2, 28.3; D25_
 
 - [ ] 7. Decision model (Jev)
@@ -102,7 +105,7 @@ honors.
 - Tasks marked with `*` are optional (tests) and can be skipped for a faster path.
 - Status reflects the code in `src/skye/models` and `tests/` at migration time, not the former `model-providers` checkboxes.
 - The `models` extra is empty (stdlib REST); `google` declares only its SDK and exact token counting declares only `tiktoken` (design "Extras and budgets"; D25).
-- Open items at migration: 3.5 (Google auth through `auth`), 6.2 (`tiktoken` extra name), 7.1 (Jev not yet in `src`), 8.1 (pydantic structured output under O4), 9.1 (differential scaffold).
+- Open items at migration: 6.2 (exact-token-counting extra name blocked on O22), 7.1 (Jev not yet in `src`), 8.1 (pydantic structured output under O4), 9.1 (differential scaffold).
 
 ## Task Dependency Graph
 
@@ -111,7 +114,7 @@ honors.
   "waves": [
     { "id": 0, "tasks": ["1.1", "1.2", "1.3", "1.4", "1.5"] },
     { "id": 1, "tasks": ["2.1", "2.2", "5.1", "6.1"] },
-    { "id": 2, "tasks": ["2.3", "3.1", "3.2", "3.3", "3.4", "6.2", "7.1"] },
+    { "id": 2, "tasks": ["2.3", "3.1", "3.2", "3.3", "3.4", "5.2", "6.2", "7.1"] },
     { "id": 3, "tasks": ["3.5", "4.1", "7.2", "8.1"] },
     { "id": 4, "tasks": ["4.2", "9.1"] }
   ]

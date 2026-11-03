@@ -4,7 +4,7 @@
 
 This plan executes the target module and folder structure defined in `design.md`, governed by the testable requirements in `requirements.md` (the source of truth; requirements are cited by number). It is a **structure-only migration**: it moves and renames packages and declares boundaries, with no behavior change beyond what the requirements state.
 
-The migration is done and was verified green on 2026-11-02. The only open work is group **13**, the final verification, to be run with Kiro. The rename of the project and the owner actions are not tasks of this spec: they are in `.kiro/steering/12-decisions.md` (open decision O1 and the section on owner actions). Documentation-as-wiki is group 10.
+The migration is done and was verified green on 2026-11-02. The only open work is group **13**, the final verification, to be run with Kiro. The rename of the project and the owner actions are not tasks of this spec: they are in `.kiro/steering/12-decisions.md` (decision D31 and the section on owner actions). Documentation-as-wiki is group 10.
 
 ### Ordering principle
 
@@ -222,6 +222,16 @@ The migration is done and was verified green on 2026-11-02. The only open work i
   - [x] 13.5 Report what was found and anything left open.
     - _Requirements: 15.1_
 
+- [ ] 14. Reduce the core (open: waits for the owner's decision O4)
+  - [ ] 14.1 Replace `pydantic` with dataclasses in the core, with its own validation and serialization for `CompletionRequest` and `CompletionResponse`; tests green at every step.
+    - Note: the pydantic stack is about 7.7 MB of the 8.9 MB core on Linux and about 37 ms of the 91 ms of `import skye`; the measure is in `docs/budgets.md`. No code is changed before O4 is decided.
+    - _Requirements: 7.1, 7.9; O4_
+  - [ ] 14.2 Replace `tenacity` with a retry of our own in the standard library (backoff and jitter, sync and async).
+    - Note: saves 0.15 MB and brings the core to zero third-party dependencies (`00-rules.md`).
+    - _Requirements: 7.1_
+  - [ ] 14.3 Lower `core.max_installed_mb` and the cold-start limit in `budgets.toml` to the new measure, and empty `allowed_dependencies` and `known_compiled`. Budgets only go down.
+    - _Requirements: 7.2, 7.9_
+
 ## Requirement coverage
 
 This table uses the current numbering of `requirements.md` (local Requirements 1 to 49, the merged
@@ -324,7 +334,9 @@ Execution waves (tasks within a wave are independent and can run in parallel; a 
     { "id": 19, "tasks": ["10.4", "10.5", "10.6", "10.7"] },
     { "id": 20, "tasks": ["11.1", "11.2", "11.3", "11.4"] },
     { "id": 21, "tasks": ["12.1", "12.2", "12.3", "12.4"] },
-    { "id": 22, "tasks": ["13.1", "13.2", "13.3", "13.4", "13.5"] }
+    { "id": 22, "tasks": ["13.1", "13.2", "13.3", "13.4", "13.5"] },
+    { "id": 23, "tasks": ["14.1", "14.2"] },
+    { "id": 24, "tasks": ["14.3"] }
   ]
 }
 ```

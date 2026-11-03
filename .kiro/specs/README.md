@@ -8,7 +8,7 @@ component and is listed separately.
 | # | Component | Codename | Status | Spec folder |
 |---|-----------|----------|--------|-------------|
 | 1 | base | stratus | requirements only | `0-base-base/` |
-| 2 | auth | ozone | requirements only | `0-base-auth/` |
+| 2 | auth | ozone | migrated | `0-base-auth/` |
 | 3 | models | zephyr | migrated | `1-adapters-models/` (was `model-providers`) |
 | 4 | store | lake | requirements only | `1-adapters-store/` |
 | 5 | router | jet | requirements only | `2-services-router/` |

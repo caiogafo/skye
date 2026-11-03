@@ -1,0 +1,193 @@
+Builds on: #[[file:.kiro/steering/11-design.md]] (sections: Base contracts, Ports, Public API and lazy imports, Layers, Allowed imports)
+
+# Design Document: base
+
+## Overview
+
+`base` is the layer-0 foundation (codename stratus). It holds the shapes every other component shares — the message and
+completion models, the error hierarchy, the configuration loader, the `missing_extra` lazy-import helper and every Port — and
+it imports only the standard library. It does no file, network or process I/O, with the one sanctioned exception of
+`base/http.py`, the standard-library HTTP transport shared by `auth` and the adapters (Requirement 3.1, 3.2). Nothing in
+`base` imports another component, and each Port performs no I/O and imports no component (Requirement 3.4). This document
+describes only the internals of `base`; the layer, the allowed imports (none but the standard library), the Port catalogue
+and the public-API rule are in the steering sections named above and are not restated here.
+
+Ports defined by this component (all under `base/interfaces`): `model`, `decision`, `runnable`, `storage`, `registry`,
+`cost_calculator`, `error_handler`, `token_counter`, `memory`, `vector_encoder`, `router`, `safety`, `observer`,
+`event_handler`, `content_reader`, `multimodal_handler`, `prompt`, `config_loader`, `plugin`, `capability`, `authorizer`,
+`authentication` (design "Ports"). Every cross-component dependency crosses one of these, never a concrete implementation.
+
+## Architecture
+
+`base` sits at layer 0 and may import only the standard library (design "Layers", "Allowed imports", enforced by
+`tests/budget/test_import_matrix.py` and `tests/budget/test_clean_import.py`). The shape is four concerns in flat modules plus
+one interfaces package:
+
+- **Contracts** — the data shapes passed across Ports: `messages.py`, `completion.py`, `capability_schema.py`,
+  `openai_shape.py`, `health.py`.
+- **Errors** — the `SkyeError` hierarchy in `exceptions.py`.
+- **Configuration** — `config.py` (the loader, precedence, `${VAR}` substitution) built on `lazy_import.py`.
+- **Transport** — `http.py`, the single I/O module, used by `auth` and the adapters but by nothing else in `base`.
+- **Ports** — `interfaces/`, one module per Port, re-exported from `interfaces/__init__.py`.
+
+The top-level public surface (`skye/__init__.py` re-exporting `messages`, `completion`, `exceptions`, `config`) is owned by
+the cross-cutting spec `0-base-structure`, not here; `base` only guarantees that those four modules import no optional or
+provider library (design "Public API and lazy imports"; Requirement 2 of this spec realizes Requirement 16, not Requirement
+7.8).
+
+## Package layout
+
+```
+base/
+  __init__.py             package docstring ending "Codename: stratus."
+  messages.py             SkyeMessage + role variants (User/Assistant/System/Capability), ContentChunk
+  completion.py           CompletionRequest, CompletionResponse, StreamChunk, TokenUsage, CapabilityCall
+  capability_schema.py    the capability contract (name, description, parameters); handlers live in tools
+  openai_shape.py         read-only helpers to accept the OpenAI message/tool shape at the boundary
+  health.py               HealthMetrics shared by adapters and the router's health tracking
+  exceptions.py           SkyeError, ProviderError, ConfigurationError, ValidationError,
+                          CapabilityExecutionError, MissingExtraError
+  config.py               ConfigLoader, SkyeConfig, ModelConfig, substitute_env_vars, the 3 prefixed vars
+  lazy_import.py          missing_extra(): first-use import, MissingExtraError on absence
+  http.py                 the one network-I/O module (urllib + json); request_json, stream_lines, send_bytes, request
+  interfaces/
+    __init__.py           re-exports every Port
+    model.py decision.py runnable.py storage.py registry.py cost_calculator.py error_handler.py
+    token_counter.py memory.py vector_encoder.py router.py safety.py observer.py event_handler.py
+    content_reader.py multimodal_handler.py prompt.py config_loader.py plugin.py capability.py
+    authorizer.py authentication.py
+```
+
+## Components and Interfaces
+
+### Standard contracts (Requirement 2)
+
+`messages.py` defines `SkyeMessage` with the role literal `user | assistant | system | capability` and the subclasses
+`UserMessage`, `AssistantMessage`, `SystemMessage`, `CapabilityMessage`, plus `ContentChunk` for multimodal parts (design
+"Base contracts"). `completion.py` defines `CompletionRequest` and `CompletionResponse` and the one standard response schema:
+content, role, metadata, `TokenUsage`, model identifier and provider, normalized whatever the provider produced; a stream
+yields `StreamChunk` values in one format (Requirement 16.4, 16.5). `CapabilityCall` and `ExecutableCapabilityCall` live here
+so adapters in `models` need no import of `tools` (design "Base contracts"). The capability schema (name, description,
+parameters) is a pure contract in `capability_schema.py`; the handlers and the registry stay in `tools`. `openai_shape.py`
+lets a caller pass messages and tools in the OpenAI shape, which the boundary converts to library types without subclassing
+or re-exporting an SDK class.
+
+### Port catalogue (Requirement 2)
+
+Every Port is one module in `interfaces/`, defining an ABC or Protocol with no I/O and no component import (Requirement 3.4).
+The catalogue is the steering "Ports" list. The library validates a component's Port compliance at initialization and at
+runtime, and supports dynamic registration and discovery of plugins through the `plugin` and `registry` Ports (Requirement
+16.1, 16.2, 16.3). Naming follows the 00-rules convention `{Concept}Interface` (`ModelInterface`, `CapabilityInterface`,
+`VectorEncoderInterface`, `EventHandlerInterface`, `ContentReaderInterface`); the composition Ports keep their design names
+(`Runnable`, `DecisionModel`, `Decision`, `AuthorizerInterface`, `AuthenticationInterface`), matching `interfaces/__init__.py`.
+
+### Errors and logging (Requirement 3)
+
+`exceptions.py` defines `SkyeError` as the root and the specific types `ProviderError` (provider name, status code, original
+error as context), `ConfigurationError`, `ValidationError` (field and value), `CapabilityExecutionError` and
+`MissingExtraError` (names the extra, subclasses `ImportError`). A wrapped error keeps the original message and stack by being
+raised `from` the cause, and `SkyeError.__init__` logs the exception with structured `extra={...}` so every exception is
+logged at an appropriate level (Requirement 18.1, 18.2). `base` defines the shapes for structured log events and the telemetry
+hook Ports (`observer`, `event_handler`) consumed by `observe`; the `correlation_id_header` and a per-component log level are
+configuration fields (Requirement 18.3, 18.4). The structured-log rule is "message plus `extra={...}`", never f-string
+interpolation (00-rules).
+
+### Token usage and cost (Requirement 4)
+
+`completion.py` carries `TokenUsage` (prompt, completion, total) in every `CompletionResponse`, and `ModelConfig` in
+`config.py` carries `cost_per_1k_prompt_tokens` / `cost_per_1k_completion_tokens` so a cost estimate can be attached to the
+response metadata and custom pricing accepted for private models (Requirement 19.1, 19.2). `base` defines the
+`cost_calculator` and `token_counter` Ports; the concrete counter and `CostCalculator` live in `models` (design "Extras and
+budgets"), and aggregation across requests is exposed through the response metadata (Requirement 19.3).
+
+### Configuration (Requirement 5)
+
+`config.py` holds `ConfigLoader`, which loads from a dictionary, environment variables, and a YAML or JSON file named by
+`SKYE_CONFIG`, applying them in the order file, then environment, then code overrides (highest precedence), so the effective
+precedence is code > environment > file (Requirement 20.1, 20.2). `substitute_env_vars` expands `${VAR}` in every string field
+and raises `ConfigurationError` when the variable is missing (Requirement 20.4). A YAML file needs the extra `yaml`: `_yaml()`
+calls `missing_extra("yaml", extra="yaml")`, so a missing parser raises `MissingExtraError` naming the extra, while JSON needs
+nothing (Requirement 20.1; D29). An invalid value raises `ConfigurationError` with details (Requirement 20.3). The prefixed
+environment variables are exactly three — `SKYE_LOG_LEVEL`, `SKYE_CONFIG`, `SKYE_ENABLE_TELEMETRY` (`ALL_ENV_VARS`); provider
+credentials never come from a prefixed variable (D18).
+
+### Type safety (Requirement 6)
+
+Every public API in `base` is fully type-hinted with Python 3.10 syntax (`list[str]`, `X | None`), the minimum supported
+version (Requirement 21.1; 00-rules). Invalid data raises `ValidationError` carrying the field and the value (Requirement
+21.3). Requirement 21.2 — new data structures as dataclasses, not pydantic — is honored going forward; the existing `base`
+contracts (`messages.py`, `completion.py`, `config.py`) still subclass `pydantic.BaseModel`, and moving them to dataclasses is
+open decision O4 (D24). This spec records that migration as a task rather than claiming it done.
+
+## Data Models
+
+`base` is where the shared data models are defined, not consumed from elsewhere: the `SkyeMessage` role variants and
+`ContentChunk` (`messages.py`); `CompletionRequest`, `CompletionResponse`, `StreamChunk`, `TokenUsage`, `CapabilityCall`,
+`ExecutableCapabilityCall` (`completion.py`); `CapabilitySchema` (`capability_schema.py`); `HealthMetrics` (`health.py`); and
+the configuration models `SkyeConfig`, `ModelConfig`, `RateLimitConfig`, `RetryConfig`, `CooldownConfig`, `RouterConfig`
+(`config.py`). New structures are dataclasses (Requirement 21.2, D24); the models above are the pydantic legacy under O4.
+
+## Error Handling
+
+`SkyeError` is the one root; `ProviderError` wraps a provider failure with its context and status, `ConfigurationError`
+reports a bad configuration value or file, `ValidationError` names the field and value, and `MissingExtraError` names the
+absent extra while subclassing `ImportError` so existing `except ImportError` sites keep working. Every error is raised `from`
+its cause to keep the original message and stack, and logged on construction with structured context (Requirement 18.1, 18.2).
+`http.py` maps a `urllib` HTTP error or transport failure to a `ProviderError` with the status code, keeping the cause.
+
+## Testing Strategy
+
+Unit tests in `tests/unit` cover the message and completion models, the error hierarchy (wrapping, context, logging), the
+configuration loader (precedence, `${VAR}` substitution, invalid values, YAML needing the extra) and each Port's contract,
+all with no network. The deterministic budget tests guard the architecture: `test_import_matrix.py` (base imports only the
+standard library), `test_clean_import.py` (`import skye` pulls no optional or provider library), `test_codenames.py` (the
+codename stratus appears only in the sanctioned places) and `test_steering.py`. `base` carries `http.py`, so the import-matrix
+test allows network I/O only in that module.
+
+## Correctness Properties
+
+*A property is a characteristic that should hold across all valid executions; it bridges the user stories and the tests.*
+
+### Property 1: `base` imports only the standard library
+
+For any module under `base`, a static import scan finds no third-party package, so installing `base` installs nothing and
+importing it reaches no optional library.
+
+**Validates: Requirement 1 (Requirement 3.1, 3.3, 3.5 of steering)**
+
+### Property 2: `base` does no I/O outside `http.py`
+
+For any module under `base` other than `http.py`, a static scan finds no file, network or process I/O, and no Port performs
+I/O or imports a component.
+
+**Validates: Requirement 1 (Requirement 3.2, 3.4 of steering)**
+
+### Property 3: One response shape whatever the provider
+
+For any `CompletionResponse` a component produces, it carries content, role, metadata, token usage, model identifier and
+provider, and a stream yields `StreamChunk` values in one format.
+
+**Validates: Requirement 2 (Requirement 16.4, 16.5 of steering)**
+
+### Property 4: A wrapped error keeps its cause and is logged
+
+For any error raised through the `SkyeError` hierarchy, the original message and stack are preserved (raised `from` the cause)
+and the error is logged with structured context at an appropriate level.
+
+**Validates: Requirement 3 (Requirement 18.1, 18.2 of steering)**
+
+### Property 5: Configuration precedence and substitution
+
+For any set of sources, the loader applies file, then environment, then code, and expands `${VAR}` in every string; a missing
+variable or an invalid value raises `ConfigurationError`, and a YAML file without the `yaml` extra raises `MissingExtraError`.
+
+**Validates: Requirement 5 (Requirement 20.1–20.4 of steering), Requirement 6 (Requirement 21.3)**
+
+## Open items
+
+- **O4 / D24 — pydantic to dataclasses.** `messages.py`, `completion.py` and `config.py` still subclass `pydantic.BaseModel`.
+  New structures are dataclasses; moving these is open (tracked in tasks.md). `base` must not need pydantic to import
+  (Requirement 3.3), so the migration is the path to removing pydantic from the core.
+- **O6 — where `base/http.py` goes.** `base` must do no I/O, yet `http.py` is the one shared transport (Requirement 3.2). Its
+  placement, and whether cloud secret managers are in scope of `auth`, is open; the import-matrix test currently allows
+  network I/O only in `http.py`.
