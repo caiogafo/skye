@@ -69,7 +69,9 @@ def sign_request(
     )
 
     scope = f"{date_stamp}/{region}/{service}/aws4_request"
-    string_to_sign = "\n".join([ALGORITHM, amz_date, scope, _sha256_hex(canonical_request.encode("utf-8"))])
+    string_to_sign = "\n".join(
+        [ALGORITHM, amz_date, scope, _sha256_hex(canonical_request.encode("utf-8"))]
+    )
 
     key = _hmac(("AWS4" + secret_key).encode("utf-8"), date_stamp)
     for part in (region, service, "aws4_request"):
@@ -82,6 +84,7 @@ def sign_request(
     if session_token:
         out["x-amz-security-token"] = session_token
     out["Authorization"] = (
-        f"{ALGORITHM} Credential={access_key}/{scope}, SignedHeaders={signed_headers}, Signature={signature}"
+        f"{ALGORITHM} Credential={access_key}/{scope}, "
+        f"SignedHeaders={signed_headers}, Signature={signature}"
     )
     return out

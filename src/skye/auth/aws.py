@@ -1,8 +1,11 @@
 """AWS authentication on the standard library: SigV4, Bedrock API keys, credential sources.
 
-Credential sources, in order: explicit arguments, environment variables, a named profile's
-static keys in ``~/.aws/credentials``, the ECS/container credentials endpoint, EC2 instance
-metadata (IMDSv2). Profiles with SSO or assume-role are out of scope. Imports only ``base``.
+Credential sources, in order: explicit arguments, environment variables, web identity
+(``AWS_ROLE_ARN`` with ``AWS_WEB_IDENTITY_TOKEN_FILE``), a named profile (static keys in
+``~/.aws/credentials``; assume-role, web identity or IAM Identity Center in ``~/.aws/config``), the
+ECS/container credentials endpoint, EC2 instance metadata (IMDSv2). An explicit ``role_arn`` assumes
+a role (also cross-account) on top of whatever source resolved. SSO needs an earlier
+``aws sso login``; ``auth`` reads its cache and never logs in. Imports only ``base``.
 """
 
 from __future__ import annotations
@@ -13,9 +16,11 @@ import json
 import os
 import threading
 from collections.abc import Callable, Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Any
 
+from skye.auth import aws_profile, sts
 from skye.auth.sigv4 import sign_request
 from skye.base import http
 from skye.base.exceptions import ConfigurationError
@@ -29,9 +34,9 @@ _REFRESH_MARGIN = _dt.timedelta(minutes=5)
 class AwsCredentials:
     """A resolved AWS credential set; ``expires_at`` is None for static keys."""
 
-    access_key: str
-    secret_key: str
-    session_token: str | None = None
+    access_key: str = field(repr=False)
+    secret_key: str = field(repr=False)
+    session_token: str | None = field(default=None, repr=False)
     expires_at: _dt.datetime | None = None
 
     def expired(self, now: _dt.datetime | None = None) -> bool:
@@ -56,8 +61,12 @@ def _from_json(data: Mapping[str, str]) -> AwsCredentials:
     )
 
 
-def _get(url: str, headers: dict[str, str] | None = None, method: str = "GET", timeout: float = 2.0) -> str:
-    return http.send_bytes(url, None, headers=headers, method=method, timeout=timeout, provider="aws").decode("utf-8")
+def _get(
+    url: str, headers: dict[str, str] | None = None, method: str = "GET", timeout: float = 2.0
+) -> str:
+    return http.send_bytes(
+        url, None, headers=headers, method=method, timeout=timeout, provider="aws"
+    ).decode("utf-8")
 
 
 def _env_credentials(env: Mapping[str, str]) -> AwsCredentials | None:
@@ -84,7 +93,9 @@ def _profile_credentials(profile: str, env: Mapping[str, str]) -> AwsCredentials
 
 
 def _container_credentials(env: Mapping[str, str]) -> AwsCredentials | None:
-    rel, full = env.get("AWS_CONTAINER_CREDENTIALS_RELATIVE_URI"), env.get("AWS_CONTAINER_CREDENTIALS_FULL_URI")
+    rel, full = env.get("AWS_CONTAINER_CREDENTIALS_RELATIVE_URI"), env.get(
+        "AWS_CONTAINER_CREDENTIALS_FULL_URI"
+    )
     if not (rel or full):
         return None
     url = full or f"{_ECS_HOST}{rel}"
@@ -100,7 +111,9 @@ def _container_credentials(env: Mapping[str, str]) -> AwsCredentials | None:
 
 def _imds_credentials() -> AwsCredentials | None:
     try:
-        token = _get(f"{_IMDS}/latest/api/token", {"X-aws-ec2-metadata-token-ttl-seconds": "21600"}, "PUT")
+        token = _get(
+            f"{_IMDS}/latest/api/token", {"X-aws-ec2-metadata-token-ttl-seconds": "21600"}, "PUT"
+        )
         hdrs = {"X-aws-ec2-metadata-token": token}
         base = f"{_IMDS}/latest/meta-data/iam/security-credentials/"
         role = _get(base, hdrs).strip().splitlines()[0]
@@ -119,10 +132,26 @@ class CredentialProvider:
         secret_key: str | None = None,
         session_token: str | None = None,
         profile_name: str | None = None,
+        role_arn: str | None = None,
+        role_session_name: str = "skye",
+        external_id: str | None = None,
+        region: str = "us-east-1",
+        sts_endpoint: str | None = None,
+        sso_endpoint: str | None = None,
         env: Mapping[str, str] | None = None,
     ) -> None:
-        self._explicit = AwsCredentials(access_key, secret_key, session_token) if access_key and secret_key else None
+        self._explicit = (
+            AwsCredentials(access_key, secret_key, session_token)
+            if access_key and secret_key
+            else None
+        )
         self._profile = profile_name
+        self._role_arn = role_arn
+        self._role_session_name = role_session_name
+        self._external_id = external_id
+        self._region = region
+        self._sts_endpoint = sts_endpoint
+        self._sso_endpoint = sso_endpoint
         self._env = env
         self._cached: AwsCredentials | None = None
         self._lock = threading.Lock()
@@ -135,17 +164,31 @@ class CredentialProvider:
             return self._cached
 
     def _resolve(self) -> AwsCredentials:
+        env = self._env if self._env is not None else os.environ
+        base = self._resolve_source(env)
+        if self._role_arn:
+            return self._assume(base, self._role_arn, self._role_session_name, self._external_id)
+        return base
+
+    def _resolve_source(self, env: Mapping[str, str]) -> AwsCredentials:
         if self._explicit:
             return self._explicit
-        env = self._env if self._env is not None else os.environ
         found = _env_credentials(env)
+        if not found and env.get("AWS_ROLE_ARN") and env.get("AWS_WEB_IDENTITY_TOKEN_FILE"):
+            found = self._web_identity(
+                env["AWS_ROLE_ARN"],
+                env["AWS_WEB_IDENTITY_TOKEN_FILE"],
+                env.get("AWS_ROLE_SESSION_NAME") or self._role_session_name,
+            )
         if not found and self._profile:
-            found = _profile_credentials(self._profile, env)
+            found = _profile_credentials(self._profile, env) or self._profile_from_config(
+                self._profile, env
+            )
             if not found:
                 raise ConfigurationError(
-                    f"AWS profile {self._profile!r} has no static keys in ~/.aws/credentials; "
-                    "profiles using SSO or assume-role are not supported, pass explicit keys or use "
-                    "environment variables, container or instance-role credentials"
+                    f"AWS profile {self._profile!r} was not found in ~/.aws/credentials or "
+                    "~/.aws/config, or it has none of static keys, assume-role, web identity or "
+                    "SSO settings"
                 )
         found = found or _container_credentials(env) or _imds_credentials()
         if not found:
@@ -155,6 +198,70 @@ class CredentialProvider:
             )
         return found
 
+    def _assume(
+        self, source: AwsCredentials, role_arn: str, session_name: str, external_id: str | None
+    ) -> AwsCredentials:
+        key, secret, token, expires = sts.assume_role(
+            role_arn,
+            access_key=source.access_key,
+            secret_key=source.secret_key,
+            session_token=source.session_token,
+            session_name=session_name,
+            region=self._region,
+            external_id=external_id,
+            endpoint=self._sts_endpoint,
+        )
+        return AwsCredentials(key, secret, token, expires)
+
+    def _web_identity(self, role_arn: str, token_file: str, session_name: str) -> AwsCredentials:
+        try:
+            token = Path(token_file).read_text(encoding="utf-8").strip()
+        except OSError as error:
+            raise ConfigurationError(
+                f"Cannot read the web identity token file {token_file}",
+                details={"path": token_file},
+            ) from error
+        key, secret, session, expires = sts.assume_role_with_web_identity(
+            role_arn,
+            token,
+            session_name=session_name,
+            region=self._region,
+            endpoint=self._sts_endpoint,
+        )
+        return AwsCredentials(key, secret, session, expires)
+
+    def _profile_from_config(self, name: str, env: Mapping[str, str]) -> AwsCredentials | None:
+        settings = aws_profile.read_profile(name, env)
+        if not settings:
+            return None
+        if settings.get("web_identity_token_file") and settings.get("role_arn"):
+            return self._web_identity(
+                settings["role_arn"],
+                settings["web_identity_token_file"],
+                settings.get("role_session_name") or self._role_session_name,
+            )
+        if settings.get("role_arn") and settings.get("source_profile"):
+            source_name = settings["source_profile"]
+            source = _profile_credentials(source_name, env) or self._profile_from_config(
+                source_name, env
+            )
+            if source is None:
+                raise ConfigurationError(
+                    f"The source profile {source_name!r} of profile {name!r} has no credentials"
+                )
+            return self._assume(
+                source,
+                settings["role_arn"],
+                settings.get("role_session_name") or self._role_session_name,
+                settings.get("external_id"),
+            )
+        if settings.get("sso_account_id") or settings.get("sso_role_name"):
+            key, secret, token, expires = aws_profile.sso_credentials(
+                name, settings, env, endpoint=self._sso_endpoint
+            )
+            return AwsCredentials(key, secret, token, expires)
+        return None
+
 
 class SigV4Authenticator:
     """Authentication Port implementation that signs requests with SigV4."""
@@ -163,7 +270,9 @@ class SigV4Authenticator:
         self,
         region: str,
         service: str,
-        credentials: CredentialProvider | Callable[[], AwsCredentials] | AwsCredentials | None = None,
+        credentials: (
+            CredentialProvider | Callable[[], AwsCredentials] | AwsCredentials | None
+        ) = None,
     ) -> None:
         self.region = region
         self.service = service
@@ -177,7 +286,9 @@ class SigV4Authenticator:
         else:
             self._get = credentials
 
-    def apply(self, method: str, url: str, headers: Mapping[str, str], body: bytes = b"") -> dict[str, str]:
+    def apply(
+        self, method: str, url: str, headers: Mapping[str, str], body: bytes = b""
+    ) -> dict[str, str]:
         creds = self._get()
         return sign_request(
             method,
@@ -198,9 +309,13 @@ class BedrockApiKeyAuthenticator:
     def __init__(self, api_key: str | None = None) -> None:
         self._key = api_key or os.environ.get("AWS_BEARER_TOKEN_BEDROCK")
         if not self._key:
-            raise ConfigurationError("No Bedrock API key: pass api_key or set AWS_BEARER_TOKEN_BEDROCK")
+            raise ConfigurationError(
+                "No Bedrock API key: pass api_key or set AWS_BEARER_TOKEN_BEDROCK"
+            )
 
-    def apply(self, method: str, url: str, headers: Mapping[str, str], body: bytes = b"") -> dict[str, str]:
+    def apply(
+        self, method: str, url: str, headers: Mapping[str, str], body: bytes = b""
+    ) -> dict[str, str]:
         return {**headers, "Authorization": f"Bearer {self._key}"}
 
 
@@ -217,12 +332,21 @@ def bedrock_authenticator(
     if api_key or (not access_key and os.environ.get("AWS_BEARER_TOKEN_BEDROCK")):
         return BedrockApiKeyAuthenticator(api_key)
     provider = CredentialProvider(
-        access_key=access_key, secret_key=secret_key, session_token=session_token, profile_name=profile_name
+        access_key=access_key,
+        secret_key=secret_key,
+        session_token=session_token,
+        profile_name=profile_name,
     )
     return SigV4Authenticator(region, "bedrock", provider)
 
 
+def aws_authenticator(region: str, service: str, **credentials: Any) -> SigV4Authenticator:
+    """A SigV4 authenticator for any AWS service; ``credentials`` go to ``CredentialProvider``."""
+    return SigV4Authenticator(region, service, CredentialProvider(**credentials))
+
+
 __all__ = [
+    "aws_authenticator",
     "AwsCredentials",
     "CredentialProvider",
     "SigV4Authenticator",

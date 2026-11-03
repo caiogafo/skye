@@ -47,9 +47,14 @@ Work is ordered by the tiers of the design "Auth component" section:
 ```
 auth/
   __init__.py             package docstring ending "Codename: ozone."
-  sigv4.py                stdlib AWS Signature Version 4 signer (hashlib / hmac / datetime)   [done]
-  aws.py                  AWS credential sources + SigV4Authenticator + Bedrock API key        [done]
-  google.py               Google bearer / metadata / API-key authenticators + resolver         [done, partial]
+  sigv4.py                stdlib AWS Signature Version 4 signer (hashlib / hmac / datetime)
+  aws.py                  AWS credential sources + SigV4Authenticator + Bedrock API key
+  aws_profile.py          ~/.aws/config profiles: SSO cache (never a login), assume-role, web identity
+  sts.py                  AssumeRole and AssumeRoleWithWebIdentity over STS (SigV4 reused)
+  google.py               Google bearer, metadata, API key, service account, authorized user,
+                          impersonation, Workload Identity Federation + resolver
+  oauth2.py               client-credentials and token-exchange flows
+  errors.py               LoginRequiredError (log in again; no mode logs in)
   azure.py                Microsoft Entra ID for Azure OpenAI: managed identity, client secret,
                           certificate (rsa), federated token file, API key
   openai_compatible.py    API key / bearer for OpenAI-compatible providers, Anthropic, Cohere
@@ -165,9 +170,8 @@ sources against fake endpoints, and the credential-source registry (register and
 The deterministic budget tests guard the architecture: `test_import_matrix.py` (`auth` imports only `base`),
 `test_extras_footprint.py` (`test_auth_extra_declares_exactly_rsa`: the `auth` extra declares exactly `rsa`, the `google`
 extra does not), `test_codenames.py` (ozone appears only in the sanctioned places) and the clean-import test (`import skye`
-and a core-only install pull neither `rsa` nor a provider library). Until the RSA strategy code imports `rsa`, the
-declare-exactly check for `auth` is `xfail` with a recorded reason in `test_extras_footprint.py` (`EXTRA_XFAIL`); landing the
-RSA minting removes that xfail.
+and a core-only install pull neither `rsa` nor a provider library). The RSA minting in `rsa_signing.py` imports `rsa`, so the
+declare-exactly check for `auth` runs on live code (the former `xfail` in `test_extras_footprint.py` is gone).
 
 ## Correctness Properties
 
@@ -218,6 +222,6 @@ variables are the three owned by `base`.
 
 ## Open items
 
-- **O6 — where `base/http.py` goes, and whether cloud secret managers are in scope of `auth`.** `auth`'s secret-manager
-  sources call over `base/http.py`; O6 is open on that module's placement and on whether the cloud secret managers belong to
-  `auth`. The secret-manager work (task 6) is blocked on O6; no code lands until the decision is recorded in `12-decisions.md`.
+- **O6 is closed by D32:** `base/http.py` stays in `base`, and the cloud secret managers are in scope of `auth` (`secrets.py`).
+- **Partial modes.** A Google external account takes its subject token from a file or a URL only (not from an AWS environment); the
+  AWS SSO and Azure CLI caches are read and never refreshed, so an expired login says to log in again.

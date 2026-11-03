@@ -36,8 +36,8 @@ BUDGETS = load_budgets()
 # Extra -> files or directories (relative to src/skye) forming its Component. Current layout;
 # update when the structure moves.
 EXTRA_PATHS: dict[str, list[str]] = {
-    # auth: authentication and credentials (Layer 0). `rsa` is declared for RS256 signing, which
-    # lands with the auth strategies (see EXTRA_XFAIL); the stdlib SigV4 signer lives here today.
+    # auth: authentication and credentials (Layer 0). `rsa` is declared for RS256 signing
+    # (`auth/rsa_signing.py`); the SigV4 signer and the other strategies are standard library.
     "auth": ["auth"],
     "openai": ["models/llm/openai_compatible.py", "models/embeddings/openai_embeddings.py"],
     "anthropic": ["models/llm/anthropic.py"],
@@ -183,11 +183,9 @@ def _declared() -> dict[str, set[str]]:
     }
 
 
-# Reasons the current tree does not satisfy the declare-exactly rule yet (auth: rsa is not imported yet).
-EXTRA_XFAIL: dict[str, str] = {
-    "auth": "rsa is declared for RS256 (Google/Azure assertions); the strategy code that imports it "
-    "is the auth milestone, not this phase (Requirement 18).",
-}
+# Reasons the current tree does not satisfy the declare-exactly rule yet: none. The `auth` extra declares exactly `rsa`,
+# which the RS256 minting (`auth/rsa_signing.py`) imports lazily through `missing_extra`.
+EXTRA_XFAIL: dict[str, str] = {}
 
 
 @pytest.mark.parametrize("extra", sorted(EXTRA_PATHS))

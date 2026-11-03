@@ -8,13 +8,14 @@ import pytest
 from skye.auth import google as g
 from skye.base.interfaces.authentication import AuthenticationInterface
 
-ENV = (*g.TOKEN_ENV_VARS, g.API_KEY_ENV_VAR, "GOOGLE_APPLICATION_CREDENTIALS")
+ENV = (*g.TOKEN_ENV_VARS, g.API_KEY_ENV_VAR, "GOOGLE_APPLICATION_CREDENTIALS")  # noqa: E501
 
 
 @pytest.fixture(autouse=True)
-def clean_env(monkeypatch: pytest.MonkeyPatch) -> None:
+def clean_env(monkeypatch: pytest.MonkeyPatch, tmp_path) -> None:
     for n in ENV:
         monkeypatch.delenv(n, raising=False)
+    monkeypatch.setenv("CLOUDSDK_CONFIG", str(tmp_path / "no-gcloud"))
 
 
 def test_bearer_explicit_and_protocol() -> None:
@@ -90,10 +91,12 @@ def test_resolve_env_order(monkeypatch: pytest.MonkeyPatch) -> None:
     assert isinstance(g.resolve_google_auth(), g.GoogleBearerAuth)
 
 
-def test_resolve_metadata_and_service_account_hint(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_resolve_metadata_and_the_nothing_available_message(monkeypatch: pytest.MonkeyPatch) -> None:
     with patch.object(g, "_metadata_server_available", return_value=True):
         assert isinstance(g.resolve_google_auth(), g.GoogleMetadataAuth)
-    monkeypatch.setenv("GOOGLE_APPLICATION_CREDENTIALS", "/sa.json")
     with patch.object(g, "_metadata_server_available", return_value=False):
-        with pytest.raises(g.GoogleAuthError, match="not supported yet"):
+        with pytest.raises(g.GoogleAuthError, match="gcloud auth application-default login"):
             g.resolve_google_auth()
+    monkeypatch.setenv("GOOGLE_APPLICATION_CREDENTIALS", "/no/such/sa.json")
+    with pytest.raises(g.GoogleAuthError, match="/no/such/sa.json"):
+        g.resolve_google_auth()
