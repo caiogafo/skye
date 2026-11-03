@@ -155,6 +155,127 @@ Durable, external state behind the `StorageBackend` Port:
 python examples/store/backends.py
 ```
 
+### Base (`examples/base/`)
+
+Core data types and the error hierarchy behind the Ports in `skye.base`:
+- `content_chunks.py` (Live): `ContentChunk` and `StreamChunk`
+- `errors.py` (Live): the `SkyeError` hierarchy
+
+**Run:**
+```bash
+python examples/base/content_chunks.py
+```
+
+### Models (`examples/models/`)
+
+The model layer: token counting, cost and the model Ports:
+- `token_counting.py` (Live): `TokenCounter`
+- `cost_tracking.py` (Live): `CostCalculator`
+- `cohere.py` (proposed-interface, guarded): Cohere as a language model
+- `decision_model.py` (proposed-interface, guarded): the `DecisionModel` Port
+- `retry_and_errors.py` (proposed-interface, guarded): `ProviderError` and where retry lives
+
+**Run:**
+```bash
+python examples/models/token_counting.py
+```
+
+### Tools (`examples/tools/`)
+
+The capability registry and MCP client paths:
+- `registry.py` (Live): register, discover and execute capabilities
+- `mcp_fastmcp.py` (Live, `fastmcp` branch guarded): built-in vs `fastmcp` MCP client
+- `mcp_prompts_and_resources.py` (Live): MCP prompts and resources via the built-in client
+
+**Run:**
+```bash
+python examples/tools/registry.py
+```
+
+### Memory (`examples/memory/`)
+
+The memory Port, `skye.base.interfaces.memory.MemoryInterface`:
+- `conversation_memory.py` (proposed-interface, guarded): intended Port-level usage
+- `custom_memory.py` (proposed-interface, guarded): your own memory store
+
+**Run:**
+```bash
+python examples/memory/custom_memory.py
+```
+
+### Guard (`examples/guard/`)
+
+Content moderation behind the guard Port, `SafetyFilterInterface`:
+- `safety_filters.py` (Live, Port-level): implement the Port and screen input and output
+
+**Run:**
+```bash
+python examples/guard/safety_filters.py
+```
+
+### Policy (`examples/policy/`)
+
+Authorization behind the policy Port, `AuthorizerInterface`:
+- `authorizer.py` (Live, Port-level): implement the Port and decide permit or forbid
+
+**Run:**
+```bash
+python examples/policy/authorizer.py
+```
+
+### Observe (`examples/observe/`)
+
+Telemetry behind the observe Ports, `ObserverInterface` and `EventHandlerInterface`:
+- `telemetry.py` (Live, Port-level): collect events, metrics and traces
+- `custom_exporter.py` (Live, Port-level): the event-handler Port as an exporter
+
+**Run:**
+```bash
+python examples/observe/telemetry.py
+```
+
+### Gateway (`examples/gateway/`)
+
+Exposing Skye capabilities, built from real parts:
+- `mcp_server.py` (proposed-interface, guarded): the intended gateway shape
+
+**Run:**
+```bash
+python examples/gateway/mcp_server.py
+```
+
+### Agents (`examples/agents/`)
+
+Agent types behind the `Runnable` Port, via the `skye.agents` registry:
+- `custom_agent_type.py` (Live): `register_agent_type`, `create_agent`, `list_agent_types`
+- `react_agent.py` (proposed-interface, guarded): `create_agent(REACT, ...)` wiring shape; the placeholder is not invoked
+- `agent_with_hooks.py` (proposed-interface, guarded): injecting memory/guard/observe services through the Ports
+
+**Run:**
+```bash
+python examples/agents/custom_agent_type.py
+```
+
+### Teams (`examples/teams/`)
+
+Composing a team from the `Runnable` Port:
+- `team_of_runnables.py` (proposed-interface, guarded): user `Runnable`s plus free-string roles toward a shared objective
+
+**Run:**
+```bash
+python examples/teams/team_of_runnables.py
+```
+
+### Flows (`examples/flows/`)
+
+Chaining the `Runnable` Port in order:
+- `sequential_flow.py` (proposed-interface, guarded): output→input chain with local cycle detection
+
+**Run:**
+```bash
+python examples/flows/sequential_flow.py
+```
+
 ### 6. Serverless (`examples/serverless/`)
 
 Patterns for serverless runtimes, where the size of the library and its cold start matter:
@@ -294,7 +415,7 @@ response = router.complete(
 - **Rate Limiting**: Enforce TPM/RPM limits
 - **Capabilities**: Call functions/tools from models
 - **Streaming**: Real-time token-by-token responses
-- **Structured Outputs**: Type-safe responses with Pydantic
+- **Structured Outputs**: Type-safe responses validated against a dataclass
 - **Async Support**: Full async/await support
 - **YAML Configuration**: Declarative configuration files
 - **Environment Variables**: Secure credential management

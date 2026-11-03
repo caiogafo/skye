@@ -1,0 +1,29 @@
+{
+  "id": "FEAT-005",
+  "type": "docs",
+  "description": "Layer-3 runtime examples (agents/teams/flows, 6 files) plus the examples/README.md category entries (R24.1). agents/custom_agent_type.py is Live; agents/react_agent.py and agent_with_hooks.py, and all teams/flows examples, are proposed-interface guarded (built from the real Runnable Port; the ReAct placeholder must NOT be invoked because it raises NotImplementedError). This FEAT runs LAST because the README step summarizes every new category created by the earlier FEATs. Read .agents/tasks/example-coverage/context.json and this file FIRST; exact signatures are in the plan Digest.",
+  "status": "completed",
+  "steps": [
+    "Create examples/agents/custom_agent_type.py (Live). Define a small Runnable factory (a class with async invoke(input)->output), register it via skye.agents.register_agent_type('echo-demo', factory, replace=True), create it with create_agent('echo-demo'), await agent.invoke('hi') inside asyncio.run, and print list_agent_types(). Use replace=True and a script-local name because the harness does not reset the agents registry between scripts.",
+    "Create examples/agents/react_agent.py (proposed-interface, guarded). Use create_agent(REACT, ...) from skye.agents to show the factory and model/tools wiring shape, but do NOT call .invoke (ReActAgent.invoke raises NotImplementedError). Print a note that the ReAct loop ships with the future agents spec and return.",
+    "Create examples/agents/agent_with_hooks.py (proposed-interface, guarded). Show the intended injection of optional services (memory/guard/observe) into an agent via its factory options, constructing those services from the real Ports (SafetyFilterInterface, ObserverInterface, MemoryInterface impls \u2014 small local classes). Guard-return before invoking any agent loop.",
+    "Create examples/teams/team_of_runnables.py (proposed-interface, guarded). Define two or three tiny user Runnables (async invoke) and a small local coordinator that assigns free-string roles and runs them toward a shared objective; docstring notes the planned teams API and that composition is via the Runnable Port. Guard-return before any not-yet-existing teams orchestration call.",
+    "Create examples/flows/sequential_flow.py (proposed-interface, guarded). Chain the Runnables in order (output->input) with a small local sequential runner; demonstrate cycle detection with a local check that, when a cycle is configured, prints a line containing the word 'Expected' (so the harness does not treat it as a failure). Docstring notes the planned flows API.",
+    "Update examples/README.md: add a short 'Example Categories' entry for each new directory (base, models, auth, store, tools, memory, guard, policy, observe, gateway, agents, teams, flows), noting for each whether its examples are Live or proposed-interface/guarded, to satisfy R24.1. Modify ONLY \u2014 do not rewrite the stale prompts/ section or the pydantic examples.",
+    "Run black and fix ruff on examples/agents, examples/teams, examples/flows and examples/README.md so all are clean. Then run the full examples suite."
+  ],
+  "acceptance_criteria": [
+    "uv run pytest tests/examples -q passes for the whole suite (baseline 87 plus the ~24 new scripts)",
+    "uv run ruff check examples/agents examples/teams examples/flows examples/README.md reports no errors",
+    "uv run black --check examples/agents examples/teams examples/flows reports nothing to reformat",
+    "examples/README.md has a category entry for every new directory; the prompts section and pydantic examples are untouched",
+    "The ReAct placeholder is never invoked; no FAILURE_MARKER on a normal path"
+  ],
+  "verification": [
+    "uv run pytest tests/examples -q",
+    "uv run ruff check examples/agents examples/teams examples/flows examples/README.md",
+    "uv run black --check examples/agents examples/teams examples/flows"
+  ],
+  "blocked_reason": null,
+  "findings": "Created examples/agents/{custom_agent_type.py (Live), react_agent.py, agent_with_hooks.py} (last two proposed-interface, guarded), examples/teams/team_of_runnables.py and examples/flows/sequential_flow.py (both proposed-interface, guarded, built purely from the Runnable Port). The ReAct placeholder is never invoked. sequential_flow.py prints an 'Expected cycle refused...' line for its deliberate cycle demo so the harness treats it as success. README updated with 'Example Categories' entries for every new dir (base, models, tools, memory, guard, policy, observe, gateway, agents, teams, flows); Auth and Store already had entries; prompts/ and pydantic sections untouched. VERIFICATION: `uv run pytest tests/examples -q` => 139 passed. `uv run ruff check examples/agents examples/teams examples/flows` => all checks passed. `uv run black --check examples/agents examples/teams examples/flows` => 5 files unchanged. CAVEAT for later steps: the verification/acceptance command as written includes `examples/README.md` in the ruff invocation, but ruff tries to parse the .md as Python and reports ~1109 syntax errors; ruff/black do not lint markdown. Ran ruff/black on the Python dirs only (per the context.json scope note to verify new paths and the fact that ruff cannot lint markdown). README correctness is satisfied by the category-entry acceptance criterion, which is met."
+}
