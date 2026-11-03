@@ -15,10 +15,11 @@ Example:
 from abc import ABC, abstractmethod
 from typing import Any
 
-from pydantic import BaseModel, Field
+from skye.base.validated import Validated, field, validated
 
 
-class SafetyResult(BaseModel):
+@validated
+class SafetyResult(Validated):
     """Result of a safety validation check.
 
     Attributes:
@@ -39,9 +40,9 @@ class SafetyResult(BaseModel):
     """
 
     is_safe: bool
-    violations: list[str] = Field(default_factory=list)
-    confidence: float = Field(default=1.0, ge=0.0, le=1.0)
-    metadata: dict[str, Any] = Field(default_factory=dict)
+    violations: list[str] = field(default_factory=list)
+    confidence: float = field(default=1.0, ge=0.0, le=1.0)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 class SafetyFilterInterface(ABC):

@@ -11,12 +11,10 @@ verifying correct behavior under stress including:
 **Validates: Requirements 7.1, 7.2**
 """
 
-import asyncio
 import statistics
 import threading
 import time
 from typing import Any
-from unittest.mock import Mock, patch
 
 import pytest
 
@@ -24,8 +22,8 @@ from skye.base.completion import CompletionRequest, CompletionResponse, TokenUsa
 from skye.base.exceptions import ProviderError
 from skye.base.interfaces.model import ModelInterface
 from skye.base.interfaces.router import RoutingStrategy
-from skye.base.messages import AssistantMessage, UserMessage
-from skye.router.model_router import ModelRouter, ModelTarget, RouteConfig
+from skye.base.messages import UserMessage
+from skye.router.model_router import ModelRouter
 
 
 class MockModel(ModelInterface):
@@ -410,7 +408,7 @@ class TestConcurrentRouting:
         print(f"Monitoring samples:  {len(active_counts_during)}")
         print(f"Max active (model-1): {max([c for m, c in active_counts_during if m == 'model-1'], default=0)}")
         print(f"Max active (model-2): {max([c for m, c in active_counts_during if m == 'model-2'], default=0)}")
-        print(f"Final active counts: 0 (verified)")
+        print("Final active counts: 0 (verified)")
         print(f"{'=' * 60}")
 
     def test_concurrent_routing_different_strategies(self):

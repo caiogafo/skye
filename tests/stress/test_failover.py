@@ -15,7 +15,6 @@ import statistics
 import threading
 import time
 from typing import Any
-from unittest.mock import Mock, patch
 
 import pytest
 
@@ -27,8 +26,6 @@ from skye.base.messages import UserMessage
 from skye.router.model_router import (
     FallbackConfig,
     ModelRouter,
-    ModelTarget,
-    RouteConfig,
 )
 
 
@@ -187,7 +184,7 @@ class TestFailoverScenarios:
             model = result["model"]
             models_used[model] = models_used.get(model, 0) + 1
 
-        print(f"\nModels used:")
+        print("\nModels used:")
         for model, count in sorted(models_used.items()):
             print(f"  {model}: {count} requests")
 
@@ -195,11 +192,11 @@ class TestFailoverScenarios:
         primary_health = router.get_model_health("primary")
         fallback_health = router.get_model_health("fallback")
 
-        print(f"\nHealth metrics:")
-        print(f"  Primary:")
+        print("\nHealth metrics:")
+        print("  Primary:")
         print(f"    Success rate: {primary_health.success_rate * 100:.2f}%")
         print(f"    Failures:     {primary_health.failure_count}")
-        print(f"  Fallback:")
+        print("  Fallback:")
         print(f"    Success rate: {fallback_health.success_rate * 100:.2f}%")
         print(f"    Failures:     {fallback_health.failure_count}")
         print(f"{'=' * 60}")
@@ -285,11 +282,11 @@ class TestFailoverScenarios:
         print(f"Successful:         {sum(1 for r in results if r['success'])}")
         print(f"Failed:             {sum(1 for r in results if not r['success'])}")
         print(f"Time elapsed:       {elapsed:.2f}s")
-        print(f"\nCooldown status:")
+        print("\nCooldown status:")
         print(f"  Models in cooldown: {len(cooled_down)}")
         for info in cooled_down:
             print(f"    {info.model_id}: until {info.cooldown_until} ({info.reason})")
-        print(f"\nPrimary health:")
+        print("\nPrimary health:")
         print(f"  In cooldown:      {primary_health.is_in_cooldown}")
         print(f"  Cooldown until:   {primary_health.cooldown_until}")
         print(f"{'=' * 60}")
@@ -379,10 +376,10 @@ class TestFailoverScenarios:
         print(f"Successful:         {len(successful)}")
         print(f"Failed:             {len(failed)}")
         print(f"Success rate:       {len(successful) / len(results) * 100:.2f}%")
-        print(f"\nModels used:")
+        print("\nModels used:")
         for model, count in sorted(models_used.items()):
             print(f"  {model}: {count} requests")
-        print(f"\nLatency metrics:")
+        print("\nLatency metrics:")
         print(f"  Average:          {avg_latency:.3f}s")
         print(f"  Max:              {max_latency:.3f}s")
         print(f"{'=' * 60}")
@@ -468,15 +465,15 @@ class TestFailoverScenarios:
         print(f"{'=' * 60}")
         print(f"Total time:         {total_time:.2f}s")
         print(f"Requests measured:  {len(latencies)}")
-        print(f"\nLatency distribution:")
+        print("\nLatency distribution:")
         print(f"  Min:              {min_latency:.3f}s")
         print(f"  Max:              {max_latency:.3f}s")
         print(f"  Average:          {avg_latency:.3f}s")
         print(f"  Median:           {median_latency:.3f}s")
         print(f"  P95:              {p95_latency:.3f}s")
         print(f"  P99:              {p99_latency:.3f}s")
-        print(f"\nExpected latency breakdown:")
-        print(f"  Primary (50ms) + Fallback1 (50ms) + Fallback2 (50ms) = ~150ms")
+        print("\nExpected latency breakdown:")
+        print("  Primary (50ms) + Fallback1 (50ms) + Fallback2 (50ms) = ~150ms")
         print(f"{'=' * 60}")
 
         # Verify latency is reasonable
@@ -533,7 +530,7 @@ class TestFailoverScenarios:
 
         # Check cooldown status
         cooled_down_before = router.get_cooldown_models()
-        print(f"\nPhase 1 - After failures:")
+        print("\nPhase 1 - After failures:")
         print(f"  Models in cooldown: {len(cooled_down_before)}")
         for info in cooled_down_before:
             print(f"    {info.model_id}")
@@ -541,12 +538,12 @@ class TestFailoverScenarios:
         assert len(cooled_down_before) > 0, "Primary should be in cooldown"
 
         # Phase 2: Wait for cooldown to expire
-        print(f"\nPhase 2 - Waiting for cooldown to expire...")
+        print("\nPhase 2 - Waiting for cooldown to expire...")
         time.sleep(1.5)
 
         # Phase 3: Check recovery
         cooled_down_after = router.get_cooldown_models()
-        print(f"\nPhase 3 - After cooldown expires:")
+        print("\nPhase 3 - After cooldown expires:")
         print(f"  Models in cooldown: {len(cooled_down_after)}")
 
         # Verify cooldown expired
@@ -642,11 +639,11 @@ class TestFailoverScenarios:
         print(f"\n{'=' * 60}")
         print("Concurrent Failover with Multiple Chains")
         print(f"{'=' * 60}")
-        print(f"Chain 1 (primary1):")
+        print("Chain 1 (primary1):")
         print(f"  Total requests:   {len(chain1_results)}")
         print(f"  Successful:       {chain1_success}")
         print(f"  Success rate:     {chain1_success / len(chain1_results) * 100:.2f}%")
-        print(f"\nChain 2 (primary2):")
+        print("\nChain 2 (primary2):")
         print(f"  Total requests:   {len(chain2_results)}")
         print(f"  Successful:       {chain2_success}")
         print(f"  Success rate:     {chain2_success / len(chain2_results) * 100:.2f}%")
@@ -720,11 +717,11 @@ class TestFailoverScenarios:
         print(f"{'=' * 60}")
         print(f"Total requests:     {len(results)}")
         print(f"Successful:         {successful}")
-        print(f"\nRate limit usage:")
-        print(f"  Primary:")
+        print("\nRate limit usage:")
+        print("  Primary:")
         print(f"    RPM: {primary_stats.rpm_used}/{primary_stats.rpm_limit}")
         print(f"    TPM: {primary_stats.tpm_used}/{primary_stats.tpm_limit}")
-        print(f"  Fallback:")
+        print("  Fallback:")
         print(f"    RPM: {fallback_stats.rpm_used}/{fallback_stats.rpm_limit}")
         print(f"    TPM: {fallback_stats.tpm_used}/{fallback_stats.tpm_limit}")
         print(f"{'=' * 60}")

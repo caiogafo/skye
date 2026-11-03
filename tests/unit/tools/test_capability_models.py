@@ -1,8 +1,9 @@
 """Tests for CapabilityCall and CapabilityResult models."""
 
 import pytest
-from pydantic import ValidationError
+from pydantic import ValidationError as PydanticValidationError
 
+from skye.base.exceptions import ValidationError
 from skye.tools.capability_models import CapabilityCall, CapabilityResult
 
 
@@ -218,7 +219,7 @@ class TestCapabilityResultValidation:
 
     def test_reject_missing_capability_call_id(self) -> None:
         """Test that missing capability_call_id is rejected."""
-        with pytest.raises(ValidationError) as exc_info:
+        with pytest.raises(PydanticValidationError) as exc_info:
             CapabilityResult(
                 name="test_tool",
                 result="success",
@@ -227,7 +228,7 @@ class TestCapabilityResultValidation:
 
     def test_reject_missing_name(self) -> None:
         """Test that missing name is rejected."""
-        with pytest.raises(ValidationError) as exc_info:
+        with pytest.raises(PydanticValidationError) as exc_info:
             CapabilityResult(
                 capability_call_id="call_123",
                 result="success",
@@ -266,7 +267,7 @@ class TestCapabilityCallSerialization:
             arguments={"location": "San Francisco"},
         )
 
-        data = tool_call.model_dump()
+        data = tool_call.to_dict()
 
         assert data["id"] == "call_123"
         assert data["name"] == "weather.get_current"
@@ -280,7 +281,7 @@ class TestCapabilityCallSerialization:
             arguments={"location": "San Francisco"},
         )
 
-        json_str = tool_call.model_dump_json()
+        json_str = tool_call.to_json()
 
         assert "call_123" in json_str
         assert "weather.get_current" in json_str
@@ -304,7 +305,7 @@ class TestCapabilityCallSerialization:
         """Test creating CapabilityCall from JSON string."""
         json_str = '{"id": "call_789", "name": "test_tool", "arguments": {"key": "value"}}'
 
-        tool_call = CapabilityCall.model_validate_json(json_str)
+        tool_call = CapabilityCall.from_json(json_str)
 
         assert tool_call.id == "call_789"
         assert tool_call.name == "test_tool"

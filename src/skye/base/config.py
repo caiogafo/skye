@@ -1,6 +1,6 @@
 """Configuration models and loading system for Skye.
 
-This module provides Pydantic models for configuring Skye components including
+This module provides dataclass models for configuring Skye components including
 rate limiting, retries, cooldowns, model configurations, and global settings.
 It also includes the ConfigLoader for loading configuration from multiple sources.
 
@@ -27,11 +27,9 @@ import re
 from pathlib import Path
 from typing import Any
 
-from pydantic import BaseModel, Field
-from pydantic import ValidationError as PydanticValidationError
-
-from skye.base.exceptions import ConfigurationError, MissingExtraError
+from skye.base.exceptions import ConfigurationError, MissingExtraError, ValidationError
 from skye.base.lazy_import import missing_extra
+from skye.base.validated import Validated, dump, field, validated
 
 # Set up module logger
 logger = logging.getLogger(__name__)
@@ -107,7 +105,8 @@ def substitute_env_vars(config: dict[str, Any] | list[Any] | str | Any) -> Any:
         return config
 
 
-class RateLimitConfig(BaseModel):
+@validated
+class RateLimitConfig(Validated):
     """Rate limit configuration for a model.
 
     Defines rate limiting constraints for API requests to prevent exceeding
@@ -137,7 +136,8 @@ class RateLimitConfig(BaseModel):
     tokens_per_day: int | None = None
 
 
-class RetryConfig(BaseModel):
+@validated
+class RetryConfig(Validated):
     """Retry configuration for a model.
 
     Defines retry behavior for failed API requests including maximum retry
@@ -164,12 +164,13 @@ class RetryConfig(BaseModel):
     max_retries: int = 3
     retry_after_seconds: int = 5
     exponential_backoff: bool = True
-    retry_on_errors: list[str] = Field(
+    retry_on_errors: list[str] = field(
         default_factory=lambda: ["rate_limit", "timeout", "server_error"]
     )
 
 
-class CooldownConfig(BaseModel):
+@validated
+class CooldownConfig(Validated):
     """Cooldown configuration for failed models.
 
     Defines cooldown behavior to temporarily disable models that experience
@@ -196,7 +197,8 @@ class CooldownConfig(BaseModel):
     cooldown_duration_seconds: int = 60
 
 
-class ModelConfig(BaseModel):
+@validated
+class ModelConfig(Validated):
     """Configuration for a model.
 
     Comprehensive configuration for an LLM model including provider details,
@@ -245,21 +247,22 @@ class ModelConfig(BaseModel):
 
     # Advanced routing features
     rate_limits: RateLimitConfig | None = None
-    retry_config: RetryConfig = Field(default_factory=RetryConfig)
-    cooldown_config: CooldownConfig = Field(default_factory=CooldownConfig)
-    fallback_models: list[str] = Field(default_factory=list)
+    retry_config: RetryConfig = field(default_factory=RetryConfig)
+    cooldown_config: CooldownConfig = field(default_factory=CooldownConfig)
+    fallback_models: list[str] = field(default_factory=list)
 
     # Load balancing
     weight: float = 1.0
     priority: int = 0
-    tags: list[str] = Field(default_factory=list)
+    tags: list[str] = field(default_factory=list)
 
     # Cost tracking
     cost_per_1k_prompt_tokens: float | None = None
     cost_per_1k_completion_tokens: float | None = None
 
 
-class SkyeConfig(BaseModel):
+@validated
+class SkyeConfig(Validated):
     """Global Skye configuration.
 
     Top-level configuration for the entire Skye platform including logging,
@@ -269,6 +272,8 @@ class SkyeConfig(BaseModel):
         log_level: Logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL).
         enable_telemetry: Whether to enable telemetry collection.
         correlation_id_header: HTTP header name for correlation IDs.
+        component_log_levels: Log level per component, keyed by the component name (for example
+            ``{"router": "DEBUG", "models": "WARNING"}``); a component not listed uses ``log_level``.
         models: Dictionary of model configurations keyed by model name.
         plugins: Dictionary of plugin configurations keyed by plugin name.
         default_routing_strategy: Default strategy for model routing.
@@ -294,16 +299,43 @@ class SkyeConfig(BaseModel):
     log_level: str = "INFO"
     enable_telemetry: bool = True
     correlation_id_header: str = "X-Correlation-ID"
-    models: dict[str, ModelConfig] = Field(default_factory=dict)
-    plugins: dict[str, dict[str, Any]] = Field(default_factory=dict)
+    component_log_levels: dict[str, str] = field(default_factory=dict)
+    models: dict[str, ModelConfig] = field(default_factory=dict)
+    plugins: dict[str, dict[str, Any]] = field(default_factory=dict)
 
     # Router configuration
     default_routing_strategy: str = "round_robin"
     enable_fallbacks: bool = True
     enable_rate_limiting: bool = True
 
+    def __post_init__(self) -> None:
+        """Validate the fields, then that every component log level is a standard level name."""
+        super().__post_init__()
+        for component, level in self.component_log_levels.items():
+            if not isinstance(logging.getLevelName(level.upper()), int):
+                raise ValidationError(
+                    f"Unknown log level {level!r} for component {component!r}",
+                    field="component_log_levels",
+                    value={component: level},
+                )
 
-class RouterConfig(BaseModel):
+    def level_for(self, component: str) -> str:
+        """The log level of a component: its own if set, else the global ``log_level``.
+
+        Args:
+            component: The component name (``models``, ``router``, ``tools``, ...).
+        """
+        return self.component_log_levels.get(component, self.log_level).upper()
+
+    def apply_log_levels(self) -> None:
+        """Set the level of the ``skye`` logger and of each listed component logger (``skye.<component>``)."""
+        logging.getLogger("skye").setLevel(self.log_level.upper())
+        for component in self.component_log_levels:
+            logging.getLogger(f"skye.{component}").setLevel(self.level_for(component))
+
+
+@validated
+class RouterConfig(Validated):
     """Complete router configuration from YAML.
 
     This model represents a complete router configuration that can be loaded
@@ -345,21 +377,35 @@ class RouterConfig(BaseModel):
         ... )
     """
 
-    routes: list[dict[str, Any]] = Field(default_factory=list, description="Route configurations")
-    fallbacks: list[dict[str, Any]] = Field(
+    routes: list[dict[str, Any]] = field(default_factory=list, description="Route configurations")
+    fallbacks: list[dict[str, Any]] = field(
         default_factory=list, description="Fallback configurations"
     )
-    retry_policies: list[dict[str, Any]] = Field(
+    retry_policies: list[dict[str, Any]] = field(
         default_factory=list, description="Retry policy configurations"
     )
-    allowed_fails_policies: list[dict[str, Any]] = Field(
+    allowed_fails_policies: list[dict[str, Any]] = field(
         default_factory=list, description="Allowed fails policy configurations"
     )
-    strategy: str = Field("round_robin", description="Default routing strategy")
-    cooldown_seconds: float = Field(60.0, ge=0.0, description="Cooldown duration in seconds")
-    enable_pre_call_checks: bool = Field(
+    strategy: str = field("round_robin", description="Default routing strategy")
+    cooldown_seconds: float = field(60.0, ge=0.0, description="Cooldown duration in seconds")
+    enable_pre_call_checks: bool = field(
         True, description="Enable pre-call rate limit checks"
     )
+
+
+def _validation_errors(error: ValidationError) -> list[dict[str, Any]]:
+    """The validation failure as a list of ``{type, loc, msg, input}`` entries (``loc`` is the field path)."""
+    path = str(error.details.get("path", ""))
+    loc = [part.strip("'\"") for part in re.split(r"[.\[\]]+", path) if part][1:]
+    return [
+        {
+            "type": "value_error",
+            "loc": loc or [str(error.details.get("field", ""))],
+            "msg": error.message,
+            "input": error.details.get("value"),
+        }
+    ]
 
 
 def load_router_config(yaml_path: str | Path) -> dict[str, Any]:
@@ -425,15 +471,16 @@ def load_router_config(yaml_path: str | Path) -> dict[str, Any]:
 
     # Validate against RouterConfig model
     try:
-        router_config = RouterConfig(**substituted_data)
+        router_config = RouterConfig.from_dict(substituted_data)
         # Return as dict for compatibility with router initialization
-        return router_config.model_dump()
-    except PydanticValidationError as e:
+        dumped: dict[str, Any] = dump(router_config)
+        return dumped
+    except ValidationError as e:
         raise ConfigurationError(
             "Router configuration validation failed",
             details={
                 "path": str(yaml_path),
-                "validation_errors": e.errors(),
+                "validation_errors": _validation_errors(e),
             },
         ) from e
 
@@ -530,11 +577,12 @@ class ConfigLoader:
 
         # Validate and create SkyeConfig
         try:
-            return SkyeConfig(**config_data)
-        except PydanticValidationError as e:
+            config: SkyeConfig = SkyeConfig.from_dict(config_data)
+            return config
+        except ValidationError as e:
             raise ConfigurationError(
                 "Configuration validation failed",
-                details={"validation_errors": e.errors()},
+                details={"validation_errors": _validation_errors(e)},
             ) from e
 
     @staticmethod
@@ -558,7 +606,7 @@ class ConfigLoader:
 
         # YAML needs the extra `yaml`; JSON needs nothing. The parse error types are those of the format being read.
         yaml = _yaml() if config_path.suffix in [".yaml", ".yml"] else None
-        yaml_error = yaml.YAMLError if yaml is not None else ValueError
+        yaml_error: type[Exception] = yaml.YAMLError if yaml is not None else ValueError
         try:
             with open(config_path) as f:
                 if yaml is not None:
@@ -582,7 +630,8 @@ class ConfigLoader:
                 )
 
             # Apply environment variable substitution
-            return substitute_env_vars(data)
+            substituted: dict[str, Any] = substitute_env_vars(data)
+            return substituted
 
         except (yaml_error, json.JSONDecodeError) as e:
             raise ConfigurationError(

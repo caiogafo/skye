@@ -1,17 +1,19 @@
 """Unit tests for BasePromptBuilder."""
 
-import pytest
-from skye.prompts import BasePromptBuilder
-from skye.base.messages import UserMessage, SystemMessage, AssistantMessage
-
 # Import test data from the proper location
 import sys
 from pathlib import Path
+
+import pytest
+
+from skye.base.messages import UserMessage
+from skye.prompts import BasePromptBuilder
+
 test_data_path = Path(__file__).parent / "test_data"
 sys.path.insert(0, str(test_data_path.parent))
 
 try:
-    from test_data import load_ner_examples, load_classification_examples
+    from test_data import load_classification_examples, load_ner_examples
 except ImportError:
     # Fallback if import fails
     def load_ner_examples():
@@ -352,8 +354,8 @@ class TestBasePromptBuilder:
         builder = BasePromptBuilder()
         
         # Create a temporary template file
-        import tempfile
         import os
+        import tempfile
         
         with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False) as f:
             f.write("File template: {content}")

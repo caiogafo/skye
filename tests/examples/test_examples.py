@@ -6,15 +6,14 @@ dummy values and every HTTP call is answered by the fake, so nothing leaves the 
 
 from __future__ import annotations
 
-import os
 import runpy
 import sys
 from pathlib import Path
 
 import pytest
 
-from tests.budget.measure import ROOT, load_budgets
 from skye.models.registry import ProviderRegistry
+from tests.budget.measure import ROOT, load_budgets
 from tests.examples.fake_network import patched
 
 EXAMPLES = ROOT / "examples"

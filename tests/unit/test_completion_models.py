@@ -2,9 +2,10 @@
 """Unit tests for completion models."""
 
 import pytest
-from pydantic import BaseModel, ValidationError
+from pydantic import BaseModel
 
 from skye.base.completion import CompletionRequest, CompletionResponse, StreamChunk, TokenUsage
+from skye.base.exceptions import ValidationError
 from skye.base.messages import UserMessage
 
 
@@ -125,9 +126,9 @@ def test_completion_response_capability_calls():
 @pytest.mark.asyncio
 async def test_completion_response_execute_capability_calls():
     """Test executing capability calls from CompletionResponse without registry."""
-    from skye.tools.local_function import LocalFunctionCapability
-    from skye.tools.capability_models import CapabilityCall
     from skye.base.messages import CapabilityMessage
+    from skye.tools.capability_models import CapabilityCall
+    from skye.tools.local_function import LocalFunctionCapability
 
     # Create a test capability
     def get_weather(location: str) -> dict:
@@ -180,10 +181,10 @@ async def test_completion_response_execute_capability_calls():
 @pytest.mark.asyncio
 async def test_completion_response_execute_capability_calls_error():
     """Test executing capability calls with errors."""
+    from skye.base.messages import CapabilityMessage
+    from skye.tools.capability_models import CapabilityCall
     from skye.tools.local_function import LocalFunctionCapability
     from skye.tools.registry import CapabilityRegistry
-    from skye.tools.capability_models import CapabilityCall
-    from skye.base.messages import CapabilityMessage
 
     # Create a test capability that raises an error
     def failing_function(value: str) -> str:
@@ -253,10 +254,10 @@ async def test_completion_response_execute_capability_calls_no_capabilities():
 @pytest.mark.asyncio
 async def test_completion_response_execute_multiple_capability_calls():
     """Test executing multiple capability calls."""
+    from skye.base.messages import CapabilityMessage
+    from skye.tools.capability_models import CapabilityCall
     from skye.tools.local_function import LocalFunctionCapability
     from skye.tools.registry import CapabilityRegistry
-    from skye.tools.capability_models import CapabilityCall
-    from skye.base.messages import CapabilityMessage
 
     # Create test capabilities
     def get_weather(location: str) -> dict:
@@ -328,10 +329,10 @@ async def test_completion_response_execute_multiple_capability_calls():
 @pytest.mark.asyncio
 async def test_completion_response_execute_capability_calls_with_overrides():
     """Test executing capability calls with argument overrides."""
+    from skye.base.messages import CapabilityMessage
+    from skye.tools.capability_models import CapabilityCall
     from skye.tools.local_function import LocalFunctionCapability
     from skye.tools.registry import CapabilityRegistry
-    from skye.tools.capability_models import CapabilityCall
-    from skye.base.messages import CapabilityMessage
 
     # Create a test capability
     def get_weather(location: str, units: str = "fahrenheit") -> dict:

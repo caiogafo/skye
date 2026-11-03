@@ -19,10 +19,11 @@ Example:
 from abc import ABC, abstractmethod
 from typing import Any
 
-from pydantic import BaseModel, Field
+from skye.base.validated import Validated, field, validated
 
 
-class CapabilitySchema(BaseModel):
+@validated
+class CapabilitySchema(Validated):
     """Schema defining a capability's signature.
 
     This model describes the capability's interface for LLM function calling,
@@ -53,10 +54,10 @@ class CapabilitySchema(BaseModel):
         'calculate'
     """
 
-    name: str = Field(min_length=1)
-    description: str = Field(min_length=1)
-    parameters: dict[str, Any] = Field(default_factory=dict)
-    returns: dict[str, Any] = Field(default_factory=dict)
+    name: str = field(min_length=1)
+    description: str = field(min_length=1)
+    parameters: dict[str, Any] = field(default_factory=dict)
+    returns: dict[str, Any] = field(default_factory=dict)
 
 
 class CapabilityInterface(ABC):

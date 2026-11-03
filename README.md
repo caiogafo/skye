@@ -11,7 +11,7 @@ Skye provides a foundational layer for building AI agents and intelligent applic
 
 - 🎯 **Provider-agnostic** - Unified interface for OpenAI, Anthropic, AWS Bedrock, Azure, and more
 - 🧩 **Modular architecture** - Install only what you need via optional extras
-- 🔒 **Type-safe** - Complete type hints with Pydantic validation
+- 🔒 **Type-safe** - Complete type hints, with validated dataclasses
 - ⚡ **Async-first** - Both sync and async APIs throughout
 - 🔄 **Load balancing** - Multiple routing strategies with automatic fallbacks
 - 📊 **Observability** - Built-in telemetry, logging, and tracing
@@ -102,4 +102,4 @@ Skye is inspired by:
 - **Clean Architecture** - For architectural principles
 - **Amazon Bedrock AgentCore Gateway** - For the gateway model (targets, inbound and outbound authorization, policy on every tool call)
 - **Cedar** - For the policy model (principal, action, resource, context; default deny; forbid overrides permit)
-- **Pydantic** - For data validation and settings management
+- **Pydantic** - For data validation, until the models move to dataclasses (`base` already has)

@@ -17,7 +17,6 @@ Known failures of the current tree are xfail with a reason; budgets.toml is neve
 from __future__ import annotations
 
 import ast
-import re
 import sys
 
 import pytest

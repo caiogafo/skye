@@ -64,8 +64,8 @@ class TestInit:
         assert (p.project_id, p.location, p.credentials) == ("my-project", "us-central1", None)
 
     def test_credentials_and_registration(self) -> None:
-        from skye.models.registry import ProviderRegistry
         import skye.models  # noqa: F401
+        from skye.models.registry import ProviderRegistry
 
         p = GoogleProvider(project_id="p", location="europe-west1", credentials="token")
         assert p.credentials == "token"

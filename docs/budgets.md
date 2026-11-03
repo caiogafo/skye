@@ -71,5 +71,19 @@ Checked against `budgets.toml` and `pyproject.toml`.
 | Extra sizes over the core, on Linux: `auth` 0.5 MB (`rsa`), `memory` 2.6 MB (`redis`), `yaml` 2.9 MB (`pyyaml`, compiled), `openai` 8.4 MB (`tiktoken`, compiled; it does not install the OpenAI SDK, open decision O22), `postgres` 14.0 MB (`asyncpg`, compiled), `mcp` 50.6 MB (`fastmcp`, 7 compiled distributions, over its limit of 48: `fastmcp` itself depends on `pyyaml`, so what left the core now counts as added by this extra, while the whole `mcp` environment is unchanged at 59.0 MB; open until the owner decides how the `mcp` extra is measured) | the compiled ones | only who installs an extra pays for it |
 | `skyeai[all]` size | it includes `mcp` and `memory` | not advertised for Lambda |
 
+### What the core weighs (Linux x86_64, Python 3.13, 2026-11-02)
+
+The 11 MB in `budgets.toml` is a ceiling, not a measurement. The installed core is 8.9 MB (`du`):
+
+| Component | MB |
+|---|---|
+| `pydantic_core` (one compiled `.so`, 5.0 MB) | 5.1 |
+| `pydantic` | 2.0 |
+| `typing_extensions`, `typing_inspection`, `annotated_types`, `dist-info` folders | about 0.5 |
+| `skye` (676 KB of sources) | 0.9 |
+| `tenacity` | 0.15 |
+
+The pydantic stack is about 7.7 MB, 86% of the core; removing it (open decision O4, tasks 14.1 to 14.3 of `0-base-structure`) brings the core to about 1.2 MB. Without it the core does not go below about 8.7 MB.
+
 Done since the previous table (2026-10-30): `jinja2` and `markupsafe` left the core (the prompts engine is standard library), and the provider SDK extras
 (`google` 176 MB, `cohere` 33 MB, `anthropic` 10 MB) are now empty because every provider has one built-in REST adapter.

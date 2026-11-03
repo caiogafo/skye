@@ -36,8 +36,8 @@ def test_exception_exports():
     from skye.base.exceptions import (
         CapabilityExecutionError,
         ConfigurationError,
-        SkyeError,
         ProviderError,
+        SkyeError,
         ValidationError,
     )
 
@@ -91,9 +91,9 @@ def test_config_exports():
         ConfigLoader,
         CooldownConfig,
         ModelConfig,
-        SkyeConfig,
         RateLimitConfig,
         RetryConfig,
+        SkyeConfig,
     )
 
     # Verify they are classes

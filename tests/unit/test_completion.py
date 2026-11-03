@@ -3,7 +3,7 @@
 from datetime import datetime
 
 import pytest
-from pydantic import BaseModel, ValidationError
+from pydantic import BaseModel
 
 from skye.base.completion import (
     CompletionRequest,
@@ -11,6 +11,7 @@ from skye.base.completion import (
     StreamChunk,
     TokenUsage,
 )
+from skye.base.exceptions import ValidationError
 from skye.base.messages import UserMessage
 
 

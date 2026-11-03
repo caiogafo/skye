@@ -48,7 +48,7 @@ target_cold_start_ms = 150          # where the path should stay on a laptop
 runs = 5
 
 [imports.max_files]
-pydantic = 10
+pydantic = 5
 tenacity = 1
 
 [load]

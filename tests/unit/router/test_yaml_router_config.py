@@ -9,7 +9,6 @@ import tempfile
 from pathlib import Path
 
 import pytest
-import yaml
 
 from skye.base.config import RouterConfig, load_router_config
 from skye.base.exceptions import ConfigurationError

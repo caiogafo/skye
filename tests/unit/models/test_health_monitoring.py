@@ -6,14 +6,14 @@ for LLM and embedding providers.
 
 import time
 from typing import Any
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 
 from skye.base.completion import CompletionRequest, CompletionResponse, TokenUsage
-from skye.base.messages import UserMessage
-from skye.models.base import BaseModelProvider, BaseEmbeddingProvider
 from skye.base.health import HealthMetrics
+from skye.base.messages import UserMessage
+from skye.models.base import BaseEmbeddingProvider, BaseModelProvider
 
 
 class TestHealthMetrics:

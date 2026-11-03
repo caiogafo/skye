@@ -3,16 +3,15 @@
 Tests exception creation, messages, and error context preservation.
 """
 
-import pytest
 
+from skye.base.exceptions import SkyeError
 from skye.tools.exceptions import (
+    CapabilityCallParsingError,
     CapabilityError,
     CapabilityExecutionError,
     CapabilityNotFoundError,
     CapabilityValidationError,
-    CapabilityCallParsingError,
 )
-from skye.base.exceptions import SkyeError
 
 
 class TestCapabilityError:

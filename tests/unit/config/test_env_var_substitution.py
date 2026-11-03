@@ -1,7 +1,5 @@
 """Unit tests for environment variable substitution in configuration."""
 
-import os
-from pathlib import Path
 
 import pytest
 

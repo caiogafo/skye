@@ -2,10 +2,11 @@
 
 import base64
 from pathlib import Path
+
 import pytest
 
-from skye.models.transport.multimodal import ImageHandler
 from skye.base.exceptions import ValidationError
+from skye.models.transport.multimodal import ImageHandler
 
 
 class TestImageHandler:

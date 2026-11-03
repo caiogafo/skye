@@ -4,13 +4,13 @@ import json
 
 import pytest
 
+from skye.base.completion import CompletionResponse, TokenUsage
+from skye.tools.capability_call_handler import CapabilityCallHandler
+from skye.tools.capability_models import CapabilityCall, CapabilityResult
 from skye.tools.exceptions import CapabilityCallParsingError
 from skye.tools.interface import CapabilityInterface
 from skye.tools.registry import CapabilityRegistry
 from skye.tools.schema import CapabilitySchema
-from skye.tools.capability_call_handler import CapabilityCallHandler
-from skye.tools.capability_models import CapabilityCall, CapabilityResult
-from skye.base.completion import CompletionResponse, TokenUsage
 
 
 class MockCapability(CapabilityInterface):

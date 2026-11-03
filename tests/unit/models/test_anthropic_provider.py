@@ -9,15 +9,14 @@ Tests cover:
 - Error handling
 """
 
-from datetime import datetime, timezone
 from typing import Any
 from unittest.mock import Mock, patch
 
 import pytest
 
-from skye.base.completion import CompletionRequest, CompletionResponse, StreamChunk, TokenUsage
+from skye.base.completion import CompletionRequest, CompletionResponse, StreamChunk
 from skye.base.exceptions import ProviderError
-from skye.base.messages import AssistantMessage, SystemMessage, UserMessage
+from skye.base.messages import SystemMessage, UserMessage
 from skye.models.llm.anthropic import AnthropicProvider
 from skye.models.transport.rest import JsonObject
 

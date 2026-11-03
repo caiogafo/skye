@@ -1,7 +1,8 @@
 """Message types for Skye conversations.
 
 This module provides type-safe message representations for different roles and contexts
-in AI conversations. All message types are based on Pydantic models for validation.
+in AI conversations. All message types are dataclasses whose fields are validated when the
+message is built (see ``skye.base.validated``).
 
 Example:
     >>> from skye.base.messages import UserMessage, AssistantMessage
@@ -14,14 +15,16 @@ Example:
     {'role': 'user', 'content': 'Hello, how are you?', ...}
 """
 
+from collections.abc import Mapping
 from datetime import datetime, timezone
 from typing import Any, Literal
 from uuid import uuid4
 
-from pydantic import BaseModel, Field
+from skye.base.validated import Validated, field, from_mapping, validated
 
 
-class SkyeMessage(BaseModel):
+@validated
+class SkyeMessage(Validated):
     """Base class for all message types.
 
     Provides common functionality for messages including serialization,
@@ -42,9 +45,9 @@ class SkyeMessage(BaseModel):
 
     content: str
     role: Literal["user", "assistant", "system", "capability"]
-    metadata: dict[str, Any] = Field(default_factory=dict)
-    id: str = Field(default_factory=lambda: str(uuid4()))
-    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    metadata: dict[str, Any] = field(default_factory=dict)
+    id: str = field(default_factory=lambda: str(uuid4()))
+    timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
 
     @property
     def message_type(self) -> str:
@@ -55,27 +58,8 @@ class SkyeMessage(BaseModel):
         """
         return self.role
 
-    def to_dict(self) -> dict[str, Any]:
-        """Convert message to dictionary format.
-
-        Returns:
-            Dictionary representation of the message.
-
-        Example:
-            >>> msg = UserMessage(content="Hello")
-            >>> msg.to_dict()
-            {'role': 'user', 'content': 'Hello', ...}
-        """
-        return {
-            "role": self.role,
-            "content": self.content,
-            "metadata": self.metadata,
-            "id": self.id,
-            "timestamp": self.timestamp.isoformat(),
-        }
-
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> "SkyeMessage":
+    def from_dict(cls, data: Mapping[str, Any]) -> "SkyeMessage":
         """Create message from dictionary format.
 
         Args:
@@ -90,17 +74,14 @@ class SkyeMessage(BaseModel):
             >>> isinstance(msg, UserMessage)
             True
         """
-        role = data.get("role")
-        if role == "user":
-            return UserMessage(**data)
-        elif role == "assistant":
-            return AssistantMessage(**data)
-        elif role == "system":
-            return SystemMessage(**data)
-        elif role == "capability":
-            return CapabilityMessage(**data)
-        else:
-            return cls(**data)
+        kinds: dict[Any, type[SkyeMessage]] = {
+            "user": UserMessage,
+            "assistant": AssistantMessage,
+            "system": SystemMessage,
+            "capability": CapabilityMessage,
+        }
+        message: SkyeMessage = from_mapping(kinds.get(data.get("role"), cls), data)
+        return message
 
     def to_dict(self) -> dict[str, Any]:
         """Convert message to dictionary format.
@@ -119,6 +100,7 @@ class SkyeMessage(BaseModel):
         return {"role": self.role, "content": self.content}
 
 
+@validated
 class UserMessage(SkyeMessage):
     """Message from a user.
 
@@ -133,6 +115,7 @@ class UserMessage(SkyeMessage):
     role: Literal["user"] = "user"
 
 
+@validated
 class AssistantMessage(SkyeMessage):
     """Message from an AI assistant.
 
@@ -151,7 +134,7 @@ class AssistantMessage(SkyeMessage):
     """
 
     role: Literal["assistant"] = "assistant"
-    capability_calls: list[dict[str, Any]] = Field(default_factory=list)
+    capability_calls: list[dict[str, Any]] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
         """Convert assistant message to dictionary format.
@@ -178,6 +161,7 @@ class AssistantMessage(SkyeMessage):
         return result
 
 
+@validated
 class SystemMessage(SkyeMessage):
     """System-level instruction message.
 
@@ -192,6 +176,7 @@ class SystemMessage(SkyeMessage):
     role: Literal["system"] = "system"
 
 
+@validated
 class CapabilityMessage(SkyeMessage):
     """Message containing capability execution results.
 
@@ -244,7 +229,8 @@ class CapabilityMessage(SkyeMessage):
         }
 
 
-class ContentChunk(BaseModel):
+@validated
+class ContentChunk(Validated):
     """Represents a chunk of content with metadata.
 
     Used for document processing, RAG systems, and other scenarios where
@@ -267,7 +253,7 @@ class ContentChunk(BaseModel):
     """
 
     text: str
-    metadata: dict[str, Any] = Field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
     chunk_id: str | None = None
     source: str | None = None
 

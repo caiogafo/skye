@@ -1,9 +1,10 @@
 """Validation utilities for Skye.
 
 This module provides utilities for validating interface compliance and
-generating JSON schemas from Pydantic models.
+generating JSON schemas from dataclasses and Pydantic models.
 """
 
+import dataclasses
 import inspect
 from abc import ABC
 from typing import Any
@@ -11,6 +12,7 @@ from typing import Any
 from pydantic import BaseModel
 
 from skye.base.exceptions import ValidationError
+from skye.base.validated import json_schema
 
 
 def validate_interface_compliance(implementation: Any, interface: type[ABC]) -> None:
@@ -71,20 +73,21 @@ def validate_interface_compliance(implementation: Any, interface: type[ABC]) -> 
         )
 
 
-def generate_schema(model: type[BaseModel]) -> dict[str, Any]:
-    """Generate JSON Schema from a Pydantic model.
+def generate_schema(model: type) -> dict[str, Any]:
+    """Generate JSON Schema from a dataclass or a Pydantic model.
 
-    Converts a Pydantic model to JSON Schema format, which can be used for
-    structured output validation or API documentation.
+    Converts a model class to JSON Schema format, which can be used for
+    structured output validation or API documentation. The library's own models are
+    dataclasses; a Pydantic model (a user's structured-output class) is accepted too.
 
     Args:
-        model: A Pydantic model class.
+        model: A dataclass or a Pydantic model class.
 
     Returns:
         JSON Schema dictionary representation of the model.
 
     Raises:
-        ValidationError: If the provided type is not a Pydantic model.
+        ValidationError: If the provided type is neither a dataclass nor a Pydantic model.
 
     Example:
         >>> from skye.base.messages import UserMessage
@@ -94,10 +97,13 @@ def generate_schema(model: type[BaseModel]) -> dict[str, Any]:
         >>> 'properties' in schema
         True
     """
+    if inspect.isclass(model) and dataclasses.is_dataclass(model):
+        return json_schema(model)
+
     # Validate that the input is a Pydantic model
     if not (inspect.isclass(model) and issubclass(model, BaseModel)):
         raise ValidationError(
-            f"Expected a Pydantic BaseModel class, got {type(model).__name__}",
+            f"Expected a dataclass or a Pydantic BaseModel class, got {type(model).__name__}",
             field="model_type",
             value=str(model),
         )

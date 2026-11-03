@@ -16,7 +16,6 @@ import statistics
 import threading
 import time
 from typing import Any
-from unittest.mock import Mock, patch
 
 import pytest
 
@@ -25,9 +24,7 @@ from skye.tools import (
     CapabilityRegistry,
     CapabilitySchema,
     LocalFunctionCapability,
-    capability,
 )
-from skye.tools.exceptions import CapabilityNotFoundError, CapabilityValidationError
 
 
 class MockCapability(CapabilityInterface):
@@ -317,10 +314,10 @@ class TestCapabilityLoad:
         print(f"Total capabilities:  {registry.count()}")
         print(f"Total operations:    {len(lookup_times)}")
         print(f"Total time:          {total_time:.2f}s")
-        print(f"\nLookup performance:")
+        print("\nLookup performance:")
         print(f"  Average:           {avg_lookup * 1000:.3f}ms")
         print(f"  Max:               {max_lookup * 1000:.3f}ms")
-        print(f"\nExecution performance:")
+        print("\nExecution performance:")
         print(f"  Average:           {avg_exec:.3f}s")
         print(f"{'=' * 60}")
 
@@ -607,7 +604,7 @@ class TestCapabilityLoad:
         print(f"Total searches:     {len(search_results)}")
         print(f"Successful:         {len(successful)}")
         print(f"Total time:         {total_time:.2f}s")
-        print(f"\nSearch performance:")
+        print("\nSearch performance:")
         print(f"  Average time:     {avg_search_time * 1000:.3f}ms")
         print(f"  Max time:         {max_search_time * 1000:.3f}ms")
         print(f"{'=' * 60}")
@@ -681,7 +678,7 @@ class TestCapabilityLoad:
         print(f"Average latency:    {avg_latency:.3f}s")
         print(f"Median latency:     {median_latency:.3f}s")
         print(f"Std deviation:      {stdev_latency:.3f}s")
-        print(f"\nPercentiles:")
+        print("\nPercentiles:")
         print(f"  P50:              {p50:.3f}s")
         print(f"  P75:              {p75:.3f}s")
         print(f"  P90:              {p90:.3f}s")

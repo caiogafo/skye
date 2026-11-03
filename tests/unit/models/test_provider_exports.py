@@ -2,8 +2,6 @@
 
 import types
 
-import pytest
-
 
 class TestProviderExports:
     """Test suite for provider package exports."""
@@ -20,8 +18,8 @@ class TestProviderExports:
             AnthropicProvider,
             AzureOpenAIProvider,
             BedrockProvider,
-            OpenAIProvider,
             GoogleProvider,
+            OpenAIProvider,
         )
 
         assert OpenAIProvider is not None
@@ -35,9 +33,9 @@ class TestProviderExports:
         from skye.models import (
             BedrockEmbeddingProvider,
             CohereEmbeddingProvider,
-            OpenAIEmbeddingProvider,
             GoogleEmbeddingProvider,
             GoogleMultimodalEmbeddingProvider,
+            OpenAIEmbeddingProvider,
         )
 
         assert OpenAIEmbeddingProvider is not None
@@ -205,8 +203,8 @@ class TestProviderExports:
             AnthropicProvider,
             AzureOpenAIProvider,
             BedrockProvider,
-            OpenAIProvider,
             GoogleProvider,
+            OpenAIProvider,
         )
 
         assert isinstance(OpenAIProvider, type)
@@ -220,9 +218,9 @@ class TestProviderExports:
         from skye.models import (
             BedrockEmbeddingProvider,
             CohereEmbeddingProvider,
-            OpenAIEmbeddingProvider,
             GoogleEmbeddingProvider,
             GoogleMultimodalEmbeddingProvider,
+            OpenAIEmbeddingProvider,
         )
 
         assert isinstance(OpenAIEmbeddingProvider, type)

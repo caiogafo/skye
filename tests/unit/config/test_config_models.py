@@ -1,15 +1,15 @@
 """Unit tests for configuration models."""
 
 import pytest
-from pydantic import ValidationError
 
 from skye.base.config import (
     CooldownConfig,
     ModelConfig,
-    SkyeConfig,
     RateLimitConfig,
     RetryConfig,
+    SkyeConfig,
 )
+from skye.base.exceptions import ValidationError
 
 
 def test_rate_limit_config():

@@ -1,6 +1,6 @@
 """Completion request and response models for Skye.
 
-This module provides Pydantic models for LLM completion requests and responses,
+This module provides dataclass models for LLM completion requests and responses,
 including support for streaming, structured outputs, and token usage tracking.
 
 Example:
@@ -20,15 +20,16 @@ from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Any
 from uuid import uuid4
 
-from pydantic import BaseModel, Field, field_validator
-
+from skye.base.exceptions import ValidationError
 from skye.base.messages import CapabilityMessage, SkyeMessage
+from skye.base.validated import Validated, field, validated
 
 if TYPE_CHECKING:
     from skye.base.capability_schema import CapabilityRegistryLike
 
 
-class CapabilityCall(BaseModel):
+@validated
+class CapabilityCall(Validated):
     """Represents a capability call request from an LLM.
 
     When an LLM decides to invoke a capability, it generates a capability call
@@ -51,21 +52,15 @@ class CapabilityCall(BaseModel):
         ... )
     """
 
-    id: str = Field(
-        ...,
-        description="Unique identifier for this capability call from the provider",
-    )
-    name: str = Field(
-        ...,
-        description="Name of the capability to invoke",
-    )
-    arguments: dict[str, Any] = Field(
-        default_factory=dict,
-        description="Arguments to pass to the capability",
+    id: str = field(description="Unique identifier for this capability call from the provider")
+    name: str = field(description="Name of the capability to invoke")
+    arguments: dict[str, Any] = field(
+        default_factory=dict, description="Arguments to pass to the capability"
     )
 
 
-class ExecutableCapabilityCall(BaseModel):
+@validated
+class ExecutableCapabilityCall(Validated):
     """A capability call that can execute itself.
 
     Wraps a capability call (id, name, arguments) with the capability
@@ -74,14 +69,12 @@ class ExecutableCapabilityCall(BaseModel):
     Component (Requirement 2); ``skye.tools.capability_models`` re-exports it.
     """
 
-    model_config = {"arbitrary_types_allowed": True}
-
-    id: str = Field(..., description="Unique identifier for this capability call")
-    name: str = Field(..., description="Name of the capability to invoke")
-    arguments: dict[str, Any] = Field(
+    id: str = field(description="Unique identifier for this capability call")
+    name: str = field(description="Name of the capability to invoke")
+    arguments: dict[str, Any] = field(
         default_factory=dict, description="Arguments to pass to the capability"
     )
-    capability: Any | None = Field(
+    capability: Any | None = field(
         default=None, description="The actual capability implementation"
     )
 
@@ -119,7 +112,8 @@ class ExecutableCapabilityCall(BaseModel):
             )
 
 
-class TokenUsage(BaseModel):
+@validated
+class TokenUsage(Validated):
     """Token usage statistics for a completion request.
 
     Tracks the number of tokens used in the prompt, completion, and total.
@@ -145,7 +139,8 @@ class TokenUsage(BaseModel):
     total_tokens: int
 
 
-class CompletionRequest(BaseModel):
+@validated
+class CompletionRequest(Validated):
     """Request for model completion.
 
     Represents a request to an LLM provider with all necessary parameters
@@ -174,7 +169,8 @@ class CompletionRequest(BaseModel):
         mcp_servers: List of MCP server configurations to load capabilities from
             (requires skyeai[mcp]). Each config should contain server connection details.
         response_format: Format specification for structured outputs.
-        response_schema: Pydantic model class for structured output validation.
+        response_schema: Class that describes the structured output (for example a pydantic model
+            or a dataclass); the adapter validates the reply with it.
         metadata: Additional metadata for the request.
 
     Example (Base Skye):
@@ -239,47 +235,49 @@ class CompletionRequest(BaseModel):
     # Polymorphic input: either messages OR prompt
     messages: list[SkyeMessage] | None = None
     prompt: str | None = None  # Template name (requires skyeai[prompts])
-    prompt_variables: dict[str, Any] = Field(default_factory=dict)
+    prompt_variables: dict[str, Any] = field(default_factory=dict)
 
     model: str
-    temperature: float = Field(default=0.7, ge=0.0, le=2.0)
-    max_tokens: int | None = Field(default=None, gt=0)
-    top_p: float = Field(default=1.0, ge=0.0, le=1.0)
+    temperature: float = field(default=0.7, ge=0.0, le=2.0)
+    max_tokens: int | None = field(default=None, gt=0)
+    top_p: float = field(default=1.0, ge=0.0, le=1.0)
     stop: list[str] | None = None
     stream: bool = False
     # Capabilities can be provided as:
     # 1. List of CapabilityInterface objects (direct, no registry needed)
     # 2. CapabilityRegistry instance (enables search/discovery)
-    capabilities: list[Any] | Any | None = None  # List[CapabilityInterface] or CapabilityRegistry
+    capabilities: Any | None = None  # list of CapabilityInterface, or a CapabilityRegistry
     capability_choice: str | None = None  # "auto", "required", or specific capability name
     # MCP server configurations (requires skyeai[mcp])
     mcp_servers: list[dict[str, Any]] | None = None
     response_format: dict[str, Any] | None = None
-    response_schema: type[BaseModel] | None = None
-    metadata: dict[str, Any] = Field(default_factory=dict)
+    response_schema: type | None = None  # a class with model_validate_json (for example a pydantic model); base never imports pydantic
+    metadata: dict[str, Any] = field(default_factory=dict)
 
-    @field_validator("capability_choice")
-    @classmethod
-    def validate_capability_choice(cls, v: str | None) -> str | None:
-        """Validate capability_choice is 'auto', 'required', or a capability name."""
-        if v is not None and v not in ["auto", "required"]:
-            # If not a standard value, assume it's a specific capability name
-            # Capability names should be non-empty strings
-            if not isinstance(v, str) or not v.strip():
-                raise ValueError(
-                    "capability_choice must be 'auto', 'required', or a non-empty capability name"
-                )
-        return v
-
-    def model_post_init(self, __context: Any) -> None:
-        """Validate that either messages or prompt is provided, but not both."""
+    def __post_init__(self) -> None:
+        """Validate the fields, then that exactly one of messages and prompt is provided."""
+        super().__post_init__()
+        choice = self.capability_choice
+        if choice is not None and choice not in ("auto", "required") and not choice.strip():
+            raise ValidationError(
+                "capability_choice must be 'auto', 'required', or a non-empty capability name",
+                field="capability_choice",
+                value=choice,
+            )
         if self.messages is None and self.prompt is None:
-            raise ValueError("Either 'messages' or 'prompt' must be provided")
+            raise ValidationError(
+                "Either 'messages' or 'prompt' must be provided", field="messages", value=None
+            )
         if self.messages is not None and self.prompt is not None:
-            raise ValueError("Cannot provide both 'messages' and 'prompt' - use one or the other")
+            raise ValidationError(
+                "Cannot provide both 'messages' and 'prompt' - use one or the other",
+                field="prompt",
+                value=self.prompt,
+            )
 
 
-class CompletionResponse(BaseModel):
+@validated
+class CompletionResponse(Validated):
     """Response from model completion.
 
     Represents the response from an LLM provider, including the generated content,
@@ -338,22 +336,22 @@ class CompletionResponse(BaseModel):
         >>> results = await response.execute_capability_calls(registry)
     """
 
-    id: str = Field(default_factory=lambda: str(uuid4()))
+    id: str = field(default_factory=lambda: str(uuid4()))
     model: str
     provider: str
     content: str
-    structured_output: BaseModel | None = None
+    structured_output: Any | None = None  # an instance of response_schema
     role: str = "assistant"
     finish_reason: str
     usage: TokenUsage
     capability_calls: list[Any] | None = None  # List of CapabilityCall (requires skyeai[capabilities])
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    metadata: dict[str, Any] = Field(default_factory=dict)
+    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    metadata: dict[str, Any] = field(default_factory=dict)
     
-    # Internal: store capabilities for execution
-    _capabilities: list[Any] | None = None
+    # Internal: the capabilities of the request, kept to execute the calls; not an argument
+    _capabilities: list[Any] | None = field(default=None, init=False, repr=False, compare=False)
 
-    def get_output(self) -> str | BaseModel:
+    def get_output(self) -> Any:
         """Get the output - structured if available, otherwise text content.
 
         Returns:
@@ -372,8 +370,8 @@ class CompletionResponse(BaseModel):
             'Hello'
             >>>
             >>> # With structured output
-            >>> from pydantic import BaseModel
-            >>> class Person(BaseModel):
+            >>>             >>> @dataclass
+            ... class Person:
             ...     name: str
             >>> person = Person(name="Alice")
             >>> response.structured_output = person
@@ -476,7 +474,7 @@ class CompletionResponse(BaseModel):
         
         # Create executable wrappers
         executable_calls = []
-        for call in self.capability_calls:
+        for call in self.capability_calls or []:
             # Find the matching capability
             capability = None
             if self._capabilities:
@@ -654,7 +652,8 @@ class CompletionResponse(BaseModel):
         return messages
 
 
-class StreamChunk(BaseModel):
+@validated
+class StreamChunk(Validated):
     """A chunk from a streaming response.
 
     Represents a single chunk of data received during streaming completion.

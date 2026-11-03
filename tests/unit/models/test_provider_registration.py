@@ -1,6 +1,5 @@
 """Tests for automatic provider registration on import."""
 
-import pytest
 
 
 class TestProviderAutoRegistration:
@@ -123,9 +122,9 @@ class TestProviderAutoRegistration:
             AnthropicProvider,
             AzureOpenAIProvider,
             BedrockProvider,
+            GoogleProvider,
             OpenAIProvider,
             ProviderRegistry,
-            GoogleProvider,
         )
 
         # Verify that the registered classes match the expected classes
@@ -140,10 +139,10 @@ class TestProviderAutoRegistration:
         from skye.models import (
             BedrockEmbeddingProvider,
             CohereEmbeddingProvider,
-            OpenAIEmbeddingProvider,
-            ProviderRegistry,
             GoogleEmbeddingProvider,
             GoogleMultimodalEmbeddingProvider,
+            OpenAIEmbeddingProvider,
+            ProviderRegistry,
         )
 
         # Verify that the registered classes match the expected classes

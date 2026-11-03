@@ -232,7 +232,7 @@ def test_schema_generation_with_invalid_input():
         generate_schema(NotAPydanticModel)
 
     error = exc_info.value
-    assert "expected a pydantic basemodel" in error.message.lower()
+    assert "expected a dataclass or a pydantic basemodel" in error.message.lower()
     assert error.details["field"] == "model_type"
 
 
@@ -244,4 +244,4 @@ def test_schema_generation_with_instance_instead_of_class():
         generate_schema(msg)  # type: ignore
 
     error = exc_info.value
-    assert "expected a pydantic basemodel" in error.message.lower()
+    assert "expected a dataclass or a pydantic basemodel" in error.message.lower()

@@ -1,13 +1,14 @@
 """Unit tests for BaseModelProvider."""
 
-import pytest
-from typing import Any, Iterator
 from datetime import datetime, timezone
+from typing import Any, Iterator
 
-from skye.models.base import BaseModelProvider
+import pytest
+
 from skye.base.completion import CompletionRequest, CompletionResponse, StreamChunk, TokenUsage
-from skye.base.messages import UserMessage
 from skye.base.exceptions import ProviderError
+from skye.base.messages import UserMessage
+from skye.models.base import BaseModelProvider
 
 
 class MockProvider(BaseModelProvider):

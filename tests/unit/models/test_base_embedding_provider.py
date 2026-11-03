@@ -1,7 +1,8 @@
 """Unit tests for BaseEmbeddingProvider."""
 
-import pytest
 from typing import Any
+
+import pytest
 
 from skye.models.base import BaseEmbeddingProvider
 

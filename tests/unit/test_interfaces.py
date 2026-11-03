@@ -22,8 +22,8 @@ from skye.base.interfaces.router import ModelRouterInterface, RoutingStrategy
 from skye.base.interfaces.safety import SafetyFilterInterface, SafetyResult
 from skye.base.interfaces.storage import StorageAdapterInterface
 from skye.base.interfaces.vector_encoder import VectorEncoderInterface
-from skye.memory import MemoryEntry
 from skye.base.messages import ContentChunk, SkyeMessage, UserMessage
+from skye.memory import MemoryEntry
 
 
 class TestModelInterface:
@@ -486,7 +486,7 @@ class TestCapabilityInterface:
 
     def test_capability_schema_empty_name_fails(self):
         """Test that CapabilitySchema requires non-empty name."""
-        from pydantic import ValidationError
+        from skye.base.exceptions import ValidationError
 
         with pytest.raises(ValidationError):
             CapabilitySchema(name="", description="Test", parameters={}, returns={})

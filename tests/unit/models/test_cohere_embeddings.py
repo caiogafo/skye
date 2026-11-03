@@ -82,6 +82,7 @@ class TestCohereEmbeddingProviderBatchEncoding:
 class TestCohereNoVendorSdk:
     def test_module_imports_no_cohere_sdk(self) -> None:
         import ast
+
         import skye.models.embeddings.cohere_embeddings as mod
 
         tree = ast.parse(Path(mod.__file__).read_text())

@@ -10,13 +10,12 @@ These tests verify the Bedrock provider implementation including:
 
 import sys
 from pathlib import Path
-from datetime import datetime, timezone
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import Mock, patch
 
 import pytest
 
-from skye.base.completion import CompletionRequest, CompletionResponse, StreamChunk, TokenUsage
-from skye.base.messages import AssistantMessage, SystemMessage, UserMessage
+from skye.base.completion import CompletionRequest, CompletionResponse, StreamChunk
+from skye.base.messages import SystemMessage, UserMessage
 from skye.models.llm.bedrock import BedrockProvider
 from skye.models.transport import rest
 

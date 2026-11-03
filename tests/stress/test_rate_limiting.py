@@ -15,7 +15,7 @@ import statistics
 import threading
 import time
 from typing import Any
-from unittest.mock import Mock, patch
+from unittest.mock import patch
 
 import pytest
 
@@ -163,7 +163,7 @@ class TestRateLimiting:
 
         # Get usage stats
         stats = router.get_usage_stats("model-1")
-        print(f"\nUsage Statistics:")
+        print("\nUsage Statistics:")
         print(f"  RPM used:         {stats.rpm_used}")
         print(f"  RPM limit:        {stats.rpm_limit}")
         print(f"  TPM used:         {stats.tpm_used}")
@@ -240,7 +240,7 @@ class TestRateLimiting:
         print(f"Successful:         {sum(1 for r in results if r['success'])}")
         print(f"Failed:             {sum(1 for r in results if not r['success'])}")
         print(f"Time elapsed:       {elapsed:.2f}s")
-        print(f"\nUsage Statistics:")
+        print("\nUsage Statistics:")
         print(f"  TPM used:         {stats.tpm_used}/{stats.tpm_limit}")
         print(f"  RPM used:         {stats.rpm_used}/{stats.rpm_limit}")
         print(f"  Active requests:  {stats.active_requests}")
@@ -286,7 +286,7 @@ class TestRateLimiting:
         print(f"\n{'=' * 60}")
         print("Rate Limit Reset Test")
         print(f"{'=' * 60}")
-        print(f"Before reset:")
+        print("Before reset:")
         print(f"  RPM used:  {stats_before.rpm_used}")
         print(f"  TPM used:  {stats_before.tpm_used}")
 
@@ -296,7 +296,7 @@ class TestRateLimiting:
         later = time.time() + tracker.window_seconds + 1
         with patch("skye.router.health_tracker.time.time", return_value=later):
             stats_after = router.get_usage_stats("model-1")
-        print(f"\nAfter reset:")
+        print("\nAfter reset:")
         print(f"  RPM used:  {stats_after.rpm_used}")
         print(f"  TPM used:  {stats_after.tpm_used}")
         print(f"{'=' * 60}")
@@ -362,11 +362,11 @@ class TestRateLimiting:
         stats_with = router_with_checks.get_usage_stats("model-1")
         stats_without = router_without_checks.get_usage_stats("model-2")
 
-        print(f"\nWith checks:")
+        print("\nWith checks:")
         print(f"  RPM used: {stats_with.rpm_used}/{stats_with.rpm_limit}")
         print(f"  TPM used: {stats_with.tpm_used}/{stats_with.tpm_limit}")
 
-        print(f"\nWithout checks:")
+        print("\nWithout checks:")
         print(f"  RPM used: {stats_without.rpm_used}/{stats_without.rpm_limit}")
         print(f"  TPM used: {stats_without.tpm_used}/{stats_without.tpm_limit}")
         print(f"{'=' * 60}")
@@ -447,7 +447,7 @@ class TestRateLimiting:
         print(f"Successful:         {len(successful)}")
         print(f"Total time:         {total_time:.2f}s")
         print(f"Throughput:         {throughput:.2f} req/s")
-        print(f"\nLatency metrics:")
+        print("\nLatency metrics:")
         print(f"  Average:          {avg_latency:.3f}s")
         print(f"  Min:              {min_latency:.3f}s")
         print(f"  Max:              {max_latency:.3f}s")
@@ -455,7 +455,7 @@ class TestRateLimiting:
         print(f"  P99:              {p99_latency:.3f}s")
 
         stats = router.get_usage_stats("model-1")
-        print(f"\nRate limit usage:")
+        print("\nRate limit usage:")
         print(f"  RPM used:         {stats.rpm_used}/{stats.rpm_limit}")
         print(f"  TPM used:         {stats.tpm_used}/{stats.tpm_limit}")
         print(f"{'=' * 60}")

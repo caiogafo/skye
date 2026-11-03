@@ -86,11 +86,12 @@ class ConfigurationError(SkyeError):
     pass
 
 
-class ValidationError(SkyeError):
+class ValidationError(SkyeError, ValueError):
     """Error in data validation.
 
-    Raised when data fails validation, typically when Pydantic model
-    validation fails or when interface compliance checks fail.
+    Raised when data fails validation: a field of a model cannot be read as its type or breaks a
+    constraint, or an interface compliance check fails. It is also a ``ValueError``, so code that
+    catches ``ValueError`` keeps working.
 
     Args:
         message: Human-readable error message

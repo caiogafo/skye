@@ -24,7 +24,7 @@ Ports defined by this component (all under `base/interfaces`): `model`, `decisio
 one interfaces package:
 
 - **Contracts** — the data shapes passed across Ports: `messages.py`, `completion.py`, `capability_schema.py`,
-  `openai_shape.py`, `health.py`.
+  `openai_shape.py`, `health.py`, `log_event.py`; they are dataclasses built on `validated.py`.
 - **Errors** — the `SkyeError` hierarchy in `exceptions.py`.
 - **Configuration** — `config.py` (the loader, precedence, `${VAR}` substitution) built on `lazy_import.py`.
 - **Transport** — `http.py`, the single I/O module, used by `auth` and the adapters but by nothing else in `base`.
@@ -45,6 +45,8 @@ base/
   capability_schema.py    the capability contract (name, description, parameters); handlers live in tools
   openai_shape.py         read-only helpers to accept the OpenAI message/tool shape at the boundary
   health.py               HealthMetrics shared by adapters and the router's health tracking
+  validated.py            @validated keyword-only dataclasses: field checks, conversions, constraints (standard library)
+  log_event.py            ModelInvocationEvent and the correlation id (the structured log event of a model call)
   exceptions.py           SkyeError, ProviderError, ConfigurationError, ValidationError,
                           CapabilityExecutionError, MissingExtraError
   config.py               ConfigLoader, SkyeConfig, ModelConfig, substitute_env_vars, the 3 prefixed vars
@@ -87,9 +89,11 @@ runtime, and supports dynamic registration and discovery of plugins through the 
 error as context), `ConfigurationError`, `ValidationError` (field and value), `CapabilityExecutionError` and
 `MissingExtraError` (names the extra, subclasses `ImportError`). A wrapped error keeps the original message and stack by being
 raised `from` the cause, and `SkyeError.__init__` logs the exception with structured `extra={...}` so every exception is
-logged at an appropriate level (Requirement 18.1, 18.2). `base` defines the shapes for structured log events and the telemetry
-hook Ports (`observer`, `event_handler`) consumed by `observe`; the `correlation_id_header` and a per-component log level are
-configuration fields (Requirement 18.3, 18.4). The structured-log rule is "message plus `extra={...}`", never f-string
+logged at an appropriate level (Requirement 18.1, 18.2). `log_event.py` defines the shape of the structured log event of a model invocation
+(`ModelInvocationEvent`: phase start, end or error; model; provider; correlation id; request and response details, never the
+message text; `log_extra()` gives the keys for `logging`'s `extra`) and the telemetry hook Ports (`observer`, `event_handler`)
+consumed by `observe`; `SkyeConfig` carries the `correlation_id_header` and `component_log_levels` (a level per component, with
+`level_for` and `apply_log_levels`) (Requirement 18.3, 18.4). Emitting the events is the job of `models` and `observe`. The structured-log rule is "message plus `extra={...}`", never f-string
 interpolation (00-rules).
 
 ### Token usage and cost (Requirement 4)
@@ -115,9 +119,14 @@ credentials never come from a prefixed variable (D18).
 
 Every public API in `base` is fully type-hinted with Python 3.10 syntax (`list[str]`, `X | None`), the minimum supported
 version (Requirement 21.1; 00-rules). Invalid data raises `ValidationError` carrying the field and the value (Requirement
-21.3). Requirement 21.2 — new data structures as dataclasses, not pydantic — is honored going forward; the existing `base`
-contracts (`messages.py`, `completion.py`, `config.py`) still subclass `pydantic.BaseModel`, and moving them to dataclasses is
-open decision O4 (D24). This spec records that migration as a task rather than claiming it done.
+21.3). Requirement 21.2 — data structures as dataclasses, not pydantic — holds for every `base` contract: `validated.py` gives
+the dataclasses what pydantic gave them, in the standard library. `@validated` makes a keyword-only dataclass; when one is built
+each field is checked against its annotation and the safe conversions are applied (an `int` for a `float`, a numeric string for
+an `int`, an ISO string for a `datetime`, a `dict` for a nested dataclass); a value that cannot be read, a constraint that is
+broken (`field(ge=…, le=…, min_length=…)`), a missing argument or one the class does not have raises `ValidationError` naming
+the field. `ValidationError` is also a `ValueError`. `from_dict`, `to_dict`, `to_json`, `from_json` and `json_schema` replace
+`model_validate`, `model_dump`, `model_dump_json`, `model_validate_json` and `model_json_schema`. A user's structured-output
+class (`response_schema`) may still be a pydantic model: `base` only needs the class to be callable.
 
 ## Data Models
 
@@ -125,7 +134,7 @@ open decision O4 (D24). This spec records that migration as a task rather than c
 `ContentChunk` (`messages.py`); `CompletionRequest`, `CompletionResponse`, `StreamChunk`, `TokenUsage`, `CapabilityCall`,
 `ExecutableCapabilityCall` (`completion.py`); `CapabilitySchema` (`capability_schema.py`); `HealthMetrics` (`health.py`); and
 the configuration models `SkyeConfig`, `ModelConfig`, `RateLimitConfig`, `RetryConfig`, `CooldownConfig`, `RouterConfig`
-(`config.py`). New structures are dataclasses (Requirement 21.2, D24); the models above are the pydantic legacy under O4.
+(`config.py`). All of them are `@validated` dataclasses (Requirement 21.2, D24).
 
 ## Error Handling
 
@@ -185,9 +194,7 @@ variable or an invalid value raises `ConfigurationError`, and a YAML file withou
 
 ## Open items
 
-- **O4 / D24 — pydantic to dataclasses.** `messages.py`, `completion.py` and `config.py` still subclass `pydantic.BaseModel`.
-  New structures are dataclasses; moving these is open (tracked in tasks.md). `base` must not need pydantic to import
-  (Requirement 3.3), so the migration is the path to removing pydantic from the core.
-- **O6 — where `base/http.py` goes.** `base` must do no I/O, yet `http.py` is the one shared transport (Requirement 3.2). Its
-  placement, and whether cloud secret managers are in scope of `auth`, is open; the import-matrix test currently allows
-  network I/O only in `http.py`.
+- **pydantic leaves the core only when the other components move.** `base` no longer imports it (Requirement 3.3), but `tools`,
+  `memory`, `utils` and `router` still do; tasks 14.1 to 14.3 of `0-base-structure` remove the dependency (D24, O4).
+- **O6 is closed by D32:** `base/http.py` stays in `base` as the one network-I/O module (Requirement 3.2); the import-matrix test
+  allows network I/O only there; cloud secret managers are in scope of `auth` over `base/http.py`.

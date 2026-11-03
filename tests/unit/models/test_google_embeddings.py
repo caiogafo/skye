@@ -7,10 +7,9 @@ from unittest.mock import patch
 import pytest
 
 import skye.models.embeddings.google_embeddings as mod
+from skye.auth.google import GoogleBearerAuth
 from skye.models.embeddings.google_embeddings import GoogleEmbeddingProvider
 from skye.models.transport.rest import JsonObject
-
-from skye.auth.google import GoogleBearerAuth
 
 
 def make(**kw: object) -> GoogleEmbeddingProvider:

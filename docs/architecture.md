@@ -21,7 +21,7 @@ Skye follows Clean Architecture principles with a stable core of interfaces:
 │  │   - And more...                   │  │
 │  └───────────────────────────────────┘  │
 │  ┌───────────────────────────────────┐  │
-│  │   Data Models (Pydantic)          │  │
+│  │   Data Models (dataclasses)       │  │
 │  │   - CompletionRequest/Response    │  │
 │  │   - UserMessage, AssistantMessage │  │
 │  │   - ModelConfig, SkyeConfig     │  │

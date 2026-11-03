@@ -5,6 +5,7 @@ from typing import Any
 
 import pytest
 
+from skye.base.messages import CapabilityMessage
 from skye.tools import (
     CapabilityInterface,
     CapabilityNotFoundError,
@@ -12,7 +13,6 @@ from skye.tools import (
     CapabilitySchema,
     CapabilityValidationError,
 )
-from skye.base.messages import CapabilityMessage
 
 
 class MockCapability(CapabilityInterface):

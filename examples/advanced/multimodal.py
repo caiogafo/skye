@@ -1,31 +1,23 @@
-"""Multimodal inputs: images in a message, from a URL, a base64 data URL or a file.
+"""Multimodal inputs: turn an image (URL, data URL, file or bytes) into the shape each provider expects.
 
-A ``UserMessage`` carries text and, next to it, ``images``: a list of URLs, data URLs or file paths. The library converts them to the
-shape of each provider (for OpenAI an ``image_url`` part), so the same message works wherever the model accepts images.
+`ImageHandler` reads the four kinds of source and returns the part a provider adds to a message: for OpenAI an `image_url` part,
+for Anthropic and Bedrock a base64 block. It needs no key and no network.
 
-Set OPENAI_API_KEY.
+Not yet available: carrying the images inside a `UserMessage` through `client.complete`. Until the adapters do it (task 5.2 of
+the `models` spec) a message holds text only.
 """
 
 import base64
-import os
 import tempfile
 from pathlib import Path
 
-import skye
-from skye.base.messages import UserMessage
+from skye.models.transport.multimodal import ImageHandler
 
 # A 1x1 PNG, so the example needs no image file
 PIXEL = base64.b64decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==")
 
 
 def main() -> None:
-    api_key = os.getenv("OPENAI_API_KEY")
-    if not api_key:
-        print("OPENAI_API_KEY not set, skipping")
-        return
-
-    client = skye.provider("openai", api_key=api_key)
-
     with tempfile.TemporaryDirectory() as tmp:
         path = Path(tmp) / "pixel.png"
         path.write_bytes(PIXEL)
@@ -33,16 +25,15 @@ def main() -> None:
         sources = {
             "url": "https://example.com/image.jpg",
             "data URL": "data:image/png;base64," + base64.b64encode(PIXEL).decode(),
-            "file": str(path),
+            "file": path,
+            "bytes": PIXEL,
         }
-        for kind, image in sources.items():
-            message = UserMessage(content=f"What is in this image ({kind})?", images=[image])
-            response = client.complete(messages=[message], model="gpt-4o", max_tokens=50)
-            print(f"{kind}: {response.content}")
+        for kind, source in sources.items():
+            part = ImageHandler.to_openai_format(source)
+            print(f"{kind}: OpenAI part of type {part['type']!r}, url starts with {part['image_url']['url'][:22]!r}")
 
-        # Several images in one message
-        message = UserMessage(content="Compare these two images.", images=[sources["data URL"], str(path)])
-        print("two images:", client.complete(messages=[message], model="gpt-4o", max_tokens=50).content)
+        block = ImageHandler.to_anthropic_format(PIXEL)
+        print("Anthropic block:", block["type"], block["source"]["media_type"])
 
 
 if __name__ == "__main__":

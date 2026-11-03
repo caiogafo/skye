@@ -9,7 +9,7 @@ Tests cover:
 
 import time
 from typing import Any
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import MagicMock
 
 import pytest
 

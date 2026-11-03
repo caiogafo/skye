@@ -4,7 +4,6 @@ This module verifies that all expected symbols are properly exported from
 the skye.tools package and that __all__ is correctly defined.
 """
 
-import pytest
 
 
 def test_capability_interface_import():
@@ -66,11 +65,11 @@ def test_capability_result_import():
 def test_exception_imports():
     """Test that all exception classes can be imported."""
     from skye.tools import (
+        CapabilityCallParsingError,
         CapabilityError,
         CapabilityExecutionError,
         CapabilityNotFoundError,
         CapabilityValidationError,
-        CapabilityCallParsingError,
     )
     
     assert CapabilityError is not None
@@ -198,13 +197,13 @@ def test_star_import():
 def test_combined_import():
     """Test that multiple symbols can be imported together."""
     from skye.tools import (
+        CapabilityCall,
         CapabilityInterface,
         CapabilityRegistry,
+        CapabilityResult,
         CapabilitySchema,
         LocalFunctionCapability,
         RemoteAPICapability,
-        CapabilityCall,
-        CapabilityResult,
     )
     
     assert CapabilityInterface is not None

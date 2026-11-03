@@ -12,7 +12,12 @@ from types import SimpleNamespace
 
 import pytest
 
-from skye.base.exceptions import ConfigurationError, MissingExtraError, ProviderError, ValidationError
+from skye.base.exceptions import (
+    ConfigurationError,
+    MissingExtraError,
+    ProviderError,
+    ValidationError,
+)
 from skye.base.messages import AssistantMessage, UserMessage
 from skye.tools import mcp_boundary as b
 from skye.tools.exceptions import CapabilityExecutionError

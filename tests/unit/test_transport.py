@@ -7,10 +7,10 @@ from unittest.mock import patch
 
 import pytest
 
+from skye.auth.sigv4 import sign_request
 from skye.base.exceptions import ProviderError
 from skye.models.transport import http
 from skye.models.transport.retry import with_retry
-from skye.auth.sigv4 import sign_request
 from skye.models.transport.streaming import SSEEvent, parse_sse
 
 

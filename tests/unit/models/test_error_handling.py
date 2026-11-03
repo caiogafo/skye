@@ -12,8 +12,6 @@ Tests cover:
 
 from unittest.mock import MagicMock
 
-import pytest
-
 from skye.base.exceptions import ProviderError
 from skye.models.transport.error_mapping import ErrorHandler
 

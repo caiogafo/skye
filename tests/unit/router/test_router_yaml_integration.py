@@ -6,18 +6,18 @@ to ensure proper router instantiation from configuration.
 
 import os
 import tempfile
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterator
-from datetime import datetime, timezone
 
 import pytest
 
+from skye.base.completion import CompletionRequest, CompletionResponse, StreamChunk, TokenUsage
 from skye.base.exceptions import ConfigurationError
 from skye.base.interfaces.router import RoutingStrategy
-from skye.router.model_router import ModelRouter
-from skye.models.registry import ProviderRegistry
 from skye.models.base import BaseModelProvider
-from skye.base.completion import CompletionRequest, CompletionResponse, StreamChunk, TokenUsage
+from skye.models.registry import ProviderRegistry
+from skye.router.model_router import ModelRouter
 
 
 class MockProvider(BaseModelProvider):
@@ -447,8 +447,8 @@ class TestModelTargetEnvVarSubstitution:
 
     def test_model_target_env_var_substitution(self):
         """Test that ModelTarget substitutes environment variables."""
-        from skye.router.model_router import ModelTarget
         from skye.base.config import _env_var_cache
+        from skye.router.model_router import ModelTarget
 
         # Clear cache to avoid interference from other tests
         _env_var_cache.clear()
