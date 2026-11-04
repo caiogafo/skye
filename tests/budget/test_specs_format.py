@@ -55,7 +55,8 @@ def _spec_dirs() -> list:
     return sorted(p for p in SPECS.iterdir() if p.is_dir())
 
 
-CROSS_CUTTING_SPEC = "0-base-structure"
+# The cross-cutting specs: the structure and the public surface (decision D35, Requirement 15.2).
+CROSS_CUTTING_SPECS = ("0-base-structure", "0-base-uxui")
 
 
 def _layers() -> dict[str, tuple[int, str]]:
@@ -73,14 +74,15 @@ def _layers() -> dict[str, tuple[int, str]]:
 def expected_spec_names() -> set[str]:
     """The folder name `<n>-<layer>-<scope>` of every component, plus the cross-cutting spec."""
     names = {f"{n}-{layer}-{component}" for component, (n, layer) in _layers().items()}
-    return names | {CROSS_CUTTING_SPEC}
+    return names | set(CROSS_CUTTING_SPECS)
 
 
 def test_every_spec_is_named_n_layer_scope():
     allowed = expected_spec_names() | LEGACY_SPECS
     bad = [p.name for p in _spec_dirs() if p.name not in allowed]
     assert not bad, f"spec folders that are not `<n>-<layer>-<scope>` of a component (nor the cross-cutting spec): {bad}"
-    assert (SPECS / CROSS_CUTTING_SPEC).is_dir(), f"the cross-cutting spec `{CROSS_CUTTING_SPEC}` is missing"
+    for cross_cutting in CROSS_CUTTING_SPECS:
+        assert (SPECS / cross_cutting).is_dir(), f"the cross-cutting spec `{cross_cutting}` is missing"
     components, _ = _requirements()
     assert set(_layers()) == set(components), "Requirement 2.1 and Requirement 1.1 list different components"
 

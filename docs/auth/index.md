@@ -26,7 +26,7 @@ the cache that tool left and, if it is missing or expired, raises `LoginRequired
 | Secrets | AWS Secrets Manager, SSM Parameter Store, Azure Key Vault, Google Secret Manager |
 
 ```python
-from skye.auth.registry import resolve_credential_source
+from skye.auth import resolve_credential_source
 
 auth = resolve_credential_source("google")                       # picks the first usable mode
 vault = resolve_credential_source("aws-secrets-manager", region="eu-west-1")
@@ -44,7 +44,7 @@ password = vault.get("prod/db/password")
 Register a factory under a name; it can return an authenticator or a secret source with `get(name)`.
 
 ```python
-from skye.auth.registry import register_credential_source, resolve_credential_source
+from skye.auth import register_credential_source, resolve_credential_source
 
 register_credential_source("vault", lambda **config: MyVaultAuth(**config))
 auth = resolve_credential_source("vault", token="...")

@@ -8,7 +8,7 @@ token source in without subclassing anything.
 
 from collections.abc import Mapping
 
-from skye.base.interfaces.authentication import AuthenticationInterface
+from skye.interfaces import AuthenticationInterface
 
 
 class StaticTokenAuthenticator:

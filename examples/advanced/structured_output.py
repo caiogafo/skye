@@ -1,6 +1,6 @@
 """Structured output: ask for a declared shape and get a typed object back.
 
-The schema is a model class with nested objects, enums and optional fields. The library asks the provider for JSON in that shape, validates
+The schema is a dataclass with nested objects, enums and optional fields. The library asks the provider for JSON in that shape, validates
 the answer against the schema and puts the object in ``response.structured_output``. An answer that does not conform raises
 ``ValidationError`` naming the field.
 
@@ -10,11 +10,10 @@ Set OPENAI_API_KEY.
 import os
 from enum import Enum
 
-from pydantic import BaseModel
-
 import skye
-from skye.base.exceptions import ValidationError
-from skye.base.messages import UserMessage
+from skye import ValidationError
+from skye import UserMessage
+from skye.data import Validated, validated
 
 
 class Sentiment(str, Enum):
@@ -23,17 +22,19 @@ class Sentiment(str, Enum):
     NEUTRAL = "neutral"
 
 
-class Address(BaseModel):
+@validated
+class Address(Validated):
     city: str
     country: str
 
 
-class Person(BaseModel):
+@validated
+class Person(Validated):
     name: str
     age: int
     address: Address  # nested object
     sentiment: Sentiment  # enum
-    nickname: str | None = None  # optional
+    nickname: str | None = None  # optional (a schema with optional fields is sent in non-strict mode)
 
 
 def main() -> None:

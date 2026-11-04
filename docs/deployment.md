@@ -32,7 +32,7 @@ Skye is built for serverless architectures, where the size of the library and it
 ```python
 # Bedrock is called over REST with the standard library: no boto3, no SDK to ship
 import skye
-from skye.base.messages import UserMessage
+from skye import UserMessage
 
 def lambda_handler(event, context):
     # Bedrock provider works without boto3 in dependencies

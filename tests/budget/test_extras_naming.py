@@ -1,8 +1,8 @@
 """An extra is named after what it enables, and an extra named after a provider installs no provider SDK (Requirement 7.13).
 
 Each provider has a built-in REST adapter (Requirement 9.3), so `anthropic`, `bedrock`, `cohere`, `google` and `azure` are empty extras that
-exist only to keep old install commands working. `openai` still declares `tiktoken` (exact token counts), which is not the OpenAI SDK: it is
-listed as known debt (open decision O22). The list may only shrink: when `openai` is renamed or emptied, the stale-list test fails.
+exist only to keep old install commands working. Exact token counts live in the extra `tokens` (`tiktoken`), named for its function (decision D33); `openai` is an empty extra.
+The list of known debt is empty and may not grow.
 """
 
 from __future__ import annotations
@@ -10,7 +10,7 @@ from __future__ import annotations
 from tests.budget.measure import pyproject
 
 PROVIDERS = {"openai", "anthropic", "bedrock", "azure", "google", "cohere"}
-KNOWN_PROVIDER_EXTRAS_WITH_A_LIBRARY = {"openai"}
+KNOWN_PROVIDER_EXTRAS_WITH_A_LIBRARY: set[str] = set()
 
 
 def _extras() -> dict[str, list[str]]:

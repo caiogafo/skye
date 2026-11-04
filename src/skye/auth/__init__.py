@@ -22,3 +22,31 @@ login. Modules:
 
 Codename: ozone.
 """
+
+from typing import Any
+
+# The commonest classes, importable as ``from skye.auth import SigV4Authenticator``; each is loaded on first use so that
+# ``import skye.auth`` stays light.
+_LAZY = {
+    "AwsCredentials": "skye.auth.aws",
+    "CredentialProvider": "skye.auth.aws",
+    "SigV4Authenticator": "skye.auth.aws",
+    "BedrockApiKeyAuthenticator": "skye.auth.aws",
+    "aws_authenticator": "skye.auth.aws",
+    "bedrock_authenticator": "skye.auth.aws",
+    "register_credential_source": "skye.auth.registry",
+    "resolve_credential_source": "skye.auth.registry",
+}
+
+__all__ = list(_LAZY)
+
+
+def __getattr__(name: str) -> Any:
+    module = _LAZY.get(name)
+    if module is None:
+        raise AttributeError(f"module 'skye.auth' has no attribute {name!r}")
+    import importlib
+
+    value = getattr(importlib.import_module(module), name)
+    globals()[name] = value
+    return value

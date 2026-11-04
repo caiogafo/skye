@@ -10,7 +10,7 @@ import asyncio
 import os
 
 import skye
-from skye.base.messages import UserMessage
+from skye import UserMessage
 
 
 async def async_completion(client) -> None:

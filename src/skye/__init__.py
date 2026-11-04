@@ -3,38 +3,75 @@
 Skye provides a foundational layer for building AI agents and intelligent applications
 with a Clean Architecture approach. The base package includes only interfaces and models,
 while all implementations are available as optional extras. The top level re-exports only
-the four base modules (messages, completion, exceptions, config); import everything else
+the commonest names (messages, completion, errors) and ``provider``; the modules ``skye.messages``, ``skye.completion``, ``skye.exceptions``, ``skye.config``, ``skye.data`` and ``skye.interfaces`` are the public paths of ``base``; import everything else
 from its Component path (skye.models, skye.router, skye.tools, ...).
 
 Installation:
-    pip install skyeai                    # Base only
-    pip install skyeai[bedrock]           # + Bedrock provider
-    pip install skyeai[agents,memory]     # + Multiple extras
-    pip install skyeai[all]               # Everything
+    pip install skyeai                    # every provider (built-in REST adapters)
+    pip install skyeai[tokens]            # + exact token counts
+    pip install skyeai[memory,yaml]       # + Redis store, YAML configuration
+    pip install skyeai[all]               # every optional library
 
 Example:
     >>> import skye
-    >>> from skye.base.messages import UserMessage
+    >>> from skye import UserMessage
     >>>
     >>> client = skye.provider("bedrock", region="us-east-1")
     >>> response = client.complete(
     ...     messages=[UserMessage(content="Hello")],
     ...     model="anthropic.claude-3-sonnet-20240229-v1:0"
     ... )
-    >>> print(response.text)
+    >>> print(response.content)
 """
 
 __version__ = "0.1.0"
 
 from typing import TYPE_CHECKING, Any
 
-from skye.base import completion, config, exceptions, messages
 
 if TYPE_CHECKING:
+    from skye.base.completion import CompletionRequest, CompletionResponse, StreamChunk, TokenUsage
+    from skye.base.exceptions import (
+        ConfigurationError,
+        MissingExtraError,
+        ProviderError,
+        SkyeError,
+        ValidationError,
+    )
+    from skye.base.messages import AssistantMessage, CapabilityMessage, SystemMessage, UserMessage
     from skye.base.interfaces.model import ModelInterface
     from skye.base.interfaces.vector_encoder import VectorEncoderInterface
 
-__all__ = ["__version__", "messages", "completion", "exceptions", "config", "provider"]
+# The commonest names, importable as ``from skye import UserMessage``; each is loaded on first use, so ``import skye`` stays light.
+_LAZY = {
+    "UserMessage": "skye.base.messages",
+    "SystemMessage": "skye.base.messages",
+    "AssistantMessage": "skye.base.messages",
+    "CapabilityMessage": "skye.base.messages",
+    "CompletionRequest": "skye.base.completion",
+    "CompletionResponse": "skye.base.completion",
+    "StreamChunk": "skye.base.completion",
+    "TokenUsage": "skye.base.completion",
+    "SkyeError": "skye.base.exceptions",
+    "ProviderError": "skye.base.exceptions",
+    "ConfigurationError": "skye.base.exceptions",
+    "ValidationError": "skye.base.exceptions",
+    "MissingExtraError": "skye.base.exceptions",
+}
+
+__all__ = ["__version__", "messages", "completion", "exceptions", "config", "provider", *_LAZY]
+
+
+def __getattr__(name: str) -> Any:
+    """Load a commonly used name (``UserMessage``, ``SkyeError``, ...) on first access."""
+    module = _LAZY.get(name)
+    if module is None:
+        raise AttributeError(f"module 'skye' has no attribute {name!r}")
+    import importlib
+
+    value = getattr(importlib.import_module(module), name)
+    globals()[name] = value
+    return value
 
 
 def provider(name: str, **config: Any) -> "ModelInterface | VectorEncoderInterface":
@@ -52,3 +89,7 @@ def provider(name: str, **config: Any) -> "ModelInterface | VectorEncoderInterfa
     from skye.models.registry import provider as _provider
 
     return _provider(name, **config)
+
+
+# The public module paths of ``base`` (``skye.messages`` and the others); imported last so that they are attributes of ``skye``.
+from skye import completion, config, exceptions, messages  # noqa: E402

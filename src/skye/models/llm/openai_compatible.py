@@ -36,6 +36,7 @@ from typing import Any
 from skye.base.completion import CompletionRequest, CompletionResponse, StreamChunk, TokenUsage
 from skye.base.messages import AssistantMessage
 from skye.models.base import BaseModelProvider
+from skye.models.transport.structured import schema_of, strict_schema
 from skye.models.transport import rest
 
 DEFAULT_API_BASE = "https://api.openai.com/v1"
@@ -137,6 +138,14 @@ class OpenAICompatibleProvider(BaseModelProvider):
                 )
             else:
                 openai_msg: dict[str, Any] = {"role": msg.role, "content": msg.content}
+                images = getattr(msg, "images", None)
+                if images:
+                    from skye.models.transport.multimodal import ImageHandler
+
+                    openai_msg["content"] = [
+                        {"type": "text", "text": msg.content},
+                        *(ImageHandler.to_openai_format(image) for image in images),
+                    ]
                 if isinstance(msg, AssistantMessage) and msg.capability_calls:
                     openai_msg["tool_calls"] = msg.capability_calls
                 result.append(openai_msg)
@@ -248,13 +257,14 @@ class OpenAICompatibleProvider(BaseModelProvider):
         
         # Handle structured outputs
         if request.response_schema:
-            schema = request.response_schema.model_json_schema()
+            schema = schema_of(request.response_schema)
+            strict = strict_schema(schema)
             openai_request["response_format"] = {
                 "type": "json_schema",
                 "json_schema": {
                     "name": request.response_schema.__name__,
-                    "schema": schema,
-                    "strict": True
+                    "schema": strict or schema,
+                    "strict": strict is not None
                 }
             }
         elif request.response_format:

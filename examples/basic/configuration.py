@@ -9,7 +9,7 @@ import os
 import tempfile
 from pathlib import Path
 
-from skye.base.config import ConfigLoader, substitute_env_vars
+from skye.config import ConfigLoader, substitute_env_vars
 
 YAML = """\
 log_level: INFO

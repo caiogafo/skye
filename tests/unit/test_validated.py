@@ -159,3 +159,30 @@ def test_importing_the_models_does_not_import_pydantic():
         "sys.exit(1 if 'pydantic' in sys.modules else 0)"
     )
     assert subprocess.run([sys.executable, "-c", code]).returncode == 0
+
+
+class _Color(str, __import__("enum").Enum):
+    RED = "red"
+    BLUE = "blue"
+
+
+def test_an_enum_field_reads_its_value_and_names_the_field_when_wrong():
+    @validated
+    class Paint(Validated):
+        color: _Color
+
+    assert Paint(color="red").color is _Color.RED
+    assert Paint(color=_Color.BLUE).color is _Color.BLUE
+    with pytest.raises(ValidationError) as caught:
+        Paint(color="green")
+    assert caught.value.details["field"] == "color"
+
+
+def test_an_enum_field_has_a_schema_and_serializes_to_its_value():
+    @validated
+    class Paint(Validated):
+        color: _Color
+
+    assert json_schema(Paint)["properties"]["color"] == {"enum": ["red", "blue"]}
+    assert Paint(color="red").to_dict() == {"color": "red"}
+    assert Paint(color="red").to_json() == '{"color": "red"}'

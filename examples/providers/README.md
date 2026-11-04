@@ -6,7 +6,7 @@ This directory contains examples demonstrating the simplified boto3-style API fo
 
 ```python
 import skye
-from skye.base.messages import UserMessage, SystemMessage
+from skye import UserMessage, SystemMessage
 
 # Create a client
 client = skye.provider("openai", api_key="sk-...")
@@ -146,7 +146,7 @@ response = await client.acomplete(
 ## Message Types
 
 ```python
-from skye.base.messages import UserMessage, SystemMessage, AssistantMessage
+from skye import UserMessage, SystemMessage, AssistantMessage
 
 messages = [
     SystemMessage(content="You are a helpful assistant."),

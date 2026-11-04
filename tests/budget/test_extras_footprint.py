@@ -40,6 +40,8 @@ EXTRA_PATHS: dict[str, list[str]] = {
     # (`auth/rsa_signing.py`); the SigV4 signer and the other strategies are standard library.
     "auth": ["auth"],
     "openai": ["models/llm/openai_compatible.py", "models/embeddings/openai_embeddings.py"],
+    # tokens: exact token counting (`tiktoken`, lazy and optional; D33).
+    "tokens": ["models/transport/token_counter.py"],
     "anthropic": ["models/llm/anthropic.py"],
     "bedrock": ["models/llm/bedrock.py", "models/embeddings/bedrock_embeddings.py"],
     "google": [
@@ -86,6 +88,7 @@ IMPORT_NAMES: dict[str, set[str]] = {
     "psycopg2-binary": {"psycopg2"},
     "asyncpg": {"asyncpg"},
     "fastmcp": {"fastmcp"},
+    "fastmcp-slim": {"fastmcp"},
     "pyyaml": {"yaml"},
     }
 

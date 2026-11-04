@@ -15,12 +15,31 @@ Example:
     {'role': 'user', 'content': 'Hello, how are you?', ...}
 """
 
+import base64
 from collections.abc import Mapping
 from datetime import datetime, timezone
 from typing import Any, Literal
 from uuid import uuid4
 
 from skye.base.validated import Validated, field, from_mapping, validated
+
+
+def sniff_image_mime(data: bytes) -> str:
+    """MIME type of raw image bytes from their first bytes (JPEG when unknown)."""
+    if data.startswith(b"\x89PNG"):
+        return "image/png"
+    if data.startswith((b"GIF87a", b"GIF89a")):
+        return "image/gif"
+    if data[:4] == b"RIFF" and data[8:12] == b"WEBP":
+        return "image/webp"
+    return "image/jpeg"
+
+
+def _image_text(image: Any) -> str:
+    """JSON-safe text for one image input."""
+    if isinstance(image, bytes):
+        return f"data:{sniff_image_mime(image)};base64," + base64.b64encode(image).decode("ascii")
+    return str(image)
 
 
 @validated
@@ -106,6 +125,10 @@ class UserMessage(SkyeMessage):
 
     Represents input from a human user in the conversation.
 
+    Attributes:
+        images: Images sent with the text: each is an http(s) URL, a ``data:image`` URI, a file path
+            (``str`` or ``Path``) or raw bytes. Each adapter converts them to its provider's shape.
+
     Example:
         >>> msg = UserMessage(content="What is the weather today?")
         >>> msg.role
@@ -113,6 +136,17 @@ class UserMessage(SkyeMessage):
     """
 
     role: Literal["user"] = "user"
+    images: list[Any] = field(default_factory=list)
+
+    def to_dict(self) -> dict[str, Any]:
+        """Convert to a dictionary; images (URL, data URI, path or bytes) become strings.
+
+        Bytes turn into a ``data:`` URI and a path into its text, so the result is JSON-safe.
+        """
+        result = super().to_dict()
+        if self.images:
+            result["images"] = [_image_text(image) for image in self.images]
+        return result
 
 
 @validated

@@ -6,7 +6,7 @@ The ``guard`` component exports nothing concrete yet, but the
 its own blocked-words filter and runs it end to end, no client needed.
 """
 
-from skye.base.interfaces.safety import SafetyFilterInterface, SafetyResult
+from skye.interfaces import SafetyFilterInterface, SafetyResult
 
 
 class BlockedWordsFilter(SafetyFilterInterface):

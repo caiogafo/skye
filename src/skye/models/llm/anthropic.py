@@ -27,12 +27,14 @@ Example:
 
 import asyncio
 from collections.abc import Iterator
+import json
 from datetime import datetime, timezone
 from typing import Any
 
 from skye.base.completion import CompletionRequest, CompletionResponse, StreamChunk, TokenUsage
 from skye.base.messages import AssistantMessage
 from skye.models.base import BaseModelProvider
+from skye.models.transport.structured import STRUCTURED_TOOL, schema_of
 from skye.models.transport import rest
 
 # Import CapabilityCall for capability call extraction
@@ -130,6 +132,14 @@ class AnthropicProvider(BaseModelProvider):
                 )
             else:
                 content: str | list[dict[str, Any]] = msg.content
+                images = getattr(msg, "images", None)
+                if images:
+                    from skye.models.transport.multimodal import ImageHandler
+
+                    content = [
+                        *(ImageHandler.to_anthropic_format(image) for image in images),
+                        {"type": "text", "text": msg.content},
+                    ]
                 if isinstance(msg, AssistantMessage) and msg.capability_calls:
                     content = [
                         {
@@ -211,7 +221,7 @@ class AnthropicProvider(BaseModelProvider):
         
         capability_calls = []
         for content_block in response.content:
-            if content_block.type == "tool_use":
+            if content_block.type == "tool_use" and content_block.name != STRUCTURED_TOOL:
                 capability_calls.append(
                     CapabilityCall(
                         id=content_block.id,
@@ -302,6 +312,17 @@ class AnthropicProvider(BaseModelProvider):
                     # Already formatted tool choice
                     anthropic_request["tool_choice"] = request.capability_choice
         
+        # Structured output: no native mode, so the answer is forced through one tool (function calling)
+        if request.response_schema and not request.capabilities:
+            anthropic_request["tools"] = [
+                {
+                    "name": STRUCTURED_TOOL,
+                    "description": f"Return the answer as a {request.response_schema.__name__}.",
+                    "input_schema": schema_of(request.response_schema),
+                }
+            ]
+            anthropic_request["tool_choice"] = {"type": "tool", "name": STRUCTURED_TOOL}
+
         # Provider-specific metadata
         if request.metadata:
             for key, value in request.metadata.items():
@@ -326,6 +347,9 @@ class AnthropicProvider(BaseModelProvider):
         for content_block in response.content:
             if content_block.type == "text":
                 content_text += content_block.text
+            elif content_block.type == "tool_use" and content_block.name == STRUCTURED_TOOL:
+                # The structured answer: its input is the JSON the declared schema describes
+                content_text = json.dumps(self._plain(content_block.input))
             elif content_block.type == "tool_use":
                 # Store in metadata for compatibility
                 capability_calls_metadata.append({

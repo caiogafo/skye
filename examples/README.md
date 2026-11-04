@@ -299,7 +299,7 @@ Provider by provider versions of multimodal inputs, structured outputs and funct
 
 ```python
 import skye
-from skye.base.messages import UserMessage
+from skye import UserMessage
 
 client = skye.provider("openai", api_key="sk-...")
 
@@ -315,7 +315,7 @@ print(response.content)
 
 ```python
 import skye
-from skye.base.messages import UserMessage
+from skye import UserMessage
 
 client = skye.provider("openai", api_key="sk-...")
 

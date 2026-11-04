@@ -34,7 +34,7 @@ One call creates the client of a provider, in the style of `boto3.client`:
 
 ```python
 import skye
-from skye.base.messages import UserMessage
+from skye import UserMessage
 
 client = skye.provider("openai", api_key="sk-...")
 response = client.complete(messages=[UserMessage(content="Hello!")], model="gpt-4")

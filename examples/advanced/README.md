@@ -88,7 +88,7 @@ All of them create the client with one call, `skye.provider(name, **config)`.
 ### Multimodal Processing
 
 ```python
-from skye.base.messages import UserMessage
+from skye import UserMessage
 
 message = UserMessage(content="What's in this image?", images=["https://example.com/image.jpg"])
 response = client.complete(messages=[message], model="gpt-4o")
@@ -97,9 +97,10 @@ response = client.complete(messages=[message], model="gpt-4o")
 ### Structured Outputs
 
 ```python
-from pydantic import BaseModel
+from skye.data import Validated, validated
 
-class Person(BaseModel):
+@validated
+class Person(Validated):
     name: str
     age: int
 
@@ -137,7 +138,7 @@ asyncio.run(main())
 ## Error Handling
 
 ```python
-from skye.base.exceptions import ProviderError, SkyeError, ValidationError
+from skye import ProviderError, SkyeError, ValidationError
 
 try:
     response = client.complete(messages=[...], model="gpt-4")

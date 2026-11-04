@@ -13,8 +13,8 @@ It shows the two provider-agnostic content shapes in ``skye.base``:
 """
 
 import skye  # noqa: F401  (imported so the example reads like user code)
-from skye.base.completion import StreamChunk
-from skye.base.messages import ContentChunk
+from skye import StreamChunk
+from skye.messages import ContentChunk
 
 
 def inspect_content_chunk() -> None:

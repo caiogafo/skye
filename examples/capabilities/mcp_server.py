@@ -17,7 +17,7 @@ Example MCP servers you can use:
 import os
 import asyncio
 import skye
-from skye.base.messages import UserMessage
+from skye import UserMessage
 from skye.tools import MCPCapability
 
 

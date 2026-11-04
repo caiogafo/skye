@@ -8,7 +8,7 @@ capability-invoke pairs, no client needed.
 
 from typing import Any
 
-from skye.base.interfaces.event_handler import EventHandlerInterface
+from skye.interfaces import EventHandlerInterface
 
 
 class BufferingExporter(EventHandlerInterface):

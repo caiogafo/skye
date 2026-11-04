@@ -14,7 +14,7 @@ import asyncio
 import tempfile
 from pathlib import Path
 
-from skye.base.exceptions import MissingExtraError
+from skye import MissingExtraError
 from skye.store import (
     DynamoDBBackend,
     FileSystemBackend,

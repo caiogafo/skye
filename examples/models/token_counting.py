@@ -11,7 +11,7 @@ offline harness, so ``TokenCounter`` falls back to its standard-library approxim
 """
 
 import skye  # noqa: F401  (imported so the example reads like user code)
-from skye.base.messages import SystemMessage, UserMessage
+from skye import SystemMessage, UserMessage
 from skye.models import TokenCounter
 
 

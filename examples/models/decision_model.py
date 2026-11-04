@@ -13,8 +13,8 @@ rejected with a Skye error.
 import asyncio
 from collections.abc import Sequence
 
-from skye.base.exceptions import ValidationError
-from skye.base.interfaces.decision import DecisionModel, DecisionResult
+from skye import ValidationError
+from skye.interfaces import DecisionModel, DecisionResult
 
 
 class FirstOptionDecider:

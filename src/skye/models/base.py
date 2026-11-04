@@ -47,6 +47,7 @@ from skye.base.interfaces.model import ModelInterface
 from skye.base.interfaces.vector_encoder import VectorEncoderInterface
 from skye.base.health import HealthMetrics
 from skye.models.transport.retry import with_retry
+from skye.models.transport.structured import parse_structured
 
 
 class BaseModelProvider(ModelInterface, ABC):
@@ -590,22 +591,14 @@ class BaseModelProvider(ModelInterface, ABC):
     def _parse_structured_output(request: CompletionRequest, response: CompletionResponse) -> None:
         """Validate the text of the response against the declared output schema and attach the result.
 
-        The REST adapters return plain JSON text (no SDK ``parsed`` field), so the shape is checked here, once, for every provider.
+        The REST adapters return plain JSON text (no SDK ``parsed`` field), so the shape is checked here, once, for every provider;
+        the schema is a dataclass, or any class with ``model_validate_json``.
         A result that does not conform raises ``ValidationError`` naming the field (Requirement 27.2); it is not retried.
         """
         schema = getattr(request, "response_schema", None)
         if schema is None or response.structured_output is not None or not response.content:
             return
-        try:
-            response.structured_output = schema.model_validate_json(response.content)
-        except Exception as e:
-            errors = e.errors() if hasattr(e, "errors") else []
-            field = ".".join(str(part) for part in errors[0]["loc"]) if errors and errors[0].get("loc") else "response_schema"
-            raise ValidationError(
-                f"The response does not conform to {getattr(schema, '__name__', schema)}: {e}",
-                field=field,
-                value=response.content,
-            ) from e
+        response.structured_output = parse_structured(schema, response.content)
 
     @with_retry(max_retries=3, min_wait=4, max_wait=10, multiplier=1)
     def _complete_with_retry(self, request: CompletionRequest) -> CompletionResponse:
@@ -618,6 +611,9 @@ class BaseModelProvider(ModelInterface, ABC):
             provider_request = self._transform_request(request)
             provider_response = self._call_provider(provider_request)
             return self._transform_response(provider_response)
+        except ValidationError:
+            # The caller's input is wrong: retrying cannot fix it, so it is not wrapped as a provider failure.
+            raise
         except Exception as e:
             # Get provider name from model info if available
             provider_name = "unknown"
@@ -626,9 +622,13 @@ class BaseModelProvider(ModelInterface, ABC):
             except Exception:
                 pass
             
+            # Keep the HTTP status the transport saw: callers (router, health) tell an
+            # authentication failure from a rate limit by it.
+            status_code = e.details.get("status_code") if isinstance(e, ProviderError) else None
             raise ProviderError(
                 f"Provider call failed: {str(e)}",
                 provider=provider_name,
+                status_code=status_code,
                 original_error=str(e),
                 error_type=type(e).__name__
             ) from e

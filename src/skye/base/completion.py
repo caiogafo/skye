@@ -251,7 +251,7 @@ class CompletionRequest(Validated):
     # MCP server configurations (requires skyeai[mcp])
     mcp_servers: list[dict[str, Any]] | None = None
     response_format: dict[str, Any] | None = None
-    response_schema: type | None = None  # a class with model_validate_json (for example a pydantic model); base never imports pydantic
+    response_schema: type | None = None  # a dataclass (the standard); a user's pydantic model also works; base imports neither
     metadata: dict[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:

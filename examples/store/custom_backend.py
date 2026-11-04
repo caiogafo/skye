@@ -8,7 +8,7 @@ one would go. This example backs it with a plain dict to keep the focus on the s
 import asyncio
 from typing import Any
 
-from skye.base.interfaces import StorageBackend
+from skye.interfaces import StorageBackend
 
 
 class DictBackend(StorageBackend):

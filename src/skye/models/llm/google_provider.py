@@ -41,6 +41,7 @@ from skye.auth.google import resolve_google_auth
 from skye.base.completion import CapabilityCall, CompletionRequest, CompletionResponse, StreamChunk, TokenUsage
 from skye.base.interfaces.authentication import AuthenticationInterface
 from skye.models.base import BaseModelProvider
+from skye.models.transport.structured import schema_instruction
 from skye.models.transport import rest
 from skye.models.transport.rest import JsonObject, wrap
 
@@ -172,6 +173,11 @@ class GoogleProvider(BaseModelProvider):
                 # Map assistant to model for Google
                 role = "model" if msg.role == "assistant" else msg.role
                 parts: list[dict[str, Any]] = [{"text": msg.content}]
+                images = getattr(msg, "images", None)
+                if images:
+                    from skye.models.transport.multimodal import ImageHandler
+
+                    parts = [*(ImageHandler.to_google_format(image) for image in images), *parts]
 
                 if isinstance(msg, AssistantMessage) and msg.capability_calls:
                     parts = [
@@ -276,6 +282,10 @@ class GoogleProvider(BaseModelProvider):
             "contents": contents,
             "generationConfig": generation_config,
         }
+        if request.response_schema:
+            # JSON mode plus the schema in the instructions (no schema dialect to translate)
+            generation_config["responseMimeType"] = "application/json"
+            system_parts = [*system_parts, {"text": schema_instruction(request.response_schema)}]
         if system_parts:
             google_request["systemInstruction"] = {"parts": system_parts}
 

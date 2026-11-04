@@ -11,7 +11,7 @@ This version demonstrates:
 import asyncio
 import os
 import skye
-from skye.base.messages import UserMessage, SystemMessage
+from skye import UserMessage, SystemMessage
 
 
 def basic_completion():
@@ -131,7 +131,7 @@ Use RouterRegistry for load balancing across deployments:
 ```python
 import skye
 import skye.router as rt
-from skye.base.messages import UserMessage
+from skye import UserMessage
 
 # Define load balancing setup
 registry = rt.RouterRegistry([

@@ -1,0 +1,7 @@
+{
+  "task_id": "task-example-coverage",
+  "task_description": "Write ~24 new Skye example scripts (plus examples/README.md entries) so the owner can validate the framework's public interface. Every example runs offline and green under tests/examples (fake network, no optional libs). Ground truth is src/skye, not the report prose. New examples use the current explicit-path import style (import skye + from skye.base.messages import UserMessage). Examples whose public API does not exist in src yet are written against the intended Port-level interface with a top-of-file docstring and a guarded early return; never invent a fake API. Do NOT touch the stale prompts/ set, the pydantic structured-output files, or examples/providers/router_example.py.",
+  "status": "completed",
+  "feature_order": ["FEAT-001", "FEAT-002", "FEAT-003", "FEAT-004", "FEAT-005"],
+  "blocked_reason": null
+}

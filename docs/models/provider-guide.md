@@ -39,7 +39,7 @@ pip install skyeai[all-providers]
 
 ```python
 import skye
-from skye.base.messages import UserMessage
+from skye import UserMessage
 
 # Create provider client
 client = skye.provider("openai", api_key="sk-...")
@@ -57,7 +57,7 @@ print(response.content)
 
 ```python
 import skye
-from skye.base.messages import UserMessage
+from skye import UserMessage
 
 client = skye.provider("anthropic", api_key="sk-ant-...")
 
@@ -71,7 +71,7 @@ response = client.complete(
 
 ```python
 import skye
-from skye.base.messages import UserMessage
+from skye import UserMessage
 
 # Works with or without boto3 installed
 # Bedrock needs no boto3: the REST call and the SigV4 signature use the standard library
@@ -87,7 +87,7 @@ response = client.complete(
 
 ```python
 import skye
-from skye.base.messages import UserMessage
+from skye import UserMessage
 
 client = skye.provider(
     "azure",
@@ -106,7 +106,7 @@ response = client.complete(
 
 ```python
 import skye
-from skye.base.messages import UserMessage
+from skye import UserMessage
 
 client = skye.provider(
     "google",
@@ -173,7 +173,7 @@ embeddings = await embedder.aencode_batch(["text1", "text2"])
 
 ```python
 import skye
-from skye.base.messages import UserMessage
+from skye import UserMessage
 
 client = skye.provider("openai", api_key="sk-...")
 
@@ -218,11 +218,12 @@ response = client.complete(
 ## Structured Outputs
 
 ```python
-from pydantic import BaseModel
 import skye
-from skye.base.messages import UserMessage
+from skye import UserMessage
+from skye.data import Validated, validated
 
-class Person(BaseModel):
+@validated
+class Person(Validated):
     name: str
     age: int
     occupation: str
@@ -246,7 +247,7 @@ print(f"{person.name} is {person.age} years old")
 
 ```python
 import skye
-from skye.base.messages import UserMessage
+from skye import UserMessage
 
 client = skye.provider("openai", api_key="sk-...")
 
@@ -262,7 +263,7 @@ for chunk in client.stream(
 ```python
 import asyncio
 import skye
-from skye.base.messages import UserMessage
+from skye import UserMessage
 
 async def main():
     client = skye.provider("openai", api_key="sk-...")

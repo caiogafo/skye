@@ -11,9 +11,9 @@ last_updated: 2026-11-02
 The router is the main entry point for load balancing across multiple providers and deployments:
 
 ```python
-from skye.base.messages import UserMessage
+from skye import UserMessage
 from skye.router import ModelRouter, ModelTarget, RouteConfig
-from skye.base.interfaces.router import RoutingStrategy
+from skye.router import RoutingStrategy
 
 # Create router with multiple targets for an alias
 router = ModelRouter(routes=[

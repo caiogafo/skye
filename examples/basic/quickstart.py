@@ -9,7 +9,7 @@ Set one of: OPENAI_API_KEY, ANTHROPIC_API_KEY, or AWS credentials for Bedrock.
 import os
 
 import skye
-from skye.base.messages import UserMessage
+from skye import UserMessage
 
 
 def main() -> None:

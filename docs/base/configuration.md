@@ -80,7 +80,7 @@ models:
 
 ```python
 from pathlib import Path
-from skye.base.config import ConfigLoader
+from skye.config import ConfigLoader
 
 config = ConfigLoader.load(
     config_path=Path("skye.yaml"),

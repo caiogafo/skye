@@ -95,12 +95,14 @@ Written without the project name (it is being chosen); `<pkg>` is the import pac
 5. THE limits SHALL live in `budgets.toml`, read identically by `make budget-fast`, `make budget` and the workflow `.github/workflows/budgets.yml`; THE workflow SHALL run `tests/budget` on every pull request and fail on a breach; THE budgets SHALL only go down, and a change to a limit SHALL be an explicit, reviewed edit.
 6. THE extras `teams` and `flows` SHALL exist as optional-dependency groups recorded in `budgets.toml`, SHALL be independent of each other (installing one excludes every library unique to the other), SHALL declare no third-party library and no compiled package until one is needed and be listed in `known_empty`; WHEN one is added, THE declaration SHALL equal the import and THE extra SHALL leave `known_empty` in the same change; THE core SHALL work with neither installed.
 7. THE lists `known_leaks` and `known_import_failures` SHALL be empty; WHILE an entry exists, THE tests SHALL warn naming it, and IF a listed entry starts working again, THEN THE tests SHALL fail.
-8. THE top-level package SHALL re-export only messages, completion, exceptions, config and the function `provider` (Requirement 9.11), none of which imports an optional or provider library when `import <pkg>` runs.
+8. THE top-level package SHALL re-export only the names and facades of Requirement 7.14 (including the function `provider`, Requirement 9.11), none of which imports an optional or provider library when `import <pkg>` runs.
 9. THE cold start of the library, measured in a fresh interpreter as `import <pkg>`, importing the router, building a router with one target and building one request, without network, SHALL stay within `max_cold_start_ms` of `budgets.toml` (best of five runs), a limit compatible with serverless (a thin Python function starts in 100 to 300 ms and an init of 500 to 2000 ms is usually acceptable for an LLM application); IF it is exceeded, THEN `tests/budget/test_cold_start.py` SHALL fail.
 10. THE budgets (size, import time, cold start) SHALL be verified for the standard installation, that is the core with no extra; THE standard installation SHALL work without any optional library (a provider SDK, `fastmcp`, `tiktoken`, `asyncpg`, `pyyaml`), and no optional library SHALL be installed or imported unless the user asks for it with an extra.
 11. THE sizes SHALL be measured on Linux x86_64, the platform of the pull-request runner and of the serverless target, where the compiled wheels are larger than on a laptop, and THE limits of `budgets.toml` SHALL apply to that measure; EACH extra SHALL have its own budget, measured in its own environment, and a heavy extra SHALL weigh only on who installs it.
 12. AN extra SHALL contain only the libraries that the feature it names needs; IF an extra bundles a library that its feature does not use (for example a database driver for a backend that the user did not ask for), THEN that library SHALL move to an extra of its own or be removed, and a library that only an optional file format needs (YAML) SHALL be in an extra, not in the core.
-13. AN extra SHALL be named after what it enables and SHALL NOT be named after a provider whose SDK it does not install: each provider has a built-in REST adapter (Requirement 9.3), so an extra named after a provider SHALL declare no library, and the extra for exact token counting SHALL be named for that function (open decision O22).
+13. AN extra SHALL be named after what it enables and SHALL NOT be named after a provider whose SDK it does not install: each provider has a built-in REST adapter (Requirement 9.3), so an extra named after a provider SHALL declare no library, and the extra for exact token counting SHALL be named for that function (`tokens`, decision D33).
+14. A PUBLIC import path SHALL have at most two levels (`skye.<name>`) and SHALL NOT go through `skye.base` or into a module inside a component: the commonest names come from `skye`, the Ports from `skye.interfaces`, the validated-dataclass tools from `skye.data`, and `skye.messages`, `skye.completion`, `skye.exceptions` and `skye.config` are the public paths of those modules of `base`; THE examples and the documentation SHALL use only those paths (decision D34).
+15. A FACADE (`skye.interfaces`, `skye.data`, `skye.messages`, `skye.completion`, `skye.exceptions`, `skye.config`) SHALL only re-export: it SHALL contain no logic and no name that its source module does not define, and a name SHALL be added to a facade only after it exists in its source (decision D34).
 
 ### Requirement 8: Codenames
 
@@ -198,13 +200,15 @@ Written without the project name (it is being chosen); `<pkg>` is the import pac
 #### Acceptance Criteria
 
 1. THE requirements, the high-level design and the decisions SHALL live only in `10-requirements.md`, `11-design.md` and `12-decisions.md`.
-2. EACH component SHALL have exactly one spec, named `<n>-<layer>-<scope>` (`.kiro/specs/<n>-<layer>-<scope>/`, the layer from Requirement 2.1 and the component as the scope); the cross-cutting work SHALL live in the one spec `.kiro/specs/0-base-structure/`, at layer 0 with `0-base-base` and `0-base-auth`. EACH spec has `requirements.md` (Kiro format: its user stories as `### Requirement N:` blocks, each criterion being a pointer `THE spec SHALL realize Requirement N.k of #[[file:.kiro/steering/10-requirements.md]]`, never a copied rule), `design.md` (detailed design, opening with a `Builds on:` line that cites the sections and components of `11-design.md`) and `tasks.md` (the only place for tasks, each citing the requirements it satisfies).
+2. EACH component SHALL have exactly one spec, named `<n>-<layer>-<scope>` (`.kiro/specs/<n>-<layer>-<scope>/`, the layer from Requirement 2.1 and the component as the scope); the cross-cutting work SHALL live in two specs, both at layer 0 with `0-base-base` and `0-base-auth`: `.kiro/specs/0-base-structure/` (structure, base contracts, consolidation, documentation wiki) and `.kiro/specs/0-base-uxui/` (the public surface a user touches: import paths, names, Port contracts, examples and docstrings; decision D35). EACH spec has `requirements.md` (Kiro format: its user stories as `### Requirement N:` blocks, each criterion being a pointer `THE spec SHALL realize Requirement N.k of #[[file:.kiro/steering/10-requirements.md]]`, never a copied rule), `design.md` (detailed design, opening with a `Builds on:` line that cites the sections and components of `11-design.md`) and `tasks.md` (the only place for tasks, each citing the requirements it satisfies).
 3. WHEN a new spec needs a requirement that no existing one covers, THE requirement SHALL be added here, in Kiro format with the next number, and the spec SHALL cite it; existing numbers SHALL NOT be renumbered.
 4. WHEN a requirement changes, THE change SHALL be made here with a decision-log line, and a milestone SHALL be added to each component that cites it.
 5. THE documentation SHALL be a wiki with one section per component, a glossary and `docs/index.md`; IF a page lacks front matter, has a broken link or is unreachable from the index, THEN THE docs test SHALL fail.
 6. THE `README.md` SHALL be a short entry (what the library is, install, quick start, links into the wiki), and every other explanation SHALL live in the wiki.
 7. THE glossary page SHALL map each codename to its plain component name and role, list the two documentation-only watermarks apart from the 15, and state the contrast between `auth` (authentication) and `policy` (authorization).
 8. THE steering files SHALL reflect the current code (package structure, naming conventions, configuration patterns with YAML examples, and examples that exist).
+9. THE example in the package docstring and the example in each Port docstring SHALL be run by a test (calls that need the network skipped), so that an attribute or a call that does not exist cannot appear in the first text a user reads.
+10. THE documentation SHALL hold one page that lists every kind of extension (the Port to implement, the registry to register it in, the example file, and whether the Port has an implementation yet), derived from "Extension points" of `11-design.md`.
 
 ### Requirement 16: Interfaces and the standard response
 
@@ -217,6 +221,10 @@ Written without the project name (it is being chosen); `<pkg>` is the import pac
 3. THE library SHALL let plugins be registered and discovered dynamically.
 4. THE library SHALL return every completion in one standard format with message content, role, metadata, token usage, model identifier and provider, and SHALL normalize provider-specific response fields to that schema.
 5. WHEN streaming is enabled, THE library SHALL yield response chunks in one standard format.
+6. A Port SHALL describe the call its users make: each method SHALL have the parameter names, the `def` or `async def` form and the return type of the implementations, and an asynchronous stream SHALL be typed `AsyncIterator`; IF a Port and an implementation differ, THEN the difference is a defect of one of them and SHALL NOT be hidden by `type: ignore`.
+7. THE compliance check of Requirement 16.2 SHALL compare, for every method, the parameter names and kinds and the `def` or `async def` form, for abstract base classes and for `Protocol` Ports alike, and ONE test SHALL run every built-in implementation through it.
+8. EVERY Port docstring SHALL state its error contract: what it raises (a `SkyeError` subclass), what it returns when something is missing, whether it may be called from several threads or tasks, and, for hooks and observers, that their exceptions are logged and swallowed.
+9. A Port that has no implementation and no test SHALL NOT be exported until a component needs it, and a Port with many methods SHALL be split by role so that a caller takes only the part it uses.
 
 ### Requirement 17: Router and model configuration
 
@@ -279,6 +287,10 @@ Written without the project name (it is being chosen); `<pkg>` is the import pac
 
 1. THE library SHALL use "Capability" in type names, variable names, documentation and prompts for what an LLM can invoke, and not "Tool".
 2. WHEN the capability-related code is scanned, THE result SHALL show no "Tool" terminology, except the MCP wire terms and the folder `tools`.
+3. THE glossary SHALL state once that capability, tool and function call name the same thing, and that a Port is a class named `*Interface`, with the documented exceptions `Runnable`, `DecisionModel` and `StorageBackend`.
+4. A PUBLIC name SHALL be defined once and any other path SHALL re-export it; a new public class SHALL NOT reuse the name of another public class, and a test SHALL fail on a public name defined twice in the library.
+5. A name SHALL say what a user does or has: verbs for actions and nouns for things, the synchronous and asynchronous forms being `x` and `ax`, `get_x` reading one thing, `list_x` many, `set_x` configuring and `register` adding.
+6. A file SHALL be named after the one idea in it (a provider file `<provider>.py`, an embeddings file `<provider>_embeddings.py`), and a new public module or package SHALL have one short name.
 
 ### Requirement 23: Tests
 
@@ -299,6 +311,11 @@ Written without the project name (it is being chosen); `<pkg>` is the import pac
 1. THE examples SHALL be organized by feature category, each with a README.
 2. THE examples SHALL demonstrate every capability type, YAML router configuration and every supported provider.
 3. THE examples SHALL create a client with `<pkg>.provider(name, **config)` (Requirement 9.11), and WHEN the examples change or the library changes, a test SHALL run every example offline against a fake network and fail on an uncaught exception or on a failure that an example prints.
+4. EVERY example SHALL run with no key and no network, print a result and never end in a traceback; WHERE a real service is needed, THE example SHALL say so and show what the output looks like.
+5. EACH example SHALL teach one idea in about 80 lines or fewer, SHALL NOT be an empty file, and a second example of the same idea SHALL replace the first.
+6. EVERY `pip install` line in the examples, the documentation and the `README.md` SHALL name an extra that exists and declares a library, and SHALL state that the base install is enough for every provider; a test SHALL fail otherwise.
+7. THE examples SHALL print plain section titles and aligned labels, with no banner and no row of emoji.
+8. EACH example folder SHALL have a short README (what the reader learns, the command, what appears, what is needed) that lists exactly the files of the folder, and `examples/README.md` SHALL number a reading order; a test SHALL fail when a README and its folder disagree.
 ### Requirement 25: Embeddings
 
 **User Story:** As a developer building retrieval, I want embedding adapters behind one Port, so that I can switch embedding models without changing my code.

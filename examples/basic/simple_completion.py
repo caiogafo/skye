@@ -12,11 +12,12 @@ Note: Set environment variables for API keys:
 - AWS credentials for Bedrock
 """
 
+import dataclasses
 import os
 import skye
-from pydantic import BaseModel
+from skye.data import Validated, validated
 
-from skye.base.messages import UserMessage, AssistantMessage, SystemMessage
+from skye import UserMessage, AssistantMessage, SystemMessage
 
 
 def basic_completion_example():
@@ -126,13 +127,14 @@ def structured_output_example():
         return
     
     # Define output schema
-    class Person(BaseModel):
+    @validated
+    class Person(Validated):
         name: str
         age: int
         occupation: str
     
     print(f"\nRequesting structured output with schema: {Person.__name__}")
-    print(f"  Fields: {list(Person.model_fields.keys())}")
+    print(f"  Fields: {[f.name for f in dataclasses.fields(Person)]}")
     
     try:
         response = client.complete(
@@ -184,7 +186,7 @@ def capability_message_example():
     print("Capability Message Example")
     print("=" * 60)
     
-    from skye.base.messages import CapabilityMessage
+    from skye import CapabilityMessage
     
     # Assistant calls a capability
     assistant_msg = AssistantMessage(

@@ -20,6 +20,7 @@ Example:
 from __future__ import annotations
 
 import dataclasses
+import enum
 import datetime as _dt
 import functools
 import json
@@ -224,6 +225,8 @@ def dump(value: Any) -> Any:
     """
     if dataclasses.is_dataclass(value) and not isinstance(value, type):
         return {f.name: dump(getattr(value, f.name)) for f in dataclasses.fields(value) if f.init}
+    if isinstance(value, enum.Enum):
+        return value.value
     if isinstance(value, Mapping):
         return {key: dump(item) for key, item in value.items()}
     if isinstance(value, (list, tuple)):
@@ -360,6 +363,13 @@ def _convert_arm(value: Any, tp: Any, path: str, lax: bool) -> Any:
         if isinstance(value, type):
             return value
         raise _RejectError("expected a class")
+    if isinstance(tp, type) and issubclass(tp, enum.Enum):
+        if isinstance(value, tp):
+            return value
+        try:
+            return tp(value)
+        except ValueError:
+            raise _RejectError(f"expected one of {[member.value for member in tp]}") from None
     if tp is str:
         if isinstance(value, str):
             return value
@@ -567,6 +577,8 @@ def _schema(tp: Any) -> dict[str, Any]:
         if len(args) == 2:
             schema["additionalProperties"] = _schema(args[1])
         return schema
+    if isinstance(tp, type) and issubclass(tp, enum.Enum):
+        return {"enum": [member.value for member in tp]}
     simple = {
         str: {"type": "string"},
         bool: {"type": "boolean"},

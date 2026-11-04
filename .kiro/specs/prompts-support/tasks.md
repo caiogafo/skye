@@ -39,6 +39,10 @@ The plan starts with interfaces, mocks, and samples to validate the user experie
   - Validate that the interface covers all intended use cases
   - Ensure all tests pass, ask the user if questions arise.
 
+- [ ] 3. Rewrite the stale `examples/prompts/` set off Jinja2 (D20, Requirement 30.9)
+  - Note: this whole spec (introduction, glossary, design, tasks above) is legacy pre-D20 and still describes a Jinja2 + pydantic builder; it is migrated in place when `prompts` is picked up (folder to be renamed `2-services-prompts`). Separately from that migration, the twelve files under `examples/prompts/` are stale: they refer to "Jinja2" features, use a `MockPromptBuilder` alias, and manipulate `sys.path`. Rewrite them against the standard-library engine (`{{ }}`, `if`/`elif`/`else`, `for`, filters; no macros, inheritance, include, or variable assignment per D20 / Requirement 30.9), drop the Jinja2 wording and the `MockPromptBuilder` alias, and import normally without `sys.path` hacks. Keep each runnable under `tests/examples`. Found 2026-11-03 in the example-coverage review (`.agents/tasks/example-coverage-gaps.md`).
+  - _Requirements: 24.2, 24.3, 30.9; D20_
+
 - [ ] 3. Implement template registry and caching system
   - [ ] 3.1 Create TemplateRegistry class with versioning support
     - Implement template storage with name:version keys

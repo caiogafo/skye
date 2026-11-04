@@ -13,8 +13,8 @@ Unified interface for all LLM providers:
 ```python
 from abc import ABC, abstractmethod
 from typing import Iterator
-from skye.base.completion import CompletionResponse, StreamChunk
-from skye.base.messages import SkyeMessage
+from skye import CompletionResponse, StreamChunk
+from skye.messages import SkyeMessage
 
 class ModelInterface(ABC):
     @abstractmethod
@@ -53,7 +53,7 @@ class ModelInterface(ABC):
 Define tools/functions that agents can use:
 
 ```python
-from skye.base.interfaces import CapabilityInterface, CapabilitySchema
+from skye.interfaces import CapabilityInterface, CapabilitySchema
 
 class WebSearchCapability(CapabilityInterface):
     def get_schema(self) -> CapabilitySchema:
@@ -79,7 +79,7 @@ class WebSearchCapability(CapabilityInterface):
 Store and retrieve agent memories:
 
 ```python
-from skye.base.interfaces import MemoryInterface
+from skye.interfaces import MemoryInterface
 from skye.memory import MemoryEntry
 
 class MyMemory(MemoryInterface):

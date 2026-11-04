@@ -13,7 +13,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any
 
-from skye.base.interfaces.memory import MemoryEntryLike, MemoryInterface
+from skye.interfaces import MemoryEntryLike, MemoryInterface
 
 
 @dataclass

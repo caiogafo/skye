@@ -9,7 +9,7 @@ needed.
 
 from typing import Any
 
-from skye.base.interfaces.observer import EventType, ObserverInterface
+from skye.interfaces import EventType, ObserverInterface
 
 
 class InMemoryObserver(ObserverInterface):

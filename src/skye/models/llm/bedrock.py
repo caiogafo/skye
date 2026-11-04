@@ -24,6 +24,8 @@ Example:
     >>> print(response.content)
 """
 
+import base64
+import json
 import asyncio
 import urllib.parse
 from collections.abc import Iterator
@@ -32,6 +34,7 @@ from typing import Any
 
 from skye.base.completion import CompletionRequest, CompletionResponse, StreamChunk, TokenUsage
 from skye.models.base import BaseModelProvider
+from skye.models.transport.structured import STRUCTURED_TOOL, schema_of
 from skye.models.transport import rest
 from skye.models.transport.eventstream import post_eventstream_json
 
@@ -139,6 +142,18 @@ class BedrockProvider(BaseModelProvider):
                 )
             else:
                 content: list[dict[str, Any]] = [{"text": msg.content}]
+                images = getattr(msg, "images", None)
+                if images:
+                    from skye.models.transport.multimodal import ImageHandler
+
+                    blocks = []
+                    for image in images:
+                        block = ImageHandler.to_bedrock_format(image)
+                        source = block["image"]["source"]
+                        # The REST body is JSON: bytes travel as base64 text.
+                        source["bytes"] = base64.b64encode(source["bytes"]).decode("ascii")
+                        blocks.append(block)
+                    content = [*blocks, {"text": msg.content}]
                 if isinstance(msg, AssistantMessage) and msg.capability_calls:
                     content = [
                         {
@@ -225,7 +240,7 @@ class BedrockProvider(BaseModelProvider):
         
         capability_calls = []
         for content_block in message.get("content", []):
-            if "toolUse" in content_block:
+            if "toolUse" in content_block and content_block["toolUse"]["name"] != STRUCTURED_TOOL:
                 tool_use = content_block["toolUse"]
                 
                 from skye.base.completion import CapabilityCall
@@ -299,6 +314,21 @@ class BedrockProvider(BaseModelProvider):
                         # Already formatted capability choice
                         bedrock_request["toolConfig"]["toolChoice"] = request.capability_choice
         
+        # Structured output: no native mode, so the answer is forced through one tool (function calling)
+        if request.response_schema and not request.capabilities:
+            bedrock_request["toolConfig"] = {
+                "tools": [
+                    {
+                        "toolSpec": {
+                            "name": STRUCTURED_TOOL,
+                            "description": f"Return the answer as a {request.response_schema.__name__}.",
+                            "inputSchema": {"json": schema_of(request.response_schema)},
+                        }
+                    }
+                ],
+                "toolChoice": {"tool": {"name": STRUCTURED_TOOL}},
+            }
+
         # Provider-specific metadata
         if request.metadata:
             for key, value in request.metadata.items():
@@ -333,6 +363,9 @@ class BedrockProvider(BaseModelProvider):
         for content_block in message.get("content", []):
             if "text" in content_block:
                 content += content_block["text"]
+            elif "toolUse" in content_block and content_block["toolUse"]["name"] == STRUCTURED_TOOL:
+                # The structured answer: its input is the JSON the declared schema describes
+                content += json.dumps(content_block["toolUse"]["input"])
             elif "toolUse" in content_block:
                 # Store in metadata for compatibility
                 tool_use = content_block["toolUse"]

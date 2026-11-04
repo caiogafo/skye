@@ -36,9 +36,11 @@ Add a file to the right group; do not invent a prefix. Keep the set small: merge
     `3-runtime-agents`, `3-runtime-teams`, `3-runtime-flows`.
   - No other prefix or suffix (no `-support`, `-engine`, `-runtime` as a suffix). Specs are never archived or deleted. Rename a folder with
     `git mv`, then fix every reference to its path.
-- **The one exception to "one spec per component" is `0-base-structure`**, the cross-cutting spec. It holds the work that belongs to no single
-  component: the system structure, the documentation wiki and the old consolidation work, all inside its own three files and with no subfolder.
-  Its tasks are numbered groups (group 10 is the wiki).
+- **The exception to "one spec per component" is two cross-cutting specs, not one.** `0-base-structure` holds the work that belongs to no
+  single component: the system structure, the documentation wiki and the old consolidation work. `0-base-uxui` holds the public surface a
+  user touches: import paths, names, Port contracts, examples and docstrings (decision D35; it was the folder `uxui` before). Both sit at
+  layer 0 beside `0-base-base` and `0-base-auth`, each inside its own three files with no subfolder. `0-base-structure`'s tasks are numbered
+  groups (group 10 is the wiki).
 - **Files** are exactly `requirements.md`, `design.md`, `tasks.md` (Kiro's three). No other file is a source of truth.
 - **Front matter** of each spec file: `component: <name>` (the component name, without the layer number) and `codename: <word>`; `previous_name: <old folder>` while a renamed spec still
   has that history.

@@ -109,7 +109,7 @@ class TokenCounter:
         if model not in cls._tokenizers:
             if model.startswith("gpt-") or model.startswith("o1-") or model.startswith("o3-"):
                 try:
-                    tiktoken = LazyImporter.import_module("tiktoken", install_extra="openai")
+                    tiktoken = LazyImporter.import_module("tiktoken", install_extra="tokens")
                     # Handle different model naming patterns
                     try:
                         cls._tokenizers[model] = tiktoken.encoding_for_model(model)

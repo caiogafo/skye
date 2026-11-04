@@ -232,6 +232,11 @@ The migration is done and was verified green on 2026-11-02. The only open work i
   - [ ] 14.3 Lower `core.max_installed_mb` and the cold-start limit in `budgets.toml` to the new measure, and empty `allowed_dependencies` and `known_compiled`. Budgets only go down.
     - _Requirements: 7.2, 7.9_
 
+- [x] 15. Short public import paths (D34)
+  - [x] 15.1 Add the public facades and rewrite the imports of the examples and the docs
+    - Evidence: `src/skye/interfaces.py`, `data.py`, `messages.py`, `completion.py`, `exceptions.py`, `config.py` (re-exports of `base`), the lazy names in `src/skye/__init__.py`, `RoutingStrategy` in `skye.router`, lazy exports in `skye.auth`; every import in `examples/`, `docs/` and `README.md` now has at most two levels and none goes through `skye.base`; `tests/budget/test_public_imports.py` fails on a deeper or `skye.base` path, and `tests/budget/test_import_matrix.py` counts the facades as `base`.
+    - _Requirements: 7.8, 7.14; D34_
+
 ## Requirement coverage
 
 This table uses the current numbering of `requirements.md` (local Requirements 1 to 49, the merged
@@ -336,7 +341,8 @@ Execution waves (tasks within a wave are independent and can run in parallel; a 
     { "id": 21, "tasks": ["12.1", "12.2", "12.3", "12.4"] },
     { "id": 22, "tasks": ["13.1", "13.2", "13.3", "13.4", "13.5"] },
     { "id": 23, "tasks": ["14.1", "14.2"] },
-    { "id": 24, "tasks": ["14.3"] }
+    { "id": 24, "tasks": ["14.3"] },
+    { "id": 25, "tasks": ["15.1"] }
   ]
 }
 ```

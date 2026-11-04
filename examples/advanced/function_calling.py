@@ -11,7 +11,7 @@ import asyncio
 import os
 
 import skye
-from skye.base.messages import UserMessage
+from skye import UserMessage
 from skye.tools import capability
 
 

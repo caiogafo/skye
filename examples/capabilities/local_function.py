@@ -20,7 +20,7 @@ import os
 import json
 import asyncio
 import skye
-from skye.base.messages import UserMessage, CapabilityMessage
+from skye import UserMessage, CapabilityMessage
 from skye.tools import capability
 
 

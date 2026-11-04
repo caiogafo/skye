@@ -8,8 +8,8 @@ Set OPENAI_API_KEY.
 
 import os
 
-from skye.base.interfaces.router import RoutingStrategy
-from skye.base.messages import UserMessage
+from skye.router import RoutingStrategy
+from skye import UserMessage
 from skye.router import FallbackConfig, ModelRouter, ModelTarget, RetryPolicyConfig, RouteConfig
 
 

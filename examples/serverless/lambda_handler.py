@@ -8,7 +8,7 @@ of a handler (written for AWS Lambda, but any serverless runtime works the same 
 import os
 
 import skye
-from skye.base.messages import UserMessage
+from skye import UserMessage
 
 # Created at cold start, reused by every warm invocation. Credentials come from the provider's standard variables.
 CLIENT = skye.provider("bedrock", region=os.getenv("AWS_REGION", "us-east-1"))

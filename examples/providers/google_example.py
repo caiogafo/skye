@@ -9,7 +9,7 @@ This version demonstrates:
 
 import os
 import skye
-from skye.base.messages import UserMessage, SystemMessage
+from skye import UserMessage, SystemMessage
 
 
 def basic_completion():
@@ -135,7 +135,7 @@ Example Cloud Run service using Skye with Google:
 
 ```python
 import skye
-from skye.base.messages import UserMessage
+from skye import UserMessage
 from flask import Flask, request, jsonify
 
 app = Flask(__name__)

@@ -12,8 +12,8 @@ Features shown:
 import os
 import base64
 from pathlib import Path
-from skye.base.completion import CompletionRequest
-from skye.base.messages import UserMessage
+from skye import CompletionRequest
+from skye import UserMessage
 import skye
 
 
@@ -282,8 +282,8 @@ Complete workflow for image analysis:
 
 ```python
 from pathlib import Path
-from skye.base.completion import CompletionRequest
-from skye.base.messages import UserMessage
+from skye import CompletionRequest
+from skye import UserMessage
 import skye
 
 # Initialize provider
@@ -329,9 +329,10 @@ response = client.complete(request)
 print("UI Elements:", response.content)
 
 # Step 3: Extract structured data
-from pydantic import BaseModel
+from skye.data import Validated, validated
 
-class UIElement(BaseModel):
+@validated
+class UIElement(Validated):
     name: str
     type: str
     location: str

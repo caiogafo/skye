@@ -14,7 +14,7 @@ without hardcoding credentials or deployment details in your code.
 import os
 from pathlib import Path
 
-from skye.base.messages import UserMessage
+from skye import UserMessage
 from skye.router import ModelRouter
 
 

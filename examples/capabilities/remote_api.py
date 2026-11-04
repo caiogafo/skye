@@ -19,9 +19,9 @@ import os
 import json
 import asyncio
 import skye
-from skye.base.messages import UserMessage, CapabilityMessage
+from skye import UserMessage, CapabilityMessage
 from skye.tools import RemoteAPICapability
-from skye.tools.schema import CapabilitySchema
+from skye.tools import CapabilitySchema
 
 
 def basic_remote_api_example():

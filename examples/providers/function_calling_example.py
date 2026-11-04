@@ -11,8 +11,8 @@ Features shown:
 
 import os
 import json
-from skye.base.completion import CompletionRequest
-from skye.base.messages import UserMessage, CapabilityMessage
+from skye import CompletionRequest
+from skye import UserMessage, CapabilityMessage
 import skye
 
 

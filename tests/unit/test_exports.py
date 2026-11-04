@@ -146,13 +146,19 @@ def test_interface_exports():
 
 
 CURATED = ["messages", "completion", "exceptions", "config"]
+# The commonest names, loaded lazily on first access (decision D34).
+LAZY_NAMES = {
+    "UserMessage", "SystemMessage", "AssistantMessage", "CapabilityMessage", "CompletionRequest", "CompletionResponse",
+    "StreamChunk", "TokenUsage", "SkyeError", "ProviderError", "ConfigurationError", "ValidationError", "MissingExtraError",
+}
 
 
 def test_all_exports_in_all_list():
-    """__all__ is the version, the four curated base modules and the lazy `provider` function (Requirement 7.8, decision D28)."""
+    """__all__ is the version, the four curated modules, the lazy `provider` function and the lazy common names (Requirement 7.8, decisions D28 and D34)."""
     from skye import __all__
 
-    assert __all__ == ["__version__", *CURATED, "provider"]
+    assert __all__[: 2 + len(CURATED)] == ["__version__", *CURATED, "provider"]
+    assert set(__all__[2 + len(CURATED):]) == LAZY_NAMES
 
 
 def test_curated_top_level_modules():
@@ -182,8 +188,7 @@ def test_removed_names_not_reexported():
     """Names re-exported before task 10.1 are no longer on the top-level package (`provider` came back as a lazy function, D28)."""
     import skye
 
-    for name in ["ModelRouter", "UserMessage", "SkyeError",
-                 "ConfigLoader", "ModelInterface", "MemoryInterface"]:
+    for name in ["ModelRouter", "ConfigLoader", "ModelInterface", "MemoryInterface"]:
         assert not hasattr(skye, name), name
 
 

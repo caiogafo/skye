@@ -15,7 +15,7 @@ Skye supports two ways to provide capabilities to the LLM:
 
 ```python
 import skye
-from skye.base.messages import UserMessage
+from skye import UserMessage
 from skye.tools import capability
 
 # Define capability using decorator

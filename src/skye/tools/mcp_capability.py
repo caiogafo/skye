@@ -178,7 +178,7 @@ class MCPCapability(CapabilityInterface):
 
         try:
             # Import FastMCP client (availability probe only; raises below if absent)
-            from fastmcp import FastMCP  # noqa: F401
+            from fastmcp import Client  # noqa: F401
 
             # Note: In a real implementation, this would use an actual MCP client
             # connection that was established when the tool was loaded from the server.

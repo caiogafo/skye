@@ -112,6 +112,13 @@ Three checks run on every import: no upward import; no import outside the compon
 `config_loader`, `plugin`, `capability`, `authorizer`, `authentication`. Every cross-component dependency crosses a Port,
 never a concrete implementation.
 
+A Port is a class named `*Interface` (exceptions: `Runnable`, `DecisionModel`, `StorageBackend`) and describes the call its users
+make (Requirement 16.6). Its docstring ends with a fixed footer: what it raises, what it returns when something is missing, whether
+several threads or tasks may call it, and, for hooks and observers, that their exceptions are logged and swallowed (Requirement 16.8).
+The compliance check compares every method by parameter names and kinds and by `def` or `async def`, for abstract bases and
+`Protocol`s alike, and one test runs every built-in implementation through it (Requirement 16.7). A Port that nothing implements
+and nothing tests is not exported (Requirement 16.9). Whether a Port is a `Protocol` or an abstract base is open decision O25.
+
 ## Composition
 `agents`, `teams`, `flows` compose each other and model adapters without importing each other, because each holds its children
 as `Runnable` references received from the caller. Model adapters implement `Runnable`, so a model is a step in a flow or a
@@ -144,8 +151,12 @@ wrapped errors keep the original message and stack. Configuration sources, in pr
 `${VAR}` is substituted; invalid values raise `ConfigurationError`. The Ports are listed in "Ports"; each performs no I/O.
 
 ## Public API and lazy imports
-`<pkg>/__init__.py` re-exports exactly `messages`, `completion`, `exceptions`, `config`, all in `base` and standard-library only, so
-`import <pkg>` never reaches an optional or provider library (Requirement 7.4, 7.8). Lazy loading uses the standard library
+A user-facing path has at most two levels and never goes through `<pkg>.base` or into a module inside a component (Requirement 7.14, D34).
+The public paths are thin facades that only re-export `base` (Requirement 7.15): `<pkg>` (the commonest names, resolved lazily),
+`<pkg>.interfaces` (every Port), `<pkg>.data` (`Validated`, `validated`, `field`), `<pkg>.messages`, `<pkg>.completion`,
+`<pkg>.exceptions`, `<pkg>.config`; each component package exports what its users need. All of it is standard-library only, so
+`import <pkg>` never reaches an optional or provider library (Requirement 7.4, 7.8). `tests/budget/test_public_imports.py` scans the
+examples, the documentation and the `README.md`. Lazy loading uses the standard library
 (`importlib`, module `__getattr__`) plus one thin helper in `base` that imports at first use and raises `MissingExtraError`
 (wrapping the `ImportError`, naming the extra). Each optional component imports its heavy library inside the function that first
 needs it. A breaking rename is acceptable while the version is 0.x and the migration is documented.
@@ -210,7 +221,10 @@ Only `tools/mcp_fastmcp.py` imports `fastmcp`; the built-in client is the defaul
 4. A clean top-level import pulls no forbidden library. 5. Extras declare exactly the imported libraries. 6. Codename invariants hold.
 7. A store backend lives in exactly one place. 8. An absent extra raises `MissingExtraError`. 9. `DecisionModel` probabilities are
 well-formed. 10. The transport and the adapters import no provider SDK or third-party HTTP client. 11. No import edge among
-`agents`, `teams`, `flows`. 12. `teams` and `flows` import neither `models` nor an orchestrator. 13. An added integration stays inside its owner.
+`agents`, `teams`, `flows`. 12. `teams` and `flows` import neither `models` nor an orchestrator. 13. An added integration stays inside its owner. 14. Examples, documentation and `README.md` import only from the public paths.
+15. No public class name is defined twice. 16. Every built-in implementation conforms to its Port by signature. 17. Every example runs
+offline, exits 0 and ends in no traceback, and every install line names a real extra. 18. The first docstring of the package and of
+each Port runs.
 
 ## Codename placement
 
@@ -229,4 +243,6 @@ Front matter of the spec and the docs section; one italic line under the section
 
 ## Testing
 Deterministic checks guard the architecture: the import matrix, the codename test, the extras footprint test, the clean-import test,
-the steering test, the no-old-name test, and the differential tests. A requirement that has no test names the reason.
+the steering test, the no-old-name test, the public-imports test, and the differential tests. The public surface adds the Port
+conformance test, the duplicate-name test, the example-quality tests (offline run, size, README against folder, install lines) and the
+docstring test (properties 14 to 18). A requirement that has no test names the reason.

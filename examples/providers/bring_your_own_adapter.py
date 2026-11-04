@@ -7,7 +7,7 @@ member of a team). No configuration, no environment variable, no registration.
 
 import asyncio
 
-from skye.base.interfaces.runnable import Runnable
+from skye.interfaces import Runnable
 
 
 class UppercaseModel:

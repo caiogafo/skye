@@ -114,7 +114,7 @@ max_compiled_over_core = 1
 max_over_core_mb = 15
 target_over_core_mb = 2
 
-[extras.openai]
+[extras.tokens]
 max_compiled_over_core = 4
 max_over_core_mb = 20
 target_over_core_mb = 4
@@ -123,6 +123,6 @@ target_over_core_mb = 4
 # from pyproject.toml and from this list. The test fails if an extra is empty and
 # not listed here, and if a listed extra stops being empty.
 [extras_policy]
-known_empty = ["agents", "guard", "observe", "prompts", "teams", "flows", "tools", "bedrock", "anthropic", "google", "cohere"]   # provider extras are empty: one built-in stdlib REST adapter each (Requirement 20); "observe" has no telemetry import yet. "tools" carries no third-party library: fastmcp lives in the separate "mcp" extra (Requirement 15).
+known_empty = ["agents", "guard", "observe", "prompts", "teams", "flows", "tools", "openai", "bedrock", "anthropic", "google", "cohere"]   # provider extras are empty: one built-in stdlib REST adapter each (Requirement 20); "observe" has no telemetry import yet. "tools" carries no third-party library: fastmcp lives in the separate "mcp" extra (Requirement 15).
 # Convenience bundles. They are not budgeted one by one: each member extra is.
 bundles = ["llm-providers", "embedding-providers", "all-providers", "providers", "all"]

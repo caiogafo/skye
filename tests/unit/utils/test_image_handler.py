@@ -58,7 +58,9 @@ class TestImageHandler:
         result = ImageHandler.process_image(image_bytes)
         
         assert result["type"] == "image_url"
-        assert result["image_url"]["url"].startswith("data:image/jpeg;base64,")
+        # The type is read from the bytes (PNG signature); unknown bytes are sent as JPEG
+        assert result["image_url"]["url"].startswith("data:image/png;base64,")
+        assert ImageHandler.process_image(b"\x00\x01")["image_url"]["url"].startswith("data:image/jpeg;base64,")
         
         # Verify base64 encoding
         base64_part = result["image_url"]["url"].split(",")[1]

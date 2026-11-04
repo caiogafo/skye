@@ -15,7 +15,7 @@ the examples harness treats as success, not a failure.
 import asyncio
 from dataclasses import dataclass, field
 
-from skye.base.interfaces.runnable import Runnable
+from skye.interfaces import Runnable
 
 
 class Trim:

@@ -12,11 +12,7 @@ web identity, a named profile, the ECS container endpoint, then EC2 instance met
 No secret values are printed, only the header names that authentication added.
 """
 
-from skye.auth.aws import (
-    AwsCredentials,
-    BedrockApiKeyAuthenticator,
-    SigV4Authenticator,
-)
+from skye.auth import AwsCredentials, BedrockApiKeyAuthenticator, SigV4Authenticator
 
 URL = "https://bedrock-runtime.us-east-1.amazonaws.com/"
 

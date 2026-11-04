@@ -15,7 +15,7 @@ free strings) and guard-return before any not-yet-existing teams call.
 import asyncio
 from dataclasses import dataclass
 
-from skye.base.interfaces.runnable import Runnable
+from skye.interfaces import Runnable
 
 
 class Researcher:

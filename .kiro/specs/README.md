@@ -23,7 +23,8 @@ component and is listed separately.
 | 14 | teams | front | requirements only | `3-runtime-teams/` |
 | 15 | flows | stream | requirements only | `3-runtime-flows/` |
 
-Cross-cutting (not a component): `0-base-structure` — system structure, the docs wiki and the old consolidation work.
+Cross-cutting (not a component): `0-base-structure` — system structure, the docs wiki and the old consolidation work; `0-base-uxui` — the
+public surface a user touches (import paths, names, Port contracts, examples, docstrings; decision D35, was `uxui`).
 
 Legacy specs: their requirements are migrated to the new format (steering requirements 29 to 48 and pointer criteria); `design.md` and `tasks.md` still hold the old content, and the folders keep the old names (`agent-runtime`, `gateway`, `policy-engine`, `prompts-support`) until they are renamed.
 

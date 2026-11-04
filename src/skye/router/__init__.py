@@ -92,6 +92,7 @@ from skye.router.config_models import (
     RouteConfig,
     UsageStats,
 )
+from skye.base.interfaces.router import RoutingStrategy
 from skye.router.model_router import ModelRouter
 from skye.base.interfaces import StorageBackend
 from skye.store.durable_function import DurableFunctionBackend
@@ -102,6 +103,7 @@ from skye.store.postgres import PostgreSQLBackend
 from skye.store.redis import RedisBackend
 
 __all__ = [
+    "RoutingStrategy",
     # Router
     "ModelRouter",
     # Configuration models

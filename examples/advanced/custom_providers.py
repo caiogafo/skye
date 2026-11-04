@@ -10,11 +10,11 @@ If you only need to wrap an SDK or a function, a ``Runnable`` is lighter: see ``
 from typing import Any
 
 import skye
-from skye.base.completion import CompletionResponse, StreamChunk, TokenUsage
-from skye.base.exceptions import SkyeError
-from skye.base.messages import UserMessage
-from skye.models.base import BaseModelProvider
-from skye.models.registry import ProviderRegistry
+from skye import CompletionResponse, StreamChunk, TokenUsage
+from skye import SkyeError
+from skye import UserMessage
+from skye.models import BaseModelProvider
+from skye.models import ProviderRegistry
 
 
 class ShoutProvider(BaseModelProvider):

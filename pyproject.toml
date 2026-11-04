@@ -14,11 +14,14 @@ dependencies = [
 [project.optional-dependencies]
 # Model providers: each has one built-in stdlib REST adapter (Requirement 20); vendor SDKs are
 # dev/test oracles only. The extras exist so `pip install skyeai[openai]` etc. keep working.
-openai = ["tiktoken>=0.5"]  # optional exact token counting for gpt-*/o1/o3 models; stdlib estimate otherwise
+openai = []
 anthropic = []
 bedrock = []  # SigV4 is in the stdlib (auth/sigv4.py); boto3 is not needed
 google = []
 cohere = []
+
+# Exact token counts for gpt-*/o1/o3 models (decision D33); the library falls back to a stdlib estimate when tiktoken is absent.
+tokens = ["tiktoken>=0.5"]
 
 # Individual components
 # auth: pure-Python RSA for RS256 (Google service-account JWT, Azure certificate assertion).
@@ -29,7 +32,7 @@ prompts = []  # empty extra: the template engine is standard library
 tools = []  # empty extra: a module of the core, no third-party libraries
 # mcp: fastmcp, the optional full-capability substitute for the built-in stdlib MCP client,
 # chosen only by create_mcp_client(target, impl="fastmcp") (Requirement 21).
-mcp = ["fastmcp>=2.0"]
+mcp = ["fastmcp-slim[client]>=4.0"]  # client only: full fastmcp also pulls the server stack (pyyaml, watchfiles, websockets, jsonref)
 memory = ["redis>=5.0"]
 postgres = ["asyncpg>=0.29"]  # the PostgreSQL store backend (compiled wheel)
 guard = []
@@ -42,7 +45,7 @@ llm-providers = ["tiktoken>=0.5"]
 embedding-providers = ["tiktoken>=0.5"]
 all-providers = ["tiktoken>=0.5"]
 providers = ["tiktoken>=0.5"]
-all = ["tiktoken>=0.5", "redis>=5.0", "asyncpg>=0.29", "fastmcp>=2.0", "rsa>=4.9", "pyyaml>=6.0"]
+all = ["tiktoken>=0.5", "redis>=5.0", "asyncpg>=0.29", "fastmcp-slim[client]>=4.0", "rsa>=4.9", "pyyaml>=6.0"]
 
 [dependency-groups]
 dev = [

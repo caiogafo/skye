@@ -9,7 +9,7 @@ Set MCP_SERVER_URL to the address of a server (default: http://localhost:8000/mc
 import asyncio
 import os
 
-from skye.tools.mcp_client import create_mcp_client
+from skye.tools import create_mcp_client
 
 
 async def main() -> None:

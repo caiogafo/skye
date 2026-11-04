@@ -15,7 +15,7 @@ between scripts, so this example registers under a script-local name with
 import asyncio
 
 from skye.agents import create_agent, list_agent_types, register_agent_type
-from skye.base.interfaces.runnable import Runnable
+from skye.interfaces import Runnable
 
 
 class EchoAgent:

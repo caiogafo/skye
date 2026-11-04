@@ -9,7 +9,7 @@ Every error line that is provoked on purpose contains the word ``Expected`` so t
 offline harness reads it as a deliberate demonstration rather than a real failure.
 """
 
-from skye.base.exceptions import ProviderError, SkyeError
+from skye import ProviderError, SkyeError
 
 
 def main() -> None:

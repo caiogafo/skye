@@ -11,8 +11,8 @@ Features shown:
 """
 
 import os
-from skye.base.messages import UserMessage
-from skye.base.interfaces.router import RoutingStrategy
+from skye import UserMessage
+from skye.router import RoutingStrategy
 from skye.router import ModelRouter, ModelTarget, RouteConfig
 
 

@@ -16,9 +16,9 @@ from skye.store import (
     FileSystemBackend,
     DurableFunctionBackend,
 )
-from skye.base.interfaces.router import RoutingStrategy
-from skye.base.completion import CompletionRequest
-from skye.base.messages import UserMessage
+from skye.router import RoutingStrategy
+from skye import CompletionRequest
+from skye import UserMessage
 
 
 def example_in_memory_storage():

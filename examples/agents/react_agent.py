@@ -13,7 +13,7 @@ public API. We guard-return before calling ``.invoke`` so the script stays green
 import asyncio
 
 from skye.agents import REACT, create_agent
-from skye.base.interfaces.runnable import Runnable
+from skye.interfaces import Runnable
 
 
 async def main() -> None:

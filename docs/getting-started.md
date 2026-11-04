@@ -33,22 +33,22 @@ Import by **component** name; there is no layer in the path.
 
 ```python
 # base re-exports (always available)
-from skye.base.completion import CompletionRequest, CompletionResponse
-from skye.base.messages import UserMessage, AssistantMessage
+from skye import CompletionRequest, CompletionResponse
+from skye import UserMessage, AssistantMessage
 
 # router (core)
 from skye.router import ModelRouter, ModelTarget
-from skye.base.interfaces.router import RoutingStrategy
+from skye.router import RoutingStrategy
 
-# providers (only with the matching extra installed; loaded lazily)
-from skye.models.llm import openai_compatible
+# provider classes (no extra needed: each provider has a built-in REST adapter)
+from skye.models import OpenAIProvider, AnthropicProvider
 ```
 
 ## First call
 
 ```python
 from skye.router import ModelRouter
-from skye.base.messages import UserMessage
+from skye import UserMessage
 
 router = ModelRouter.from_yaml("router_config.yaml")  # a YAML file needs the extra: pip install skyeai[yaml]
 response = router.complete(messages=[UserMessage(content="Hello!")], model="gpt-4")
@@ -100,8 +100,8 @@ optional library, only for what you ask for:
 | `memory` | the Redis store backend | redis |
 | `postgres` | the PostgreSQL store backend | asyncpg (compiled) |
 | `mcp` | the optional `fastmcp` client, chosen with `impl="fastmcp"` (the built-in client needs nothing) | fastmcp (heavy, compiled) |
-| `openai` | exact token counts for `gpt-*` models; it does not install the OpenAI SDK (the rename is open decision O22) | tiktoken (compiled) |
-| `anthropic`, `bedrock`, `google`, `cohere` | nothing: each provider has a built-in REST adapter; they exist so old install commands keep working | none |
+| `tokens` | exact token counts for `gpt-*`, `o1-*` and `o3-*` models (a standard-library estimate is used without it) | tiktoken (compiled) |
+| `openai`, `anthropic`, `bedrock`, `google`, `cohere` | nothing: each provider has a built-in REST adapter; they exist so old install commands keep working | none |
 | `agents`, `prompts`, `tools`, `guard`, `teams`, `flows`, `observe` | nothing: these components are part of the core | none |
 | `all` | all the libraries above | all of the above |
 
@@ -111,7 +111,7 @@ optional library, only for what you ask for:
 
 ```python
 import skye
-from skye.base.messages import UserMessage
+from skye import UserMessage
 
 # Create provider client (boto3-style)
 client = skye.provider("bedrock", region="us-east-1")
@@ -131,7 +131,7 @@ print(response.content)
 ```python
 import asyncio
 import skye
-from skye.base.messages import UserMessage
+from skye import UserMessage
 
 async def main():
     client = skye.provider("openai", api_key="sk-...")
@@ -150,7 +150,7 @@ asyncio.run(main())
 
 ```python
 import skye
-from skye.base.messages import UserMessage
+from skye import UserMessage
 
 client = skye.provider("openai", api_key="sk-...")
 
@@ -164,11 +164,12 @@ for chunk in client.stream(
 ### Structured Outputs
 
 ```python
-from pydantic import BaseModel
 import skye
-from skye.base.messages import UserMessage
+from skye import UserMessage
+from skye.data import Validated, validated
 
-class Person(BaseModel):
+@validated
+class Person(Validated):
     name: str
     age: int
     occupation: str

@@ -10,7 +10,7 @@ This version demonstrates:
 """
 
 import skye
-from skye.base.messages import UserMessage, SystemMessage
+from skye import UserMessage, SystemMessage
 
 
 def basic_completion():
@@ -102,7 +102,7 @@ def lambda_deployment_example():
     print("-" * 40)
     print("""
 import skye
-from skye.base.messages import UserMessage
+from skye import UserMessage
 
 # Initialize client once (reused across invocations)
 client = skye.provider("bedrock", region="us-east-1")
@@ -217,7 +217,7 @@ def router_example():
     
     try:
         from skye.router import ModelRouter, ModelTarget, RouteConfig
-        from skye.base.interfaces.router import RoutingStrategy
+        from skye.router import RoutingStrategy
         
         # Define multi-region setup with ModelRouter
         router = ModelRouter(

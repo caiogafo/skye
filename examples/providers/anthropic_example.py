@@ -10,7 +10,7 @@ This version demonstrates:
 
 import os
 import skye
-from skye.base.messages import UserMessage, SystemMessage
+from skye import UserMessage, SystemMessage
 
 
 def basic_completion():
@@ -130,7 +130,7 @@ Example:
 
 ```python
 import skye
-from skye.base.messages import SystemMessage, UserMessage
+from skye import SystemMessage, UserMessage
 
 client = skye.provider("anthropic", api_key="sk-ant-...")
 

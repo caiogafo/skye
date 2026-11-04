@@ -11,8 +11,8 @@ import os
 import time
 
 import skye
-from skye.base.completion import CompletionRequest
-from skye.base.messages import UserMessage
+from skye import CompletionRequest
+from skye import UserMessage
 
 
 def stream_sync(client) -> None:

@@ -6,7 +6,7 @@ The ``policy`` component is minimal, but the
 defines a tiny rule set and shows one permit and one forbid, no client needed.
 """
 
-from skye.base.interfaces.authorizer import AuthorizerInterface, Decision
+from skye.interfaces import AuthorizerInterface, Decision
 
 
 class RuleSetAuthorizer(AuthorizerInterface):

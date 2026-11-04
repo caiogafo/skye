@@ -13,14 +13,8 @@ exception name followed by a colon as a failure, so this example prints the clas
 name and message as separate, plainly-worded fields rather than in that form.
 """
 
-from skye.base.exceptions import (
-    CapabilityExecutionError,
-    ConfigurationError,
-    MissingExtraError,
-    ProviderError,
-    SkyeError,
-    ValidationError,
-)
+from skye import ConfigurationError, MissingExtraError, ProviderError, SkyeError, ValidationError
+from skye.exceptions import CapabilityExecutionError
 
 
 def _report(error: SkyeError) -> None:

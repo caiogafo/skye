@@ -9,7 +9,7 @@ yet, so this example shows the intended shape from real parts only — a
 before any not-yet-existing gateway call. No fake server API is invented.
 """
 
-from skye.base.interfaces.authorizer import AuthorizerInterface, Decision
+from skye.interfaces import AuthorizerInterface, Decision
 from skye.tools import CapabilityRegistry, capability
 
 

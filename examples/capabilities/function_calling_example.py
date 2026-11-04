@@ -18,9 +18,9 @@ import os
 import json
 import asyncio
 import skye
-from skye.base.messages import UserMessage, CapabilityMessage
+from skye import UserMessage, CapabilityMessage
 from skye.tools import capability
-from skye.tools.registry import CapabilityRegistry
+from skye.tools import CapabilityRegistry
 
 
 def basic_function_calling():

@@ -18,6 +18,7 @@ from pathlib import Path
 from typing import Union, Dict, Any
 
 from skye.base.exceptions import ValidationError
+from skye.base.messages import sniff_image_mime
 
 
 class ImageHandler:
@@ -87,9 +88,10 @@ class ImageHandler:
         
         elif isinstance(image_input, bytes):
             base64_image = base64.b64encode(image_input).decode("utf-8")
+            mime_type = ImageHandler._sniff_mime_type(image_input)
             return {
                 "type": "image_url",
-                "image_url": {"url": f"data:image/jpeg;base64,{base64_image}"}
+                "image_url": {"url": f"data:{mime_type};base64,{base64_image}"}
             }
         
         else:
@@ -99,6 +101,11 @@ class ImageHandler:
                 str(image_input)
             )
     
+    @staticmethod
+    def _sniff_mime_type(data: bytes) -> str:
+        """MIME type of raw image bytes from their first bytes (JPEG when unknown)."""
+        return sniff_image_mime(data)
+
     @staticmethod
     def _get_mime_type(extension: str) -> str:
         """Get MIME type from file extension.
@@ -225,4 +232,23 @@ class ImageHandler:
                         "source": {"bytes": base64.b64decode(data)}
                     }
                 }
+            raise ValidationError(
+                "Bedrock does not fetch image URLs: pass a file path, bytes or a data URI",
+                "image_input",
+                url,
+            )
         return processed
+
+    @staticmethod
+    def to_google_format(image_input: Union[str, Path, bytes]) -> Dict[str, Any]:
+        """Convert image to Google (Gemini) part format.
+
+        Inline data becomes ``{"inlineData": {"mimeType": ..., "data": <base64>}}``;
+        a URL becomes ``{"fileData": {"fileUri": ...}}``.
+        """
+        processed = ImageHandler.process_image(image_input)
+        url = processed["image_url"]["url"]
+        if url.startswith("data:"):
+            head, data = url.split(",", 1)
+            return {"inlineData": {"mimeType": head.split(";")[0].split(":")[1], "data": data}}
+        return {"fileData": {"fileUri": url}}

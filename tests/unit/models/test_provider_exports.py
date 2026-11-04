@@ -259,9 +259,10 @@ class TestProviderExports:
         # - 5 model providers
         # - 5 embedding providers
         # - 4 utilities
+        # - 1 decision model (Jev)
         # - 2 base classes
-        # Total: 17
-        expected_count = 17
+        # Total: 18
+        expected_count = 18
 
         assert len(__all__) == expected_count, f"Expected {expected_count} exports, got {len(__all__)}"
 

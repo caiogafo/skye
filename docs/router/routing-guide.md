@@ -35,9 +35,9 @@ from skye.router import (
     RetryPolicyConfig,
     AllowedFailsPolicyConfig,
 )
-from skye.base.interfaces.router import RoutingStrategy
-from skye.base.messages import UserMessage
-from skye.base.completion import CompletionRequest
+from skye.router import RoutingStrategy
+from skye import UserMessage
+from skye import CompletionRequest
 
 # Create provider instances
 gpt4 = skye.provider("openai", api_key=os.getenv("OPENAI_API_KEY"))
@@ -98,9 +98,9 @@ from skye.router import (
     FallbackConfig,
     RetryPolicyConfig,
 )
-from skye.base.interfaces.router import RoutingStrategy
-from skye.base.messages import UserMessage
-from skye.base.completion import CompletionRequest
+from skye.router import RoutingStrategy
+from skye import UserMessage
+from skye import CompletionRequest
 
 # Create router with aliases - providers instantiated automatically
 # All policies configured in constructor
@@ -215,7 +215,7 @@ anthropic_target = ModelTarget(
 
 ```python
 from skye.router import RouteConfig, ModelTarget
-from skye.base.interfaces.router import RoutingStrategy
+from skye.router import RoutingStrategy
 
 route = RouteConfig(
     alias="gpt-4",
@@ -320,7 +320,7 @@ for info in cooled_down:
 ## Routing Strategies
 
 ```python
-from skye.base.interfaces.router import RoutingStrategy
+from skye.router import RoutingStrategy
 
 # Available strategies:
 RoutingStrategy.ROUND_ROBIN        # Rotate through models

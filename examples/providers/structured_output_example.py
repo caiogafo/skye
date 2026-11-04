@@ -9,10 +9,11 @@ Features shown:
 - Type-safe responses
 """
 
+import dataclasses
 import os
-from pydantic import BaseModel, Field
-from skye.base.completion import CompletionRequest
-from skye.base.messages import UserMessage
+from skye.data import Validated, field, validated
+from skye import CompletionRequest
+from skye import UserMessage
 import skye
 
 
@@ -34,13 +35,14 @@ def basic_structured_output():
         return
     
     # Define output schema
-    class Person(BaseModel):
+    @validated
+    class Person(Validated):
         name: str
         age: int
         occupation: str
     
     print("\nSchema:")
-    print(f"  Fields: {list(Person.model_fields.keys())}")
+    print(f"  Fields: {[f.name for f in dataclasses.fields(Person)]}")
     print(f"  Types: name (str), age (int), occupation (str)")
     
     request = CompletionRequest(
@@ -87,12 +89,14 @@ def nested_schema():
         return
     
     # Define nested schema
-    class Address(BaseModel):
+    @validated
+    class Address(Validated):
         street: str
         city: str
         country: str
     
-    class Person(BaseModel):
+    @validated
+    class Person(Validated):
         name: str
         age: int
         address: Address
@@ -150,12 +154,14 @@ def list_extraction():
         return
     
     # Define schema with list
-    class Task(BaseModel):
+    @validated
+    class Task(Validated):
         title: str
         priority: str
         completed: bool
     
-    class TodoList(BaseModel):
+    @validated
+    class TodoList(Validated):
         tasks: list[Task]
     
     print("\nSchema:")
@@ -210,10 +216,11 @@ def field_validation():
         return
     
     # Define schema with validation
-    class Product(BaseModel):
-        name: str = Field(min_length=1, max_length=100)
-        price: float = Field(gt=0, le=10000)
-        rating: float = Field(ge=0, le=5)
+    @validated
+    class Product(Validated):
+        name: str = field(min_length=1, max_length=100)
+        price: float = field(gt=0, le=10000)
+        rating: float = field(ge=0, le=5)
         in_stock: bool
     
     print("\nSchema with validation:")
@@ -271,10 +278,11 @@ def enum_fields():
         NEGATIVE = "negative"
         NEUTRAL = "neutral"
     
-    class Review(BaseModel):
+    @validated
+    class Review(Validated):
         text: str
         sentiment: Sentiment
-        rating: int = Field(ge=1, le=5)
+        rating: int = field(ge=1, le=5)
     
     print("\nSchema:")
     print(f"  text: str")
@@ -323,7 +331,8 @@ def optional_fields():
     
     from typing import Optional
     
-    class Contact(BaseModel):
+    @validated
+    class Contact(Validated):
         name: str
         email: str
         phone: Optional[str] = None
@@ -377,7 +386,7 @@ def main():
         print("✅ All examples completed!")
         print("=" * 60)
         print("\nKey points:")
-        print("  • Define schemas using Pydantic BaseModel")
+        print("  • Define schemas as @validated dataclasses")
         print("  • Skye handles schema validation automatically")
         print("  • Responses are type-safe Python objects")
         print("  • Supports nested schemas, lists, enums, and validation")

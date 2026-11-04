@@ -61,8 +61,15 @@ ORCHESTRATORS = {"agents", "teams", "flows"}
 
 # Top-level modules that are not Components: they belong to the Layer 0 foundation.
 # `utils` is a stdlib-only helper package that lives alongside `base` in Layer 0.
+# The public facades (`skye.messages`, `skye.interfaces`, ...) only re-export `base` (decision D34).
 NON_COMPONENT_TO_COMPONENT = {
     "utils": "base",
+    "messages": "base",
+    "completion": "base",
+    "exceptions": "base",
+    "config": "base",
+    "data": "base",
+    "interfaces": "base",
 }
 
 
