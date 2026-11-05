@@ -4,14 +4,17 @@ previous_name: uxui
 ---
 
 # Design Document: uxui
-Builds on: #[[file:.kiro/steering/11-design.md]] (sections: Ports, Public API and lazy imports, Extension points, Correctness properties, Testing).
-The system view (facades, the Port rules, the new checks) is in those sections. This file holds the detail of this spec: the baseline of the
-audit, the mechanism of each check, where each lives, and which open decision blocks which task.
+Builds on: #[[file:.kiro/steering/11-design.md]] (sections: Ports, Composition, Public API and lazy imports, Extension points, Correctness properties, Testing).
+The system view (facades, the Port rules, the execution primitive and `ToolProvider`, the router shorthand, the new checks) is in those sections.
+This file holds the detail of this spec: the baseline of the audit, the mechanism of each check, where each lives, and which open decision blocks
+which task.
 
 ## Overview
 The work has three parts, taken from the audit of 2026-11-03: the examples a newcomer runs (findings 1 to 12), the names and imports a user types
-(13 to 24) and the contracts of the Ports an extension author implements (25 to 35). The import paths are done (decision D34); everything else
-is open. The design adds no runtime feature to the library. It adds checks (tests that fail on the thing the audit found), repairs the defects the
+(13 to 24) and the contracts of the Ports an extension author implements (25 to 35). Three follow-up reports of 2026-11-04 (familiarity,
+simplicity, tools), reconciled in `.agents/tasks/uxui-reconciliation.md`, add the execution primitive, the `ToolProvider` Port, the router
+shorthand, the typed `provider()` and the guessability aliases (the "Follow-up reports" section below). The import paths are done (decision D34);
+everything else is open. The design adds no runtime feature to the library. It adds checks (tests that fail on the thing the audit found), repairs the defects the
 checks reveal, and rewrites the examples to the standard of Requirement 24. Two choices hold for all of it:
 - A rule is enforced by a test where it can be, with an allowlist that **only shrinks** (the pattern of `known_leaks` in `budgets.toml`): the
   test is written first, fails on the known cases, and each repair removes its entry.
@@ -138,15 +141,64 @@ need a network or a key. A Port docstring example is a real, offline call.
 exported Port: kind, Port, registry or place to register, example file, and status (implemented or not yet). A docs test fails when a name in
 `skye.interfaces.__all__` is missing from the page.
 
+## Follow-up reports (familiarity, simplicity, tools)
+Three reports of 2026-11-04 looked at the same surface from three angles: how close it is to what a user knows (familiarity), how much a user
+must write and decide (simplicity), and the low-level tool-call path and what an agent needs from it (tools). They proposed different fixes to
+the same problem in eight places; `.agents/tasks/uxui-reconciliation.md` gives the single answer used in each case. The decisions they settled
+are rules now in steering; the questions they left open are O24 to O33. The work they add, beyond the 35 findings:
+
+### The execution primitive (tools report L2, A1; steering 16.10)
+One function in `base`, next to the capability Port, runs a single call: it never raises and returns a `CapabilityMessage` whose outcome says ok,
+error, denied or skipped (O30). `CompletionResponse.execute_capability_calls`, the executable call, the registry and `CapabilityCallHandler`
+delegate to it, so the four execution paths and three result types of today collapse to one behaviour; `registry.execute` stays the one path that
+raises, documented as "I called it myself". Living in `base` lets `agents`, `teams` and `flows` use it without importing `tools` (the layer
+table). A change to it (a timeout, the outcome field) reaches the agent, the manual loop and the single call at once — the reason it is built
+first (task 3.11).
+
+### The `ToolProvider` Port (tools report A5, A6; steering 16.11)
+A Port in `base/interfaces` with three methods — list the schemas for an operation, run one call with a context, optionally close. The capability
+registry implements it and the gateway client implements it, so an agent takes its toolset one way (Requirement 42.1). The context carries the
+scope token and the operation description (42.3) and is a separate argument, never folded into the model's `**arguments` where a key could clash
+(task 3.12). Blocked in part on O32 (who writes the operation description, the existing O12).
+
+### The router shorthand (simplicity report S1; steering 22.8)
+`ModelRouter({"alias": ["provider/model", ...]})` builds the same `RouteConfig`, `ModelTarget` and `FallbackConfig` as the full form (first entry
+primary, the rest fallbacks); the provider is read from the `"provider/model"` string and the API key from the provider's standard variable.
+One syntax only: the `from_list` form the familiarity report first proposed is dropped (reconciliation 2). `skye.Router` is the lazy alias
+(task 4.3, under O27's extension). The full form (strategy, retry policies, explicit `FallbackConfig`, YAML) stays first-class and documented;
+an explicit value always wins over a default (task 4.7).
+
+### Typed `provider()` (simplicity report S2; steering 22.9)
+`@overload` so the default returns the model client and `provider_type="embedding"` the embedding client, and the quickstart type-checks with no
+cast. A combined client type that exposes both `complete` and `encode` is a larger option the simplicity report raises; it is **not** decided
+here (added to O28's surface clean-up) (task 4.8).
+
+### Guessability aliases (familiarity report C1 to C5; steering 22.7, open decision O27)
+Thin aliases that store no second value: `CompletionResponse.text` → `content`; `tool_choice`/`tools` accepted as `capability_choice`/`capabilities`
+(one input name, no second field); `CapabilityRegistry.list()` → `list_all`; `Validated.model_dump`/`model_validate`/`model_json_schema` →
+`dump`/`from_mapping`/`json_schema`; `skye.Router`, and `skye.tool` for `skye.tools.capability`. O27 as written covers only `text`, `list()`,
+`kind=`, `tool_choice`, `ainvoke`; the Pydantic-style methods, `skye.Router`, `skye.tool` and `tools=` extend it or wait (reconciliation 6, 8).
+`skye.completion(...)` as a callable module is rejected: a facade may only re-export (Requirement 7.15); it is a documentation line only. A test
+records each name as `exists` or `known_missing`, the list only shrinking (task 4.9, steering property 20).
+
+### Decisions this section adds (O30 to O33)
+| Decision | Question | Blocks |
+|---|---|---|
+| O30 | the outcome of a call: `status` (ok/error/denied/skipped) or a boolean | 3.11 |
+| O31 | the batch method: make it sync and add `aexecute_...`, or keep async | 3.11 |
+| O32 | registration of a decorated capability (`registry.add`, `@capability(register=True)`, or an implicit global) | 3.12 |
+| O33 | one call type with `execute()`, or two types renamed | 3.11 |
+
 ## Open decisions and the tasks they block
 | Decision | Question | Blocks |
 |---|---|---|
 | O24 | the call shape of `ModelInterface` | 3.5 |
 | O25 | `Protocol` or abstract base for a Port | 3.10 |
 | O26 | an offline demo provider: public, examples-only, or none | 5.3 |
-| O27 | aliases: `text`, `list()`, `kind=`, `tool_choice`, `ainvoke` | 4.3, part of 6.1 |
-| O28 | router re-exports, `MCPClientPort`, placeholder packages | 4.2, 4.5, 4.6 |
+| O27 | aliases: `text`, `list()`, `kind=`, `tool_choice`, `ainvoke`, and its extension to `skye.Router`, the Pydantic-style methods, `skye.tool` | 4.3, 4.9, part of 6.1 |
+| O28 | router re-exports, `MCPClientPort`, placeholder packages, a combined client type | 4.2, 4.5, 4.6, 4.8 |
 | O29 | the six unreconciled Ports, the two storage Ports, splitting large Ports | 3.6, 3.9 |
+| O30 to O33 | the tool-call outcome, the batch method name, capability registration, the executable call | 3.11, 3.12 |
 Related and not blocking: O4 (pydantic removal) sets when 2.2 can finish, O20 (examples first) is the practice this spec follows for the
 extension points.
 
@@ -203,10 +255,27 @@ For the package docstring and each Port docstring, every example that is not mar
 For any name in `skye.interfaces.__all__`, the extension page has a row for it.
 **Validates: Requirement 13 (Requirement 15.10 of steering)**
 
+### Property 13: One execution behaviour
+For the same capability call, `response.execute_capability_calls()`, the executable call's `execute()` and the primitive all return an equal
+`CapabilityMessage`, and a tool whose own result is the text `"Error: ..."` has the outcome `ok`, not a failure.
+**Validates: Requirement 15 (Requirements 16.10 and 16.12 of steering)**
+
+### Property 14: The router shorthand builds the full form
+For a shorthand `ModelRouter({"alias": [...]})`, the router it builds equals the one the explicit `RouteConfig`/`ModelTarget`/`FallbackConfig`
+form builds for the same aliases, and an explicitly set field is never overwritten by a default.
+**Validates: Requirement 17 (Requirement 22.8 of steering)**
+
+### Property 15: A guessable alias adds no behaviour
+For each guessable-name alias, it returns the value of the name it delegates to and stores no second value; the test's known-missing list only
+shrinks.
+**Validates: Requirement 18 (Requirements 22.7 and 22.9 of steering)**
+
 ## Superseded (history)
-- The folder was `.kiro/specs/uxui/` with two files, `report.md` (the audit, three parts) and `rules.md` (27 rules and their status); both were
-  exempted from the spec tests by name. They are now `.agents/tasks/uxui-audit-report.md` and `.agents/tasks/uxui-audit-rules.md`, and their
-  content is in steering (requirements, decisions O24 to O29), in the tables above and in `tasks.md`.
+- The folder was `.kiro/specs/uxui/` with, at first, two files — `report.md` (the audit, three parts) and `rules.md` (27 rules and their status) —
+  and later four more: `familiarity-report.md`, `simplicity-report.md`, `tools-report.md` and `reconciliation.md`. All were exempted from the spec
+  tests by name. They are now under `.agents/tasks/` as `uxui-audit-report.md`, `uxui-audit-rules.md`, `uxui-familiarity-report.md`,
+  `uxui-simplicity-report.md`, `uxui-tools-report.md` and `uxui-reconciliation.md`, and their content is in steering (requirements, decisions O24
+  to O33), in the tables above and in `tasks.md`.
 - Rules 1 to 4, 7 and 8 were applied before this spec (facades, decision D34, Requirement 7.14, `tests/budget/test_public_imports.py`); they are
   tasks 1.1 to 1.3, ticked.
 
@@ -215,9 +284,9 @@ For any name in `skye.interfaces.__all__`, the extension page has a row for it.
 {
   "waves": [
     { "id": 0, "tasks": ["1.4", "2.1", "3.1", "3.3", "3.4", "5.1", "5.2", "6.1"] },
-    { "id": 1, "tasks": ["2.2", "2.3", "3.2", "3.7", "4.1", "5.5", "5.6", "5.7", "5.9", "6.2", "6.4"] },
+    { "id": 1, "tasks": ["2.2", "2.3", "3.2", "3.7", "4.1", "4.7", "4.8", "5.5", "5.6", "5.7", "5.9", "6.2", "6.4"] },
     { "id": 2, "tasks": ["3.8", "4.4", "5.4", "5.8", "6.3"] },
-    { "id": 3, "tasks": ["3.5", "3.6", "3.9", "3.10", "4.2", "4.3", "4.5", "4.6", "5.3", "5.10"] },
+    { "id": 3, "tasks": ["3.5", "3.6", "3.9", "3.10", "3.11", "3.12", "4.2", "4.3", "4.5", "4.6", "4.9", "5.3", "5.10"] },
     { "id": 4, "tasks": ["7.1"] }
   ]
 }

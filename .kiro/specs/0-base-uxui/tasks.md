@@ -85,6 +85,22 @@ guess the answer in code). Tasks that belong to another spec (`models:8.2`, `pro
     - `ModelRouterInterface` (16 methods) and `PromptBuilderInterface` (22 methods) split by role (selection, health, configuration;
       rendering, registry, schema) once O29 settles the boundaries; a caller that needs only one role types against it.
     - _Requirements: 7.1; O29_
+  - [ ] 3.11 One execution primitive — blocked on O30, O31, O33 for the outcome and the method shape
+    - Add one function in `base`, next to the capability Port, that runs a single call, never raises, and returns a `CapabilityMessage` with
+      the outcome chosen in O30; make `CompletionResponse.execute_capability_calls`, the executable call, `CapabilityRegistry` and
+      `CapabilityCallHandler` delegate to it (`registry.execute` stays the raising path); give the batch method the sync/async shape chosen
+      in O31 and the call type chosen in O33. Also fix the low-level defects that need no decision: `json.dumps(result, default=str)` so a
+      `datetime` in a result is not the tool's error (L5); accept a name key in `argument_overrides` (L6); type `capability_calls` as
+      `list[CapabilityCall]` and `capabilities` as the list-or-registry union (L3); drop the `skyeai[capabilities]` try/except (L7); import
+      `CapabilityCall` from the facade path (L8). Test that every path returns an equal message and that a tool's `"Error:"` text is `ok`.
+      See `design.md` "The execution primitive".
+    - _Requirements: 15.1, 15.2; 16.10, 16.12 of steering; O30, O31, O33_
+  - [ ] 3.12 The `ToolProvider` Port — blocked on O32 and the agent-runtime design (O12)
+    - Define the Port in `base/interfaces` (list schemas for an operation, run one call with an explicit `context`, optionally close);
+      `CapabilityRegistry` and the gateway client implement it; the context carries the scope token and operation description, never folded
+      into the model's arguments. Resolve capability registration per O32 so `create_agent(capabilities=[...])` has something to resolve names
+      against. See `design.md` "The `ToolProvider` Port".
+    - _Requirements: 16.1, 16.2; 16.11 of steering; O32_
   - [ ] 3.10 Protocol-vs-ABC convention — blocked on O25
     - Write the rule in steering once O25 is decided (which Ports are `Protocol`, which stay abstract bases) and apply it to
       `MCPClientPort` → `MCPClientInterface` if the O28 naming choice also lands.
@@ -114,6 +130,24 @@ guess the answer in code). Tasks that belong to another spec (`models:8.2`, `pro
     - If O28 chooses it, add a module-level `__getattr__` to `skye.flows`, `skye.gateway`, `skye.teams`, `skye.policy`, `skye.observe`,
       `skye.guard` that raises `ImportError("skye.<name> is planned, not available yet")` on an attribute a user might expect.
     - _Requirements: 3.2; O28_
+  - [ ] 4.7 Router shorthand
+    - `ModelRouter({"alias": ["provider/model", ...]})` builds the same `RouteConfig`, `ModelTarget` and `FallbackConfig` (first entry
+      primary, the rest fallbacks), reads the provider from the string and the API key from the provider's standard variable, and leaves
+      the full form first-class; one syntax only (no `from_list`). A test asserts the shorthand and the explicit form build an equal router
+      and that an explicit field is never overwritten by a default. Rewrite the `routing/` examples to start with the shorthand (feeds 5.7,
+      5.8). See `design.md` "The router shorthand".
+    - _Requirements: 17.1; 22.8 of steering_
+  - [ ] 4.8 Typed `provider()` — the combined client type is blocked on O28
+    - Add `@overload` so the default call returns the model client and `provider_type="embedding"` the embedding client, and a type-checker
+      test over the quickstart lines (no cast, no `ignore`). The larger "one combined client exposing `complete` and `encode`" option waits
+      for O28.
+    - _Requirements: 18.2; 22.9 of steering; O28_
+  - [ ] 4.9 Guessability aliases and their test — blocked on O27 for the set
+    - Add only the aliases O27 accepts (and its extension to `skye.Router`, `Validated.model_dump`/`model_validate`/`model_json_schema`,
+      `skye.tool`, `tools=`), each delegating with no second value stored; `skye.completion(...)` stays a documentation line (facade purity,
+      1.4). Add `tests/budget/test_guessable_names.py` with each name as `exists` or `known_missing`, the list only shrinking. See
+      `design.md` "Guessability aliases".
+    - _Requirements: 18.1, 18.2; 22.7 of steering; O27_
 
 - [ ] 5. Examples
   - [ ] 5.1 Delete the empty example

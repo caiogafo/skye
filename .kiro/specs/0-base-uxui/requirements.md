@@ -9,13 +9,15 @@ previous_name: uxui
 
 This spec covers the public surface of Skye as a user meets it: the import paths, the names, the Ports an extension author implements, the
 examples, and the first docstring a user reads. It comes from a three-part audit (the examples, the names and imports, the contracts of the
-Ports; 35 findings, in `design.md`) and from the 27 rules derived from it. Those rules are now criteria in `.kiro/steering/10-requirements.md`
+Ports; 35 findings, in `design.md`), from the 27 rules derived from it, and from three follow-up reports (familiarity, simplicity, tools) whose
+conflicts are resolved in one place. Those rules are now criteria in `.kiro/steering/10-requirements.md`
 (Requirements 7.14, 7.15, 15.9, 15.10, 16.6 to 16.9, 22.3 to 22.6 and 24.4 to 24.8) and the questions the audit left to the owner are the open
 decisions O24 to O29 in `.kiro/steering/12-decisions.md`. Here each requirement is one user story and each acceptance criterion is a pointer
 of the form `THE spec SHALL realize Requirement N.k of #[[file:.kiro/steering/10-requirements.md]]`, never a copy of the criterion. The number
 after `Requirement` in a heading below is local to this file; the number in a criterion is the steering one. Fetch a steering requirement with
-`grep -n -A25 "^### Requirement 24:" .kiro/steering/10-requirements.md`. The raw audit is kept as `.agents/tasks/uxui-audit-report.md` and
-`.agents/tasks/uxui-audit-rules.md`; the folder of this spec was called `uxui` before decision D35.
+`grep -n -A25 "^### Requirement 24:" .kiro/steering/10-requirements.md`. The raw audit and the follow-up reports are kept under `.agents/tasks/`
+(`uxui-audit-report.md`, `uxui-audit-rules.md`, `uxui-familiarity-report.md`, `uxui-simplicity-report.md`, `uxui-tools-report.md`,
+`uxui-reconciliation.md`); the folder of this spec was called `uxui` before decision D35.
 
 ## Requirements
 
@@ -145,3 +147,38 @@ after `Requirement` in a heading below is local to this file; the number in a cr
 
 1. THE spec SHALL realize Requirement 15.2 of #[[file:.kiro/steering/10-requirements.md]].
 2. THE spec SHALL honor decision D35 of #[[file:.kiro/steering/12-decisions.md]].
+
+### Requirement 15: One way to execute a capability call
+
+**User Story:** As a developer writing a tool loop or an agent, I want one primitive that runs a call and tells me how it ended, so that every path behaves the same and a failure is a field, not a text prefix.
+
+#### Acceptance Criteria
+
+1. THE spec SHALL realize Requirement 16.10 of #[[file:.kiro/steering/10-requirements.md]].
+2. THE spec SHALL realize Requirement 16.12 of #[[file:.kiro/steering/10-requirements.md]].
+
+### Requirement 16: A toolset reaches a runtime component through one Port
+
+**User Story:** As an agent author, I want the local registry and the gateway to offer tools through the same Port, so that the agent takes its toolset one way and passes a scope token with every call.
+
+#### Acceptance Criteria
+
+1. THE spec SHALL realize Requirement 16.11 of #[[file:.kiro/steering/10-requirements.md]].
+2. THE spec SHALL realize Requirement 16.9 of #[[file:.kiro/steering/10-requirements.md]].
+
+### Requirement 17: A shorthand for the router
+
+**User Story:** As a developer, I want a one-line way to write a router with a fallback, so that the common case does not cost six classes while the full form stays available.
+
+#### Acceptance Criteria
+
+1. THE spec SHALL realize Requirement 22.8 of #[[file:.kiro/steering/10-requirements.md]].
+
+### Requirement 18: Names a newcomer tries
+
+**User Story:** As a developer coming from the OpenAI SDK, LiteLLM or Pydantic, I want the names I try first to exist as thin aliases, so that I do not have to learn a new word for a thing I already know.
+
+#### Acceptance Criteria
+
+1. THE spec SHALL realize Requirement 22.7 of #[[file:.kiro/steering/10-requirements.md]].
+2. THE spec SHALL realize Requirement 22.9 of #[[file:.kiro/steering/10-requirements.md]].

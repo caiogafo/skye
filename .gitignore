@@ -63,3 +63,5 @@ uv.lock
 
 # personal working notes (not part of the wiki, not committed)
 docs/_notes/
+# agent task artifacts and working reports (not committed)
+.agents/

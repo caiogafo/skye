@@ -119,6 +119,14 @@ The compliance check compares every method by parameter names and kinds and by `
 `Protocol`s alike, and one test runs every built-in implementation through it (Requirement 16.7). A Port that nothing implements
 and nothing tests is not exported (Requirement 16.9). Whether a Port is a `Protocol` or an abstract base is open decision O25.
 
+One primitive runs a single capability call: it never raises and returns a `CapabilityMessage` whose outcome says succeeded, failed,
+denied or skipped (Requirement 16.10, open decision O30). It lives in `base`, beside the capability Port, so `agents`, `teams` and
+`flows` call it without importing `tools`. The response methods, the executable call, the registry and the call handler all delegate to
+it, so one behaviour holds on every path; `registry.execute` is the one documented exception that raises ("I called it myself"). A
+runtime component reaches its toolset through one Port — list the schemas for an operation, run one call, optionally close — implemented
+by the capability registry and by the gateway client, and every call carries a context (scope token, operation description) separate
+from the model's arguments (Requirement 16.11, open decision O32).
+
 ## Composition
 `agents`, `teams`, `flows` compose each other and model adapters without importing each other, because each holds its children
 as `Runnable` references received from the caller. Model adapters implement `Runnable`, so a model is a step in a flow or a
@@ -156,7 +164,15 @@ The public paths are thin facades that only re-export `base` (Requirement 7.15):
 `<pkg>.interfaces` (every Port), `<pkg>.data` (`Validated`, `validated`, `field`), `<pkg>.messages`, `<pkg>.completion`,
 `<pkg>.exceptions`, `<pkg>.config`; each component package exports what its users need. All of it is standard-library only, so
 `import <pkg>` never reaches an optional or provider library (Requirement 7.4, 7.8). `tests/budget/test_public_imports.py` scans the
-examples, the documentation and the `README.md`. Lazy loading uses the standard library
+examples, the documentation and the `README.md`.
+
+A name a user of the OpenAI SDK, LiteLLM or Pydantic would try may be added as a thin alias that stores no second value (Requirement
+22.7, open decision O27); a test records each such name as `exists` or `known_missing` and the missing list only shrinks. A verbose
+configuration object may offer one shorthand on its existing constructor that builds the same objects and hides none of the full form,
+with one syntax and no second constructor (Requirement 22.8): the router takes `{"alias": ["provider/model", ...]}` and builds the same
+`RouteConfig`, `ModelTarget` and `FallbackConfig`. `provider(name, **config)` is typed so the common call type-checks with no cast
+(Requirement 22.9). None of these is copied from the reference library; an API shape is a design choice, source and docstrings are not
+(see `CONTRIBUTING.md`). Lazy loading uses the standard library
 (`importlib`, module `__getattr__`) plus one thin helper in `base` that imports at first use and raises `MissingExtraError`
 (wrapping the `ImportError`, naming the extra). Each optional component imports its heavy library inside the function that first
 needs it. A breaking rename is acceptable while the version is 0.x and the migration is documented.
@@ -224,7 +240,8 @@ well-formed. 10. The transport and the adapters import no provider SDK or third-
 `agents`, `teams`, `flows`. 12. `teams` and `flows` import neither `models` nor an orchestrator. 13. An added integration stays inside its owner. 14. Examples, documentation and `README.md` import only from the public paths.
 15. No public class name is defined twice. 16. Every built-in implementation conforms to its Port by signature. 17. Every example runs
 offline, exits 0 and ends in no traceback, and every install line names a real extra. 18. The first docstring of the package and of
-each Port runs.
+each Port runs. 19. Every execution path returns the same `CapabilityMessage` for the same call, and a tool's own `"Error:"` text is not
+marked as a failure. 20. A guessable-name alias stores no second value, and the known-missing list only shrinks.
 
 ## Codename placement
 

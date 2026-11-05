@@ -225,6 +225,9 @@ Written without the project name (it is being chosen); `<pkg>` is the import pac
 7. THE compliance check of Requirement 16.2 SHALL compare, for every method, the parameter names and kinds and the `def` or `async def` form, for abstract base classes and for `Protocol` Ports alike, and ONE test SHALL run every built-in implementation through it.
 8. EVERY Port docstring SHALL state its error contract: what it raises (a `SkyeError` subclass), what it returns when something is missing, whether it may be called from several threads or tasks, and, for hooks and observers, that their exceptions are logged and swallowed.
 9. A Port that has no implementation and no test SHALL NOT be exported until a component needs it, and a Port with many methods SHALL be split by role so that a caller takes only the part it uses.
+10. ONE primitive SHALL run a single capability call, never raise, and return a `CapabilityMessage` whose outcome says whether the call succeeded, failed, was denied or was skipped; THE response methods, the executable call, the registry and the call handler SHALL delegate to it, and its synchronous and asynchronous forms SHALL follow the `x` and `ax` rule (Requirement 22.5); the primitive SHALL live in `base`, next to the capability Port, so that a runtime component uses it without importing `tools` (open decisions O30, O31).
+11. THE toolset of a runtime component SHALL reach it through one Port (list the schemas for an operation, run one call, optionally close), implemented by the capability registry and by the gateway client; A call SHALL carry an explicit context (a scope token, the operation description) separate from the arguments the model chose (Requirement 42; open decision O32).
+12. THE type of `capabilities` on a request and of `capability_calls` on a response SHALL name the capability types of `base`, not `Any`, so that an editor helps where the user writes the loop; A success value that is not JSON SHALL be rendered as text, never raised as the tool's own error.
 
 ### Requirement 17: Router and model configuration
 
@@ -291,6 +294,9 @@ Written without the project name (it is being chosen); `<pkg>` is the import pac
 4. A PUBLIC name SHALL be defined once and any other path SHALL re-export it; a new public class SHALL NOT reuse the name of another public class, and a test SHALL fail on a public name defined twice in the library.
 5. A name SHALL say what a user does or has: verbs for actions and nouns for things, the synchronous and asynchronous forms being `x` and `ax`, `get_x` reading one thing, `list_x` many, `set_x` configuring and `register` adding.
 6. A file SHALL be named after the one idea in it (a provider file `<provider>.py`, an embeddings file `<provider>_embeddings.py`), and a new public module or package SHALL have one short name.
+7. WHERE a name a user of a reference library (the OpenAI SDK, LiteLLM, Pydantic) would try is missing, THE library MAY add it as a thin alias that stores no second value and adds no behaviour, and a test SHALL record each such name with the state `exists` or `known_missing`, the list of missing names only shrinking (open decision O27); THE library SHALL NOT add a second way to do a thing that is not such an alias.
+8. WHERE a configuration object is verbose for the common case (the router), THE library MAY offer one shorthand on the existing constructor that builds the same objects and hides none of the full form, with one syntax and no second constructor; A value the user gives SHALL always win over a default.
+9. THE one call that creates a client, `<pkg>.provider(name, **config)`, SHALL be typed so that the common call type-checks with no cast: the default returns the model client and `provider_type="embedding"` the embedding client.
 
 ### Requirement 23: Tests
 
