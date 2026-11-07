@@ -1,5 +1,7 @@
 ---
 component: agents
+codename: cyclone
+previous_name: agent-runtime
 ---
 
 # Requirements Document
@@ -55,7 +57,7 @@ The requirements themselves live in `.kiro/steering/10-requirements.md`; each re
 
 ### Requirement 3: Hook semantics
 
-**User Story:** As a developer, I want hooks that can change what happens, not only watch it.
+**User Story:** As a developer, I want hooks that can change what happens, not only watch it, so that I can add limits, safety and policy without editing the loop.
 
 #### Acceptance Criteria
 
@@ -89,7 +91,7 @@ The requirements themselves live in `.kiro/steering/10-requirements.md`; each re
 
 ### Requirement 6: Observers and interceptors
 
-**User Story:** As a developer, I want to keep using event handlers for logging, without giving them the power to change the run.
+**User Story:** As a developer, I want to keep using event handlers for logging, without giving them the power to change the run, so that observing stays safe.
 
 #### Acceptance Criteria
 
@@ -98,7 +100,7 @@ The requirements themselves live in `.kiro/steering/10-requirements.md`; each re
 
 ### Requirement 7: Toolset and the Gateway
 
-**User Story:** As a developer, I want the agent to ask for the tools its operation needs, instead of holding a fixed list.
+**User Story:** As a developer, I want the agent to ask for the tools its operation needs, instead of holding a fixed list, so that the prompt stays small.
 
 #### Acceptance Criteria
 
@@ -108,7 +110,7 @@ The requirements themselves live in `.kiro/steering/10-requirements.md`; each re
 
 ### Requirement 8: State and resumability
 
-**User Story:** As a platform engineer, I want a run to survive the end of a Lambda invocation.
+**User Story:** As a platform engineer, I want a run to survive the end of a Lambda invocation, so that long work resumes in a later one.
 
 #### Acceptance Criteria
 
@@ -119,7 +121,7 @@ The requirements themselves live in `.kiro/steering/10-requirements.md`; each re
 
 ### Requirement 9: Lambda constraints
 
-**User Story:** As a platform engineer, I want the loop to behave correctly in Lambda.
+**User Story:** As a platform engineer, I want the loop to behave correctly in Lambda, so that it needs no parallel processes or background work.
 
 #### Acceptance Criteria
 
@@ -139,7 +141,7 @@ The requirements themselves live in `.kiro/steering/10-requirements.md`; each re
 
 ### Requirement 11: Dependencies and budgets
 
-**User Story:** As a maintainer, I want the runtime to stay light.
+**User Story:** As a maintainer, I want the runtime to stay light, so that the package and its cold start stay small.
 
 #### Acceptance Criteria
 
@@ -149,7 +151,7 @@ The requirements themselves live in `.kiro/steering/10-requirements.md`; each re
 
 ### Requirement 12: Testing
 
-**User Story:** As a maintainer, I want the loop and hooks tested without a real model.
+**User Story:** As a maintainer, I want the loop and hooks tested without a real model, so that tests run offline and are deterministic.
 
 #### Acceptance Criteria
 

@@ -189,7 +189,7 @@ The migration is done and was verified green on 2026-11-02. The only open work i
     - Evidence: `.kiro/specs/README.md`.
     - _Requirements: 15.2_
   - [x] 11.4 Retire the one-off prompts that are done: `01-module-structure.md` and `02-steering.md` moved to `.kiro/prompts/done/` (the folder is local and ignored by git); the owner's choices they hold are in `12-decisions.md`. `03-specs-and-docs.md` stays until the migration runs are finished.
-    - Evidence: `.kiro/prompts/done/`.
+    - Evidence: `.agents/prompts/done/` (moved from `.kiro/prompts/done/`).
     - _Requirements: 15.1_
 
 - [x] 12. Code and test work left by the migration

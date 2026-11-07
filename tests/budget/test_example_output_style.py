@@ -1,6 +1,6 @@
 """Plain output (Requirement 24.7 of steering, task 5.9 of the uxui spec).
 
-No banner row (``"=" * 60``) and no emoji in the examples. ``prompts/`` is owned by the ``prompts-support`` spec (task 3) and is
+No banner row (``"=" * 60``) and no emoji in the examples. ``prompts/`` is owned by the ``prompts`` spec (task 5) and is
 listed in ``KNOWN_FOLDERS``; the list only shrinks.
 """
 

@@ -19,8 +19,8 @@ checks reveal, and rewrites the examples to the standard of Requirement 24. Two 
 - A rule is enforced by a test where it can be, with an allowlist that **only shrinks** (the pattern of `known_leaks` in `budgets.toml`): the
   test is written first, fails on the known cases, and each repair removes its entry.
 - A fix that belongs to one component is a task here, marked with the component it touches, because the audit is the one place that sees the
-  whole surface. A fix that another spec already tracks stays there (`models:8.2` for the pydantic structured-output examples, `prompts-support`
-  task 3 for the stale `examples/prompts/`).
+  whole surface. A fix that another spec already tracks stays there (`models:8.2` for the pydantic structured-output examples, `prompts:5`
+  for the stale `examples/prompts/`).
 
 ## Baseline: the 35 findings
 Level P1 blocks or misleads a user, P2 costs time, P3 is polish. "Done" means the work exists and a test guards it. Task numbers are in `tasks.md`.
@@ -31,7 +31,7 @@ Level P1 blocks or misleads a user, P2 costs time, P3 is polish. "Done" means th
 | 2 | Install lines are wrong after the extras changes | P1 | 24.6 | 5.5 | |
 | 3 | Examples end in a raw traceback | P1 | 24.4 | 5.2, 5.4 | |
 | 4 | `providers/router_example.py` is empty | P1 | 24.5 | 5.1 | |
-| 5 | `examples/prompts/` is stale (Jinja2, `sys.path`) | P1 | D20, 30.9 | `prompts-support` task 3 | |
+| 5 | `examples/prompts/` is stale (Jinja2, `sys.path`) | P1 | D20, 30.9 | `prompts:5` | |
 | 6 | READMEs name files and commands that do not exist | P2 | 24.8 | 5.6 | |
 | 7 | Overlapping examples (function calling three times, YAML twice) | P2 | 24.5 | 5.7 | |
 | 8 | Large files hide the point (nine over 300 lines) | P2 | 24.5 | 5.8 | |
@@ -185,7 +185,7 @@ or `known_missing`, the list only shrinking (task 4.9, steering property 20).
 **Status: the parser is not written, and none of the examples below has been run through a parser.** The syntax was drafted with the owner in
 two interviews (decisions D49 to D61) and the reference examples were written by hand. This spec owns the public surface of the language (the
 syntax a user types, the load calls, the error messages); the parser and the grammar belong to `base`, the flow engine to `3-runtime-flows`,
-the router mapping to the router spec and the bundled prompts to `prompts-support` task 18. System view: `11-design.md`, section "The `.skye`
+the router mapping to the router spec and the bundled prompts to `prompts:4`. System view: `11-design.md`, section "The `.skye`
 language"; requirements: Requirement 54 of steering.
 
 ### Syntax in one page

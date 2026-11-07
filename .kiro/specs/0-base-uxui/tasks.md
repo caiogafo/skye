@@ -5,7 +5,7 @@
 This plan closes the findings of the 2026-11-03 audit of the public surface (`.agents/tasks/uxui-audit-report.md`), grouped by
 mechanism: the import facades (done before this spec), name collisions, Port conformance, naming and vocabulary, the examples, and
 docstrings. Each task cites the local requirement it satisfies (`N.k` of `requirements.md`) and, where useful, the steering
-requirement or decision directly. A task that depended on an open decision names the decision (D36 to D45, taken by the owner) it follows. Tasks that belong to another spec (`models:8.2`, `prompts-support` task 3) are not repeated here.
+requirement or decision directly. A task that depended on an open decision names the decision (D36 to D45, taken by the owner) it follows. Tasks that belong to another spec (`models:8.2`, `prompts:5`) are not repeated here.
 
 ## Tasks
 
@@ -210,7 +210,7 @@ requirement or decision directly. A task that depended on an open decision names
     - Evidence: kept `advanced/function_calling.py` and `routing/yaml_config_example.py`; the three duplicates are deleted.
     - Keep the short one of each pair and link the long one as "reference" or delete it: `advanced/function_calling.py` over
       `capabilities/function_calling_example.py` and `providers/function_calling_example.py`; `routing/yaml_config_example.py` over
-      `routing/yaml_config.py`; the short `prompts/` duplicates are handled by `prompts-support` task 3, not here.
+      `routing/yaml_config.py`; the short `prompts/` duplicates are handled by `prompts:5`, not here.
     - _Requirements: 9.3_
   - [x] 5.8 Size test and split
     - Evidence: `tests/budget/test_example_size.py`; every example is at most 80 lines except `advanced/custom_providers.py` (90, the only `KNOWN_LONG` entry).
@@ -258,7 +258,7 @@ requirement or decision directly. A task that depended on an open decision names
       the 50 requests crossed a minute boundary (proved by moving the clock; the test now fixes the window, the code is unchanged). Allowlists: empty are `KNOWN_MISMATCHES`,
       `KNOWN_STALE`, `known_leaks`, `known_import_failures`, `known_compiled`; non-empty with a named debt are `KNOWN_DUPLICATES` (the two older `tools` copies of `CapabilitySchema` and
       `CapabilityInterface`), `KNOWN_LONG` (`advanced/custom_providers.py`, 90 lines, because `BaseModelProvider` has 11 abstract hooks; proposal S5.5, not yet a task) and
-      `KNOWN_FOLDERS` (`prompts/`, task 3 of `prompts-support`).
+      `KNOWN_FOLDERS` (`prompts/`, `prompts:5`).
     - Kiro runs `uv run pytest tests/ -q` and `uv run pytest tests/budget -q`. The implementation of the other tasks was written without
       running the suite, so expect to repair failures in the new tests and in the code they guard: do that here, one failure at a time.
     - Confirm every new allowlist (`KNOWN_DUPLICATES`, `KNOWN_MISMATCHES`, `KNOWN_LONG`) is non-empty only where a real, named debt remains.
@@ -366,7 +366,7 @@ requirement or decision directly. A task that depended on an open decision names
   3.6, 3.11 and 4.2 updates those lines in the same commit; their evidence of work already done keeps the old name with a "renamed in D3x" note.
 - The open decisions O24 to O33 are taken (D36 to D45 of `.kiro/steering/12-decisions.md`); each task cites its decision. Where a task
   text still says "once O.. is decided", read the decision as taken and follow it.
-- `models:8.2` (pydantic structured-output examples) and `prompts-support` task 3 (stale `examples/prompts/`) are tracked in their
+- `models:8.2` (pydantic structured-output examples) and `prompts:5` (stale `examples/prompts/`) are tracked in their
   own specs and are not duplicated here, even though they appear in the audit (findings behind Requirement 24's pydantic/D20
   contradictions).
 - Group 1 is done; its evidence is the committed facades and `tests/budget/test_public_imports.py`.

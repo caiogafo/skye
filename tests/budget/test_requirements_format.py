@@ -30,7 +30,7 @@ STORY_NO_BENEFIT = re.compile(r"^\*\*User Story:\*\* As (?:a|an|the) .+?, I (?:w
 
 # Specs whose user stories still lack the "so that <benefit>" clause. The list may only shrink: a spec that has been fixed
 # must be removed (the stale-list test fails otherwise).
-STORIES_WITHOUT_BENEFIT = {"agent-runtime", "gateway", "policy-engine"}
+STORIES_WITHOUT_BENEFIT: set[str] = set()
 
 
 def _id(path) -> str:

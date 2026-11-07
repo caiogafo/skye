@@ -1,7 +1,7 @@
 """Examples are small (Requirement 24.5 of steering, task 5.8 of the uxui spec).
 
 One idea per example, about 80 lines. ``KNOWN_LONG`` maps each file still over the limit to the most lines it may have; the entry only
-goes down, and a file that fits is removed from the list. Files that start with an underscore (the shared helper ``examples/_offline.py``) are not examples. ``prompts/`` is owned by the ``prompts-support`` spec (task 3).
+goes down, and a file that fits is removed from the list. Files that start with an underscore (the shared helper ``examples/_offline.py``) are not examples. ``prompts/`` is owned by the ``prompts`` spec (task 5).
 """
 
 from __future__ import annotations

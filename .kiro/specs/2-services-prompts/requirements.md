@@ -1,26 +1,28 @@
 ---
 component: prompts
+codename: cirrus
+previous_name: prompts-support
 ---
 
 # Requirements Document
 
 ## Introduction
 
-This document specifies the requirements for adding comprehensive prompts support to Skye using Jinja2 templating. The feature will provide a robust, production-ready implementation of the existing `PromptBuilderInterface`, enabling template management, few-shot learning, multimodal content support, and structured output generation. The implementation will follow Skye's clean architecture principles and be available as an optional extra (`skyeai[prompts]`).
+The `prompts` component implements the `PromptBuilderInterface` of `base`: versioned templates, variable injection, few-shot examples, message roles, multimodal content and output schemas. It follows the liteprompt design with a standard-library template engine (`prompts/engine.py`), so it needs no third-party library and no extra (decision D20; Requirement 13). The `prompt` block of the `.skye` language is the second way to write a prompt (decision D60). This spec states the user stories the component serves and points at the requirements and decisions in steering; it copies no rule. It supersedes the former `prompts-support` spec, whose Jinja2 and pydantic design is replaced by the current decisions and recorded as history in `design.md`.
 
 The requirements themselves live in `.kiro/steering/10-requirements.md`; each requirement below is one user story of this component, and each acceptance criterion is a pointer to the steering criterion it realizes (never a copy). Questions that were open in the former text are in `.kiro/steering/12-decisions.md`.
 
 ## Glossary
 
-- **Prompt_Builder**: The main class implementing `PromptBuilderInterface` using Jinja2 templating
-- **Template**: A Jinja2 template string with variable placeholders for generating prompts
+- **Prompt_Builder**: The class implementing `PromptBuilderInterface` (`BasePromptBuilder`), using the standard-library engine
+- **Template**: A template string with `{{ }}` placeholders, `if` and `for` blocks, for generating prompts
 - **Template_Registry**: Internal storage system for managing templates with versioning
 - **Variable_Validator**: Component that validates template variables against requirements
 - **Example_Selector**: Component that selects relevant few-shot examples dynamically
 - **Message_Formatter**: Component that converts rendered templates to `SkyeMessage` objects
 - **Content_Handler**: Component that processes multimodal content (text, images, audio, etc.)
 - **Schema_Validator**: Component that validates and formats output schemas
-- **Jinja_Environment**: Configured Jinja2 environment with custom filters and macros
+- **Engine**: The standard-library template engine `prompts/engine.py`, with the built-in filters and the custom filters the developer registers
 
 ## Requirements
 
@@ -88,9 +90,9 @@ The requirements themselves live in `.kiro/steering/10-requirements.md`; each re
 2. THE spec SHALL realize Requirement 32.2 of #[[file:.kiro/steering/10-requirements.md]].
 3. THE spec SHALL realize Requirement 32.3 of #[[file:.kiro/steering/10-requirements.md]].
 
-### Requirement 7: Jinja2 Advanced Features
+### Requirement 7: Template engine features
 
-**User Story:** As a developer, I want to use custom Jinja2 filters, macros, and template composition, so that I can create sophisticated and reusable prompt components.
+**User Story:** As a developer, I want to use conditionals, loops, custom filters and template composition (without macros, inheritance or includes, decision D20), so that I can create reusable prompt components.
 
 #### Acceptance Criteria
 
@@ -153,23 +155,3 @@ The requirements themselves live in `.kiro/steering/10-requirements.md`; each re
 1. THE spec SHALL realize Requirement 34.4 of #[[file:.kiro/steering/10-requirements.md]].
 2. THE spec SHALL realize Requirement 34.5 of #[[file:.kiro/steering/10-requirements.md]].
 3. THE spec SHALL realize Requirement 34.6 of #[[file:.kiro/steering/10-requirements.md]].
-
-## Notes to integrate (from the `.skye` work of 2026-11-07; the owner asked for them here, to be absorbed when this spec is rewritten around `.skye`)
-
-**What exists:** the `prompt` block of version 1 is parsed and checked (`skye.base.dsl`: `variables`, `message "<role>"`, `text`, `when`, `each`, `placeholder`, `allow_missing`) and can be written back (`to_text`). **It is not rendered:** nothing turns a `PromptSpec` into messages yet, so the 18 bundled templates in `src/skye/prompts/templates/` stay in `.jinja` and task 18 of `tasks.md` waits.
-
-**Decision of the owner:** the whole of Jinja is not needed to start. The first thing to build is the part an agentic workflow needs; the rest is version 2.
-
-**Version 1, to build (after the flow runtime, or together with it, because a flow step is `run = prompt.NAME`):**
-- A renderer in this component (`skye.prompts`), not in `base` (`base` has no template engine): `PromptSpec` plus the variables gives a list of `SkyeMessage` (real roles, a `placeholder` replaced by the history the caller passes), conditions and loops evaluated with `skye.base.dsl.evaluate`, `{{ }}` rendered by `prompts/engine.py`; a missing required variable raises the `ValueError` of Requirement 30.2, defaults and `allow_missing` as in 30.4.
-- The equivalence test of task 18.3 (old template and new block give the same messages after normalising spaces) for the templates that the version 1 language can express.
-
-**Version 2, measured on the 18 templates (what the language cannot say yet):**
-- `else` and `elif` for `when` (28 uses each, `elif` mostly `X == "value"`); today only `when not X` can stand in.
-- Loop variables in `each`: `loop.index` (3 uses) and `loop.last` (1 use), plus `first` and `length`.
-- A loop over a dictionary, `for key, value in collected_data.items()` (2 uses): needs two loop variables and an `items()` function.
-- A condition inside a line (20 lines in 11 files, for example `- {{ memory.content }}{% if memory.timestamp %} ({{ memory.timestamp }}){% endif %}`): `when` blocks produce whole lines; options are a conditional expression with `+` in `{{ }}` or an inline `when`.
-- An inline loop with a separator (`["a", "b"]` built with `{% for tool in tools %}"{{ tool.name }}"{% if not loop.last %}, {% endif %}{% endfor %}` in `tool_agent.jinja`): needs a way to join an attribute of every item (a `map` or `join` with an attribute).
-- Already available in the engine and enough for the templates: the filters `default`, `join`, `upper`; nested `each`; attribute access (`table.columns`).
-- Not needed and not to be added (D20): macros, inheritance, include, variable assignment.
-The fate of `prompts/engine.py` after the conversion is open decision O35.

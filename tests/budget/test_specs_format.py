@@ -16,12 +16,7 @@ SPECS = KIRO / "specs"
 STEERING = KIRO / "steering"
 
 # Specs still in the old format. Remove a name when its spec is migrated.
-LEGACY_SPECS = {
-    "agent-runtime",
-    "gateway",
-    "policy-engine",
-    "prompts-support",
-}
+LEGACY_SPECS: set[str] = set()
 ALLOWED_FILES = {"requirements.md", "design.md", "tasks.md", "tasks.meta.json", ".config.kiro"}
 REQ_FILE_REF = "#[[file:.kiro/steering/10-requirements.md]]"
 DESIGN_FILE_REF = "#[[file:.kiro/steering/11-design.md]]"

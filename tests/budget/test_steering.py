@@ -1,4 +1,4 @@
-"""Deterministic guard on the steering decisions (see .kiro/prompts/02-steering.md).
+"""Deterministic guard on the steering decisions (see .agents/prompts/done/02-steering.md).
 
 Offline and deterministic: parses the steering files under .kiro/steering and asserts that
 the binding project decisions are present, that no file reinstates pydantic as the

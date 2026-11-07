@@ -1,5 +1,7 @@
 ---
 component: gateway
+codename: horizon
+previous_name: gateway
 ---
 
 # Requirements Document
@@ -23,7 +25,7 @@ The requirements themselves live in `.kiro/steering/10-requirements.md`; each re
 - **Selector**: A strategy that ranks the tools of the Registry for an operation. Skye ships two: hybrid search and Jev
 - **Scope token**: A signed, expiring token that names the toolset of an operation, so the Gateway needs no server-side session
 - **Principal**: The caller, identified from IAM or from a JWT
-- **Policy engine**: The component specified in `.kiro/specs/policy-engine`
+- **Policy engine**: The component specified in `.kiro/specs/2-services-policy`
 - **Warm container**: A Lambda execution environment reused by later invocations
 - **Decision model**: A model that does not generate text. It takes a state and typed questions (yes or no, a category, a score) and returns a choice from a fixed set, with calibrated probabilities. Jev, from TypeSafe AI, is one ("System One" model). The `models` component exposes decision models through one interface
 - **Hierarchical selection**: Choosing in two steps (a domain first, then a tool inside it) when there are more candidates than a decision model accepts as labels
@@ -86,7 +88,7 @@ The requirements themselves live in `.kiro/steering/10-requirements.md`; each re
 
 ### Requirement 6: Scope token
 
-**User Story:** As a platform engineer, I want a stateless way to bind a toolset to an operation, because Lambda keeps no state between invocations.
+**User Story:** As a platform engineer, I want a stateless way to bind a toolset to an operation, so that Lambda, which keeps no state between invocations, still serves the right tools.
 
 #### Acceptance Criteria
 
@@ -119,7 +121,7 @@ The requirements themselves live in `.kiro/steering/10-requirements.md`; each re
 
 ### Requirement 8: Lambda constraints
 
-**User Story:** As a platform engineer, I want the Gateway to behave correctly in Lambda, where parallel processes and background work are not available.
+**User Story:** As a platform engineer, I want the Gateway to behave correctly in Lambda, where parallel processes and background work are not available, so that it runs without workarounds.
 
 #### Acceptance Criteria
 
@@ -160,7 +162,7 @@ The requirements themselves live in `.kiro/steering/10-requirements.md`; each re
 
 ### Requirement 12: Observability
 
-**User Story:** As a security owner, I want a record of what each agent could see and do.
+**User Story:** As a security owner, I want a record of what each agent could see and do, so that I can audit access.
 
 #### Acceptance Criteria
 
@@ -169,7 +171,7 @@ The requirements themselves live in `.kiro/steering/10-requirements.md`; each re
 
 ### Requirement 13: Size and load budgets
 
-**User Story:** As a maintainer, I want the Gateway to stay small, because it is deployed in a Lambda package.
+**User Story:** As a maintainer, I want the Gateway to stay small, so that the Lambda package and its cold start stay light.
 
 #### Acceptance Criteria
 

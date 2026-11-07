@@ -1,5 +1,7 @@
 ---
 component: policy
+codename: isobar
+previous_name: policy-engine
 ---
 
 # Requirements Document
@@ -38,7 +40,7 @@ The requirements themselves live in `.kiro/steering/10-requirements.md`; each re
 
 ### Requirement 2: Evaluation semantics
 
-**User Story:** As a security owner, I want predictable decisions.
+**User Story:** As a security owner, I want predictable decisions, so that the same request always gets the same answer.
 
 #### Acceptance Criteria
 
@@ -69,7 +71,7 @@ The requirements themselves live in `.kiro/steering/10-requirements.md`; each re
 
 ### Requirement 5: Policy representation
 
-**User Story:** As a security owner, I want to write policies in a format I can review and store.
+**User Story:** As a security owner, I want to write policies in a format I can review and store, so that changes go through review.
 
 #### Acceptance Criteria
 
@@ -80,7 +82,7 @@ The requirements themselves live in `.kiro/steering/10-requirements.md`; each re
 
 ### Requirement 6: Schema and validation
 
-**User Story:** As a platform engineer, I want mistakes found when policies load, not when a request is denied.
+**User Story:** As a platform engineer, I want mistakes found when policies load, not when a request is denied, so that a bad policy never reaches production.
 
 #### Acceptance Criteria
 
@@ -89,7 +91,7 @@ The requirements themselves live in `.kiro/steering/10-requirements.md`; each re
 
 ### Requirement 7: Integration points
 
-**User Story:** As a developer, I want one engine for every place that needs a decision.
+**User Story:** As a developer, I want one engine for every place that needs a decision, so that access is enforced the same way everywhere.
 
 #### Acceptance Criteria
 
@@ -98,7 +100,7 @@ The requirements themselves live in `.kiro/steering/10-requirements.md`; each re
 
 ### Requirement 8: Enforcement modes
 
-**User Story:** As a security owner, I want to try a policy before enforcing it.
+**User Story:** As a security owner, I want to try a policy before enforcing it, so that I see its effect without blocking anyone.
 
 #### Acceptance Criteria
 
@@ -106,7 +108,7 @@ The requirements themselves live in `.kiro/steering/10-requirements.md`; each re
 
 ### Requirement 9: Loading and versions
 
-**User Story:** As a platform engineer, I want to change policies without redeploying.
+**User Story:** As a platform engineer, I want to change policies without redeploying, so that a fix does not wait for a release.
 
 #### Acceptance Criteria
 
@@ -116,7 +118,7 @@ The requirements themselves live in `.kiro/steering/10-requirements.md`; each re
 
 ### Requirement 10: Observability
 
-**User Story:** As a security owner, I want every decision recorded.
+**User Story:** As a security owner, I want every decision recorded, so that I can explain why a request was allowed or denied.
 
 #### Acceptance Criteria
 
@@ -125,7 +127,7 @@ The requirements themselves live in `.kiro/steering/10-requirements.md`; each re
 
 ### Requirement 11: Dependencies and budgets
 
-**User Story:** As a maintainer, I want the engine to stay light.
+**User Story:** As a maintainer, I want the engine to stay light, so that it fits a Lambda package.
 
 #### Acceptance Criteria
 
@@ -134,7 +136,7 @@ The requirements themselves live in `.kiro/steering/10-requirements.md`; each re
 
 ### Requirement 12: Cedar alignment
 
-**User Story:** As a security owner, I want to move to Cedar later without rewriting policies.
+**User Story:** As a security owner, I want to move to Cedar later without rewriting policies, so that today's choice does not lock me in.
 
 #### Acceptance Criteria
 
