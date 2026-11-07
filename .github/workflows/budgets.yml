@@ -23,7 +23,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python: ["3.10", "3.13"]
+        python: ["3.11", "3.13"]  # the oldest supported Python (requires-python >=3.11, D49) and the newest
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v5
@@ -44,7 +44,6 @@ jobs:
           - "test_core or test_serverless"
           # one target per extra that has a budget in budgets.toml (tests/budget/test_workflow_matrix.py keeps the list in step)
           - "test_extra_footprint and auth"
-          - "test_extra_footprint and mcp"
           - "test_extra_footprint and memory"
           - "test_extra_footprint and postgres"
           - "test_extra_footprint and tokens"

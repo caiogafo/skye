@@ -14,10 +14,7 @@ import sys
 import tempfile
 from pathlib import Path
 
-try:
-    import tomllib
-except ModuleNotFoundError:  # Python 3.10
-    import tomli as tomllib  # type: ignore[no-redef]
+import tomllib  # standard library since Python 3.11, the minimum (D49)
 
 ROOT = Path(__file__).resolve().parents[2]
 

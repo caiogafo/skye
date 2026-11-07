@@ -39,7 +39,7 @@ make budget-fast    # policy and import checks, a second
 make budget         # installs Skye in clean environments, about a minute
 ```
 
-Sizes exclude the libraries Lambda already ships. Time is the best of five fresh interpreters. Measurements were taken on Python 3.13; the workflow runs the fast checks on 3.10 and 3.13 and the footprint checks on 3.13.
+Sizes exclude the libraries Lambda already ships. Time is the best of five fresh interpreters. Measurements were taken on Python 3.13; the workflow runs the fast checks on 3.11 (the minimum, D49) and 3.13 and the footprint checks on 3.13.
 
 **Sizes are Linux sizes.** The footprint jobs run on a Linux x86_64 runner, which is also the serverless target, and the compiled wheels (`asyncpg`, `tiktoken`, ...) are larger there than on macOS: the compiled extras are larger there (the core has no compiled file any more: it is the same 1.1 MB everywhere). The limits in `budgets.toml` are the Linux ones. To check the sizes from any machine, without a Linux runner:
 
@@ -67,7 +67,7 @@ Checked against `budgets.toml` and `pyproject.toml`.
 |---|---|---|
 | Core dependencies: none since decision D49 (`pydantic` and `tenacity` are gone); one distribution, 1.1 MB, nothing compiled (measured 2026-11-07, below) | nothing to carry | done |
 | Extras with no dependency of their own: `agents`, `guard`, `prompts`, `tools`, `teams`, `flows`, `observe`, and the provider extras `anthropic`, `bedrock`, `google`, `cohere` | they are modules, not extras (the provider extras stay so `pip install skyeai[...]` keeps working) | remove the ones that are not provider extras from `pyproject.toml` |
-| Extra sizes over the core, on Linux: `auth` 0.5 MB (`rsa`), `memory` 2.6 MB (`redis`), `tokens` 8.4 MB (`tiktoken`, compiled; decision D33), `postgres` 14.0 MB (`asyncpg`, compiled), `mcp` 50.6 MB (`fastmcp`, 7 compiled distributions, over its limit of 48: `fastmcp` itself depends on `pyyaml`, so what left the core counts as added by this extra (the extras were not re-measured on 2026-11-07: no network); open until the owner decides how the `mcp` extra is measured) | the compiled ones | only who installs an extra pays for it |
+| Extra sizes over the core, on Linux: `auth` 0.5 MB (`rsa`), `memory` 2.6 MB (`redis`), `tokens` 8.4 MB (`tiktoken`, compiled; decision D33), `postgres` 14.0 MB (`asyncpg`, compiled), `mcp` about 50 MB (`fastmcp`, 7 compiled distributions; not gated since decision D67: an optional third-party library is not part of Skye's budget, and the built-in MCP client is the default) | the compiled ones | only who installs an extra pays for it |
 | `skyeai[all]` size | it includes `mcp` and `memory` | not advertised for Lambda |
 
 ### What the core weighs (2026-11-07, task 14.4 of `0-base-structure`)

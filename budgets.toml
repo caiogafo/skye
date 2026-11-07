@@ -82,14 +82,9 @@ max_profile_mb = 3                  # core + bedrock without the preinstalled li
 
 # Megabytes added over the core install, preinstalled libraries excluded, and the number of
 # compiled distributions added over the core install (target 0 for every extra).
-# The mcp Extra provides fastmcp, the optional substitute for the built-in stdlib MCP client
-# (create_mcp_client(target, impl="fastmcp")). fastmcp is heavy: +43.4 MB, 7 compiled (caio, cffi,
-# cryptography, jsonref, rpds-py, watchfiles, websockets). Accepted by the owner (2026-11-01).
-# The tools Extra carries no third-party library (Requirement 15).
-[extras.mcp]
-max_compiled_over_core = 7
-max_over_core_mb = 48
-target_over_core_mb = 2
+# The mcp Extra (fastmcp, the optional substitute for the built-in stdlib MCP client) has no budget here:
+# it is an optional third-party library chosen only by create_mcp_client(target, impl="fastmcp"), so it is
+# listed in `not_gated` of [extras_policy] (decision D67). The tools Extra carries no third-party library.
 
 # The auth Extra declares only `rsa` (pure Python, RS256). Measured 2026-11-02: rsa + pyasn1, 1 MB.
 [extras.auth]
@@ -121,3 +116,6 @@ target_over_core_mb = 4
 known_empty = ["agents", "guard", "observe", "prompts", "teams", "flows", "tools", "openai", "bedrock", "anthropic", "google", "cohere"]   # provider extras are empty: one built-in stdlib REST adapter each (Requirement 20); "observe" has no telemetry import yet. "tools" carries no third-party library: fastmcp lives in the separate "mcp" extra (Requirement 15).
 # Convenience bundles. They are not budgeted one by one: each member extra is.
 bundles = ["llm-providers", "embedding-providers", "all-providers", "providers", "all"]
+# Extras that only install an optional third-party library Skye does not need (Requirement 7.10, decision D67):
+# not measured by the footprint gate. Skye itself (the core and every other extra) stays under its budgets.
+not_gated = ["mcp"]

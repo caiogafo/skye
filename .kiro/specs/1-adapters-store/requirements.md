@@ -7,7 +7,7 @@ codename: lake
 
 ## Introduction
 
-The one place for state backends, behind the storage Port. This spec is at the requirements stage: the design and the tasks come after the requirements are approved.
+The one place for state backends, behind the storage Port. The design and the tasks are in `design.md` and `tasks.md`.
 
 The requirements themselves live in `.kiro/steering/10-requirements.md`; each requirement below is one user story of this component, and each acceptance criterion is a pointer to the steering criterion it realizes (never a copy).
 

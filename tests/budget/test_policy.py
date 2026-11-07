@@ -30,11 +30,14 @@ def test_every_extra_is_budgeted_empty_or_a_bundle() -> None:
     budgeted.discard("extras_policy")
     policy = budgets["extras_policy"]
     known_empty, bundles = set(policy["known_empty"]), set(policy["bundles"])
+    # An extra that only installs an optional third-party library is not gated (decision D67); it may not also have a budget.
+    not_gated = set(policy.get("not_gated", []))
+    assert not (not_gated & budgeted), f"an extra is both budgeted and not gated: {sorted(not_gated & budgeted)}"
 
-    missing = extras - budgeted - known_empty - bundles
+    missing = extras - budgeted - known_empty - bundles - not_gated
     assert not missing, f"Extras with no budget in budgets.toml: {sorted(missing)}"
 
-    stale = (budgeted | known_empty | bundles) - extras
+    stale = (budgeted | known_empty | bundles | not_gated) - extras
     assert not stale, f"budgets.toml names extras that no longer exist: {sorted(stale)}"
 
 

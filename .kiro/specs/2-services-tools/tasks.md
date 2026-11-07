@@ -81,10 +81,9 @@ cited from other documents are `tools:N.k`.
   - [ ] 6.4 Fix the order-dependent MCP unit tests
     - Note: `tests/unit/tools/test_mcp_capability.py` and `test_mcp_server_client.py` set `sys.modules["fastmcp"] = MagicMock()` at module import, which leaks a fake `fastmcp` into other tests, and `test_execute_raises_not_supported_error` depends on the event loop left by test ordering. Remove the module-level `sys.modules` assignment (patch locally instead) and make the sync-`execute` test install its own loop, so selection stays per-call and `import skye` never sees a fake `fastmcp`. These tests go away with task 6.3 if those modules are deleted.
     - _Requirements: 10.4_
-  - [ ] 6.5 Stop gating CI on the size of the `mcp` extra (open decision O23, owner approval first)
-    - Note: the default MCP client is the built-in stdlib one (`create_mcp_client`); `fastmcp` is opt-in (`impl="fastmcp"`), so by Requirement 7.10 its weight is not gated. After task 6.3, if approved: take `mcp` out of the footprint gate (`budgets.toml`, the matrix in `.github/workflows/budgets.yml`, `tests/budget/test_workflow_matrix.py`), report its size in `docs/budgets.md` as known debt (+50.6 MB on Linux, limit 48 never raised), and keep the test that `fastmcp` is imported only through the extra.
-    - _Requirements: 7.10, 7.11, 15.1; O23_
-
+  - [x] 6.5 Stop gating CI on the size of the `mcp` extra (D67, closes O23)
+    - Evidence: `budgets.toml` (no `[extras.mcp]`; `not_gated = ["mcp"]` in `[extras_policy]`), `.github/workflows/budgets.yml` (no `mcp` footprint job), `tests/budget/test_policy.py` (`not_gated` accepted, never with a budget), `tests/budget/test_workflow_matrix.py` (unchanged, passes), `docs/budgets.md`; `tests/budget/test_boundary_rule.py` still allows `fastmcp` only in `tools/mcp_fastmcp.py`. Done before 6.3, which is still open.
+    - _Requirements: 7.10, 7.11, 15.1; D67_
 - [ ] 7. Final checkpoint
   - Ensure all tests pass, ask the user if questions arise.
 

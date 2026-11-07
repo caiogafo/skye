@@ -7,7 +7,7 @@ codename: halo
 
 ## Introduction
 
-Safety filters and pre-flight checks behind the safety Port. This spec is at the requirements stage: the design and the tasks come after the requirements are approved.
+Safety filters and pre-flight checks behind the safety Port. The design and the tasks are in `design.md` and `tasks.md`.
 
 The requirements themselves live in `.kiro/steering/10-requirements.md`; each requirement below is one user story of this component, and each acceptance criterion is a pointer to the steering criterion it realizes (never a copy).
 
