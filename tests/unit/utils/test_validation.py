@@ -5,7 +5,7 @@ from abc import ABC, abstractmethod
 import pytest
 from pydantic import BaseModel, Field
 
-from skye.base.completion import CompletionRequest
+from skye.base.completion import CompleteRequest
 from skye.base.exceptions import ValidationError
 from skye.base.interfaces import ModelInterface
 from skye.base.messages import AssistantMessage, ContentChunk, UserMessage
@@ -163,8 +163,8 @@ def test_schema_generation_for_content_chunk():
 
 
 def test_schema_generation_for_completion_request():
-    """Test schema generation for CompletionRequest."""
-    schema = generate_schema(CompletionRequest)
+    """Test schema generation for CompleteRequest."""
+    schema = generate_schema(CompleteRequest)
 
     assert schema["type"] == "object"
     assert "properties" in schema

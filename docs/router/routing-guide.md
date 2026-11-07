@@ -37,7 +37,7 @@ from skye.router import (
 )
 from skye.router import RoutingStrategy
 from skye import UserMessage
-from skye import CompletionRequest
+from skye import CompleteRequest
 
 # Create provider instances
 gpt4 = skye.provider("openai", api_key=os.getenv("OPENAI_API_KEY"))
@@ -100,7 +100,7 @@ from skye.router import (
 )
 from skye.router import RoutingStrategy
 from skye import UserMessage
-from skye import CompletionRequest
+from skye import CompleteRequest
 
 # Create router with aliases - providers instantiated automatically
 # All policies configured in constructor

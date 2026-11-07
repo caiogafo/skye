@@ -17,10 +17,10 @@ from unittest.mock import Mock, patch
 import pytest
 from pydantic import BaseModel
 
-from skye.base.completion import CompletionRequest, CompletionResponse, StreamChunk
+from skye.base.completion import CompleteRequest, CompleteResponse, StreamChunk
 from skye.base.exceptions import ProviderError
 from skye.base.messages import SystemMessage, UserMessage
-from skye.models.llm.openai_compatible import AzureOpenAIProvider
+from skye.models.llm.azure import AzureOpenAIProvider
 from skye.models.transport.rest import JsonObject
 
 POST = "skye.models.transport.rest.post_json"
@@ -125,7 +125,7 @@ class TestAzureOpenAIRequestTransformation:
             api_version="2024-02-15-preview",
             deployment_name="gpt-4"
         )
-        request = CompletionRequest(
+        request = CompleteRequest(
             messages=[UserMessage(content="Hello")],
             model="gpt-4",
             temperature=0.7
@@ -149,7 +149,7 @@ class TestAzureOpenAIRequestTransformation:
             api_version="2024-02-15-preview",
             deployment_name="gpt-4"
         )
-        request = CompletionRequest(
+        request = CompleteRequest(
             messages=[
                 SystemMessage(content="You are helpful"),
                 UserMessage(content="Hello")
@@ -172,7 +172,7 @@ class TestAzureOpenAIRequestTransformation:
             api_version="2024-02-15-preview",
             deployment_name="gpt-4"
         )
-        request = CompletionRequest(
+        request = CompleteRequest(
             messages=[UserMessage(content="Hello")],
             model="gpt-4",
             max_tokens=100
@@ -190,7 +190,7 @@ class TestAzureOpenAIRequestTransformation:
             api_version="2024-02-15-preview",
             deployment_name="gpt-4"
         )
-        request = CompletionRequest(
+        request = CompleteRequest(
             messages=[UserMessage(content="Hello")],
             model="gpt-4",
             stop=["END", "STOP"]
@@ -212,7 +212,7 @@ class TestAzureOpenAIRequestTransformation:
             api_version="2024-02-15-preview",
             deployment_name="gpt-4"
         )
-        request = CompletionRequest(
+        request = CompleteRequest(
             messages=[UserMessage(content="Extract person info")],
             model="gpt-4",
             response_schema=Person
@@ -244,7 +244,7 @@ class TestAzureOpenAIRequestTransformation:
                 }
             }
         ]
-        request = CompletionRequest(
+        request = CompleteRequest(
             messages=[UserMessage(content="What's the weather?")],
             model="gpt-4",
             capabilities=capabilities,
@@ -264,7 +264,7 @@ class TestAzureOpenAIRequestTransformation:
             api_version="2024-02-15-preview",
             deployment_name="gpt-4"
         )
-        request = CompletionRequest(
+        request = CompleteRequest(
             messages=[UserMessage(content="Hello")],
             model="gpt-4",
             metadata={
@@ -315,7 +315,7 @@ class TestAzureOpenAIResponseTransformation:
         
         result = provider._transform_response(mock_response)
         
-        assert isinstance(result, CompletionResponse)
+        assert isinstance(result, CompleteResponse)
         assert result.id == "chatcmpl-123"
         assert result.model == "gpt-4"
         assert result.provider == "azure"
@@ -479,10 +479,10 @@ class TestAzureOpenAIProviderCalls:
         """Test successful completion call."""
         with patch(POST, return_value=_json_response()) as post:
             provider = _provider()
-            request = CompletionRequest(messages=[UserMessage(content="Hello")], model="gpt-4")
+            request = CompleteRequest(messages=[UserMessage(content="Hello")], model="gpt-4")
             result = provider.complete(request)
 
-        assert isinstance(result, CompletionResponse)
+        assert isinstance(result, CompleteResponse)
         assert result.content == "Test response"
         assert result.provider == "azure"
         post.assert_called_once()
@@ -496,7 +496,7 @@ class TestAzureOpenAIProviderCalls:
         """Test error handling in complete."""
         with patch(POST, side_effect=Exception("API Error")):
             provider = _provider()
-            request = CompletionRequest(messages=[UserMessage(content="Hello")], model="gpt-4")
+            request = CompleteRequest(messages=[UserMessage(content="Hello")], model="gpt-4")
             with pytest.raises(ProviderError) as exc_info:
                 provider.complete(request)
 
@@ -507,7 +507,7 @@ class TestAzureOpenAIProviderCalls:
         """Test successful streaming call."""
         with patch(STREAM, return_value=iter(_sse_chunks())) as stream:
             provider = _provider()
-            request = CompletionRequest(messages=[UserMessage(content="Hello")], model="gpt-4", stream=True)
+            request = CompleteRequest(messages=[UserMessage(content="Hello")], model="gpt-4", stream=True)
             chunks = list(provider.stream(request))
 
         assert len(chunks) == 3
@@ -526,10 +526,10 @@ class TestAzureOpenAIAsyncSupport:
         """Test successful async completion (sync REST call run in an executor)."""
         with patch(POST, return_value=_json_response("Async response")) as post:
             provider = _provider()
-            request = CompletionRequest(messages=[UserMessage(content="Hello")], model="gpt-4")
+            request = CompleteRequest(messages=[UserMessage(content="Hello")], model="gpt-4")
             result = await provider.acomplete(request)
 
-        assert isinstance(result, CompletionResponse)
+        assert isinstance(result, CompleteResponse)
         assert result.content == "Async response"
         assert result.provider == "azure"
         assert post.call_args.args[0] == URL
@@ -561,7 +561,7 @@ class TestAzureOpenAIToolCalling:
             api_version="2024-02-15-preview",
             deployment_name="gpt-4"
         )
-        request = CompletionRequest(
+        request = CompleteRequest(
             messages=[UserMessage(content="What's the weather in NYC?")],
             model="gpt-4",
             capabilities=[mock_capability],
@@ -595,7 +595,7 @@ class TestAzureOpenAIToolCalling:
             api_version="2024-02-15-preview",
             deployment_name="gpt-4"
         )
-        request = CompletionRequest(
+        request = CompleteRequest(
             messages=[UserMessage(content="What's the weather?")],
             model="gpt-4",
             capabilities=[mock_capability],
@@ -626,7 +626,7 @@ class TestAzureOpenAIToolCalling:
             api_version="2024-02-15-preview",
             deployment_name="gpt-4"
         )
-        request = CompletionRequest(
+        request = CompleteRequest(
             messages=[UserMessage(content="Calculate 2+2")],
             model="gpt-4",
             capabilities=[mock_capability],
@@ -822,7 +822,7 @@ class TestAzureOpenAIToolCalling:
         mock_capability_2.get_schema.return_value = mock_schema_2
         
         # Create request with multiple capabilities
-        request = CompletionRequest(
+        request = CompleteRequest(
             messages=[UserMessage(content="Hello")],
             model="gpt-4",
             capabilities=[mock_capability_1, mock_capability_2]
@@ -856,7 +856,7 @@ class TestAzureOpenAIToolCalling:
         )
         with patch(POST, return_value=response) as post:
             provider = _provider(model="gpt-4")
-            request = CompletionRequest(
+            request = CompleteRequest(
                 messages=[UserMessage(content="What's the weather in Boston?")],
                 model="gpt-4",
                 capabilities=[mock_capability],

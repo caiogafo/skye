@@ -2,11 +2,21 @@
 
 This module defines the abstract interface for calculating API costs based on
 token usage and model pricing.
+
+Raises: ValidationError for a negative token count or price.
+Missing: ``get_pricing`` returns ``None`` for a model with no price; ``calculate_cost`` for such a model raises ValidationError.
+Concurrency: pricing tables are mutated by ``add_custom_pricing``: guard it if called from several threads.
 """
+
+from __future__ import annotations
+from typing import TYPE_CHECKING
 
 from abc import ABC, abstractmethod
 
-from skye.base.completion import TokenUsage
+
+if TYPE_CHECKING:
+    from skye.base.completion import TokenUsage
+
 
 
 class CostCalculatorInterface(ABC):

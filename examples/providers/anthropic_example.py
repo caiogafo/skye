@@ -1,210 +1,34 @@
-"""Anthropic Provider Example (Boto3-style Skye API).
+"""Anthropic through ``skye.provider("anthropic")``: completion and streaming.
 
-This version demonstrates:
-- Basic completion with Claude models
-- Streaming responses
-- System messages (Anthropic-specific)
-- Multi-turn conversations
-- Simple client creation: skye.provider("anthropic")
+A ``SystemMessage`` becomes the Anthropic ``system`` field; the rest of the call is the same as for every provider. With ANTHROPIC_API_KEY
+set the example calls Claude; without a key a scripted client answers and the example says so.
 """
 
 import os
-import skye
-from skye import UserMessage, SystemMessage
+import sys
+from pathlib import Path
 
-
-def basic_completion():
-    """Basic completion with Anthropic."""
-    print("=" * 60)
-    print("Anthropic - Basic Completion")
-    print("=" * 60)
-    
-    api_key = os.getenv("ANTHROPIC_API_KEY")
-    if not api_key:
-        print("⚠️  ANTHROPIC_API_KEY environment variable not set")
-        print("   Set it with: export ANTHROPIC_API_KEY='sk-ant-...'")
-        return
-    
-    try:
-        client = skye.provider("anthropic", api_key=api_key)
-    except ImportError as e:
-        print(f"⚠️  Error: {e}")
-        print("\nTo use Anthropic, install with: pip install skyeai[anthropic]")
-        return
-    
-    messages = [
-        SystemMessage(content="You are a helpful assistant specialized in science."),
-        UserMessage(content="Explain photosynthesis in simple terms"),
-    ]
-    
-    response = client.complete(
-        messages=messages,
-        model="claude-3-sonnet-20240229",
-        temperature=0.7,
-        max_tokens=200,
-    )
-    
-    print("\nResponse:")
-    print("  Text:", response.content)
-    print("  Model:", response.model)
-    print("  Tokens:", response.usage.total_tokens)
-    print("  Finish reason:", response.finish_reason)
-
-
-def streaming_example():
-    """Streaming completion with Anthropic."""
-    print("\n" + "=" * 60)
-    print("Anthropic - Streaming")
-    print("=" * 60)
-    
-    api_key = os.getenv("ANTHROPIC_API_KEY")
-    if not api_key:
-        print("⚠️  ANTHROPIC_API_KEY environment variable not set")
-        return
-    
-    try:
-        client = skye.provider("anthropic", api_key=api_key)
-    except ImportError:
-        print("⚠️  Anthropic provider not available")
-        return
-    
-    messages = [UserMessage(content="Write a haiku about artificial intelligence")]
-    
-    print("\nStreaming response:")
-    print("-" * 40)
-    
-    for chunk in client.stream(messages=messages, model="claude-3-sonnet-20240229"):
-        print(chunk.delta, end="", flush=True)
-    
-    print("\n" + "-" * 40)
-
-
-def claude_models():
-    """Example with different Claude models."""
-    print("\n" + "=" * 60)
-    print("Anthropic - Claude Models")
-    print("=" * 60)
-    
-    api_key = os.getenv("ANTHROPIC_API_KEY")
-    if not api_key:
-        print("⚠️  ANTHROPIC_API_KEY environment variable not set")
-        return
-    
-    try:
-        client = skye.provider("anthropic", api_key=api_key)
-    except ImportError:
-        print("⚠️  Anthropic provider not available")
-        return
-    
-    models = [
-        ("claude-3-opus-20240229", "Claude 3 Opus (most capable)"),
-        ("claude-3-sonnet-20240229", "Claude 3 Sonnet (balanced)"),
-        ("claude-3-haiku-20240307", "Claude 3 Haiku (fastest)"),
-    ]
-    
-    prompt = "What is the meaning of life?"
-    messages = [UserMessage(content=prompt)]
-    
-    print(f"\nPrompt: {prompt}")
-    print("-" * 40)
-    
-    for model_id, model_name in models:
-        print(f"\n{model_name}:")
-        
-        response = client.complete(messages=messages, model=model_id, max_tokens=100)
-        print("  Response:", response.content[:80], "...")
-        print("  Tokens:", response.usage.total_tokens)
-
-
-def system_message_example():
-    """Example showing Anthropic's system message handling."""
-    print("\n" + "=" * 60)
-    print("Anthropic - System Messages")
-    print("=" * 60)
-    
-    print("""
-Anthropic handles system messages differently than other providers.
-The system message is sent separately from the conversation messages.
-
-Example:
-
-```python
-import skye
 from skye import SystemMessage, UserMessage
 
-client = skye.provider("anthropic", api_key="sk-ant-...")
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))  # the shared offline helper lives in examples/
+from _offline import provider_or_scripted  # noqa: E402
 
-messages = [
-    SystemMessage(content="You are a Python expert."),
-    UserMessage(content="How do I use decorators?")
-]
-
-response = client.complete(messages=messages, model="claude-3-sonnet-20240229")
-```
-
-Skye automatically handles this difference for you!
-""")
+MODEL = "claude-3-sonnet-20240229"
 
 
-def multi_turn_conversation():
-    """Multi-turn conversation example."""
-    print("\n" + "=" * 60)
-    print("Anthropic - Multi-Turn Conversation")
-    print("=" * 60)
-    
-    api_key = os.getenv("ANTHROPIC_API_KEY")
-    if not api_key:
-        print("⚠️  ANTHROPIC_API_KEY environment variable not set")
-        return
-    
-    try:
-        client = skye.provider("anthropic", api_key=api_key)
-    except ImportError:
-        print("⚠️  Anthropic provider not available")
-        return
-    
-    # First turn
-    print("\nTurn 1: User asks about Python")
-    messages = [UserMessage(content="What is a Python list?")]
-    
-    response1 = client.complete(
-        messages=messages, model="claude-3-sonnet-20240229", max_tokens=150
-    )
-    print(f"Assistant: {response1.content[:100]}...")
-    
-    # Second turn - continue conversation
-    print("\nTurn 2: User asks follow-up question")
-    messages.append(response1.to_message())
-    messages.append(UserMessage(content="How do I add items to a list?"))
-    
-    response2 = client.complete(
-        messages=messages, model="claude-3-sonnet-20240229", max_tokens=150
-    )
-    print(f"Assistant: {response2.content[:100]}...")
+def main() -> None:
+    key = os.getenv("ANTHROPIC_API_KEY")
+    client = provider_or_scripted("anthropic", bool(key), "set ANTHROPIC_API_KEY", api_key=key)
 
+    messages = [SystemMessage(content="You are a helpful assistant."), UserMessage(content="What is the capital of France?")]
+    response = client.complete(messages=messages, model=MODEL, temperature=0.7, max_tokens=100)
+    print("answer:", response.content)
+    print(f"model={response.model} tokens={response.usage.total_tokens} finish={response.finish_reason}")
 
-def main():
-    """Run all examples."""
-    print("\n" + "🧠 " * 20)
-    print("SKYE - Anthropic Provider Examples")
-    print("🧠 " * 20)
-    
-    try:
-        basic_completion()
-        streaming_example()
-        claude_models()
-        system_message_example()
-        multi_turn_conversation()
-        
-        print("\n" + "=" * 60)
-        print("✅ Examples completed!")
-        print("=" * 60)
-        
-    except Exception as e:
-        print(f"\n❌ Error: {e}")
-        print("\nMake sure you have:")
-        print("  1. Installed skyeai[anthropic]: pip install skyeai[anthropic]")
-        print("  2. Set ANTHROPIC_API_KEY: export ANTHROPIC_API_KEY='sk-ant-...'")
+    print("stream: ", end="")
+    for chunk in client.stream(messages=[UserMessage(content="Write a two-line poem about Python")], model=MODEL):
+        print(chunk.delta, end="", flush=True)
+    print()
 
 
 if __name__ == "__main__":

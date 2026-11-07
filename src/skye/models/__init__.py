@@ -44,8 +44,9 @@ from skye.models.embeddings.google_multimodal_embeddings import (
 from skye.models.lazy_import import LazyImporter
 from skye.models.llm.anthropic import AnthropicProvider
 from skye.models.llm.bedrock import BedrockProvider
-from skye.models.llm.openai_compatible import AzureOpenAIProvider, OpenAIProvider
-from skye.models.llm.google_provider import GoogleProvider
+from skye.models.llm.azure import AzureOpenAIProvider
+from skye.models.llm.openai import OpenAIProvider
+from skye.models.llm.google import GoogleProvider
 from skye.models.decision.jev import JevDecisionModel
 from skye.models.transport.multimodal import ImageHandler
 from skye.models.registry import ProviderRegistry

@@ -21,7 +21,7 @@ See docs/models/provider-transformation-architecture.md for complete architectur
 import logging
 from typing import Any
 
-from skye.base.completion import CompletionResponse
+from skye.base.completion import CompleteResponse
 from skye.tools.capability_models import CapabilityCall, CapabilityResult
 from skye.tools.exceptions import (
     CapabilityCallParsingError,
@@ -77,7 +77,7 @@ class CapabilityCallHandler:
 
     def parse_capability_calls(
         self,
-        response: CompletionResponse,
+        response: CompleteResponse,
         provider: Any,
     ) -> list[CapabilityCall]:
         """Parse capability calls from a provider response using provider-specific logic.
@@ -87,7 +87,7 @@ class CapabilityCallHandler:
         logic is contained within the provider classes.
 
         Args:
-            response: CompletionResponse from the provider
+            response: CompleteResponse from the provider
             provider: Provider instance with parse_capability_calls method
 
         Returns:

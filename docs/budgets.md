@@ -87,3 +87,13 @@ The pydantic stack is about 7.7 MB, 86% of the core; removing it (open decision 
 
 Done since the previous table (2026-10-30): `jinja2` and `markupsafe` left the core (the prompts engine is standard library), and the provider SDK extras
 (`google` 176 MB, `cohere` 33 MB, `anthropic` 10 MB) are now empty because every provider has one built-in REST adapter.
+
+### Import cost per component package (until pydantic is removed, open decision O4)
+Whether a package loads pydantic when imported, measured by the modules that import it at the top level (2026-11-05):
+
+- `skye` and `skye.base` (and the facades `skye.interfaces`, `skye.data`, `skye.messages`, `skye.completion`, `skye.exceptions`, `skye.config`): no.
+- `skye.agents`, `skye.auth`, `skye.flows`, `skye.gateway`, `skye.guard`, `skye.models`, `skye.observe`, `skye.policy`, `skye.prompts`, `skye.store`, `skye.teams`: no.
+- `skye.router`: yes (one module).
+- `skye.tools`: yes (two modules, among them the pydantic `CapabilitySchema`).
+- `skye.memory`: yes (one module).
+- `skye.utils`: yes (`validation`, for pydantic structured-output classes).

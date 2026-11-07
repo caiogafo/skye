@@ -3,7 +3,7 @@
 These tests verify the Bedrock provider implementation including:
 - Built-in REST transport (no boto3)
 - Request transformation to Bedrock Converse API format
-- Response transformation from Bedrock to CompletionResponse
+- Response transformation from Bedrock to CompleteResponse
 - Tool use format handling
 - Streaming support
 """
@@ -14,7 +14,7 @@ from unittest.mock import Mock, patch
 
 import pytest
 
-from skye.base.completion import CompletionRequest, CompletionResponse, StreamChunk
+from skye.base.completion import CompleteRequest, CompleteResponse, StreamChunk
 from skye.base.messages import SystemMessage, UserMessage
 from skye.models.llm.bedrock import BedrockProvider
 from skye.models.transport import rest
@@ -63,7 +63,7 @@ class TestBedrockRequestTransformation:
     def test_transform_basic_request(self):
         """Test transformation of basic completion request."""
         provider = BedrockProvider()
-        request = CompletionRequest(
+        request = CompleteRequest(
             messages=[UserMessage(content="Hello, world!")],
             model="anthropic.claude-3-sonnet-20240229-v1:0",
             temperature=0.7
@@ -80,7 +80,7 @@ class TestBedrockRequestTransformation:
     def test_transform_request_with_system_message(self):
         """Test transformation with system message."""
         provider = BedrockProvider()
-        request = CompletionRequest(
+        request = CompleteRequest(
             messages=[
                 SystemMessage(content="You are a helpful assistant"),
                 UserMessage(content="Hello")
@@ -98,7 +98,7 @@ class TestBedrockRequestTransformation:
     def test_transform_request_with_max_tokens(self):
         """Test transformation with max_tokens parameter."""
         provider = BedrockProvider()
-        request = CompletionRequest(
+        request = CompleteRequest(
             messages=[UserMessage(content="Hello")],
             model="anthropic.claude-3-sonnet-20240229-v1:0",
             max_tokens=1000
@@ -111,7 +111,7 @@ class TestBedrockRequestTransformation:
     def test_transform_request_with_top_p(self):
         """Test transformation with top_p parameter."""
         provider = BedrockProvider()
-        request = CompletionRequest(
+        request = CompleteRequest(
             messages=[UserMessage(content="Hello")],
             model="anthropic.claude-3-sonnet-20240229-v1:0",
             top_p=0.9
@@ -124,7 +124,7 @@ class TestBedrockRequestTransformation:
     def test_transform_request_with_stop_sequences(self):
         """Test transformation with stop sequences."""
         provider = BedrockProvider()
-        request = CompletionRequest(
+        request = CompleteRequest(
             messages=[UserMessage(content="Hello")],
             model="anthropic.claude-3-sonnet-20240229-v1:0",
             stop=["STOP", "END"]
@@ -149,7 +149,7 @@ class TestBedrockRequestTransformation:
                 }
             }
         ]
-        request = CompletionRequest(
+        request = CompleteRequest(
             messages=[UserMessage(content="What's the weather?")],
             model="anthropic.claude-3-sonnet-20240229-v1:0",
             capabilities=capabilities
@@ -164,7 +164,7 @@ class TestBedrockRequestTransformation:
     def test_transform_request_with_bedrock_metadata(self):
         """Test transformation with Bedrock-specific metadata."""
         provider = BedrockProvider()
-        request = CompletionRequest(
+        request = CompleteRequest(
             messages=[UserMessage(content="Hello")],
             model="anthropic.claude-3-sonnet-20240229-v1:0",
             metadata={
@@ -181,7 +181,7 @@ class TestBedrockRequestTransformation:
     def test_transform_request_without_messages_raises_error(self):
         """Test that transformation fails without messages."""
         provider = BedrockProvider()
-        request = CompletionRequest(
+        request = CompleteRequest(
             messages=[],
             model="anthropic.claude-3-sonnet-20240229-v1:0"
         )
@@ -191,7 +191,7 @@ class TestBedrockRequestTransformation:
 
 
 class TestBedrockResponseTransformation:
-    """Test response transformation from Bedrock to CompletionResponse."""
+    """Test response transformation from Bedrock to CompleteResponse."""
     
     def test_transform_basic_response(self):
         """Test transformation of basic Bedrock response."""
@@ -221,7 +221,7 @@ class TestBedrockResponseTransformation:
         
         response = provider._transform_response(bedrock_response)
         
-        assert isinstance(response, CompletionResponse)
+        assert isinstance(response, CompleteResponse)
         assert response.content == "Hello! How can I help you today?"
         assert response.provider == "bedrock"
         assert response.role == "assistant"
@@ -423,8 +423,8 @@ class TestBedrockProviderCalls:
             "usage": {"inputTokens": 1, "outputTokens": 2, "totalTokens": 3},
         })
         provider = BedrockProvider(**KEYS)
-        resp = provider.complete(CompletionRequest(messages=[UserMessage(content="x")], model="m"))
-        assert isinstance(resp, CompletionResponse)
+        resp = provider.complete(CompleteRequest(messages=[UserMessage(content="x")], model="m"))
+        assert isinstance(resp, CompleteResponse)
         assert resp.content == "Hi"
         assert resp.finish_reason == "tool_calls"
         assert resp.capability_calls[0].arguments == {"a": 1}
@@ -455,7 +455,7 @@ class TestBedrockProviderCalls:
             "usage": {},
         })
         provider = BedrockProvider(**KEYS)
-        resp = asyncio.run(provider.acomplete(CompletionRequest(messages=[UserMessage(content="x")], model="m")))
+        resp = asyncio.run(provider.acomplete(CompleteRequest(messages=[UserMessage(content="x")], model="m")))
         assert resp.content == "async"
 
 
@@ -494,7 +494,7 @@ class TestBedrockToolCalling:
         mock_capability.get_schema.return_value = mock_schema
         
         provider = BedrockProvider(model="anthropic.claude-3-sonnet-20240229-v1:0", **KEYS)
-        request = CompletionRequest(
+        request = CompleteRequest(
             messages=[UserMessage(content="What's the weather in NYC?")],
             model="anthropic.claude-3-sonnet-20240229-v1:0",
             capabilities=[mock_capability],
@@ -531,7 +531,7 @@ class TestBedrockToolCalling:
         mock_capability.get_schema.return_value = mock_schema
         
         provider = BedrockProvider(model="anthropic.claude-3-sonnet-20240229-v1:0", **KEYS)
-        request = CompletionRequest(
+        request = CompleteRequest(
             messages=[UserMessage(content="What's the weather?")],
             model="anthropic.claude-3-sonnet-20240229-v1:0",
             capabilities=[mock_capability],
@@ -556,7 +556,7 @@ class TestBedrockToolCalling:
         mock_capability.get_schema.return_value = mock_schema
         
         provider = BedrockProvider(model="anthropic.claude-3-sonnet-20240229-v1:0", **KEYS)
-        request = CompletionRequest(
+        request = CompleteRequest(
             messages=[UserMessage(content="Calculate 2+2")],
             model="anthropic.claude-3-sonnet-20240229-v1:0",
             capabilities=[mock_capability],
@@ -735,7 +735,7 @@ class TestBedrockToolCalling:
         mock_capability_2.get_schema.return_value = mock_schema_2
         
         # Create request with multiple capabilities
-        request = CompletionRequest(
+        request = CompleteRequest(
             messages=[UserMessage(content="Hello")],
             model="anthropic.claude-3-sonnet-20240229-v1:0",
             capabilities=[mock_capability_1, mock_capability_2]
@@ -799,7 +799,7 @@ class TestBedrockToolCalling:
         
         # Execute
         provider = BedrockProvider(model="anthropic.claude-3-sonnet-20240229-v1:0", **KEYS)
-        request = CompletionRequest(
+        request = CompleteRequest(
             messages=[UserMessage(content="What's the weather in Boston?")],
             model="anthropic.claude-3-sonnet-20240229-v1:0",
             capabilities=[mock_capability],
@@ -826,7 +826,7 @@ class TestBedrockIntegration:
     
     @patch("skye.models.transport.rest.post_json")
     def test_complete_request_flow(self, mock_post):
-        """Test complete request flow from CompletionRequest to CompletionResponse."""
+        """Test complete request flow from CompleteRequest to CompleteResponse."""
         # Setup mock client
         mock_response = {
             "output": {
@@ -853,7 +853,7 @@ class TestBedrockIntegration:
         
         
         provider = BedrockProvider(region_name="us-west-2", **KEYS)
-        request = CompletionRequest(
+        request = CompleteRequest(
             messages=[UserMessage(content="Hello")],
             model="anthropic.claude-3-sonnet-20240229-v1:0",
             temperature=0.7,
@@ -862,7 +862,7 @@ class TestBedrockIntegration:
         
         response = provider.complete(request)
         
-        assert isinstance(response, CompletionResponse)
+        assert isinstance(response, CompleteResponse)
         assert response.content == "Hello! How can I help?"
         assert response.provider == "bedrock"
         assert response.usage.total_tokens == 25

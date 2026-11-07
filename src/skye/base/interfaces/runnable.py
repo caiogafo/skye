@@ -6,6 +6,13 @@ Model adapters, agents, teams and flows all satisfy this Protocol, so any of the
 can stand wherever a ``Runnable`` is accepted. Composing units hold their children
 as ``Runnable`` references instead of importing each other. The Port is pure
 contract: standard library only, no I/O.
+
+Raises: any exception of the unit propagates unchanged; composition adds none.
+Missing: not applicable: one input, one output.
+Concurrency: ``invoke`` is async and re-entrant unless the unit documents state.
+
+``ainvoke`` is a thin alias of ``invoke`` that the built-in units (model adapters, agents) also offer, for users who try the ``x`` / ``ax``
+name first; the Port requires only ``invoke``, so a class with just ``invoke`` is still a ``Runnable``.
 """
 
 from typing import Protocol, TypeVar, runtime_checkable

@@ -3,22 +3,20 @@
 ``skye.provider(name, **config)`` is the one way to create the client of a provider, in the style of ``boto3.client``. The same
 line works for every provider; only the name and the configuration change.
 
-Set one of: OPENAI_API_KEY, ANTHROPIC_API_KEY, or AWS credentials for Bedrock.
+With OPENAI_API_KEY set the example calls OpenAI; without a key it runs a scripted client and says so.
 """
 
-import os
-
-import skye
 from skye import UserMessage
+
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))  # the shared offline helper lives in examples/
+from _offline import get_client  # noqa: E402
 
 
 def main() -> None:
-    api_key = os.getenv("OPENAI_API_KEY")
-    if not api_key:
-        print("OPENAI_API_KEY not set, skipping")
-        return
-
-    client = skye.provider("openai", api_key=api_key)
+    client = get_client("openai")  # skye.provider("openai", api_key=...) when the key is set
 
     response = client.complete(
         messages=[UserMessage(content="Hello, world!")],

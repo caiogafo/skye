@@ -258,6 +258,15 @@ The plan starts with interfaces, mocks, and samples to validate the user experie
 - [ ] 17. Final checkpoint - Ensure all tests pass
   - Ensure all tests pass, ask the user if questions arise.
 
+- [ ] 18. Write the bundled prompts in the `.skye` DSL (decision D60 of `.kiro/steering/12-decisions.md`, see `0-base-uxui/dsl-decisions.md`; to start after the `.skye` parser exists; the fate of `engine.py`, open decision O35, is decided here after 18.3)
+  - [ ] 18.1 Define the reduced `prompt` block of version 1: `variables` (typed, with defaults), `message "<role>"` (real roles, not `[SYSTEM]`/`[USER]` text markers), `text`, `when <expr>`, `each x in <expr>`, interpolation `{{ expr }}` with the existing filters, multi-line strings `"""..."""`. Examples, multimodal content, output schema and the partial (`bind`) are version 2
+  - [ ] 18.2 Convert the 18 bundled templates in `src/skye/prompts/templates/` (`chat`, `classification`, `code_agent`, `code_generation`, `explanation`, `form_agent`, `main_agent`, `memory_agent`, `multimodal_agent`, `ner`, `procedure_agent`, `question_answering`, `reasoning_agent`, `relation_extraction`, `sql_generation`, `summarization`, `tabular_extraction`, `tool_agent`) from `.jinja` to `.skye`, one by one
+  - [ ] 18.3 Write an equivalence test: render each old and each new prompt with the same data (a set of variable combinations that covers every `if` and `for` branch) and compare the messages after normalising spaces and blank lines; list any intended difference (real roles instead of text markers) in the test
+  - [ ] 18.4 Keep `prompts/engine.py` for user `.jinja` templates and for the `{{ }}` interpolation of the new blocks; do not remove it in this task. A later decision may restrict it to interpolation only (control tags `{% %}` declared obsolete)
+  - [ ] 18.5 Update `loaders.py` to discover `.skye` prompt files next to the old `.jinja` ones; remove the `.jinja` copies of the bundled templates when 18.3 passes
+  - [ ] 18.6 Update the existing prompt tests and the docs to the new files
+  - _Requirements: 30, 31, 32, 33 of `10-requirements.md` (the behaviour must not change); D20 (no macros, inheritance, include or variable assignment)_
+
 ## Notes
 
 - Tasks marked with `*` are optional and can be skipped for faster MVP

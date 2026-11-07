@@ -4,10 +4,10 @@ This module provides dataclass models for LLM completion requests and responses,
 including support for streaming, structured outputs, and token usage tracking.
 
 Example:
-    >>> from skye.base.completion import CompletionRequest, TokenUsage
+    >>> from skye.base.completion import CompleteRequest, TokenUsage
     >>> from skye.base.messages import UserMessage
     >>>
-    >>> request = CompletionRequest(
+    >>> request = CompleteRequest(
     ...     messages=[UserMessage(content="Hello")],
     ...     model="gpt-4",
     ...     temperature=0.7
@@ -21,23 +21,30 @@ from typing import TYPE_CHECKING, Any
 from uuid import uuid4
 
 from skye.base.exceptions import ValidationError
+from skye.base.capability_execution import (
+    arun_capability_call,
+    find_capability,
+    run_capability_call,
+)
 from skye.base.messages import CapabilityMessage, SkyeMessage
 from skye.base.validated import Validated, field, validated
 
 if TYPE_CHECKING:
     from skye.base.capability_schema import CapabilityRegistryLike
+    from skye.base.interfaces.capability import CapabilityInterface
 
 
 @validated
 class CapabilityCall(Validated):
-    """Represents a capability call request from an LLM.
+    """A capability call requested by an LLM: the one call type, saved as id, name and arguments.
 
-    When an LLM decides to invoke a capability, it generates a capability call
-    containing the capability name and arguments. This model represents
-    that request in a provider-agnostic format.
+    When an LLM decides to invoke a capability, it generates a capability call containing the capability name and arguments.
+    The call is provider-agnostic and serialisable (``dump(call)`` holds only ``id``, ``name`` and ``arguments``). A call that came
+    from a ``CompleteResponse`` can also run itself with ``execute()``: it uses the capabilities the response carries, which are
+    kept outside the saved fields, so saving a call never saves a live capability.
 
-    Lives in base so provider adapters in ``models`` need no import of the tools
-    Component (Requirement 2); ``skye.tools.capability_models`` re-exports it.
+    Lives in base so provider adapters in ``models`` need no import of the tools Component (Requirement 2);
+    ``skye.tools.capability_models`` re-exports it.
 
     Attributes:
         id: Unique identifier for this capability call (from the provider)
@@ -50,6 +57,8 @@ class CapabilityCall(Validated):
         ...     name="weather.get_current",
         ...     arguments={"location": "San Francisco"}
         ... )
+        >>> capability_call.execute().is_error  # no capability is attached to this call
+        True
     """
 
     id: str = field(description="Unique identifier for this capability call from the provider")
@@ -57,59 +66,21 @@ class CapabilityCall(Validated):
     arguments: dict[str, Any] = field(
         default_factory=dict, description="Arguments to pass to the capability"
     )
-
-
-@validated
-class ExecutableCapabilityCall(Validated):
-    """A capability call that can execute itself.
-
-    Wraps a capability call (id, name, arguments) with the capability
-    implementation, allowing direct execution. Lives in base so that
-    ``CompletionResponse.get_capability_calls`` needs no import of the tools
-    Component (Requirement 2); ``skye.tools.capability_models`` re-exports it.
-    """
-
-    id: str = field(description="Unique identifier for this capability call")
-    name: str = field(description="Name of the capability to invoke")
-    arguments: dict[str, Any] = field(
-        default_factory=dict, description="Arguments to pass to the capability"
-    )
-    capability: Any | None = field(
-        default=None, description="The actual capability implementation"
-    )
+    # Internal: where to find the capability (a list or a registry), set by the response; never saved, never an argument
+    _capabilities: Any = field(default=None, init=False, repr=False, compare=False)
 
     def execute(self, **override_arguments: Any) -> CapabilityMessage:
-        """Execute the capability and return a CapabilityMessage.
+        """Run the call and return a ``CapabilityMessage``. It never raises: a failure is a message with the status ``error``.
 
-        ``override_arguments`` are merged over the LLM-provided arguments.
-        Failures are reported as an error CapabilityMessage, never raised.
+        ``override_arguments`` are merged over the arguments the model chose.
         """
-        import json
+        capability = find_capability(self._capabilities, self.name)
+        return run_capability_call(capability, self.id, self.name, {**self.arguments, **override_arguments})
 
-        if self.capability is None:
-            return CapabilityMessage(
-                content=f"Error: Capability '{self.name}' not found",
-                capability_id=self.id,
-                capability_name=self.name,
-            )
-        try:
-            final_arguments = {**self.arguments, **override_arguments}
-            result = self.capability.execute(**final_arguments)
-            if isinstance(result, str):
-                content = result
-            elif isinstance(result, (dict, list)):
-                content = json.dumps(result)
-            else:
-                content = str(result)
-            return CapabilityMessage(
-                content=content, capability_id=self.id, capability_name=self.name
-            )
-        except Exception as e:
-            return CapabilityMessage(
-                content=f"Error: {str(e)}",
-                capability_id=self.id,
-                capability_name=self.name,
-            )
+    async def aexecute(self, **override_arguments: Any) -> CapabilityMessage:
+        """The asynchronous form of ``execute``: it awaits ``capability.aexecute``. It never raises."""
+        capability = find_capability(self._capabilities, self.name)
+        return await arun_capability_call(capability, self.id, self.name, {**self.arguments, **override_arguments})
 
 
 @validated
@@ -140,7 +111,7 @@ class TokenUsage(Validated):
 
 
 @validated
-class CompletionRequest(Validated):
+class CompleteRequest(Validated):
     """Request for model completion.
 
     Represents a request to an LLM provider with all necessary parameters
@@ -175,7 +146,7 @@ class CompletionRequest(Validated):
 
     Example (Base Skye):
         >>> from skye.base.messages import UserMessage
-        >>> request = CompletionRequest(
+        >>> request = CompleteRequest(
         ...     messages=[UserMessage(content="What is 2+2?")],
         ...     model="gpt-4",
         ...     temperature=0.7
@@ -185,7 +156,7 @@ class CompletionRequest(Validated):
 
     Example (With skyeai[prompts]):
         >>> # Using prompt templates (requires skyeai[prompts])
-        >>> request = CompletionRequest(
+        >>> request = CompleteRequest(
         ...     prompt="math_solver",
         ...     prompt_variables={"problem": "What is 2+2?"},
         ...     model="gpt-4"
@@ -206,7 +177,7 @@ class CompletionRequest(Validated):
         ...     description="Get weather for a location"
         ... )
         >>>
-        >>> request = CompletionRequest(
+        >>> request = CompleteRequest(
         ...     messages=[UserMessage(content="What's the weather in NYC?")],
         ...     model="gpt-4",
         ...     capabilities=[capability],
@@ -217,7 +188,7 @@ class CompletionRequest(Validated):
 
     Example (With skyeai[mcp]):
         >>> # Using MCP servers (requires skyeai[mcp])
-        >>> request = CompletionRequest(
+        >>> request = CompleteRequest(
         ...     messages=[UserMessage(content="What's the weather in NYC?")],
         ...     model="gpt-4",
         ...     mcp_servers=[
@@ -277,7 +248,7 @@ class CompletionRequest(Validated):
 
 
 @validated
-class CompletionResponse(Validated):
+class CompleteResponse(Validated):
     """Response from model completion.
 
     Represents the response from an LLM provider, including the generated content,
@@ -298,7 +269,7 @@ class CompletionResponse(Validated):
 
     Example (Basic Response):
         >>> from datetime import datetime, timezone
-        >>> response = CompletionResponse(
+        >>> response = CompleteResponse(
         ...     id="resp_123",
         ...     model="gpt-4",
         ...     provider="openai",
@@ -312,8 +283,8 @@ class CompletionResponse(Validated):
         'The answer is 4.'
 
     Example (With Capability Calls):
-        >>> from skye.tools.capability_models import CapabilityCall
-        >>> response = CompletionResponse(
+        >>> from skye.completion import CapabilityCall
+        >>> response = CompleteResponse(
         ...     model="gpt-4",
         ...     provider="openai",
         ...     content="",
@@ -333,7 +304,7 @@ class CompletionResponse(Validated):
         >>> # Execute capability calls (requires skyeai[capabilities])
         >>> from skye.tools.registry import CapabilityRegistry
         >>> registry = CapabilityRegistry.get_instance()
-        >>> results = await response.execute_capability_calls(registry)
+        >>> results = response.execute_capability_calls(registry)  # doctest: +SKIP
     """
 
     id: str = field(default_factory=lambda: str(uuid4()))
@@ -344,12 +315,12 @@ class CompletionResponse(Validated):
     role: str = "assistant"
     finish_reason: str
     usage: TokenUsage
-    capability_calls: list[Any] | None = None  # List of CapabilityCall (requires skyeai[capabilities])
+    capability_calls: list[CapabilityCall] | None = None
     created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     metadata: dict[str, Any] = field(default_factory=dict)
     
     # Internal: the capabilities of the request, kept to execute the calls; not an argument
-    _capabilities: list[Any] | None = field(default=None, init=False, repr=False, compare=False)
+    _capabilities: "list[CapabilityInterface] | CapabilityRegistryLike | None" = field(default=None, init=False, repr=False, compare=False)
 
     def get_output(self) -> Any:
         """Get the output - structured if available, otherwise text content.
@@ -359,7 +330,7 @@ class CompletionResponse(Validated):
 
         Example:
             >>> # With text content
-            >>> response = CompletionResponse(
+            >>> response = CompleteResponse(
             ...     model="gpt-4",
             ...     provider="openai",
             ...     content="Hello",
@@ -387,7 +358,7 @@ class CompletionResponse(Validated):
             AssistantMessage containing the response content and capability calls.
 
         Example:
-            >>> response = CompletionResponse(
+            >>> response = CompleteResponse(
             ...     model="gpt-4",
             ...     provider="openai",
             ...     content="Let me check that for you.",
@@ -427,8 +398,8 @@ class CompletionResponse(Validated):
             True if the response contains one or more capability calls, False otherwise.
 
         Example:
-            >>> from skye.tools.capability_models import CapabilityCall
-            >>> response = CompletionResponse(
+            >>> from skye.completion import CapabilityCall
+            >>> response = CompleteResponse(
             ...     model="gpt-4",
             ...     provider="openai",
             ...     content="",
@@ -441,7 +412,7 @@ class CompletionResponse(Validated):
             >>> response.has_capability_calls()
             True
             >>>
-            >>> response_no_capabilities = CompletionResponse(
+            >>> response_no_capabilities = CompleteResponse(
             ...     model="gpt-4",
             ...     provider="openai",
             ...     content="Hello",
@@ -453,203 +424,96 @@ class CompletionResponse(Validated):
         """
         return self.capability_calls is not None and len(self.capability_calls) > 0
     
-    def get_capability_calls(self) -> list[ExecutableCapabilityCall]:
-        """Get capability calls as executable objects.
+    def __setattr__(self, name: str, value: Any) -> None:
+        super().__setattr__(name, value)
+        if name in ("_capabilities", "capability_calls"):
+            self._attach_capabilities()
 
-        Returns:
-            List of ExecutableCapabilityCall objects that can execute themselves.
+    def __post_init__(self) -> None:
+        super().__post_init__()
+        self._attach_capabilities()
 
-        Example:
-            >>> response = client.complete(
-            ...     messages=[UserMessage(content="What's the weather in SF?")],
-            ...     model="gpt-4",
-            ...     capabilities=[get_weather]
-            ... )
-            >>> if response.has_capability_calls():
-            ...     for capability in response.get_capability_calls():
-            ...         msg = capability.execute()  # Returns CapabilityMessage
-        """
-        if not self.has_capability_calls():
-            return []
-        
-        # Create executable wrappers
-        executable_calls = []
-        for call in self.capability_calls or []:
-            # Find the matching capability
-            capability = None
-            if self._capabilities:
-                for cap in self._capabilities:
-                    # Get capability name from schema
-                    try:
-                        schema = cap.get_schema()
-                        if schema.name == call.name:
-                            capability = cap
-                            break
-                    except Exception:
-                        # If get_schema fails, try direct name attribute
-                        if hasattr(cap, 'name') and cap.name == call.name:
-                            capability = cap
-                            break
-            
-            executable_calls.append(
-                ExecutableCapabilityCall(
-                    id=call.id,
-                    name=call.name,
-                    arguments=call.arguments,
-                    capability=capability
-                )
-            )
-        
-        return executable_calls
+    def _attach_capabilities(self) -> None:
+        """Give every call the capabilities of the request, so ``call.execute()`` can find its capability."""
+        for call in self.__dict__.get("capability_calls") or []:
+            call._capabilities = self.__dict__.get("_capabilities")
 
-    async def execute_capability_calls(
+    @property
+    def text(self) -> str:
+        """The text of the reply: a read-only alias of ``content`` (the name users of other libraries try first)."""
+        return self.content
+
+    def execute_capability_calls(
         self,
         registry: "CapabilityRegistryLike | None" = None,
         argument_overrides: dict[str, dict[str, Any]] | None = None,
     ) -> list["SkyeMessage"]:
-        """Execute all capability calls and return CapabilityMessage objects.
+        """Run every capability call of the response and return one ``CapabilityMessage`` per call.
 
-        Executes all capability calls in the response and returns a list of 
-        CapabilityMessage objects that can be directly added to the conversation 
-        messages for the next completion request.
-
-        The method will use capabilities from the original request if available,
-        otherwise it will use the provided registry to look them up.
+        The messages can be added to the conversation for the next completion. It uses the capabilities of the original request,
+        or ``registry`` when the request had none. A call that fails gives a message with the status ``error``; nothing is raised
+        for a failing call. ``aexecute_capability_calls`` is the asynchronous form.
 
         Args:
-            registry: Optional CapabilityRegistry instance. If not provided, uses
-                capabilities from the original request.
-            argument_overrides: Optional dict mapping capability call IDs to argument overrides.
-                Overrides will be merged with LLM-provided arguments, with overrides taking precedence.
+            registry: A capability registry, used when the request carried no capabilities.
+            argument_overrides: Arguments merged over the model's, per call id or per capability name; overrides win.
 
         Returns:
-            List of CapabilityMessage objects ready to be added to conversation
+            One ``CapabilityMessage`` per call, in order.
 
         Raises:
-            ImportError: If skyeai[capabilities] is not installed
-            ValueError: If the response has no capability calls
-            ValueError: If no registry provided and capabilities not available from request
+            ValueError: If the response has no capability calls, or if there is neither request capabilities nor a registry.
 
         Example:
-            >>> from skye.base.messages import UserMessage
-            >>>
-            >>> # Initial request with capabilities
             >>> response = client.complete(
             ...     messages=[UserMessage(content="What's the weather in San Francisco?")],
             ...     model="gpt-4",
             ...     capabilities=[weather_capability]
-            ... )
-            >>>
-            >>> # Execute capability calls (no registry needed!)
+            ... )  # doctest: +SKIP
             >>> if response.has_capability_calls():
-            ...     capability_messages = await response.execute_capability_calls()
-            ...     
-            ...     # Continue conversation with results
-            ...     final_response = client.complete(
-            ...         messages=[
-            ...             UserMessage(content="What's the weather in San Francisco?"),
-            ...             response.to_message(),
-            ...             *capability_messages  # Spread the capability messages
-            ...         ],
-            ...         model="gpt-4"
-            ...     )
-            >>>
-            >>> # Execute with argument overrides
-            >>> if response.has_capability_calls():
-            ...     overrides = {
-            ...         "call_123": {"location": "New York"}  # Override location
-            ...     }
-            ...     capability_messages = await response.execute_capability_calls(
-            ...         argument_overrides=overrides
-            ...     )
-            >>>
-            >>> # Or use a registry if capabilities weren't in the request
-            >>> from skye.tools.registry import CapabilityRegistry
-            >>> registry = CapabilityRegistry.get_instance()
-            >>> capability_messages = await response.execute_capability_calls(registry)
+            ...     capability_messages = response.execute_capability_calls()  # doctest: +SKIP
         """
-        # Import here to avoid circular dependency and allow optional capabilities
-        try:
-            from skye.base.messages import CapabilityMessage
-        except ImportError as e:
-            raise ImportError(
-                "Capability call execution requires skyeai[capabilities]. "
-                "Install with: pip install skyeai[capabilities]"
-            ) from e
+        source = self._execution_source(registry)
+        return [
+            run_capability_call(
+                find_capability(source, call.name), call.id, call.name, self._arguments_of(call, argument_overrides)
+            )
+            for call in self.capability_calls or []
+        ]
 
+    async def aexecute_capability_calls(
+        self,
+        registry: "CapabilityRegistryLike | None" = None,
+        argument_overrides: dict[str, dict[str, Any]] | None = None,
+    ) -> list["SkyeMessage"]:
+        """The asynchronous form of ``execute_capability_calls``: it awaits ``capability.aexecute`` for each call, in order."""
+        source = self._execution_source(registry)
+        return [
+            await arun_capability_call(
+                find_capability(source, call.name), call.id, call.name, self._arguments_of(call, argument_overrides)
+            )
+            for call in self.capability_calls or []
+        ]
+
+    def _execution_source(self, registry: "CapabilityRegistryLike | None") -> Any:
         if not self.has_capability_calls():
             raise ValueError("Response has no capability calls to execute")
-
-        import json
-        messages: list[SkyeMessage] = []
-
-        # Build capability lookup map
-        capability_map: dict[str, Any] = {}
-        if self._capabilities:
-            # Use capabilities from the original request
-            for cap in self._capabilities:
-                try:
-                    schema = cap.get_schema()
-                    capability_map[schema.name] = cap
-                except Exception:
-                    # If get_schema fails, try direct name attribute
-                    if hasattr(cap, 'name'):
-                        capability_map[cap.name] = cap
-        elif registry:
-            # Use registry to look up capabilities
-            for capability_call in self.capability_calls:  # type: ignore
-                cap = registry.get(capability_call.name)
-                if cap:
-                    capability_map[capability_call.name] = cap
-        else:
+        source = self._capabilities or registry
+        if not source:
             raise ValueError(
                 "No capabilities available. Either pass capabilities in the request "
                 "or provide a CapabilityRegistry instance."
             )
+        return source
 
-        for capability_call in self.capability_calls:  # type: ignore
-            try:
-                # Merge LLM arguments with overrides if provided
-                final_arguments = capability_call.arguments.copy()
-                if argument_overrides and capability_call.id in argument_overrides:
-                    final_arguments.update(argument_overrides[capability_call.id])
-
-                # Get the capability
-                capability = capability_map.get(capability_call.name)
-                if not capability:
-                    raise ValueError(f"Capability '{capability_call.name}' not found")
-
-                # Execute the capability asynchronously
-                result = await capability.aexecute(**final_arguments)
-
-                # Format result as string
-                if isinstance(result, str):
-                    content = result
-                elif isinstance(result, (dict, list)):
-                    content = json.dumps(result)
-                else:
-                    content = str(result)
-
-                # Create capability message
-                messages.append(
-                    CapabilityMessage(
-                        content=content,
-                        capability_id=capability_call.id,
-                        capability_name=capability_call.name,
-                    )
-                )
-
-            except Exception as e:
-                # Create error message
-                messages.append(
-                    CapabilityMessage(
-                        content=f"Error: {str(e)}",
-                        capability_id=capability_call.id,
-                        capability_name=capability_call.name,
-                    )
-                )
-
-        return messages
+    @staticmethod
+    def _arguments_of(call: CapabilityCall, overrides: dict[str, dict[str, Any]] | None) -> dict[str, Any]:
+        """The model's arguments with the overrides given for the call id or, failing that, for its capability name."""
+        arguments = dict(call.arguments)
+        if overrides:
+            arguments.update(overrides.get(call.name, {}))
+            arguments.update(overrides.get(call.id, {}))
+        return arguments
 
 
 @validated

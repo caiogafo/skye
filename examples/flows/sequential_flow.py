@@ -1,53 +1,30 @@
 """Chain Runnables in sequence with cycle detection (proposed-interface, guarded).
 
-The ``flows`` component is declared
-but minimal: there is no public flows API yet. What is real and composable today
-is the ``Runnable`` Port (``async invoke(input) -> output``), so this example
-chains user ``Runnable``s in order (each step's output feeds the next step's
-input) with a tiny local sequential runner.
-
-The planned ``flows`` API will own the graph and its validation; here we also show
-a local cycle check. When a cycle is configured the runner refuses to run and
-prints a line containing the word ``Expected`` -- a deliberately-shown error that
-the examples harness treats as success, not a failure.
+The ``flows`` component has no public API yet. What is real today is the ``Runnable`` Port (``async invoke(input) -> output``): this example
+chains user ``Runnable``s in order with a tiny local runner and a cycle check. A configured cycle prints a line with the word ``Expected``,
+a deliberately shown error that the examples harness treats as success. The planned ``flows`` API will own the graph and its validation.
 """
 
 import asyncio
+from collections.abc import Callable
 from dataclasses import dataclass, field
 
 from skye.interfaces import Runnable
 
 
-class Trim:
-    """Step one: strip surrounding whitespace."""
+class Apply:
+    """A step that applies a function to its input."""
+
+    def __init__(self, fn: Callable[[str], str]) -> None:
+        self.fn = fn
 
     async def invoke(self, input: str) -> str:
-        return input.strip()
-
-
-class Upper:
-    """Step two: upper-case the text."""
-
-    async def invoke(self, input: str) -> str:
-        return input.upper()
-
-
-class Exclaim:
-    """Step three: add emphasis."""
-
-    async def invoke(self, input: str) -> str:
-        return f"{input}!"
+        return self.fn(input)
 
 
 @dataclass
 class Step:
-    """A named flow step holding its Runnable and the name of the next step.
-
-    Attributes:
-        name: Unique step name.
-        runnable: The unit that does the work, held via the Runnable Port.
-        next: Name of the following step, or None for the last step.
-    """
+    """A named step: its Runnable and the name of the next step (None for the last)."""
 
     name: str
     runnable: Runnable[str, str]
@@ -56,16 +33,9 @@ class Step:
 
 @dataclass
 class Flow:
-    """A sequential flow of steps, keyed by name.
-
-    The planned ``flows`` API will own graph construction and validation; this
-    local shape mirrors its intended form so the example stays honest.
-    """
-
     steps: dict[str, Step] = field(default_factory=dict)
 
     def has_cycle(self, start: str) -> bool:
-        """Return True if following ``next`` from ``start`` revisits a step."""
         seen: set[str] = set()
         current: str | None = start
         while current is not None:
@@ -76,7 +46,6 @@ class Flow:
         return False
 
     async def run(self, start: str, value: str) -> str:
-        """Run steps from ``start`` in order, feeding each output to the next."""
         if self.has_cycle(start):
             raise ValueError("flow has a cycle")
         current: str | None = start
@@ -89,32 +58,18 @@ class Flow:
 
 
 async def main() -> None:
-    flow = Flow(
-        steps={
-            "trim": Step("trim", Trim(), next="upper"),
-            "upper": Step("upper", Upper(), next="exclaim"),
-            "exclaim": Step("exclaim", Exclaim(), next=None),
-        }
-    )
-    result = await flow.run("trim", "  hello flow  ")
-    print("Flow result:", result)
+    flow = Flow({
+        "trim": Step("trim", Apply(str.strip), next="upper"),
+        "upper": Step("upper", Apply(str.upper), next="exclaim"),
+        "exclaim": Step("exclaim", Apply(lambda text: f"{text}!")),
+    })
+    print("Flow result:", await flow.run("trim", "  hello flow  "))
 
-    # Cycle detection: configure a loop and show the runner refuses it. The line
-    # contains "Expected" so the harness does not treat it as a failure.
-    looping = Flow(
-        steps={
-            "a": Step("a", Trim(), next="b"),
-            "b": Step("b", Upper(), next="a"),
-        }
-    )
+    looping = Flow({"a": Step("a", Apply(str.strip), next="b"), "b": Step("b", Apply(str.upper), next="a")})
     try:
         await looping.run("a", "x")
-    except ValueError as e:
-        print(f"Expected cycle refused by the flow runner: {e}")
-
-    print("Composition is via the Runnable Port; the flows orchestration API")
-    print("ships with the future flows spec, so no flows call is made here.")
-    return
+    except ValueError as error:
+        print(f"Expected cycle refused by the flow runner: {error}")
 
 
 if __name__ == "__main__":

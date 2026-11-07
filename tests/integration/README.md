@@ -76,7 +76,7 @@ export AWS_REGION="us-east-1"
 ```python
 import pytest
 from skye.router import ModelRouter
-from skye.base.completion import CompletionRequest
+from skye.base.completion import CompleteRequest
 from skye.base.messages import UserMessage
 
 @pytest.mark.integration
@@ -86,7 +86,7 @@ def test_router_with_yaml_config():
     router = ModelRouter.from_yaml("tests/fixtures/sample_config.yaml")
     
     # Create request
-    request = CompletionRequest(
+    request = CompleteRequest(
         messages=[UserMessage(content="Hello, world!")],
         model="gpt-3.5-turbo"
     )
@@ -121,7 +121,7 @@ def test_openai_provider_real_api():
     
     provider = OpenAIProvider(api_key=os.getenv("OPENAI_API_KEY"))
     
-    request = CompletionRequest(
+    request = CompleteRequest(
         messages=[UserMessage(content="Say 'test' and nothing else")],
         model="gpt-3.5-turbo",
         max_tokens=10
@@ -155,7 +155,7 @@ def test_router_with_capabilities():
     router = ModelRouter.from_yaml("tests/fixtures/sample_config.yaml")
     
     # Create request with capabilities
-    request = CompletionRequest(
+    request = CompleteRequest(
         messages=[UserMessage(content="What's the weather in SF?")],
         model="gpt-3.5-turbo",
         capabilities=registry.get_all()
@@ -183,7 +183,7 @@ def test_fallback_chain_execution():
     router = ModelRouter.from_yaml("tests/fixtures/fallback_config.yaml")
     
     # Create request
-    request = CompletionRequest(
+    request = CompleteRequest(
         messages=[UserMessage(content="Hello")],
         model="gpt-4"  # Primary model
     )
@@ -266,7 +266,7 @@ async def test_async_routing():
     """Test async routing workflow."""
     router = ModelRouter.from_yaml("tests/fixtures/sample_config.yaml")
     
-    request = CompletionRequest(
+    request = CompleteRequest(
         messages=[UserMessage(content="Hello")],
         model="gpt-3.5-turbo"
     )

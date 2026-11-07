@@ -22,11 +22,12 @@ Example:
 
 from typing import Any
 
+from skye.base.interfaces.token_counter import TokenCounterInterface
 from skye.base.messages import SkyeMessage
 from skye.models.lazy_import import LazyImporter
 
 
-class TokenCounter:
+class TokenCounter(TokenCounterInterface):
     """Calculate token counts for different models.
 
     This class provides methods to count tokens in text and messages using

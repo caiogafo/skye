@@ -14,7 +14,7 @@ from unittest.mock import Mock, patch
 
 import pytest
 
-from skye.base.completion import CompletionRequest, CompletionResponse, StreamChunk
+from skye.base.completion import CompleteRequest, CompleteResponse, StreamChunk
 from skye.base.exceptions import ProviderError
 from skye.base.messages import SystemMessage, UserMessage
 from skye.models.llm.anthropic import AnthropicProvider
@@ -42,7 +42,7 @@ class TestAnthropicProviderInitialization:
         import ast
         import inspect
 
-        from skye.models.llm import anthropic as mod
+        from skye.models.llm import anthropic_compatible as mod
 
         for node in ast.walk(ast.parse(inspect.getsource(mod))):
             if isinstance(node, ast.Import):
@@ -59,7 +59,7 @@ class TestAnthropicRequestTransformation:
     def test_transform_basic_request(self) -> None:
         """Test transformation of basic completion request."""
         provider = AnthropicProvider(model="claude-3-opus-20240229", api_key="sk-ant-test")
-        request = CompletionRequest(
+        request = CompleteRequest(
             messages=[UserMessage(content="Hello")],
             model="claude-3-opus-20240229",
             temperature=0.7
@@ -79,7 +79,7 @@ class TestAnthropicRequestTransformation:
     def test_transform_with_system_message_separation(self) -> None:
         """Test transformation with system message separated."""
         provider = AnthropicProvider(model="claude-3-opus-20240229", api_key="sk-ant-test")
-        request = CompletionRequest(
+        request = CompleteRequest(
             messages=[
                 SystemMessage(content="You are a helpful assistant"),
                 UserMessage(content="Hello")
@@ -99,7 +99,7 @@ class TestAnthropicRequestTransformation:
     def test_transform_with_max_tokens(self) -> None:
         """Test transformation with max_tokens parameter."""
         provider = AnthropicProvider(model="claude-3-opus-20240229", api_key="sk-ant-test")
-        request = CompletionRequest(
+        request = CompleteRequest(
             messages=[UserMessage(content="Hello")],
             model="claude-3-opus-20240229",
             max_tokens=1000
@@ -112,7 +112,7 @@ class TestAnthropicRequestTransformation:
     def test_transform_with_stop_sequences(self) -> None:
         """Test transformation with stop sequences."""
         provider = AnthropicProvider(model="claude-3-opus-20240229", api_key="sk-ant-test")
-        request = CompletionRequest(
+        request = CompleteRequest(
             messages=[UserMessage(content="Hello")],
             model="claude-3-opus-20240229",
             stop=["END", "STOP"]
@@ -140,7 +140,7 @@ class TestAnthropicRequestTransformation:
                 }
             }
         ]
-        request = CompletionRequest(
+        request = CompleteRequest(
             messages=[UserMessage(content="What's the weather?")],
             model="claude-3-opus-20240229",
             capabilities=capabilities,
@@ -169,7 +169,7 @@ class TestAnthropicRequestTransformation:
                 }
             }
         ]
-        request = CompletionRequest(
+        request = CompleteRequest(
             messages=[UserMessage(content="What's the weather?")],
             model="claude-3-opus-20240229",
             capabilities=capabilities,
@@ -183,7 +183,7 @@ class TestAnthropicRequestTransformation:
     def test_transform_with_provider_metadata(self) -> None:
         """Test transformation with provider-specific metadata."""
         provider = AnthropicProvider(model="claude-3-opus-20240229", api_key="sk-ant-test")
-        request = CompletionRequest(
+        request = CompleteRequest(
             messages=[UserMessage(content="Hello")],
             model="claude-3-opus-20240229",
             metadata={
@@ -226,7 +226,7 @@ class TestAnthropicResponseTransformation:
         
         result = provider._transform_response(mock_response)
         
-        assert isinstance(result, CompletionResponse)
+        assert isinstance(result, CompleteResponse)
         assert result.id == "msg_123"
         assert result.model == "claude-3-opus-20240229"
         assert result.provider == "anthropic"
@@ -392,11 +392,11 @@ class TestAnthropicProviderCalls:
     def test_complete_success(self) -> None:
         with patch(POST, return_value=_msg([_text("Test response")])) as post:
             provider = AnthropicProvider(model="claude-3-opus-20240229", api_key="sk-ant-test")
-            result = provider.complete(CompletionRequest(
+            result = provider.complete(CompleteRequest(
                 messages=[UserMessage(content="Hello")], model="claude-3-opus-20240229"
             ))
 
-        assert isinstance(result, CompletionResponse)
+        assert isinstance(result, CompleteResponse)
         assert result.content == "Test response"
         assert result.provider == "anthropic"
         assert result.usage.total_tokens == 15
@@ -413,7 +413,7 @@ class TestAnthropicProviderCalls:
     def test_complete_error_handling(self) -> None:
         with patch(POST, side_effect=Exception("API Error")):
             provider = AnthropicProvider(model="claude-3-opus-20240229", api_key="sk-ant-test")
-            request = CompletionRequest(
+            request = CompleteRequest(
                 messages=[UserMessage(content="Hello")], model="claude-3-opus-20240229"
             )
             with pytest.raises(ProviderError) as exc_info:
@@ -434,7 +434,7 @@ class TestAnthropicProviderCalls:
         ]
         with patch(STREAM, return_value=iter(events)) as stream:
             provider = AnthropicProvider(model="claude-3-opus-20240229", api_key="sk-ant-test")
-            chunks = list(provider.stream(CompletionRequest(
+            chunks = list(provider.stream(CompleteRequest(
                 messages=[UserMessage(content="Hello")],
                 model="claude-3-opus-20240229", stream=True,
             )))
@@ -460,11 +460,11 @@ class TestAnthropicAsyncSupport:
     async def test_acomplete_success(self) -> None:
         with patch(POST, return_value=_msg([_text("Async response")])) as post:
             provider = AnthropicProvider(model="claude-3-opus-20240229", api_key="sk-ant-test")
-            result = await provider.acomplete(CompletionRequest(
+            result = await provider.acomplete(CompleteRequest(
                 messages=[UserMessage(content="Hello")], model="claude-3-opus-20240229"
             ))
 
-        assert isinstance(result, CompletionResponse)
+        assert isinstance(result, CompleteResponse)
         assert result.content == "Async response"
         assert result.provider == "anthropic"
         assert post.call_args.args[0] == URL
@@ -507,7 +507,7 @@ class TestAnthropicToolCalling:
         mock_capability.get_schema.return_value = mock_schema
         
         provider = AnthropicProvider(model="claude-3-opus-20240229", api_key="sk-ant-test")
-        request = CompletionRequest(
+        request = CompleteRequest(
             messages=[UserMessage(content="What's the weather in NYC?")],
             model="claude-3-opus-20240229",
             capabilities=[mock_capability],
@@ -536,7 +536,7 @@ class TestAnthropicToolCalling:
         mock_capability.get_schema.return_value = mock_schema
         
         provider = AnthropicProvider(model="claude-3-opus-20240229", api_key="sk-ant-test")
-        request = CompletionRequest(
+        request = CompleteRequest(
             messages=[UserMessage(content="What's the weather?")],
             model="claude-3-opus-20240229",
             capabilities=[mock_capability],
@@ -561,7 +561,7 @@ class TestAnthropicToolCalling:
         mock_capability.get_schema.return_value = mock_schema
         
         provider = AnthropicProvider(model="claude-3-opus-20240229", api_key="sk-ant-test")
-        request = CompletionRequest(
+        request = CompleteRequest(
             messages=[UserMessage(content="Calculate 2+2")],
             model="claude-3-opus-20240229",
             capabilities=[mock_capability],
@@ -716,7 +716,7 @@ class TestAnthropicToolCalling:
         mock_capability_2.get_schema.return_value = mock_schema_2
         
         # Create request with multiple capabilities
-        request = CompletionRequest(
+        request = CompleteRequest(
             messages=[UserMessage(content="Hello")],
             model="claude-3-opus-20240229",
             capabilities=[mock_capability_1, mock_capability_2]
@@ -747,7 +747,7 @@ class TestAnthropicToolCalling:
                           "input": {"location": "Boston"}}], stop="tool_use", i=40, o=15)
         with patch(POST, return_value=response) as post:
             provider = AnthropicProvider(model="claude-3-opus-20240229", api_key="sk-ant-test")
-            result = provider.complete(CompletionRequest(
+            result = provider.complete(CompleteRequest(
                 messages=[UserMessage(content="What's the weather in Boston?")],
                 model="claude-3-opus-20240229",
                 capabilities=[mock_capability],

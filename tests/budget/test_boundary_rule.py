@@ -172,7 +172,7 @@ def _sdk_shaped_response():
 
 def test_provider_response_is_skye_types_only():
     """The single boundary point (`_transform_response`) converts an SDK object to a Skye type."""
-    from skye.models.llm.openai_compatible import OpenAIProvider
+    from skye.models.llm.openai import OpenAIProvider
 
     result = OpenAIProvider(api_key="sk-test")._transform_response(_sdk_shaped_response())
     assert type(result).__module__.startswith("skye")
@@ -186,13 +186,13 @@ def test_models_public_port_returns_skye_types_only():
     (`_call_provider`), so the real boundary conversion runs end-to-end on the public API.
     Guards Requirement 16 for `models` (REST vs SDK) the same way the MCP checks guard `tools`.
     """
-    from skye.base.completion import CompletionRequest
+    from skye.base.completion import CompleteRequest
     from skye.base.messages import UserMessage
-    from skye.models.llm.openai_compatible import OpenAIProvider
+    from skye.models.llm.openai import OpenAIProvider
 
     provider = OpenAIProvider(api_key="sk-test")
     provider._call_provider = Mock(return_value=_sdk_shaped_response())  # type: ignore[method-assign]
-    request = CompletionRequest(messages=[UserMessage(content="hi")], model="gpt-4")
+    request = CompleteRequest(messages=[UserMessage(content="hi")], model="gpt-4")
     result = provider.complete(request)
     assert type(result).__module__.startswith("skye")
     assert not _foreign_types(result)

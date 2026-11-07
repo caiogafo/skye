@@ -45,8 +45,8 @@ class OpenAIProvider(BaseModelProvider):
         # All OpenAI-specific extraction logic here
         pass
     
-    def _transform_request(self, request: CompletionRequest) -> dict[str, Any]:
-        """Transform CompletionRequest to OpenAI format."""
+    def _transform_request(self, request: CompleteRequest) -> dict[str, Any]:
+        """Transform CompleteRequest to OpenAI format."""
         # Uses internal transformation methods
         return {
             "model": request.model,
@@ -55,11 +55,11 @@ class OpenAIProvider(BaseModelProvider):
             # ... other OpenAI-specific mappings
         }
     
-    def _transform_response(self, response: Any) -> CompletionResponse:
-        """Transform OpenAI response to CompletionResponse."""
+    def _transform_response(self, response: Any) -> CompleteResponse:
+        """Transform OpenAI response to CompleteResponse."""
         # Uses internal extraction methods
         tool_calls = self._extract_capability_calls(response)
-        return CompletionResponse(...)
+        return CompleteResponse(...)
 ```
 
 ### 2. Thin Delegation Layers
@@ -114,7 +114,7 @@ These modules MUST NOT contain provider-specific code.
 ```
 User Code
   ↓
-CompletionRequest (Skye format)
+CompleteRequest (Skye format)
   ↓
 Router (provider-agnostic)
   ↓
@@ -141,7 +141,7 @@ Provider Client
 _transform_response()
   └─ _extract_capability_calls()
   ↓
-CompletionResponse (Skye format)
+CompleteResponse (Skye format)
   ↓
 User Code
 ```
@@ -239,7 +239,7 @@ Core library code never needs to know about specific providers:
 
 ```python
 # Router code (provider-agnostic)
-def route_request(self, request: CompletionRequest) -> CompletionResponse:
+def route_request(self, request: CompleteRequest) -> CompleteResponse:
     provider = self._select_provider(request.model)
     return provider.complete(request)  # Provider handles all transformations
 ```

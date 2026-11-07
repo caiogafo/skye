@@ -26,7 +26,7 @@ def complete_with_provider(messages, model="gpt-4", temperature=0.7, max_tokens=
         provider_name: Provider to use (default: openai)
     
     Returns:
-        CompletionResponse or None if API key not available
+        CompleteResponse or None if API key not available
     """
     api_key = os.getenv(f"{provider_name.upper()}_API_KEY")
     if not api_key:

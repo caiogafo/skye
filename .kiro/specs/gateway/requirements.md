@@ -183,3 +183,5 @@ The requirements themselves live in `.kiro/steering/10-requirements.md`; each re
 #### Acceptance Criteria
 
 1. THE spec SHALL realize Requirement 44.13 of #[[file:.kiro/steering/10-requirements.md]].
+
+Note (from decision D47 of `.kiro/steering/12-decisions.md`): the Gateway client SHALL implement the `ToolProvider` Port of `skye.base.interfaces.tool_provider` (list the tools of an operation, call one with the scope token, raise `CapabilityExecutionError` on failure), so that `CapabilityRegistry` (local) and the Gateway client (remote) are interchangeable in an agent. Local mode (this requirement) is the first implementation to write: it wraps a `CapabilityRegistry`. The component `skye.gateway` is still empty and raises `ImportError` on any name (spec 0-base-uxui, task 4.6).

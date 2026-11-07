@@ -12,7 +12,7 @@ from typing import Any, Iterator
 
 import pytest
 
-from skye.base.completion import CompletionRequest, CompletionResponse, StreamChunk, TokenUsage
+from skye.base.completion import CompleteRequest, CompleteResponse, StreamChunk, TokenUsage
 from skye.base.exceptions import ConfigurationError
 from skye.base.interfaces.router import RoutingStrategy
 from skye.models.base import BaseModelProvider
@@ -26,11 +26,11 @@ class MockProvider(BaseModelProvider):
     def _initialize_client(self) -> Any:
         return {"mock": "client"}
     
-    def _transform_request(self, request: CompletionRequest) -> dict[str, Any]:
+    def _transform_request(self, request: CompleteRequest) -> dict[str, Any]:
         return {"model": request.model, "messages": []}
     
-    def _transform_response(self, response: Any) -> CompletionResponse:
-        return CompletionResponse(
+    def _transform_response(self, response: Any) -> CompleteResponse:
+        return CompleteResponse(
             id="test_id",
             model="test_model",
             provider="mock",

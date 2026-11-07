@@ -1,158 +1,17 @@
-# Advanced Examples
+# advanced
 
-This directory contains advanced examples demonstrating complex patterns and features.
+What you learn: the advanced calls. Read in this order:
 
-## Examples
+1. `custom_providers.py`: A custom provider: extend the base model provider, register it, and use it like any other
+2. `function_calling.py`: Function calling: several capabilities, parallel execution and errors inside a capability
+3. `multimodal.py`: Multimodal inputs: turn an image (URL, data URL, file or bytes) into the shape each provider expects
+4. `prompt_engineering.py`: Prompt engineering with the prompt builder: few-shot examples, composition and dynamic prompts
+5. `streaming.py`: Streaming: tokens as the model writes them, with ``stream`` (sync) and ``astream`` (async)
+6. `structured_output.py`: Structured output: ask for a declared shape and get a typed object back
+7. `value_proposition.py`: The value of Skye in one example: one prompt, several providers, and a fallback when one fails
 
-### `multimodal.py`
-Working with multimodal inputs (text, images, audio, video).
+Run: `python examples/advanced/custom_providers.py`
 
-**Topics covered:**
-- Image inputs with URLs and base64
-- Audio and video processing
-- Mixed content in messages
-- Provider-specific multimodal support
+What you see: printed results; with no key a scripted client answers and the example prints which mode ran.
 
-### `structured_output.py`
-Requesting structured outputs with declared schemas (nested objects, enums, optional fields) and validating the answer.
-
-**Topics covered:**
-- Defining output schemas
-- Nested schemas
-- Field validation
-- Type-safe responses
-- Enum fields
-- Optional fields
-
-### `function_calling.py`
-Advanced function calling patterns.
-
-**Topics covered:**
-- Several capabilities defined with `@capability`
-- Executing the calls the model asks for (`execute_capability_calls`)
-- Capability result messages and the follow-up call
-- A capability that raises: the error goes back to the model
-
-### `streaming.py`
-Streaming responses and handling tokens in real-time.
-
-**Topics covered:**
-- Streaming completions with `stream`
-- Token-by-token processing and time to first token
-- Async streaming with `astream`
-
-### `prompt_engineering.py`
-Advanced prompt engineering techniques.
-
-**Topics covered:**
-- Few-shot learning with an example template
-- Chain-of-thought prompting with system and user messages
-- Template composition
-- Dynamic prompts: callable defaults and custom filters
-
-### `custom_providers.py`
-Implementing custom model providers.
-
-**Topics covered:**
-- Extending `BaseModelProvider`
-- The transformation of a request and of an answer
-- Provider registration, then `skye.provider("name")`
-- Errors of the library (a lighter option, a `Runnable`, is in `examples/providers/bring_your_own_adapter.py`)
-
-## Running the Examples
-
-```bash
-# Run multimodal example
-python examples/advanced/multimodal.py
-
-# Run structured output example
-python examples/advanced/structured_output.py
-
-# Run function calling example
-python examples/advanced/function_calling.py
-
-# Run streaming example
-python examples/advanced/streaming.py
-
-# Run prompt engineering example
-python examples/advanced/prompt_engineering.py
-
-# Run custom providers example
-python examples/advanced/custom_providers.py
-```
-
-## Key Concepts
-
-All of them create the client with one call, `skye.provider(name, **config)`.
-
-### Multimodal Processing
-
-```python
-from skye import UserMessage
-
-message = UserMessage(content="What's in this image?", images=["https://example.com/image.jpg"])
-response = client.complete(messages=[message], model="gpt-4o")
-```
-
-### Structured Outputs
-
-```python
-from skye.data import Validated, validated
-
-@validated
-class Person(Validated):
-    name: str
-    age: int
-
-response = client.complete(messages=[...], model="gpt-4", response_schema=Person)
-person = response.structured_output  # a Person; a non-conforming answer raises ValidationError
-```
-
-### Streaming
-
-```python
-for chunk in client.stream(messages=[...], model="gpt-4"):
-    print(chunk.delta, end="", flush=True)
-```
-
-### Async Operations
-
-```python
-import asyncio
-
-async def main():
-    response = await client.acomplete(messages=[...], model="gpt-4")
-    print(response.content)
-
-asyncio.run(main())
-```
-
-## Performance Tips
-
-1. **Batch Requests**: Use batch APIs when available
-2. **Caching**: Cache responses for repeated queries
-3. **Streaming**: Use streaming for long responses
-4. **Async**: Use async for concurrent requests
-5. **Rate Limiting**: Respect provider rate limits
-
-## Error Handling
-
-```python
-from skye import ProviderError, SkyeError, ValidationError
-
-try:
-    response = client.complete(messages=[...], model="gpt-4")
-except ValidationError as e:
-    print(f"The answer did not match the schema: {e}")
-except ProviderError as e:
-    print(f"The provider failed: {e}")
-except SkyeError as e:
-    print(f"Error: {e}")
-```
-
-## Next Steps
-
-- Explore the Skye documentation
-- Check out the provider-specific examples
-- Implement custom providers for your use case
-- Contribute examples back to the community
+What you need: `pip install skyeai`; a provider key only to call a real service.

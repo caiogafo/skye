@@ -8,17 +8,13 @@ from typing import TYPE_CHECKING, Any
 
 from pydantic import BaseModel, Field
 
-from skye.base.completion import (
-    CapabilityCall,
-    ExecutableCapabilityCall,
-)
+from skye.base.completion import CapabilityCall
 
 if TYPE_CHECKING:
     from skye.base.messages import CapabilityMessage
 
 __all__ = [
     "CapabilityCall",
-    "ExecutableCapabilityCall",
     "CapabilityResult",
 ]
 
@@ -86,22 +82,15 @@ class CapabilityResult(BaseModel):
             >>> msg.capability_name
             'get_weather'
         """
-        import json
+        from skye.base.capability_execution import format_capability_result
+        from skye.base.messages import CapabilityMessage, CapabilityStatus
 
-        from skye.base.messages import CapabilityMessage
-
-        # Format the content based on whether there's an error
+        # The same text and the same status as every other execution path
         if self.error:
-            content = f"Error: {self.error}"
+            content, status = f"Error: {self.error}", CapabilityStatus.ERROR
         else:
-            # Convert result to string, handling various types
-            if isinstance(self.result, str):
-                content = self.result
-            elif isinstance(self.result, (dict, list)):
-                content = json.dumps(self.result)
-            else:
-                content = str(self.result)
+            content, status = format_capability_result(self.result), CapabilityStatus.OK
 
         return CapabilityMessage(
-            content=content, capability_id=self.capability_call_id, capability_name=self.name
+            content=content, capability_id=self.capability_call_id, capability_name=self.name, status=status
         )

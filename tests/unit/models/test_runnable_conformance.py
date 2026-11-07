@@ -15,7 +15,7 @@ from typing import Any
 
 import pytest
 
-from skye.base.completion import CompletionRequest, CompletionResponse, TokenUsage
+from skye.base.completion import CompleteRequest, CompleteResponse, TokenUsage
 from skye.base.interfaces.runnable import Runnable
 from skye.base.messages import UserMessage
 from skye.models.llm import (
@@ -83,12 +83,12 @@ async def test_invoke_delegates_to_acomplete() -> None:
     """
     provider = OpenAIProvider(api_key="test-key")
 
-    request = CompletionRequest(
+    request = CompleteRequest(
         messages=[UserMessage(content="Hello")],
         model="gpt-4",
     )
 
-    sentinel = CompletionResponse(
+    sentinel = CompleteResponse(
         id="resp-1",
         model="gpt-4",
         provider="openai",
@@ -99,7 +99,7 @@ async def test_invoke_delegates_to_acomplete() -> None:
 
     seen: dict[str, Any] = {}
 
-    async def fake_acomplete(req: CompletionRequest) -> CompletionResponse:
+    async def fake_acomplete(req: CompleteRequest) -> CompleteResponse:
         seen["request"] = req
         return sentinel
 

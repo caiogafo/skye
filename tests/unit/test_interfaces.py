@@ -9,7 +9,7 @@ from typing import Any
 
 import pytest
 
-from skye.base.completion import CompletionRequest, CompletionResponse, StreamChunk, TokenUsage
+from skye.base.completion import CompleteRequest, CompleteResponse, StreamChunk, TokenUsage
 from skye.base.interfaces.capability import CapabilityInterface, CapabilitySchema
 from skye.base.interfaces.content_reader import ContentReaderInterface
 from skye.base.interfaces.event_handler import EventHandlerInterface
@@ -20,7 +20,6 @@ from skye.base.interfaces.plugin import PluginInterface
 from skye.base.interfaces.prompt import PromptBuilderInterface
 from skye.base.interfaces.router import ModelRouterInterface, RoutingStrategy
 from skye.base.interfaces.safety import SafetyFilterInterface, SafetyResult
-from skye.base.interfaces.storage import StorageAdapterInterface
 from skye.base.interfaces.vector_encoder import VectorEncoderInterface
 from skye.base.messages import ContentChunk, SkyeMessage, UserMessage
 from skye.memory import MemoryEntry
@@ -44,7 +43,7 @@ class TestModelInterface:
         """Test that incomplete implementations raise TypeError."""
 
         class IncompleteModel(ModelInterface):
-            def complete(self, request: CompletionRequest) -> CompletionResponse:
+            def complete(self, request: CompleteRequest) -> CompleteResponse:
                 pass
 
         with pytest.raises(TypeError, match="Can't instantiate abstract class"):
@@ -54,8 +53,8 @@ class TestModelInterface:
         """Test that a complete implementation can be instantiated."""
 
         class CompleteModel(ModelInterface):
-            def complete(self, request: CompletionRequest) -> CompletionResponse:
-                return CompletionResponse(
+            def complete(self, request: CompleteRequest) -> CompleteResponse:
+                return CompleteResponse(
                     model=request.model,
                     provider="test",
                     content="Test response",
@@ -63,13 +62,13 @@ class TestModelInterface:
                     usage=TokenUsage(prompt_tokens=10, completion_tokens=5, total_tokens=15),
                 )
 
-            def stream(self, request: CompletionRequest) -> Iterator[StreamChunk]:
+            def stream(self, request: CompleteRequest) -> Iterator[StreamChunk]:
                 yield StreamChunk(id="test", delta="Test", index=0)
 
-            async def acomplete(self, request: CompletionRequest) -> CompletionResponse:
+            async def acomplete(self, request: CompleteRequest) -> CompleteResponse:
                 return self.complete(request)
 
-            async def astream(self, request: CompletionRequest) -> Iterator[StreamChunk]:
+            async def astream(self, request: CompleteRequest) -> Iterator[StreamChunk]:
                 return self.stream(request)
 
             def get_model_info(self) -> dict:
@@ -83,8 +82,8 @@ class TestModelInterface:
         """Test that a mock implementation can execute complete()."""
 
         class MockModel(ModelInterface):
-            def complete(self, request: CompletionRequest) -> CompletionResponse:
-                return CompletionResponse(
+            def complete(self, request: CompleteRequest) -> CompleteResponse:
+                return CompleteResponse(
                     model=request.model,
                     provider="mock",
                     content=f"Echo: {request.messages[0].content}",
@@ -96,20 +95,20 @@ class TestModelInterface:
                     ),
                 )
 
-            def stream(self, request: CompletionRequest) -> Iterator[StreamChunk]:
+            def stream(self, request: CompleteRequest) -> Iterator[StreamChunk]:
                 yield StreamChunk(id="mock", delta="Test", index=0)
 
-            async def acomplete(self, request: CompletionRequest) -> CompletionResponse:
+            async def acomplete(self, request: CompleteRequest) -> CompleteResponse:
                 return self.complete(request)
 
-            async def astream(self, request: CompletionRequest) -> Iterator[StreamChunk]:
+            async def astream(self, request: CompleteRequest) -> Iterator[StreamChunk]:
                 return self.stream(request)
 
             def get_model_info(self) -> dict:
                 return {"name": "mock-model", "provider": "mock"}
 
         model = MockModel()
-        request = CompletionRequest(
+        request = CompleteRequest(
             messages=[UserMessage(content="Hello world")], model="mock-model"
         )
         response = model.complete(request)
@@ -122,8 +121,8 @@ class TestModelInterface:
         """Test that a mock implementation can execute stream()."""
 
         class MockModel(ModelInterface):
-            def complete(self, request: CompletionRequest) -> CompletionResponse:
-                return CompletionResponse(
+            def complete(self, request: CompleteRequest) -> CompleteResponse:
+                return CompleteResponse(
                     model=request.model,
                     provider="mock",
                     content="Test",
@@ -131,23 +130,23 @@ class TestModelInterface:
                     usage=TokenUsage(prompt_tokens=1, completion_tokens=1, total_tokens=2),
                 )
 
-            def stream(self, request: CompletionRequest) -> Iterator[StreamChunk]:
+            def stream(self, request: CompleteRequest) -> Iterator[StreamChunk]:
                 words = ["Hello", " ", "world"]
                 for i, word in enumerate(words):
                     yield StreamChunk(id="stream_123", delta=word, index=i)
                 yield StreamChunk(id="stream_123", delta="", finish_reason="stop", index=len(words))
 
-            async def acomplete(self, request: CompletionRequest) -> CompletionResponse:
+            async def acomplete(self, request: CompleteRequest) -> CompleteResponse:
                 return self.complete(request)
 
-            async def astream(self, request: CompletionRequest) -> Iterator[StreamChunk]:
+            async def astream(self, request: CompleteRequest) -> Iterator[StreamChunk]:
                 return self.stream(request)
 
             def get_model_info(self) -> dict:
                 return {"name": "mock-model", "provider": "mock"}
 
         model = MockModel()
-        request = CompletionRequest(
+        request = CompleteRequest(
             messages=[UserMessage(content="Test")], model="mock-model", stream=True
         )
 
@@ -162,8 +161,8 @@ class TestModelInterface:
         """Test that a mock implementation can execute get_model_info()."""
 
         class MockModel(ModelInterface):
-            def complete(self, request: CompletionRequest) -> CompletionResponse:
-                return CompletionResponse(
+            def complete(self, request: CompleteRequest) -> CompleteResponse:
+                return CompleteResponse(
                     model=request.model,
                     provider="mock",
                     content="Test",
@@ -171,13 +170,13 @@ class TestModelInterface:
                     usage=TokenUsage(prompt_tokens=1, completion_tokens=1, total_tokens=2),
                 )
 
-            def stream(self, request: CompletionRequest) -> Iterator[StreamChunk]:
+            def stream(self, request: CompleteRequest) -> Iterator[StreamChunk]:
                 yield StreamChunk(id="test", delta="Test", index=0)
 
-            async def acomplete(self, request: CompletionRequest) -> CompletionResponse:
+            async def acomplete(self, request: CompleteRequest) -> CompleteResponse:
                 return self.complete(request)
 
-            async def astream(self, request: CompletionRequest) -> Iterator[StreamChunk]:
+            async def astream(self, request: CompleteRequest) -> Iterator[StreamChunk]:
                 return self.stream(request)
 
             def get_model_info(self) -> dict:
@@ -201,8 +200,8 @@ class TestModelInterface:
         """Test that a mock implementation can execute acomplete()."""
 
         class MockModel(ModelInterface):
-            def complete(self, request: CompletionRequest) -> CompletionResponse:
-                return CompletionResponse(
+            def complete(self, request: CompleteRequest) -> CompleteResponse:
+                return CompleteResponse(
                     model=request.model,
                     provider="mock",
                     content="Async response",
@@ -210,21 +209,21 @@ class TestModelInterface:
                     usage=TokenUsage(prompt_tokens=1, completion_tokens=2, total_tokens=3),
                 )
 
-            def stream(self, request: CompletionRequest) -> Iterator[StreamChunk]:
+            def stream(self, request: CompleteRequest) -> Iterator[StreamChunk]:
                 yield StreamChunk(id="test", delta="Test", index=0)
 
-            async def acomplete(self, request: CompletionRequest) -> CompletionResponse:
+            async def acomplete(self, request: CompleteRequest) -> CompleteResponse:
                 # Simulate async operation
                 return self.complete(request)
 
-            async def astream(self, request: CompletionRequest) -> Iterator[StreamChunk]:
+            async def astream(self, request: CompleteRequest) -> Iterator[StreamChunk]:
                 return self.stream(request)
 
             def get_model_info(self) -> dict:
                 return {"name": "mock-model", "provider": "mock"}
 
         model = MockModel()
-        request = CompletionRequest(
+        request = CompleteRequest(
             messages=[UserMessage(content="Test async")], model="mock-model"
         )
         response = await model.acomplete(request)
@@ -989,42 +988,6 @@ class TestObserverInterface:
         assert observer is not None
 
 
-class TestStorageAdapterInterface:
-    """Tests for StorageAdapterInterface."""
-
-    def test_storage_adapter_interface_is_abstract(self):
-        """Test that StorageAdapterInterface cannot be instantiated directly."""
-        with pytest.raises(TypeError, match="Can't instantiate abstract class"):
-            StorageAdapterInterface()
-
-    def test_storage_adapter_interface_abstract_methods(self):
-        """Test that StorageAdapterInterface defines all required abstract methods."""
-        abstract_methods = StorageAdapterInterface.__abstractmethods__
-        expected_methods = {"save", "query", "vector_search", "delete"}
-        assert abstract_methods == expected_methods
-
-    def test_complete_implementation_works(self):
-        """Test that a complete implementation can be instantiated."""
-
-        class CompleteStorage(StorageAdapterInterface):
-            def save(self, collection: str, data: dict) -> str:
-                return "id_123"
-
-            def query(self, collection: str, filters: dict) -> list[dict]:
-                return []
-
-            def vector_search(
-                self, collection: str, vector: list[float], limit: int = 10
-            ) -> list[dict]:
-                return []
-
-            def delete(self, collection: str, record_id: str) -> bool:
-                return True
-
-        storage = CompleteStorage()
-        assert storage is not None
-
-
 class TestPluginInterface:
     """Tests for PluginInterface."""
 
@@ -1231,7 +1194,7 @@ class TestModelRouterInterface:
             def register_model(self, model_id: str, model: Any) -> None:
                 pass
 
-            def select_model(self, request: CompletionRequest) -> str:
+            async def select_model(self, request: CompleteRequest) -> str:
                 return "model_1"
 
             def complete(
@@ -1240,8 +1203,8 @@ class TestModelRouterInterface:
                 model: str | None = None,
                 tags: list[str] | None = None,
                 **kwargs: Any,
-            ) -> CompletionResponse:
-                return CompletionResponse(
+            ) -> CompleteResponse:
+                return CompleteResponse(
                     model="model_1",
                     provider="test",
                     content="test",
@@ -1255,7 +1218,7 @@ class TestModelRouterInterface:
                 model: str | None = None,
                 tags: list[str] | None = None,
                 **kwargs: Any,
-            ) -> CompletionResponse:
+            ) -> CompleteResponse:
                 return self.complete(messages, model=model, tags=tags, **kwargs)
 
             def mark_model_failed(self, model_id: str) -> None:

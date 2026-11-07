@@ -6,8 +6,8 @@ import pytest
 from pydantic import BaseModel
 
 from skye.base.completion import (
-    CompletionRequest,
-    CompletionResponse,
+    CompleteRequest,
+    CompleteResponse,
     StreamChunk,
     TokenUsage,
 )
@@ -31,12 +31,12 @@ class TestTokenUsage:
             TokenUsage(prompt_tokens=10)  # Missing required fields
 
 
-class TestCompletionRequest:
-    """Tests for CompletionRequest model."""
+class TestCompleteRequest:
+    """Tests for CompleteRequest model."""
 
     def test_completion_request_minimal(self):
-        """Test creating a minimal CompletionRequest."""
-        request = CompletionRequest(messages=[UserMessage(content="Hello")], model="gpt-4")
+        """Test creating a minimal CompleteRequest."""
+        request = CompleteRequest(messages=[UserMessage(content="Hello")], model="gpt-4")
         assert len(request.messages) == 1
         assert request.model == "gpt-4"
         assert request.temperature == 0.7  # Default
@@ -44,8 +44,8 @@ class TestCompletionRequest:
         assert request.stream is False  # Default
 
     def test_completion_request_with_parameters(self):
-        """Test CompletionRequest with custom parameters."""
-        request = CompletionRequest(
+        """Test CompleteRequest with custom parameters."""
+        request = CompleteRequest(
             messages=[UserMessage(content="Hello")],
             model="gpt-4",
             temperature=0.5,
@@ -63,44 +63,44 @@ class TestCompletionRequest:
     def test_temperature_validation(self):
         """Test temperature must be between 0.0 and 2.0."""
         # Valid temperatures
-        CompletionRequest(messages=[UserMessage(content="test")], model="gpt-4", temperature=0.0)
-        CompletionRequest(messages=[UserMessage(content="test")], model="gpt-4", temperature=2.0)
+        CompleteRequest(messages=[UserMessage(content="test")], model="gpt-4", temperature=0.0)
+        CompleteRequest(messages=[UserMessage(content="test")], model="gpt-4", temperature=2.0)
 
         # Invalid temperatures
         with pytest.raises(ValidationError):
-            CompletionRequest(
+            CompleteRequest(
                 messages=[UserMessage(content="test")], model="gpt-4", temperature=-0.1
             )
 
         with pytest.raises(ValidationError):
-            CompletionRequest(
+            CompleteRequest(
                 messages=[UserMessage(content="test")], model="gpt-4", temperature=2.1
             )
 
     def test_top_p_validation(self):
         """Test top_p must be between 0.0 and 1.0."""
         # Valid top_p
-        CompletionRequest(messages=[UserMessage(content="test")], model="gpt-4", top_p=0.0)
-        CompletionRequest(messages=[UserMessage(content="test")], model="gpt-4", top_p=1.0)
+        CompleteRequest(messages=[UserMessage(content="test")], model="gpt-4", top_p=0.0)
+        CompleteRequest(messages=[UserMessage(content="test")], model="gpt-4", top_p=1.0)
 
         # Invalid top_p
         with pytest.raises(ValidationError):
-            CompletionRequest(messages=[UserMessage(content="test")], model="gpt-4", top_p=-0.1)
+            CompleteRequest(messages=[UserMessage(content="test")], model="gpt-4", top_p=-0.1)
 
         with pytest.raises(ValidationError):
-            CompletionRequest(messages=[UserMessage(content="test")], model="gpt-4", top_p=1.1)
+            CompleteRequest(messages=[UserMessage(content="test")], model="gpt-4", top_p=1.1)
 
     def test_max_tokens_validation(self):
         """Test max_tokens must be positive."""
         # Valid max_tokens
-        CompletionRequest(messages=[UserMessage(content="test")], model="gpt-4", max_tokens=100)
+        CompleteRequest(messages=[UserMessage(content="test")], model="gpt-4", max_tokens=100)
 
         # Invalid max_tokens
         with pytest.raises(ValidationError):
-            CompletionRequest(messages=[UserMessage(content="test")], model="gpt-4", max_tokens=0)
+            CompleteRequest(messages=[UserMessage(content="test")], model="gpt-4", max_tokens=0)
 
         with pytest.raises(ValidationError):
-            CompletionRequest(messages=[UserMessage(content="test")], model="gpt-4", max_tokens=-1)
+            CompleteRequest(messages=[UserMessage(content="test")], model="gpt-4", max_tokens=-1)
 
     def test_capabilities_field(self):
         """Test capabilities field for tool/function calling."""
@@ -111,7 +111,7 @@ class TestCompletionRequest:
                 "parameters": {"location": "string"},
             }
         ]
-        request = CompletionRequest(
+        request = CompleteRequest(
             messages=[UserMessage(content="What's the weather?")],
             model="gpt-4",
             capabilities=capabilities,
@@ -127,7 +127,7 @@ class TestCompletionRequest:
             answer: str
             confidence: float
 
-        request = CompletionRequest(
+        request = CompleteRequest(
             messages=[UserMessage(content="Answer this")],
             model="gpt-4",
             response_format={"type": "json_object"},
@@ -138,7 +138,7 @@ class TestCompletionRequest:
 
     def test_metadata_field(self):
         """Test metadata field for additional context."""
-        request = CompletionRequest(
+        request = CompleteRequest(
             messages=[UserMessage(content="test")],
             model="gpt-4",
             metadata={"user_id": "123", "session_id": "abc"},
@@ -147,14 +147,14 @@ class TestCompletionRequest:
         assert request.metadata["session_id"] == "abc"
 
     def test_completion_request_capabilities(self):
-        """Test CompletionRequest with capabilities field."""
+        """Test CompleteRequest with capabilities field."""
         # Test with None (default)
-        request = CompletionRequest(messages=[UserMessage(content="Hello")], model="gpt-4")
+        request = CompleteRequest(messages=[UserMessage(content="Hello")], model="gpt-4")
         assert request.capabilities is None
         assert request.capability_choice is None
 
         # Test with empty list
-        request = CompletionRequest(
+        request = CompleteRequest(
             messages=[UserMessage(content="Hello")], model="gpt-4", capabilities=[]
         )
         assert request.capabilities == []
@@ -164,7 +164,7 @@ class TestCompletionRequest:
             {"name": "get_weather", "description": "Get weather"},
             {"name": "search", "description": "Search the web"},
         ]
-        request = CompletionRequest(
+        request = CompleteRequest(
             messages=[UserMessage(content="Hello")],
             model="gpt-4",
             capabilities=mock_capabilities,
@@ -175,47 +175,47 @@ class TestCompletionRequest:
     def test_completion_request_capability_choice_validation(self):
         """Test capability_choice field validation."""
         # Valid: None (default)
-        request = CompletionRequest(messages=[UserMessage(content="Hello")], model="gpt-4")
+        request = CompleteRequest(messages=[UserMessage(content="Hello")], model="gpt-4")
         assert request.capability_choice is None
 
         # Valid: "auto"
-        request = CompletionRequest(
+        request = CompleteRequest(
             messages=[UserMessage(content="Hello")], model="gpt-4", capability_choice="auto"
         )
         assert request.capability_choice == "auto"
 
         # Valid: "required"
-        request = CompletionRequest(
+        request = CompleteRequest(
             messages=[UserMessage(content="Hello")], model="gpt-4", capability_choice="required"
         )
         assert request.capability_choice == "required"
 
         # Valid: specific capability name
-        request = CompletionRequest(
+        request = CompleteRequest(
             messages=[UserMessage(content="Hello")], model="gpt-4", capability_choice="get_weather"
         )
         assert request.capability_choice == "get_weather"
 
         # Invalid: empty string
         with pytest.raises(ValidationError):
-            CompletionRequest(
+            CompleteRequest(
                 messages=[UserMessage(content="Hello")], model="gpt-4", capability_choice=""
             )
 
         # Invalid: whitespace only
         with pytest.raises(ValidationError):
-            CompletionRequest(
+            CompleteRequest(
                 messages=[UserMessage(content="Hello")], model="gpt-4", capability_choice="   "
             )
 
 
-class TestCompletionResponse:
-    """Tests for CompletionResponse model."""
+class TestCompleteResponse:
+    """Tests for CompleteResponse model."""
 
     def test_completion_response_creation(self):
-        """Test creating a CompletionResponse."""
+        """Test creating a CompleteResponse."""
         usage = TokenUsage(prompt_tokens=10, completion_tokens=20, total_tokens=30)
-        response = CompletionResponse(
+        response = CompleteResponse(
             model="gpt-4",
             provider="openai",
             content="Hello, world!",
@@ -230,20 +230,20 @@ class TestCompletionResponse:
         assert response.role == "assistant"  # Default
 
     def test_completion_response_with_id(self):
-        """Test CompletionResponse generates unique ID."""
+        """Test CompleteResponse generates unique ID."""
         usage = TokenUsage(prompt_tokens=10, completion_tokens=20, total_tokens=30)
-        response1 = CompletionResponse(
+        response1 = CompleteResponse(
             model="gpt-4", provider="openai", content="test", finish_reason="stop", usage=usage
         )
-        response2 = CompletionResponse(
+        response2 = CompleteResponse(
             model="gpt-4", provider="openai", content="test", finish_reason="stop", usage=usage
         )
         assert response1.id != response2.id
 
     def test_completion_response_with_timestamp(self):
-        """Test CompletionResponse includes timestamp."""
+        """Test CompleteResponse includes timestamp."""
         usage = TokenUsage(prompt_tokens=10, completion_tokens=20, total_tokens=30)
-        response = CompletionResponse(
+        response = CompleteResponse(
             model="gpt-4", provider="openai", content="test", finish_reason="stop", usage=usage
         )
         assert isinstance(response.created_at, datetime)
@@ -251,7 +251,7 @@ class TestCompletionResponse:
     def test_get_output_text_content(self):
         """Test get_output returns text content when no structured output."""
         usage = TokenUsage(prompt_tokens=10, completion_tokens=20, total_tokens=30)
-        response = CompletionResponse(
+        response = CompleteResponse(
             model="gpt-4",
             provider="openai",
             content="Hello, world!",
@@ -269,7 +269,7 @@ class TestCompletionResponse:
 
         usage = TokenUsage(prompt_tokens=10, completion_tokens=20, total_tokens=30)
         person = Person(name="Alice", age=30)
-        response = CompletionResponse(
+        response = CompleteResponse(
             model="gpt-4",
             provider="openai",
             content='{"name": "Alice", "age": 30}',
@@ -283,9 +283,9 @@ class TestCompletionResponse:
         assert output.age == 30
 
     def test_completion_response_metadata(self):
-        """Test CompletionResponse with metadata."""
+        """Test CompleteResponse with metadata."""
         usage = TokenUsage(prompt_tokens=10, completion_tokens=20, total_tokens=30)
-        response = CompletionResponse(
+        response = CompleteResponse(
             model="gpt-4",
             provider="openai",
             content="test",
@@ -333,8 +333,8 @@ class TestStreamChunk:
         assert chunks[-1].finish_reason == "stop"
 
     def test_completion_request_with_prompt(self):
-        """Test creating a CompletionRequest with prompt template."""
-        request = CompletionRequest(
+        """Test creating a CompleteRequest with prompt template."""
+        request = CompleteRequest(
             prompt="greeting", prompt_variables={"name": "Alice"}, model="gpt-4"
         )
         assert request.prompt == "greeting"
@@ -345,17 +345,17 @@ class TestStreamChunk:
     def test_completion_request_requires_messages_or_prompt(self):
         """Test that either messages or prompt must be provided."""
         with pytest.raises(ValidationError, match="Either 'messages' or 'prompt' must be provided"):
-            CompletionRequest(model="gpt-4")
+            CompleteRequest(model="gpt-4")
 
     def test_completion_request_cannot_have_both(self):
         """Test that both messages and prompt cannot be provided."""
         with pytest.raises(ValidationError, match="Cannot provide both 'messages' and 'prompt'"):
-            CompletionRequest(
+            CompleteRequest(
                 messages=[UserMessage(content="Hello")], prompt="greeting", model="gpt-4"
             )
 
     def test_completion_request_prompt_with_empty_variables(self):
         """Test prompt request with no variables."""
-        request = CompletionRequest(prompt="simple_greeting", model="gpt-4")
+        request = CompleteRequest(prompt="simple_greeting", model="gpt-4")
         assert request.prompt == "simple_greeting"
         assert request.prompt_variables == {}

@@ -3,14 +3,18 @@
 - ``acomplete`` is the async form of ``complete``.
 - ``stream`` yields chunks as the model writes them; each chunk has a ``delta``.
 
-Set OPENAI_API_KEY.
+With OPENAI_API_KEY set the example calls OpenAI; without a key it runs a scripted client and says so.
 """
 
 import asyncio
-import os
 
-import skye
 from skye import UserMessage
+
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))  # the shared offline helper lives in examples/
+from _offline import get_client  # noqa: E402
 
 
 async def async_completion(client) -> None:
@@ -29,12 +33,7 @@ def streaming(client) -> None:
 
 
 def main() -> None:
-    api_key = os.getenv("OPENAI_API_KEY")
-    if not api_key:
-        print("OPENAI_API_KEY not set, skipping")
-        return
-
-    client = skye.provider("openai", api_key=api_key)
+    client = get_client("openai")
     asyncio.run(async_completion(client))
     streaming(client)
 

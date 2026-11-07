@@ -4,6 +4,10 @@ An authenticator adds headers to a request or signs it (API key, bearer token, S
 OAuth2 and so on). The contract lives in ``base``; the implementations, which perform I/O
 and may need third-party libraries, live in the ``auth`` Component. Standard library only,
 no I/O here.
+
+Raises: ProviderError or ConfigurationError when a credential cannot be obtained or refreshed; never returns a request without the credential it promises.
+Missing: not applicable (the method returns the headers to add); an unsupported method name is an error, not an empty dict.
+Concurrency: an authenticator may be shared by threads and tasks; one that caches a token must guard the refresh with a lock.
 """
 
 from collections.abc import Mapping

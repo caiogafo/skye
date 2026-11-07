@@ -2,6 +2,10 @@
 
 This module defines the abstract interface for loading configuration from
 multiple sources with precedence handling.
+
+Raises: ConfigurationError when a file is absent, malformed or the merged values do not validate.
+Missing: an absent environment variable falls back to the next source and to the default; an absent file raises.
+Concurrency: loading is read-only and safe to repeat; ``skye.config.ConfigLoader`` satisfies this Port structurally, with a static ``load``.
 """
 
 from abc import ABC, abstractmethod
@@ -23,12 +27,6 @@ class ConfigLoaderInterface(ABC):
         ...     def load(self, config_path=None, overrides=None):
         ...         # Implementation
         ...         return SkyeConfig()
-        ...
-        ...     def load_from_file(self, config_path):
-        ...         return {}
-        ...
-        ...     def load_from_env(self):
-        ...         return {}
     """
 
     @abstractmethod
@@ -55,38 +53,5 @@ class ConfigLoaderInterface(ABC):
             ...     config_path=Path("config.yaml"),
             ...     overrides={"log_level": "DEBUG"}
             ... )
-        """
-        pass
-
-    @abstractmethod
-    def load_from_file(self, config_path: Path) -> dict[str, Any]:
-        """Load configuration from a YAML or JSON file.
-
-        Args:
-            config_path: Path to configuration file.
-
-        Returns:
-            Dictionary containing configuration data.
-
-        Raises:
-            ConfigurationError: If file doesn't exist or has invalid format.
-
-        Example:
-            >>> data = loader.load_from_file(Path("config.yaml"))
-        """
-        pass
-
-    @abstractmethod
-    def load_from_env(self) -> dict[str, Any]:
-        """Load configuration from environment variables.
-
-        Reads all environment variables with SKYE_ prefix and converts them
-        to configuration keys.
-
-        Returns:
-            Dictionary containing configuration data from environment variables.
-
-        Example:
-            >>> data = loader.load_from_env()
         """
         pass

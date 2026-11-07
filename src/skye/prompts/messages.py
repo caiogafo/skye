@@ -51,8 +51,8 @@ class BasePromptBuilder(PromptBuilderInterface):
         >>> builder = BasePromptBuilder()
         >>> messages = builder.render("ner", {"text": "Apple Inc. was founded by Steve Jobs."})
         >>> # Can be used directly with Skye completion API
-        >>> from skye.base.completion import CompletionRequest
-        >>> request = CompletionRequest(messages=messages, model="gpt-4")
+        >>> from skye.base.completion import CompleteRequest
+        >>> request = CompleteRequest(messages=messages, model="gpt-4")
         >>> response = model.complete(request)
     """
     

@@ -2,6 +2,10 @@
 
 This module defines the abstract interface for event handlers that respond
 to various lifecycle events during model and capability invocations.
+
+Raises: never raises to the caller: an exception in a handler is logged and swallowed.
+Missing: not applicable (handlers return nothing).
+Concurrency: called from the thread or task that runs the model or capability; keep handlers short and thread-safe.
 """
 
 from abc import ABC, abstractmethod

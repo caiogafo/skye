@@ -4,16 +4,19 @@ The schema is a dataclass with nested objects, enums and optional fields. The li
 the answer against the schema and puts the object in ``response.structured_output``. An answer that does not conform raises
 ``ValidationError`` naming the field.
 
-Set OPENAI_API_KEY.
+With OPENAI_API_KEY set the example calls OpenAI; without a key a scripted client returns a sample object of the same shape.
 """
 
-import os
 from enum import Enum
 
-import skye
-from skye import ValidationError
-from skye import UserMessage
+from skye import UserMessage, ValidationError
 from skye.data import Validated, validated
+
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))  # the shared offline helper lives in examples/
+from _offline import get_client  # noqa: E402
 
 
 class Sentiment(str, Enum):
@@ -38,12 +41,7 @@ class Person(Validated):
 
 
 def main() -> None:
-    api_key = os.getenv("OPENAI_API_KEY")
-    if not api_key:
-        print("OPENAI_API_KEY not set, skipping")
-        return
-
-    client = skye.provider("openai", api_key=api_key)
+    client = get_client("openai")
 
     try:
         response = client.complete(

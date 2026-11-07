@@ -30,10 +30,10 @@ ALLOWED_WIRE_KEYS = {"base/openai_shape.py": {"tool_calls", "function_call"}}
 # embeddings reuse the Google adapter) and nothing of another provider. The `__init__.py` files register the adapters: they are not adapters.
 ADAPTER_DIRS = ("models/llm", "models/embeddings")
 PROVIDER_OF = {
-    "openai_compatible": "openai", "openai_embeddings": "openai",
-    "anthropic": "anthropic",
+    "openai": "openai", "openai_compatible": "openai", "azure": "openai", "openai_embeddings": "openai",
+    "anthropic": "anthropic", "anthropic_compatible": "anthropic",
     "bedrock": "bedrock", "bedrock_embeddings": "bedrock",
-    "google_provider": "google", "google_embeddings": "google", "google_multimodal_embeddings": "google",
+    "google": "google", "google_embeddings": "google", "google_multimodal_embeddings": "google",
     "cohere_embeddings": "cohere",
 }
 
@@ -114,7 +114,7 @@ def test_the_detector_finds_what_it_must():
     """It reports each kind of provider-specific content, and accepts the allowed OpenAI data shape."""
     assert core_violations("URL = 'https://api.openai.com/v1'", "router/x.py")
     assert core_violations("body = {'stop_reason': 'end_turn'}", "router/x.py")
-    assert core_violations("from skye.models.llm.openai_compatible import OpenAIProvider", "router/x.py")
+    assert core_violations("from skye.models.llm.openai import OpenAIProvider", "router/x.py")
     assert core_violations("x = BedrockProvider()", "tools/x.py")
     assert not core_violations("x = {'role': 'user'}", "router/x.py")
     assert not core_violations("call = {'tool_calls': []}", "base/openai_shape.py")
@@ -124,4 +124,4 @@ def test_the_detector_finds_what_it_must():
 def test_the_adapter_check_finds_a_cross_import():
     assert adapter_cross_imports("from skye.models.llm.anthropic import AnthropicProvider", "bedrock")
     assert not adapter_cross_imports("from skye.models.base import BaseModelProvider", "bedrock")
-    assert not adapter_cross_imports("from skye.models.llm.google_provider import GoogleProvider", "google_embeddings")
+    assert not adapter_cross_imports("from skye.models.llm.google import GoogleProvider", "google_embeddings")

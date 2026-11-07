@@ -39,7 +39,7 @@ tools/
   capability_models.py      CapabilityResult (and re-exported CapabilityCall from base)
   capability_call_handler.py  CapabilityCallHandler (parse/validate/execute/format)
   exceptions.py             CapabilityError hierarchy (on top of SkyeError)
-  mcp_client.py             MCPClientPort, BuiltinMCPClient, MCPToolCapability, create_mcp_client
+  mcp_client.py             MCPClientInterface, BuiltinMCPClient, MCPToolCapability, create_mcp_client
   mcp_fastmcp.py            FastMCPClient (the only module importing fastmcp, lazily)
   mcp_boundary.py           the single protocol -> Skye conversion point (stdlib only)
   mcp_resource.py           Resource (to move behind a base resource Port, D26)
@@ -99,7 +99,7 @@ behaviour (Requirement 18.3).
 
 ### MCP client, tri-faceted
 
-`mcp_client.py` defines `MCPClientPort`, the one Port with three facets whose return types are identical across
+`mcp_client.py` defines `MCPClientInterface`, the one Port with three facets whose return types are identical across
 implementations: `list_tools`/`call_tool` return tools as `CapabilityInterface` objects (reusing the `tools` interfaces),
 `list_prompts`/`get_prompt` return prompts as `base` messages (without importing `prompts`), and
 `list_resources`/`read_resource` return resources as `Resource` objects (Requirement 10.1). `BuiltinMCPClient` is a

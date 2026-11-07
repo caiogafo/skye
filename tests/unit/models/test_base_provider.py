@@ -5,7 +5,7 @@ from typing import Any, Iterator
 
 import pytest
 
-from skye.base.completion import CompletionRequest, CompletionResponse, StreamChunk, TokenUsage
+from skye.base.completion import CompleteRequest, CompleteResponse, StreamChunk, TokenUsage
 from skye.base.exceptions import ProviderError
 from skye.base.messages import UserMessage
 from skye.models.base import BaseModelProvider
@@ -25,7 +25,7 @@ class MockProvider(BaseModelProvider):
         self.client_initialized = True
         return {"mock": "client"}
     
-    def _transform_request(self, request: CompletionRequest) -> dict[str, Any]:
+    def _transform_request(self, request: CompleteRequest) -> dict[str, Any]:
         """Transform request to mock format."""
         return {
             "model": request.model,
@@ -33,9 +33,9 @@ class MockProvider(BaseModelProvider):
             "temperature": request.temperature
         }
     
-    def _transform_response(self, response: Any) -> CompletionResponse:
-        """Transform mock response to CompletionResponse."""
-        return CompletionResponse(
+    def _transform_response(self, response: Any) -> CompleteResponse:
+        """Transform mock response to CompleteResponse."""
+        return CompleteResponse(
             id="test_id",
             model="test_model",
             provider="mock",
@@ -156,7 +156,7 @@ def test_lazy_client_initialization():
 def test_complete_success():
     """Test successful completion."""
     provider = MockProvider()
-    request = CompletionRequest(
+    request = CompleteRequest(
         messages=[UserMessage(content="Hello")],
         model="test_model",
         temperature=0.7
@@ -164,7 +164,7 @@ def test_complete_success():
     
     response = provider.complete(request)
     
-    assert isinstance(response, CompletionResponse)
+    assert isinstance(response, CompleteResponse)
     assert response.content == "Mock response"
     assert response.model == "test_model"
     assert response.provider == "mock"
@@ -175,7 +175,7 @@ def test_complete_success():
 def test_complete_error_wrapping():
     """Test that errors are wrapped in ProviderError."""
     provider = MockProvider(should_fail=True)
-    request = CompletionRequest(
+    request = CompleteRequest(
         messages=[UserMessage(content="Hello")],
         model="test_model"
     )
@@ -193,7 +193,7 @@ def test_complete_error_wrapping():
 def test_stream_success():
     """Test successful streaming."""
     provider = MockProvider()
-    request = CompletionRequest(
+    request = CompleteRequest(
         messages=[UserMessage(content="Hello")],
         model="test_model",
         stream=True
@@ -212,7 +212,7 @@ def test_stream_success():
 def test_stream_error_wrapping():
     """Test that streaming errors are wrapped in ProviderError."""
     provider = MockProvider(fail_on_stream=True)
-    request = CompletionRequest(
+    request = CompleteRequest(
         messages=[UserMessage(content="Hello")],
         model="test_model",
         stream=True
@@ -232,14 +232,14 @@ def test_stream_error_wrapping():
 async def test_acomplete_default_implementation():
     """Test that default acomplete uses sync version."""
     provider = MockProvider()
-    request = CompletionRequest(
+    request = CompleteRequest(
         messages=[UserMessage(content="Hello")],
         model="test_model"
     )
     
     response = await provider.acomplete(request)
     
-    assert isinstance(response, CompletionResponse)
+    assert isinstance(response, CompleteResponse)
     assert response.content == "Mock response"
 
 
@@ -247,7 +247,7 @@ async def test_acomplete_default_implementation():
 async def test_astream_default_implementation():
     """Test that default astream uses sync version."""
     provider = MockProvider()
-    request = CompletionRequest(
+    request = CompleteRequest(
         messages=[UserMessage(content="Hello")],
         model="test_model",
         stream=True
@@ -275,7 +275,7 @@ def test_get_model_info():
 def test_transform_request():
     """Test request transformation."""
     provider = MockProvider()
-    request = CompletionRequest(
+    request = CompleteRequest(
         messages=[UserMessage(content="Hello")],
         model="gpt-4",
         temperature=0.8

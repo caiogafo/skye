@@ -6,6 +6,10 @@ each probability is in [0.0, 1.0] and they sum to 1.0. An empty option set must 
 rejected with a Skye error (at least one option is required) and no choice returned.
 Implemented by the ``models`` Component (decision models); consumed by gateway,
 router and guard. Standard library only.
+
+Raises: a Skye error (ValidationError) for an empty option set; ProviderError when the model call fails.
+Missing: not applicable: a choice and a probability for every option are always returned, or an error.
+Concurrency: ``decide`` is async and re-entrant; one instance serves many concurrent calls.
 """
 
 from collections.abc import Mapping, Sequence

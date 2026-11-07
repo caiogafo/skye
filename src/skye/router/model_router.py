@@ -15,10 +15,11 @@ This module provides a complete routing solution with support for:
 """
 
 import logging
+import os
 import time
 from typing import Any, Optional
 
-from skye.base.completion import CompletionRequest, CompletionResponse
+from skye.base.completion import CompleteRequest, CompleteResponse
 from skye.base.exceptions import ConfigurationError, ProviderError
 from skye.base.interfaces.model import ModelInterface
 from skye.base.interfaces.router import ModelRouterInterface, RoutingStrategy
@@ -57,6 +58,49 @@ def _run_sync(coro: Any) -> Any:
         return asyncio.run(coro)
     with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
         return executor.submit(asyncio.run, coro).result()
+
+
+# The standard environment variable of each provider's API key, read by the router shorthand.
+_API_KEY_VARIABLES = {
+    "openai": "OPENAI_API_KEY",
+    "anthropic": "ANTHROPIC_API_KEY",
+    "azure": "AZURE_OPENAI_API_KEY",
+    "google": "GOOGLE_API_KEY",
+    "cohere": "COHERE_API_KEY",
+}
+
+
+def expand_route_shorthand(shorthand: dict[str, list[str]]) -> tuple[list[RouteConfig], list[FallbackConfig]]:
+    """Expand ``{"alias": ["provider/model", ...]}`` into the full form.
+
+    The first entry is the primary target of the alias. Every other entry becomes a route named ``alias/fallback<N>`` and the
+    chain ``FallbackConfig(primary=alias, fallbacks=[...])`` lists them in order.
+
+    Raises:
+        ConfigurationError: If an entry is not ``provider/model`` or an alias has no entry.
+    """
+    routes: list[RouteConfig] = []
+    fallbacks: list[FallbackConfig] = []
+    for alias, entries in shorthand.items():
+        if isinstance(entries, str):
+            entries = [entries]
+        if not entries:
+            raise ConfigurationError(f"Route '{alias}' needs at least one 'provider/model' entry")
+        targets = []
+        for entry in entries:
+            provider, _, model = entry.partition("/")
+            if not provider or not model:
+                raise ConfigurationError(f"Route '{alias}': '{entry}' is not of the form 'provider/model'")
+            targets.append(ModelTarget(model=model, provider=provider, api_key=os.environ.get(_API_KEY_VARIABLES.get(provider, ""))))
+        routes.append(RouteConfig(alias=alias, targets=[targets[0]]))
+        names = []
+        for number, target in enumerate(targets[1:], start=1):
+            name = f"{alias}/fallback{number}"
+            routes.append(RouteConfig(alias=name, targets=[target]))
+            names.append(name)
+        if names:
+            fallbacks.append(FallbackConfig(primary=alias, fallbacks=names))
+    return routes, fallbacks
 
 
 class ModelRouter(ModelRouterInterface):
@@ -123,7 +167,7 @@ class ModelRouter(ModelRouterInterface):
 
     def __init__(
         self,
-        routes: list[RouteConfig] | None = None,
+        routes: list[RouteConfig] | dict[str, list[str]] | None = None,
         strategy: RoutingStrategy = RoutingStrategy.ROUND_ROBIN,
         cooldown_seconds: float = 60.0,
         enable_pre_call_checks: bool = True,
@@ -135,7 +179,10 @@ class ModelRouter(ModelRouterInterface):
         """Initialize the router.
 
         Args:
-            routes: Optional list of route configurations with aliases.
+            routes: Optional list of route configurations with aliases, or the shorthand
+                ``{"alias": ["provider/model", ...]}``: the first entry is the primary, the rest are its fallbacks.
+                The shorthand builds the same ``RouteConfig``, ``ModelTarget`` and ``FallbackConfig`` as the full form; the API
+                key comes from the provider's standard environment variable. An explicit ``fallbacks`` argument wins over it.
             strategy: Default routing strategy.
             cooldown_seconds: Default cooldown duration for failed models.
             enable_pre_call_checks: Whether to check rate limits before calls.
@@ -194,6 +241,11 @@ class ModelRouter(ModelRouterInterface):
             model_targets=self.model_targets,
             round_robin_index=self._round_robin_index,
         )
+
+        # The shorthand expands to the full form; explicit fallbacks are applied after it, so they win.
+        if isinstance(routes, dict):
+            routes, shorthand_fallbacks = expand_route_shorthand(routes)
+            fallbacks = [*shorthand_fallbacks, *(fallbacks or [])]
 
         # Initialize routes if provided
         if routes:
@@ -489,7 +541,7 @@ class ModelRouter(ModelRouterInterface):
         self.rate_limits[model_id] = RateLimitTracker(tpm_limit=tpm, rpm_limit=rpm, model_id=model_id, storage=self.storage_backend)
         logger.info(f"Registered model: {model_id}")
 
-    async def select_model(self, request: CompletionRequest) -> str:
+    async def select_model(self, request: CompleteRequest) -> str:
         """Select a model based on routing strategy.
 
         If the request specifies an alias, selects from targets for that alias.
@@ -512,7 +564,7 @@ class ModelRouter(ModelRouterInterface):
         await self._strategy_selector.prepare(available_models)
         return self._strategy_selector.apply_strategy(available_models, None, self.strategy)
 
-    async def _select_from_alias(self, alias: str, request: CompletionRequest) -> str:
+    async def _select_from_alias(self, alias: str, request: CompleteRequest) -> str:
         """Select a target from an alias based on the route's strategy."""
         route = self.aliases[alias]
 
@@ -545,7 +597,7 @@ class ModelRouter(ModelRouterInterface):
         model: str | None = None,
         tags: list[str] | None = None,
         **kwargs: Any
-    ) -> CompletionResponse:
+    ) -> CompleteResponse:
         """Complete a request using the router.
 
         This method provides a unified interface for routing with flexible model
@@ -588,9 +640,9 @@ class ModelRouter(ModelRouterInterface):
         if not model and not tags:
             raise ValueError("At least one of 'model' or 'tags' must be provided")
 
-        # Create internal CompletionRequest
-        from skye.base.completion import CompletionRequest
-        request = CompletionRequest(
+        # Create internal CompleteRequest
+        from skye.base.completion import CompleteRequest
+        request = CompleteRequest(
             messages=messages,
             model=model or "",  # Will be selected by router if empty
             **kwargs
@@ -608,7 +660,7 @@ class ModelRouter(ModelRouterInterface):
         model: str | None = None,
         tags: list[str] | None = None,
         **kwargs: Any
-    ) -> CompletionResponse:
+    ) -> CompleteResponse:
         """Complete a request using the router asynchronously.
 
         Args:
@@ -628,9 +680,9 @@ class ModelRouter(ModelRouterInterface):
         if not model and not tags:
             raise ValueError("At least one of 'model' or 'tags' must be provided")
 
-        # Create internal CompletionRequest
-        from skye.base.completion import CompletionRequest
-        request = CompletionRequest(
+        # Create internal CompleteRequest
+        from skye.base.completion import CompleteRequest
+        request = CompleteRequest(
             messages=messages,
             model=model or "",  # Will be selected by router if empty
             **kwargs
@@ -642,11 +694,11 @@ class ModelRouter(ModelRouterInterface):
         else:
             return await self._aroute_request_internal(request)
 
-    def _route_request_internal(self, request: CompletionRequest) -> CompletionResponse:
+    def _route_request_internal(self, request: CompleteRequest) -> CompleteResponse:
         """Route a request to an appropriate model (internal method)."""
         return _run_sync(self._aroute_request_internal(request))
 
-    async def _aroute_request_internal(self, request: CompletionRequest) -> CompletionResponse:
+    async def _aroute_request_internal(self, request: CompleteRequest) -> CompleteResponse:
         """Route a request asynchronously (internal method)."""
         # A registered model id is used as is; an alias (or no model) is resolved by the routing strategy.
         model_id = request.model if request.model in self.models else await self.select_model(request)
@@ -674,8 +726,8 @@ class ModelRouter(ModelRouterInterface):
         )
 
     async def _try_model(
-        self, model_id: str, request: CompletionRequest
-    ) -> CompletionResponse | None:
+        self, model_id: str, request: CompleteRequest
+    ) -> CompleteResponse | None:
         """Try to execute request on a specific model."""
         if model_id not in self.models:
             logger.error(f"Model {model_id} not registered")
@@ -742,7 +794,7 @@ class ModelRouter(ModelRouterInterface):
 
         return recent_fails >= allowed_fails
 
-    async def _is_model_available(self, model_id: str, request: CompletionRequest) -> bool:
+    async def _is_model_available(self, model_id: str, request: CompleteRequest) -> bool:
         """Check if a model is available for routing."""
         health = self.health.get(model_id)
         rate_limit = self.rate_limits.get(model_id)
@@ -761,7 +813,7 @@ class ModelRouter(ModelRouterInterface):
 
         return True
 
-    async def _get_available_models(self, request: CompletionRequest) -> list[str]:
+    async def _get_available_models(self, request: CompleteRequest) -> list[str]:
         """Get list of available models (not in cooldown, within rate limits)."""
         available = []
         for model_id in self.models.keys():
@@ -1018,8 +1070,8 @@ class ModelRouter(ModelRouterInterface):
             logger.info(f"Set tags for {model_id}: {tags}")
 
     def _route_with_tags_internal(
-        self, request: CompletionRequest, required_tags: list[str]
-    ) -> CompletionResponse:
+        self, request: CompleteRequest, required_tags: list[str]
+    ) -> CompleteResponse:
         """Route request to models matching required tags (internal method)."""
         # Filter models by tags
         matching_models = [
@@ -1070,8 +1122,8 @@ class ModelRouter(ModelRouterInterface):
             self.models = original_models
 
     async def _aroute_with_tags_internal(
-        self, request: CompletionRequest, required_tags: list[str]
-    ) -> CompletionResponse:
+        self, request: CompleteRequest, required_tags: list[str]
+    ) -> CompleteResponse:
         """Route request to models matching required tags asynchronously (internal method)."""
         # Filter models by tags
         matching_models = [

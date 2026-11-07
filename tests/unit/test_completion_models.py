@@ -4,7 +4,7 @@
 import pytest
 from pydantic import BaseModel
 
-from skye.base.completion import CompletionRequest, CompletionResponse, StreamChunk, TokenUsage
+from skye.base.completion import CompleteRequest, CompleteResponse, StreamChunk, TokenUsage
 from skye.base.exceptions import ValidationError
 from skye.base.messages import UserMessage
 
@@ -18,9 +18,9 @@ def test_token_usage():
 
 
 def test_completion_request():
-    """Test CompletionRequest model."""
+    """Test CompleteRequest model."""
     # Basic request
-    request = CompletionRequest(
+    request = CompleteRequest(
         messages=[UserMessage(content="Hello")], model="gpt-4", temperature=0.7, max_tokens=100
     )
     assert request.model == "gpt-4"
@@ -31,21 +31,21 @@ def test_completion_request():
 
     # Test temperature validation
     with pytest.raises(ValidationError):
-        CompletionRequest(
+        CompleteRequest(
             messages=[UserMessage(content="Hi")], model="gpt-4", temperature=3.0  # Invalid
         )
 
     # Test top_p validation
     with pytest.raises(ValidationError):
-        CompletionRequest(messages=[UserMessage(content="Hi")], model="gpt-4", top_p=1.5)  # Invalid
+        CompleteRequest(messages=[UserMessage(content="Hi")], model="gpt-4", top_p=1.5)  # Invalid
 
 
 def test_completion_response():
-    """Test CompletionResponse model."""
+    """Test CompleteResponse model."""
     usage = TokenUsage(prompt_tokens=10, completion_tokens=20, total_tokens=30)
 
     # Text response
-    response = CompletionResponse(
+    response = CompleteResponse(
         model="gpt-4", provider="openai", content="Hello there!", finish_reason="stop", usage=usage
     )
     assert response.content == "Hello there!"
@@ -77,13 +77,13 @@ def test_stream_chunk():
 
 
 def test_completion_response_capability_calls():
-    """Test CompletionResponse with capability calls."""
+    """Test CompleteResponse with capability calls."""
     from skye.tools.capability_models import CapabilityCall
 
     usage = TokenUsage(prompt_tokens=50, completion_tokens=20, total_tokens=70)
 
     # Response without capability calls
-    response_no_capabilities = CompletionResponse(
+    response_no_capabilities = CompleteResponse(
         model="gpt-4",
         provider="openai",
         content="Hello",
@@ -99,7 +99,7 @@ def test_completion_response_capability_calls():
         name="weather.get_current",
         arguments={"location": "San Francisco"},
     )
-    response_with_capabilities = CompletionResponse(
+    response_with_capabilities = CompleteResponse(
         model="gpt-4",
         provider="openai",
         content="",
@@ -112,7 +112,7 @@ def test_completion_response_capability_calls():
     assert response_with_capabilities.capability_calls[0].name == "weather.get_current"
 
     # Response with empty capability_calls list
-    response_empty_capabilities = CompletionResponse(
+    response_empty_capabilities = CompleteResponse(
         model="gpt-4",
         provider="openai",
         content="Hello",
@@ -125,7 +125,7 @@ def test_completion_response_capability_calls():
 
 @pytest.mark.asyncio
 async def test_completion_response_execute_capability_calls():
-    """Test executing capability calls from CompletionResponse without registry."""
+    """Test executing capability calls from CompleteResponse without registry."""
     from skye.base.messages import CapabilityMessage
     from skye.tools.capability_models import CapabilityCall
     from skye.tools.local_function import LocalFunctionCapability
@@ -148,7 +148,7 @@ async def test_completion_response_execute_capability_calls():
         name="weather.get_current",
         arguments={"location": "San Francisco"},
     )
-    response = CompletionResponse(
+    response = CompleteResponse(
         model="gpt-4",
         provider="openai",
         content="",
@@ -160,7 +160,7 @@ async def test_completion_response_execute_capability_calls():
     response._capabilities = [capability]
 
     # Execute capability calls - no registry needed!
-    messages = await response.execute_capability_calls()
+    messages = response.execute_capability_calls()
 
     # Verify results
     assert len(messages) == 1
@@ -208,7 +208,7 @@ async def test_completion_response_execute_capability_calls_error():
         name="failing_tool",
         arguments={"value": "test"},
     )
-    response = CompletionResponse(
+    response = CompleteResponse(
         model="gpt-4",
         provider="openai",
         content="",
@@ -218,7 +218,7 @@ async def test_completion_response_execute_capability_calls_error():
     )
 
     # Execute capability calls - now returns CapabilityMessage objects
-    messages = await response.execute_capability_calls(registry)
+    messages = response.execute_capability_calls(registry)
 
     # Verify error message
     assert len(messages) == 1
@@ -238,7 +238,7 @@ async def test_completion_response_execute_capability_calls_no_capabilities():
     registry = CapabilityRegistry()
     usage = TokenUsage(prompt_tokens=10, completion_tokens=5, total_tokens=15)
 
-    response = CompletionResponse(
+    response = CompleteResponse(
         model="gpt-4",
         provider="openai",
         content="Hello",
@@ -248,7 +248,7 @@ async def test_completion_response_execute_capability_calls_no_capabilities():
 
     # Should raise ValueError
     with pytest.raises(ValueError, match="Response has no capability calls to execute"):
-        await response.execute_capability_calls(registry)
+        response.execute_capability_calls(registry)
 
 
 @pytest.mark.asyncio
@@ -298,7 +298,7 @@ async def test_completion_response_execute_multiple_capability_calls():
             arguments={"timezone": "EST"},
         ),
     ]
-    response = CompletionResponse(
+    response = CompleteResponse(
         model="gpt-4",
         provider="openai",
         content="",
@@ -308,7 +308,7 @@ async def test_completion_response_execute_multiple_capability_calls():
     )
 
     # Execute capability calls - now returns CapabilityMessage objects
-    messages = await response.execute_capability_calls(registry)
+    messages = response.execute_capability_calls(registry)
 
     # Verify results
     import json
@@ -357,7 +357,7 @@ async def test_completion_response_execute_capability_calls_with_overrides():
         name="weather.get_current",
         arguments={"location": "San Francisco", "units": "fahrenheit"},
     )
-    response = CompletionResponse(
+    response = CompleteResponse(
         model="gpt-4",
         provider="openai",
         content="",
@@ -370,7 +370,7 @@ async def test_completion_response_execute_capability_calls_with_overrides():
     overrides = {
         "call_123": {"units": "celsius"}  # Override units but keep location
     }
-    messages = await response.execute_capability_calls(registry, argument_overrides=overrides)
+    messages = response.execute_capability_calls(registry, argument_overrides=overrides)
 
     # Verify the override was applied
     import json
@@ -383,7 +383,7 @@ async def test_completion_response_execute_capability_calls_with_overrides():
 
 
 def test_completion_request_mcp_configuration():
-    """Test CompletionRequest with MCP server configuration."""
+    """Test CompleteRequest with MCP server configuration."""
     # Request with MCP servers
     mcp_config = [
         {
@@ -398,7 +398,7 @@ def test_completion_request_mcp_configuration():
         },
     ]
 
-    request = CompletionRequest(
+    request = CompleteRequest(
         messages=[UserMessage(content="What's the weather?")],
         model="gpt-4",
         mcp_servers=mcp_config,
@@ -411,7 +411,7 @@ def test_completion_request_mcp_configuration():
 
 
 def test_completion_request_mcp_with_capabilities():
-    """Test CompletionRequest with both MCP servers and capabilities."""
+    """Test CompleteRequest with both MCP servers and capabilities."""
     # This tests that MCP servers and capabilities can coexist
     mcp_config = [
         {
@@ -425,7 +425,7 @@ def test_completion_request_mcp_with_capabilities():
         def get_schema(self):
             return {"name": "test_tool"}
 
-    request = CompletionRequest(
+    request = CompleteRequest(
         messages=[UserMessage(content="Test")],
         model="gpt-4",
         capabilities=[MockCapability()],
@@ -439,8 +439,8 @@ def test_completion_request_mcp_with_capabilities():
 
 
 def test_completion_request_mcp_empty_list():
-    """Test CompletionRequest with empty MCP servers list."""
-    request = CompletionRequest(
+    """Test CompleteRequest with empty MCP servers list."""
+    request = CompleteRequest(
         messages=[UserMessage(content="Test")],
         model="gpt-4",
         mcp_servers=[],
@@ -451,8 +451,8 @@ def test_completion_request_mcp_empty_list():
 
 
 def test_completion_request_mcp_none():
-    """Test CompletionRequest with mcp_servers=None (default)."""
-    request = CompletionRequest(
+    """Test CompleteRequest with mcp_servers=None (default)."""
+    request = CompleteRequest(
         messages=[UserMessage(content="Test")],
         model="gpt-4",
     )

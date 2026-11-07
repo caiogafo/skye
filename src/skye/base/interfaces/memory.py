@@ -10,11 +10,15 @@ Example:
     ...     def store(self, entry: MemoryEntryLike) -> str:
     ...         # Implementation here
     ...         pass
+
+Raises: ValidationError when an entry is invalid.
+Missing: ``get_by_id`` returns ``None`` and ``delete`` returns ``False`` for an unknown id; ``retrieve`` returns an empty list when nothing matches.
+Concurrency: an implementation guards its own storage; ``store`` from several tasks must not lose entries.
 """
 
-from abc import ABC, abstractmethod
+from abc import abstractmethod
 from datetime import datetime
-from typing import Any, Protocol
+from typing import Any, Protocol, runtime_checkable
 
 
 class MemoryEntryLike(Protocol):
@@ -32,7 +36,8 @@ class MemoryEntryLike(Protocol):
     created_at: datetime
 
 
-class MemoryInterface(ABC):
+@runtime_checkable
+class MemoryInterface(Protocol):
     """Abstract interface for memory storage.
 
     This interface defines the contract for persistent memory implementations.

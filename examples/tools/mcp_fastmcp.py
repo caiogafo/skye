@@ -15,7 +15,7 @@ Set MCP_SERVER_URL to the address of a server (default: http://localhost:8000/mc
 import asyncio
 import os
 
-from skye import MissingExtraError
+from skye import MissingExtraError, SkyeError
 from skye.tools import create_mcp_client
 
 
@@ -24,7 +24,12 @@ async def main() -> None:
 
     # Live: the built-in client talks JSON-RPC over HTTP (standard library only).
     client = create_mcp_client(url, impl="builtin")
-    tools = await client.list_tools()
+    try:
+        tools = await client.list_tools()
+    except (OSError, SkyeError) as error:
+        print(f"No MCP server answered at {url} ({type(error).__name__}).")
+        print("Start one (see capabilities/mcp_server.py) or set MCP_SERVER_URL to its address.")
+        return
     print(f"built-in client: {len(tools)} tool(s) on {url}")
     for tool in tools:
         print("  -", tool.get_schema().name)

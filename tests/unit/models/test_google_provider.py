@@ -10,12 +10,12 @@ import pytest
 
 import skye.models.embeddings.google_embeddings as emb_mod
 import skye.models.embeddings.google_multimodal_embeddings as mm_mod
-import skye.models.llm.google_provider as prov_mod
+import skye.models.llm.google as prov_mod
 from skye.auth.google import GoogleBearerAuth
-from skye.base.completion import CapabilityCall, CompletionRequest, CompletionResponse, StreamChunk
+from skye.base.completion import CapabilityCall, CompleteRequest, CompleteResponse, StreamChunk
 from skye.base.exceptions import ProviderError
 from skye.base.messages import AssistantMessage, CapabilityMessage, SystemMessage, UserMessage
-from skye.models.llm.google_provider import GoogleProvider
+from skye.models.llm.google import GoogleProvider
 from skye.models.transport.rest import JsonObject
 
 URL = (
@@ -29,10 +29,10 @@ def make(**kw: object) -> GoogleProvider:
     return GoogleProvider(project_id="my-project", location="us-central1", **kw)
 
 
-def req(**kw: object) -> CompletionRequest:
+def req(**kw: object) -> CompleteRequest:
     kw.setdefault("messages", [UserMessage(content="Hello")])
     kw.setdefault("model", "gemini-1.5-pro")
-    return CompletionRequest(**kw)
+    return CompleteRequest(**kw)
 
 
 def gen_response(parts: list, finish: str = "STOP", usage: dict | None = None) -> JsonObject:
@@ -156,7 +156,7 @@ class TestResponseTransformation:
         resp = make()._transform_response(
             gen_response([{"text": "Hel"}, {"text": "lo"}], "MAX_TOKENS", {"promptTokenCount": 10, "candidatesTokenCount": 5, "totalTokenCount": 15})
         )
-        assert isinstance(resp, CompletionResponse)
+        assert isinstance(resp, CompleteResponse)
         assert (resp.content, resp.finish_reason, resp.provider) == ("Hello", "max_tokens", "google")
         assert (resp.id, resp.model) == ("r1", "gemini-1.5-pro-002")
         assert (resp.usage.prompt_tokens, resp.usage.completion_tokens, resp.usage.total_tokens) == (10, 5, 15)

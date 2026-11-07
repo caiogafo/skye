@@ -1,4 +1,4 @@
-"""Prompt engineering with the prompt builder: few-shot examples, chain of thought, composition and dynamic prompts.
+"""Prompt engineering with the prompt builder: few-shot examples, composition and dynamic prompts.
 
 The builder renders templates into ``SkyeMessage`` objects. A template uses ``{{ variable }}``, ``{% if %}``, ``{% for %}`` and filters; it
 is rendered by the standard-library engine, so nothing is installed for it. ``[SYSTEM]`` and ``[USER]`` markers split a template into
@@ -33,19 +33,6 @@ def few_shot(builder: BasePromptBuilder) -> None:
     print(builder.render("sentiment", {"text": "Great screen, terrible speakers"})[0].content)
 
 
-def chain_of_thought(builder: BasePromptBuilder) -> None:
-    """A system message that asks for steps, and a user message with the question."""
-    builder.register_template(
-        "cot",
-        "[SYSTEM]\nYou solve problems. Think step by step, then give the final answer after 'Answer:'.\n\n"
-        "[USER]\n{{ question }}",
-    )
-    messages = builder.render("cot", {"question": "A train goes 60 km in 45 minutes. What is its speed in km/h?"})
-    print("\n--- chain of thought ---")
-    for message in messages:
-        print(f"[{message.role}] {message.content}")
-
-
 def composition(builder: BasePromptBuilder) -> None:
     """Small templates joined into a bigger one."""
     builder.register_template("persona", "You are a {{ role }} who writes in a {{ tone }} tone.")
@@ -70,7 +57,6 @@ def dynamic(builder: BasePromptBuilder) -> list:
 def main() -> None:
     builder = BasePromptBuilder()
     few_shot(builder)
-    chain_of_thought(builder)
     composition(builder)
     messages = dynamic(builder)
 

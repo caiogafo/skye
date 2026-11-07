@@ -2,6 +2,10 @@
 
 This module defines the abstract interface for plugins that extend Skye
 functionality with lifecycle management.
+
+Raises: PluginInitializationError when ``initialize`` fails.
+Missing: ``get_metadata`` always returns a mapping, possibly empty.
+Concurrency: ``initialize`` and ``shutdown`` are called once each, from one thread; ``shutdown`` must be safe to call after a failed ``initialize``.
 """
 
 from abc import ABC, abstractmethod

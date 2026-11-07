@@ -32,7 +32,7 @@ from skye.tools.mcp_capability import MCPCapability
 from skye.tools.mcp_boundary import MCPPrompt, MCPPromptArgument
 from skye.tools.mcp_client import (
     BuiltinMCPClient,
-    MCPClientPort,
+    MCPClientInterface,
     MCPToolCapability,
     create_mcp_client,
 )
@@ -51,7 +51,7 @@ __all__ = [
     "RemoteAPICapability",
     "MCPCapability",
     "MCPServerClient",
-    "MCPClientPort",
+    "MCPClientInterface",
     "BuiltinMCPClient",
     "MCPToolCapability",
     "MCPPrompt",

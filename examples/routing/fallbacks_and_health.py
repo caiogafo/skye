@@ -3,32 +3,35 @@
 A router balances several targets, falls back to other models when one fails, and tracks the health and the rate-limit usage of each
 model. State can live in memory, or in an external store (Redis, DynamoDB) when the process does not survive between invocations.
 
-Set OPENAI_API_KEY.
+With OPENAI_API_KEY set the targets are OpenAI models; without a key they are a scripted provider, and the example says which.
 """
 
 import os
+import sys
+from pathlib import Path
 
-from skye.router import RoutingStrategy
 from skye import UserMessage
-from skye.router import FallbackConfig, ModelRouter, ModelTarget, RetryPolicyConfig, RouteConfig
+from skye.router import FallbackConfig, ModelRouter, ModelTarget, RetryPolicyConfig, RouteConfig, RoutingStrategy
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))  # the shared offline helper lives in examples/
+from _offline import router_provider  # noqa: E402
 
 
 def main() -> None:
     api_key = os.getenv("OPENAI_API_KEY")
-    if not api_key:
-        print("OPENAI_API_KEY not set, skipping")
-        return
+    provider = router_provider("openai")
+    print("mode:", "openai (real)" if api_key else "scripted (set OPENAI_API_KEY to call openai)")
 
     router = ModelRouter(
         routes=[
             RouteConfig(
                 alias="gpt-4",
-                targets=[ModelTarget(model="gpt-4", provider="openai", api_key=api_key, tpm=90000, rpm=60)],
+                targets=[ModelTarget(model="gpt-4", provider=provider, api_key=api_key, tpm=90000, rpm=60)],
                 strategy=RoutingStrategy.ROUND_ROBIN,
             ),
             RouteConfig(
                 alias="gpt-3.5-turbo",
-                targets=[ModelTarget(model="gpt-3.5-turbo", provider="openai", api_key=api_key)],
+                targets=[ModelTarget(model="gpt-3.5-turbo", provider=provider, api_key=api_key)],
             ),
         ],
         fallbacks=[FallbackConfig(primary="gpt-4", fallbacks=["gpt-3.5-turbo"])],

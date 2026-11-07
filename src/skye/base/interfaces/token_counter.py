@@ -2,6 +2,10 @@
 
 This module defines the abstract interface for counting tokens using
 provider-specific tokenizers.
+
+Raises: ValidationError for an unknown model when no fallback tokenizer exists.
+Missing: an empty text counts zero tokens.
+Concurrency: stateless apart from a tokenizer cache; safe from many threads.
 """
 
 from abc import ABC, abstractmethod

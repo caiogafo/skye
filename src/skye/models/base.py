@@ -41,7 +41,7 @@ from abc import ABC, abstractmethod
 from collections.abc import Iterator
 from typing import Any, AsyncIterator
 
-from skye.base.completion import CompletionRequest, CompletionResponse, StreamChunk
+from skye.base.completion import CompleteRequest, CompleteResponse, StreamChunk
 from skye.base.exceptions import ProviderError, ValidationError
 from skye.base.interfaces.model import ModelInterface
 from skye.base.interfaces.vector_encoder import VectorEncoderInterface
@@ -71,8 +71,8 @@ class BaseModelProvider(ModelInterface, ABC):
     
     Subclasses must implement:
     - _initialize_client(): Create the provider-specific client
-    - _transform_request(): Convert CompletionRequest to provider format
-    - _transform_response(): Convert provider response to CompletionResponse
+    - _transform_request(): Convert CompleteRequest to provider format
+    - _transform_response(): Convert provider response to CompleteResponse
     - _transform_stream_chunk(): Convert provider stream chunk to StreamChunk
     - _transform_messages(): Convert Skye messages to provider format
     - _transform_capabilities(): Convert Skye capabilities to provider format
@@ -168,11 +168,11 @@ class BaseModelProvider(ModelInterface, ABC):
         pass
     
     @abstractmethod
-    def _transform_request(self, request: CompletionRequest) -> dict[str, Any]:
-        """Transform CompletionRequest to provider-specific format.
+    def _transform_request(self, request: CompleteRequest) -> dict[str, Any]:
+        """Transform CompleteRequest to provider-specific format.
         
         Args:
-            request: The skye CompletionRequest
+            request: The skye CompleteRequest
             
         Returns:
             Dictionary in provider-specific format
@@ -188,18 +188,18 @@ class BaseModelProvider(ModelInterface, ABC):
         pass
     
     @abstractmethod
-    def _transform_response(self, response: Any) -> CompletionResponse:
-        """Transform provider response to CompletionResponse.
+    def _transform_response(self, response: Any) -> CompleteResponse:
+        """Transform provider response to CompleteResponse.
         
         Args:
             response: The provider-specific response object
             
         Returns:
-            CompletionResponse in skye format
+            CompleteResponse in skye format
             
         Example:
             >>> def _transform_response(self, response):
-            ...     return CompletionResponse(
+            ...     return CompleteResponse(
             ...         id=response.id,
             ...         model=response.model,
             ...         provider="openai",
@@ -414,7 +414,7 @@ class BaseModelProvider(ModelInterface, ABC):
         for the CapabilityCallHandler to use.
         
         Args:
-            response: Provider-specific response object (CompletionResponse or raw response)
+            response: Provider-specific response object (CompleteResponse or raw response)
             
         Returns:
             List of CapabilityCall objects (empty list if none found)
@@ -424,11 +424,11 @@ class BaseModelProvider(ModelInterface, ABC):
             >>> response = provider.complete(request)
             >>> capability_calls = provider.parse_capability_calls(response)
         """
-        # If it's a CompletionResponse and already has capability_calls, return them
+        # If it's a CompleteResponse and already has capability_calls, return them
         if hasattr(response, 'capability_calls') and response.capability_calls is not None:
             return response.capability_calls
         
-        # Handle both CompletionResponse and raw provider response
+        # Handle both CompleteResponse and raw provider response
         if hasattr(response, 'metadata') and 'raw_response' in response.metadata:
             # Use raw response if available in metadata
             raw_response = response.metadata['raw_response']
@@ -486,18 +486,41 @@ class BaseModelProvider(ModelInterface, ABC):
         """
         pass
     
+    def _select_with_router(self, router: Any, messages: list[Any] | str) -> str:
+        """Ask a router which model to use for these messages.
+
+        ``select_model`` of the router Port is ``async`` and takes a request, so the messages are wrapped in one
+        and the coroutine is run to completion from this synchronous code.
+        """
+        import asyncio
+        import concurrent.futures
+
+        from skye.base.messages import UserMessage
+
+        if isinstance(messages, str):
+            messages = [UserMessage(content=messages)]
+        selection = router.select_model(CompleteRequest(messages=messages, model=self.default_model or ""))
+        if not asyncio.iscoroutine(selection):
+            return selection
+        try:
+            asyncio.get_running_loop()
+        except RuntimeError:
+            return asyncio.run(selection)
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+            return executor.submit(asyncio.run, selection).result()
+
     def complete(
         self,
-        messages: list[Any] | str | CompletionRequest | None = None,
+        messages: list[Any] | str | CompleteRequest | None = None,
         model: str | None = None,
         router: Any | None = None,
         temperature: float | None = None,
         max_tokens: int | None = None,
         **kwargs: Any,
-    ) -> CompletionResponse:
+    ) -> CompleteResponse:
         """Execute synchronous completion.
         
-        Supports both boto3-style direct calls and CompletionRequest objects.
+        Supports both boto3-style direct calls and CompleteRequest objects.
         
         Boto3-style usage:
             >>> # With specific model
@@ -512,12 +535,12 @@ class BaseModelProvider(ModelInterface, ABC):
             ...     router=my_router
             ... )
         
-        CompletionRequest usage (internal):
-            >>> request = CompletionRequest(messages=[...], model="gpt-4")
+        CompleteRequest usage (internal):
+            >>> request = CompleteRequest(messages=[...], model="gpt-4")
             >>> response = provider.complete(request)
         
         Args:
-            messages: List of SkyeMessage objects, string, or CompletionRequest
+            messages: List of SkyeMessage objects, string, or CompleteRequest
             model: Model identifier (mutually exclusive with router)
             router: Router instance for load balancing (mutually exclusive with model)
             temperature: Sampling temperature
@@ -525,17 +548,17 @@ class BaseModelProvider(ModelInterface, ABC):
             **kwargs: Additional provider-specific parameters
             
         Returns:
-            CompletionResponse with the model's output
+            CompleteResponse with the model's output
             
         Raises:
             ProviderError: If the provider API call fails
             ValueError: If required parameters are missing or both model and router provided
         """
         # Handle polymorphic input
-        if isinstance(messages, CompletionRequest):
+        if isinstance(messages, CompleteRequest):
             request = messages
         else:
-            # Convert to CompletionRequest
+            # Convert to CompleteRequest
             if messages is None:
                 raise ValueError("messages parameter is required")
             
@@ -548,7 +571,7 @@ class BaseModelProvider(ModelInterface, ABC):
             
             if router is not None:
                 # Router will select the model
-                effective_model = router.select_model(messages)
+                effective_model = self._select_with_router(router, messages)
             elif effective_model is None:
                 raise ValueError(
                     "Either 'model' or 'router' parameter is required"
@@ -561,7 +584,7 @@ class BaseModelProvider(ModelInterface, ABC):
             
             # Only what the caller set: an omitted temperature or max_tokens keeps the request default.
             sampling = {k: v for k, v in {"temperature": temperature, "max_tokens": max_tokens}.items() if v is not None}
-            request = CompletionRequest(
+            request = CompleteRequest(
                 messages=messages,
                 model=effective_model,
                 **sampling,
@@ -588,7 +611,7 @@ class BaseModelProvider(ModelInterface, ABC):
             raise
     
     @staticmethod
-    def _parse_structured_output(request: CompletionRequest, response: CompletionResponse) -> None:
+    def _parse_structured_output(request: CompleteRequest, response: CompleteResponse) -> None:
         """Validate the text of the response against the declared output schema and attach the result.
 
         The REST adapters return plain JSON text (no SDK ``parsed`` field), so the shape is checked here, once, for every provider;
@@ -601,7 +624,7 @@ class BaseModelProvider(ModelInterface, ABC):
         response.structured_output = parse_structured(schema, response.content)
 
     @with_retry(max_retries=3, min_wait=4, max_wait=10, multiplier=1)
-    def _complete_with_retry(self, request: CompletionRequest) -> CompletionResponse:
+    def _complete_with_retry(self, request: CompleteRequest) -> CompleteResponse:
         """Internal method with retry logic.
         
         This method is wrapped with retry decorator and does not track health metrics
@@ -635,7 +658,7 @@ class BaseModelProvider(ModelInterface, ABC):
     
     def stream(
         self,
-        messages: list[Any] | str | CompletionRequest | None = None,
+        messages: list[Any] | str | CompleteRequest | None = None,
         model: str | None = None,
         router: Any | None = None,
         temperature: float | None = None,
@@ -644,7 +667,7 @@ class BaseModelProvider(ModelInterface, ABC):
     ) -> Iterator[StreamChunk]:
         """Execute streaming completion.
         
-        Supports both boto3-style direct calls and CompletionRequest objects.
+        Supports both boto3-style direct calls and CompleteRequest objects.
         
         Boto3-style usage:
             >>> # With specific model
@@ -661,13 +684,13 @@ class BaseModelProvider(ModelInterface, ABC):
             ... ):
             ...     print(chunk.delta, end="")
         
-        CompletionRequest usage (internal):
-            >>> request = CompletionRequest(messages=[...], model="gpt-4", stream=True)
+        CompleteRequest usage (internal):
+            >>> request = CompleteRequest(messages=[...], model="gpt-4", stream=True)
             >>> for chunk in provider.stream(request):
             ...     print(chunk.delta, end="")
         
         Args:
-            messages: List of SkyeMessage objects, string, or CompletionRequest
+            messages: List of SkyeMessage objects, string, or CompleteRequest
             model: Model identifier (mutually exclusive with router)
             router: Router instance for load balancing (mutually exclusive with model)
             temperature: Sampling temperature
@@ -682,10 +705,10 @@ class BaseModelProvider(ModelInterface, ABC):
             ValueError: If required parameters are missing or both model and router provided
         """
         # Handle polymorphic input
-        if isinstance(messages, CompletionRequest):
+        if isinstance(messages, CompleteRequest):
             request = messages
         else:
-            # Convert to CompletionRequest
+            # Convert to CompleteRequest
             if messages is None:
                 raise ValueError("messages parameter is required")
             
@@ -698,7 +721,7 @@ class BaseModelProvider(ModelInterface, ABC):
             
             if router is not None:
                 # Router will select the model
-                effective_model = router.select_model(messages)
+                effective_model = self._select_with_router(router, messages)
             elif effective_model is None:
                 raise ValueError(
                     "Either 'model' or 'router' parameter is required"
@@ -710,7 +733,7 @@ class BaseModelProvider(ModelInterface, ABC):
                 messages = [UserMessage(content=messages)]
             
             sampling = {k: v for k, v in {"temperature": temperature, "max_tokens": max_tokens}.items() if v is not None}
-            request = CompletionRequest(
+            request = CompleteRequest(
                 messages=messages,
                 model=effective_model,
                 **sampling,
@@ -731,7 +754,7 @@ class BaseModelProvider(ModelInterface, ABC):
             raise
     
     @with_retry(max_retries=3, min_wait=4, max_wait=10, multiplier=1)
-    def _stream_with_retry(self, request: CompletionRequest) -> Iterator[StreamChunk]:
+    def _stream_with_retry(self, request: CompleteRequest) -> Iterator[StreamChunk]:
         """Internal method with retry logic for streaming.
         
         This method is wrapped with retry decorator and does not track health metrics
@@ -758,22 +781,26 @@ class BaseModelProvider(ModelInterface, ABC):
                 error_type=type(e).__name__
             ) from e
     
-    async def invoke(self, input: CompletionRequest) -> CompletionResponse:
+    async def invoke(self, input: CompleteRequest) -> CompleteResponse:
         """Runnable Port entry point: one request in, one response out.
 
         Delegates to :meth:`acomplete`; satisfies ``Runnable`` structurally.
         """
         return await self.acomplete(input)
 
+    async def ainvoke(self, input: CompleteRequest) -> CompleteResponse:
+        """A thin alias of :meth:`invoke` (the ``x`` / ``ax`` pair users of other libraries try first)."""
+        return await self.invoke(input)
+
     async def acomplete(
         self,
-        messages: list[Any] | str | CompletionRequest | None = None,
+        messages: list[Any] | str | CompleteRequest | None = None,
         model: str | None = None,
         router: Any | None = None,
         temperature: float | None = None,
         max_tokens: int | None = None,
         **kwargs: Any,
-    ) -> CompletionResponse:
+    ) -> CompleteResponse:
         """Execute asynchronous completion.
         
         Default implementation uses synchronous version. Override this method
@@ -781,7 +808,7 @@ class BaseModelProvider(ModelInterface, ABC):
         async client.
         
         Args:
-            messages: List of SkyeMessage objects, string, or CompletionRequest
+            messages: List of SkyeMessage objects, string, or CompleteRequest
             model: Model identifier (mutually exclusive with router)
             router: Router instance for load balancing (mutually exclusive with model)
             temperature: Sampling temperature
@@ -789,22 +816,35 @@ class BaseModelProvider(ModelInterface, ABC):
             **kwargs: Additional provider-specific parameters
             
         Returns:
-            CompletionResponse with the model's output
+            CompleteResponse with the model's output
             
         Raises:
             ProviderError: If the provider API call fails
         """
         return self.complete(messages, model, router, temperature, max_tokens, **kwargs)
     
-    async def astream(self, request: CompletionRequest) -> Iterator[StreamChunk]:  # type: ignore[misc,override]
+    async def astream(
+        self,
+        messages: list[Any] | str | CompleteRequest | None = None,
+        model: str | None = None,
+        router: Any | None = None,
+        temperature: float | None = None,
+        max_tokens: int | None = None,
+        **kwargs: Any,
+    ) -> AsyncIterator[StreamChunk]:
         """Execute asynchronous streaming completion.
         
         Default implementation uses synchronous version. Override this method
         in subclasses to provide true async support using the provider's
-        async client.
+        async client. Takes the same arguments as :meth:`stream`.
         
         Args:
-            request: The completion request
+            messages: List of SkyeMessage objects, string, or CompleteRequest
+            model: Model identifier (mutually exclusive with router)
+            router: Router instance for load balancing (mutually exclusive with model)
+            temperature: Sampling temperature
+            max_tokens: Maximum tokens to generate
+            **kwargs: Additional provider-specific parameters
             
         Yields:
             StreamChunk objects with incremental content
@@ -812,7 +852,7 @@ class BaseModelProvider(ModelInterface, ABC):
         Raises:
             ProviderError: If the provider API call fails
         """
-        for chunk in self.stream(request):
+        for chunk in self.stream(messages, model, router, temperature, max_tokens, **kwargs):
             yield chunk
     
     def get_health_metrics(self) -> dict[str, Any]:

@@ -25,11 +25,11 @@ before = set(sys.modules)
 t0 = time.perf_counter()
 import skye
 from skye.base.messages import UserMessage
-from skye.base.completion import CompletionRequest
+from skye.base.completion import CompleteRequest
 from skye.router import ModelRouter, ModelTarget, RouteConfig
 from skye.base.interfaces.router import RoutingStrategy
 router = ModelRouter(routes=[RouteConfig(alias="a", targets=[ModelTarget(model="gpt-4", provider="openai", api_key="k")], strategy=RoutingStrategy.ROUND_ROBIN)])
-request = CompletionRequest(messages=[UserMessage(content="hi")], model="a")
+request = CompleteRequest(messages=[UserMessage(content="hi")], model="a")
 elapsed = time.perf_counter() - t0
 # only what the cold path itself loaded: a .pth file of an installed SDK pre-imports `google` at interpreter start-up
 print(json.dumps({"ms": elapsed * 1000, "loaded": sorted({m.split(".")[0] for m in set(sys.modules) - before})}))

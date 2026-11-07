@@ -3,7 +3,7 @@
 Task 14.3 already shipped :class:`~skye.tools.mcp_client.BuiltinMCPClient`: a standard-library
 JSON-RPC 2.0 client over stateless HTTP, built on ``skye.base.http`` (the base-layer home of
 the shared stdlib transport, re-exported by ``skye.models.transport.http``), behind the one
-:class:`~skye.tools.mcp_client.MCPClientPort` alongside the fastmcp implementation.
+:class:`~skye.tools.mcp_client.MCPClientInterface` alongside the fastmcp implementation.
 
 Task 14.4 is the *future target*: driving the MCP extra toward **zero third-party libraries** so
 the built-in client can stand alone, while the ``fastmcp`` extra stays until that lands. This

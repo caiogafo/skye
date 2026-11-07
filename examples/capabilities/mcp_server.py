@@ -1,151 +1,54 @@
-"""MCP Server Capability Example.
+"""Use the tools of an MCP server as capabilities of a model (needs a running server).
 
-This example demonstrates how to connect to an existing MCP server,
-list its tools, and use them as Skye capabilities with language models.
-
-Prerequisites:
-- FastMCP installed: pip install skyeai[mcp]
-- An MCP server running (update SERVER_URL below)
-- OPENAI_API_KEY environment variable set
-
-Example MCP servers you can use:
-- FastMCP example servers
-- Custom MCP servers
-- Third-party MCP servers
+Connect with FastMCP, list the server's tools, wrap each one as an ``MCPCapability``, hand them to the model, run the calls it asks for
+and send the results back. Set MCP_SERVER_URL (for example http://localhost:8000/sse) and install ``pip install skyeai[mcp]``. Without a
+server the example says how to start one and stops. With OPENAI_API_KEY set the model is real, otherwise a scripted client answers.
 """
 
-import os
 import asyncio
-import skye
+import os
+import sys
+from pathlib import Path
+
 from skye import UserMessage
 from skye.tools import MCPCapability
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))  # the shared offline helper lives in examples/
+from _offline import get_client  # noqa: E402
 
-# The MCP server to connect to: set MCP_SERVER_URL (for example http://localhost:8000/sse).
-# fastmcp also accepts a script (stdio): SERVER_URL = "my_server.py", or a command: ["python", "my_server.py"].
 SERVER_URL = os.getenv("MCP_SERVER_URL")
 
 
-async def main():
-    """Connect to MCP server, list tools, and use them with a language model."""
-    
+async def main() -> None:
     if not SERVER_URL:
-        print("MCP_SERVER_URL not set, skipping (start an MCP server and set its address)")
+        print("MCP_SERVER_URL not set: start an MCP server and set its address, then run again")
         return
-
-    # Check for FastMCP
     try:
         from fastmcp import Client
     except ImportError:
-        print("❌ FastMCP not installed")
-        print("   Install with: pip install skyeai[mcp]")
+        print("FastMCP is not installed: pip install skyeai[mcp]")
         return
-    
-    # Check for API key
-    api_key = os.getenv("OPENAI_API_KEY")
-    if not api_key:
-        print("❌ OPENAI_API_KEY environment variable not set")
-        return
-    
-    # Get provider
+
+    model = get_client("openai")
+    question = [UserMessage(content="Use the available tools to help me")]
     try:
-        client = skye.provider("openai", api_key=api_key)
-    except ImportError:
-        print("❌ OpenAI provider not available")
-        return
-    
-    print("=" * 60)
-    print("MCP Server Capability Example")
-    print("=" * 60)
-    
-    try:
-        # Step 1: Connect to MCP server
-        print(f"\n📡 Connecting to MCP server: {SERVER_URL}")
-        async with Client(SERVER_URL) as client:
-            
-            # Step 2: List available tools
-            print("\n🔍 Listing available tools...")
-            tools = await client.list_tools()
-            
-            if not tools:
-                print("⚠️  No tools found on the server")
+        async with Client(SERVER_URL) as mcp:
+            tools = await mcp.list_tools()
+            print(f"{len(tools)} tool(s):", ", ".join(tool["name"] for tool in tools))
+            capabilities = [MCPCapability(mcp_tool=tool, server_name="mcp_server", cache_schema=True) for tool in tools]
+
+            response = model.complete(messages=question, model="gpt-4", capabilities=capabilities)
+            if not response.has_capability_calls():
+                print(response.content)
                 return
-            
-            print(f"✅ Found {len(tools)} tools:")
-            for tool in tools:
-                print(f"   - {tool['name']}: {tool['description']}")
-            
-            # Step 3: Convert tools to Skye capabilities
-            print("\n🔧 Converting tools to Skye capabilities...")
-            capabilities = []
-            for tool in tools:
-                capability = MCPCapability(
-                    mcp_tool=tool,
-                    server_name="mcp_server",
-                    cache_schema=True
-                )
-                capabilities.append(capability)
-            
-            print(f"✅ Converted {len(capabilities)} capabilities")
-            
-            # Step 4: Use capabilities with language model
-            print("\n💬 Sending request to language model...")
-            user_message = "Use the available tools to help me"
-            
-            response = client.complete(
-                messages=[UserMessage(content=user_message)],
-                model="gpt-4",
-                capabilities=capabilities
-            )
-            
-            print(f"\n🤖 Model response: {response.content}")
-            
-            # Step 5: Execute capability calls if any
-            if response.has_capability_calls():
-                print(f"\n⚙️  Executing {len(response.capability_calls)} capability calls...")
-                
-                for call in response.capability_calls:
-                    print(f"   - {call.name}({call.arguments})")
-                
-                capability_messages = await response.execute_capability_calls()
-                
-                print("\n📊 Capability results:")
-                for msg in capability_messages:
-                    print(f"   - {msg.capability_name}: {msg.content[:100]}...")
-                
-                # Step 6: Continue conversation with results
-                print("\n💬 Continuing conversation with results...")
-                final_response = client.complete(
-                    messages=[
-                        UserMessage(content=user_message),
-                        response.to_message(),
-                        *capability_messages
-                    ],
-                    model="gpt-4",
-                    capabilities=capabilities
-                )
-                
-                print(f"\n🤖 Final response: {final_response.content}")
-            else:
-                print("\n✅ No capability calls needed")
-        
-        print("\n" + "=" * 60)
-        print("✅ Example completed successfully!")
-        print("=" * 60)
-    
-    except ConnectionError as e:
-        print(f"\n❌ Connection failed: {e}")
-        print(f"   Make sure your MCP server is running at: {SERVER_URL}")
-    
-    except Exception as e:
-        print(f"\n❌ Error: {e}")
-        import traceback
-        traceback.print_exc()
+            for call in response.capability_calls:
+                print(f"the model asks for: {call.name}({call.arguments})")
+            results = await response.aexecute_capability_calls()
+            final = model.complete(messages=[*question, response.to_message(), *results], model="gpt-4", capabilities=capabilities)
+            print(final.content)
+    except OSError as error:
+        print(f"Could not reach the MCP server at {SERVER_URL}: {error}")
 
 
 if __name__ == "__main__":
-    print("\n🚀 Starting MCP Server Example...")
-    print(f"   Server URL: {SERVER_URL}")
-    print(f"   Update SERVER_URL in the script to match your MCP server\n")
-    
     asyncio.run(main())

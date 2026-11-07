@@ -1,10 +1,12 @@
-# Serverless examples
+# serverless
 
-Skye is built for serverless architectures, where the size of the library and its cold start make a difference: the core is the standard
-library, and a user installs only the extras they need.
+What you learn: serverless use. Read in this order:
 
-- `lambda_handler.py`: a handler that creates its client once, outside the handler, so a warm invocation pays nothing.
-- `serverless_router_example.py`: a router whose state (health, rate limits) lives in an external store, because a serverless process does
-  not survive between invocations. Redis comes with the `memory` extra, PostgreSQL with the `postgres` extra; DynamoDB needs `boto3`.
+1. `lambda_handler.py`: A serverless handler: create the client once, outside the handler, so a warm invocation pays nothing
+2. `serverless_router_example.py`: A router whose state survives between invocations of a serverless function
 
-Run one with `python examples/serverless/lambda_handler.py` (the tests in `tests/examples` run every example offline).
+Run: `python examples/serverless/lambda_handler.py`
+
+What you see: printed results; with no key a scripted client answers and the example prints which mode ran.
+
+What you need: `pip install skyeai`; a provider key only to call a real service.

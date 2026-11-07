@@ -5,7 +5,7 @@ must follow. It supports both synchronous and asynchronous operations, streaming
 and provides a unified API regardless of the underlying provider.
 
 **Polymorphic Input Support:**
-The ModelInterface works with CompletionRequest which accepts either:
+The ModelInterface works with CompleteRequest which accepts either:
 - **messages**: List of SkyeMessage objects (base Skye)
 - **prompt**: Template name with variables (requires skyeai[prompts])
 
@@ -14,31 +14,40 @@ the implementation should resolve it to messages before calling the LLM.
 
 Example (Base Skye):
     >>> from skye.base.interfaces.model import ModelInterface
-    >>> from skye.base.completion import CompletionRequest
+    >>> from skye.base.completion import CompleteRequest
     >>> from skye.base.messages import UserMessage
     >>>
     >>> # Using messages directly
-    >>> request = CompletionRequest(
+    >>> request = CompleteRequest(
     ...     messages=[UserMessage(content="Hello")],
     ...     model="gpt-4"
     ... )
-    >>> response = model.complete(request)
+    >>> response = model.complete(request)  # doctest: +SKIP
 
 Example (With skyeai[prompts]):
     >>> # Using prompt templates
-    >>> request = CompletionRequest(
+    >>> request = CompleteRequest(
     ...     prompt="greeting",
     ...     prompt_variables={"name": "Alice"},
     ...     model="gpt-4"
     ... )
-    >>> response = model.complete(request)
+    >>> response = model.complete(request)  # doctest: +SKIP
+
+Raises: ProviderError when the provider call fails, ValidationError when the request is invalid, ConfigurationError for a missing credential or model.
+Missing: not applicable; a response or an exception, never ``None``.
+Concurrency: ``complete`` and ``stream`` block the calling thread, ``acomplete`` and ``astream`` run on the event loop; an instance is shared by many calls and must not keep per-request state.
 """
 
-from abc import ABC, abstractmethod
-from collections.abc import Iterator
-from typing import Any
+from __future__ import annotations
 
-from skye.base.completion import CompletionRequest, CompletionResponse, StreamChunk
+from abc import ABC, abstractmethod
+from collections.abc import AsyncIterator, Iterator
+from typing import TYPE_CHECKING, Any
+
+
+if TYPE_CHECKING:
+    from skye.base.completion import CompleteRequest, CompleteResponse, StreamChunk
+
 
 
 class ModelInterface(ABC):
@@ -50,8 +59,12 @@ class ModelInterface(ABC):
 
     All methods are abstract and must be implemented by concrete provider classes.
 
+    **The call:** ``complete``, ``stream``, ``acomplete`` and ``astream`` take what users write,
+    ``client.complete(messages=[...], model="gpt-4")``, and also one ``CompleteRequest`` as the first argument,
+    ``client.complete(request)`` (decision D36).
+
     **Polymorphic Input Handling:**
-    Implementations should handle CompletionRequest with either:
+    Implementations should handle CompleteRequest with either:
     - `request.messages` - Direct message list (base Skye)
     - `request.prompt` - Template name to resolve (requires skyeai[prompts])
 
@@ -65,7 +78,8 @@ class ModelInterface(ABC):
 
     Example:
         >>> class OpenAIModel(ModelInterface):
-        ...     def complete(self, request: CompletionRequest) -> CompletionResponse:
+        ...     def complete(self, messages=None, model=None, router=None, temperature=None, max_tokens=None, **kwargs):
+        ...         request = messages if isinstance(messages, CompleteRequest) else CompleteRequest(messages=messages, model=model, **kwargs)
         ...         # Handle polymorphic input
         ...         if request.prompt:
         ...             # Resolve prompt to messages (if skyeai[prompts] available)
@@ -76,43 +90,56 @@ class ModelInterface(ABC):
         ...         # Call OpenAI API with messages
         ...         return self._call_api(messages, request)
         ...
-        ...     def stream(self, request: CompletionRequest) -> Iterator[StreamChunk]:
+        ...     def stream(self, messages=None, model=None, router=None, temperature=None, max_tokens=None, **kwargs):
         ...         # Stream from OpenAI API
         ...         pass
         ...
-        ...     async def acomplete(self, request: CompletionRequest) -> CompletionResponse:
+        ...     async def acomplete(self, messages=None, model=None, router=None, temperature=None, max_tokens=None, **kwargs):
         ...         # Async call to OpenAI API
         ...         pass
         ...
-        ...     async def astream(self, request: CompletionRequest) -> Iterator[StreamChunk]:
+        ...     async def astream(self, messages=None, model=None, router=None, temperature=None, max_tokens=None, **kwargs):
         ...         # Async stream from OpenAI API
-        ...         pass
+        ...         yield StreamChunk(delta="")
         ...
         ...     def get_model_info(self) -> dict:
         ...         return {"name": "gpt-4", "provider": "openai"}
     """
 
     @abstractmethod
-    def complete(self, request: CompletionRequest) -> CompletionResponse:
+    def complete(
+        self,
+        messages: list[Any] | str | CompleteRequest | None = None,
+        model: str | None = None,
+        router: Any | None = None,
+        temperature: float | None = None,
+        max_tokens: int | None = None,
+        **kwargs: Any,
+    ) -> CompleteResponse:
         """Execute a synchronous completion request.
 
-        Accepts polymorphic input via CompletionRequest:
+        Accepts polymorphic input via CompleteRequest:
         - Use `request.messages` for direct message input (base Skye)
         - Use `request.prompt` + `request.prompt_variables` for template-based input
           (skyeai[prompts])
 
         Args:
-            request: The completion request containing either messages or prompt template.
+            messages: A list of messages, a string (one user message) or one ``CompleteRequest`` as the first argument.
+            model: Model identifier (not together with ``router``).
+            router: A router that selects the model (not together with ``model``).
+            temperature: Sampling temperature; the request default when omitted.
+            max_tokens: Maximum tokens to generate; the request default when omitted.
+            **kwargs: Other fields of ``CompleteRequest`` (``capabilities``, ``response_schema``, ...).
 
         Returns:
-            CompletionResponse containing the model's response and metadata.
+            CompleteResponse containing the model's response and metadata.
 
         Raises:
             ProviderError: If the provider API call fails.
             ValidationError: If the request is invalid.
 
         Example (Base Skye):
-            >>> request = CompletionRequest(
+            >>> request = CompleteRequest(
             ...     messages=[UserMessage(content="Hello")],
             ...     model="gpt-4"
             ... )
@@ -120,7 +147,7 @@ class ModelInterface(ABC):
             >>> print(response.content)
 
         Example (With skyeai[prompts]):
-            >>> request = CompletionRequest(
+            >>> request = CompleteRequest(
             ...     prompt="greeting",
             ...     prompt_variables={"name": "Alice"},
             ...     model="gpt-4"
@@ -131,11 +158,24 @@ class ModelInterface(ABC):
         pass
 
     @abstractmethod
-    def stream(self, request: CompletionRequest) -> Iterator[StreamChunk]:
+    def stream(
+        self,
+        messages: list[Any] | str | CompleteRequest | None = None,
+        model: str | None = None,
+        router: Any | None = None,
+        temperature: float | None = None,
+        max_tokens: int | None = None,
+        **kwargs: Any,
+    ) -> Iterator[StreamChunk]:
         """Execute a streaming completion request.
 
         Args:
-            request: The completion request containing messages and parameters.
+            messages: A list of messages, a string (one user message) or one ``CompleteRequest`` as the first argument.
+            model: Model identifier (not together with ``router``).
+            router: A router that selects the model (not together with ``model``).
+            temperature: Sampling temperature; the request default when omitted.
+            max_tokens: Maximum tokens to generate; the request default when omitted.
+            **kwargs: Other fields of ``CompleteRequest``.
 
         Yields:
             StreamChunk objects containing incremental response data.
@@ -145,7 +185,7 @@ class ModelInterface(ABC):
             ValidationError: If the request is invalid.
 
         Example:
-            >>> request = CompletionRequest(
+            >>> request = CompleteRequest(
             ...     messages=[UserMessage(content="Hello")],
             ...     model="gpt-4",
             ...     stream=True
@@ -156,21 +196,34 @@ class ModelInterface(ABC):
         pass
 
     @abstractmethod
-    async def acomplete(self, request: CompletionRequest) -> CompletionResponse:
+    async def acomplete(
+        self,
+        messages: list[Any] | str | CompleteRequest | None = None,
+        model: str | None = None,
+        router: Any | None = None,
+        temperature: float | None = None,
+        max_tokens: int | None = None,
+        **kwargs: Any,
+    ) -> CompleteResponse:
         """Execute an asynchronous completion request.
 
         Args:
-            request: The completion request containing messages and parameters.
+            messages: A list of messages, a string (one user message) or one ``CompleteRequest`` as the first argument.
+            model: Model identifier (not together with ``router``).
+            router: A router that selects the model (not together with ``model``).
+            temperature: Sampling temperature; the request default when omitted.
+            max_tokens: Maximum tokens to generate; the request default when omitted.
+            **kwargs: Other fields of ``CompleteRequest``.
 
         Returns:
-            CompletionResponse containing the model's response and metadata.
+            CompleteResponse containing the model's response and metadata.
 
         Raises:
             ProviderError: If the provider API call fails.
             ValidationError: If the request is invalid.
 
         Example:
-            >>> request = CompletionRequest(
+            >>> request = CompleteRequest(
             ...     messages=[UserMessage(content="Hello")],
             ...     model="gpt-4"
             ... )
@@ -180,11 +233,24 @@ class ModelInterface(ABC):
         pass
 
     @abstractmethod
-    async def astream(self, request: CompletionRequest) -> Iterator[StreamChunk]:
-        """Execute an asynchronous streaming completion request.
+    async def astream(
+        self,
+        messages: list[Any] | str | CompleteRequest | None = None,
+        model: str | None = None,
+        router: Any | None = None,
+        temperature: float | None = None,
+        max_tokens: int | None = None,
+        **kwargs: Any,
+    ) -> AsyncIterator[StreamChunk]:
+        """Execute an asynchronous streaming completion request (an async generator: iterate it with ``async for``, do not await it).
 
         Args:
-            request: The completion request containing messages and parameters.
+            messages: A list of messages, a string (one user message) or one ``CompleteRequest`` as the first argument.
+            model: Model identifier (not together with ``router``).
+            router: A router that selects the model (not together with ``model``).
+            temperature: Sampling temperature; the request default when omitted.
+            max_tokens: Maximum tokens to generate; the request default when omitted.
+            **kwargs: Other fields of ``CompleteRequest``.
 
         Yields:
             StreamChunk objects containing incremental response data.
@@ -194,7 +260,7 @@ class ModelInterface(ABC):
             ValidationError: If the request is invalid.
 
         Example:
-            >>> request = CompletionRequest(
+            >>> request = CompleteRequest(
             ...     messages=[UserMessage(content="Hello")],
             ...     model="gpt-4",
             ...     stream=True
@@ -202,7 +268,8 @@ class ModelInterface(ABC):
             >>> async for chunk in model.astream(request):
             ...     print(chunk.delta, end="")
         """
-        pass
+        raise NotImplementedError
+        yield  # pragma: no cover  (makes this an async generator)
 
     @abstractmethod
     def get_model_info(self) -> dict[str, Any]:

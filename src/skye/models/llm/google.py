@@ -15,15 +15,15 @@ Features:
 - Multimodal inputs (images, video)
 
 Example:
-    >>> from skye.models.llm.google_provider import GoogleProvider
-    >>> from skye.base.completion import CompletionRequest
+    >>> from skye.models.llm.google import GoogleProvider
+    >>> from skye.base.completion import CompleteRequest
     >>> from skye.base.messages import UserMessage
     >>>
     >>> provider = GoogleProvider(
     ...     project_id="my-project",
     ...     location="us-central1"
     ... )
-    >>> request = CompletionRequest(
+    >>> request = CompleteRequest(
     ...     messages=[UserMessage(content="Hello")],
     ...     model="gemini-1.5-pro"
     ... )
@@ -38,7 +38,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 from skye.auth.google import resolve_google_auth
-from skye.base.completion import CapabilityCall, CompletionRequest, CompletionResponse, StreamChunk, TokenUsage
+from skye.base.completion import CapabilityCall, CompleteRequest, CompleteResponse, StreamChunk, TokenUsage
 from skye.base.interfaces.authentication import AuthenticationInterface
 from skye.models.base import BaseModelProvider
 from skye.models.transport.structured import schema_instruction
@@ -262,8 +262,8 @@ class GoogleProvider(BaseModelProvider):
                 )
         return calls or None
 
-    def _transform_request(self, request: CompletionRequest) -> dict[str, Any]:
-        """Transform CompletionRequest to the Vertex AI REST body.
+    def _transform_request(self, request: CompleteRequest) -> dict[str, Any]:
+        """Transform CompleteRequest to the Vertex AI REST body.
 
         The returned dict carries ``model`` (consumed by ``_call_provider``, not sent) plus
         ``contents``, ``systemInstruction``, ``generationConfig``, ``tools``, ``toolConfig``
@@ -343,8 +343,8 @@ class GoogleProvider(BaseModelProvider):
             return None
         return reason
 
-    def _transform_response(self, response: Any) -> CompletionResponse:
-        """Transform a ``generateContent`` JSON response to CompletionResponse."""
+    def _transform_response(self, response: Any) -> CompleteResponse:
+        """Transform a ``generateContent`` JSON response to CompleteResponse."""
         response = wrap(response)
         content = ""
         finish_reason = "stop"
@@ -373,7 +373,7 @@ class GoogleProvider(BaseModelProvider):
             }
 
         usage = response.get("usageMetadata") or JsonObject({})
-        return CompletionResponse(
+        return CompleteResponse(
             id=response.get("responseId", "") or "",
             model=response.get("modelVersion", "") or "",
             provider="google",
@@ -420,10 +420,18 @@ class GoogleProvider(BaseModelProvider):
             url + "?alt=sse", body, authenticator=self.authenticator, provider="google"
         )
 
-    async def acomplete(self, *args: Any, **kwargs: Any) -> CompletionResponse:  # type: ignore[override]
+    async def acomplete(
+        self,
+        messages: list[Any] | str | CompleteRequest | None = None,
+        model: str | None = None,
+        router: Any | None = None,
+        temperature: float | None = None,
+        max_tokens: int | None = None,
+        **kwargs: Any,
+    ) -> CompleteResponse:
         """Asynchronous completion: runs the blocking REST call in the default executor."""
         loop = asyncio.get_running_loop()
-        return await loop.run_in_executor(None, lambda: self.complete(*args, **kwargs))
+        return await loop.run_in_executor(None, lambda: self.complete(messages, model, router, temperature, max_tokens, **kwargs))
 
     def format_capability_results(self, results: list[Any]) -> list[dict[str, Any]]:
         """Format capability results for Google.

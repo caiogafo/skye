@@ -91,3 +91,12 @@ def test_the_checks_catch_a_bad_page(tmp_path):
     page.write_text("# No front matter\n\n[broken](missing.md)\n", encoding="utf-8")
     assert not front_matter(page.read_text(encoding="utf-8"))
     assert [t for t, r in links(page) if not r.exists()] == ["missing.md"]
+
+
+def test_extension_page_has_a_row_for_every_exported_name():
+    """Requirement 15.10: `docs/base/extending.md` lists every name of `skye.interfaces.__all__`."""
+    import skye.interfaces as interfaces
+
+    text = (DOCS / "base" / "extending.md").read_text(encoding="utf-8")
+    missing = [name for name in interfaces.__all__ if f"| `{name}` |" not in text]
+    assert not missing, f"docs/base/extending.md has no row for {missing}"

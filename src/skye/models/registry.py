@@ -6,7 +6,7 @@ retrieved with configuration.
 
 Example:
     >>> from skye.models.registry import ProviderRegistry
-    >>> from skye.models.llm.openai_compatible import OpenAIProvider
+    >>> from skye.models.llm.openai import OpenAIProvider
     >>>
     >>> # Register a provider
     >>> ProviderRegistry.register_model_provider("openai", OpenAIProvider)
@@ -18,7 +18,7 @@ Example:
     >>> providers = ProviderRegistry.list_model_providers()
 """
 
-from typing import Any, Type
+from typing import Any, Literal, Type, overload
 
 from skye.base.exceptions import ConfigurationError
 from skye.base.interfaces.model import ModelInterface
@@ -64,7 +64,7 @@ class ProviderRegistry(ProviderRegistryInterface):
             provider_class: The provider class that implements ModelInterface.
 
         Example:
-            >>> from skye.models.llm.openai_compatible import OpenAIProvider
+            >>> from skye.models.llm.openai import OpenAIProvider
             >>> ProviderRegistry.register_model_provider("openai", OpenAIProvider)
         """
         cls._model_providers[name] = provider_class
@@ -193,6 +193,14 @@ class ProviderRegistry(ProviderRegistryInterface):
 
 
 set_provider_registry(ProviderRegistry)
+
+
+@overload
+def provider(name: str, *, provider_type: Literal["embedding"], **config: Any) -> VectorEncoderInterface: ...
+
+
+@overload
+def provider(name: str, *, provider_type: Literal["model"] = ..., **config: Any) -> ModelInterface: ...
 
 
 def provider(name: str, **config: Any) -> ModelInterface | VectorEncoderInterface:

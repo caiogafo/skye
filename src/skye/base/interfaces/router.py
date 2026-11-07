@@ -12,13 +12,22 @@ Inspired by LiteLLM's Router, this interface supports:
 - Fallback chains with context window awareness
 - Pre-call checks for rate limits
 - Tag-based routing for access control
+
+Raises: ValueError when neither a model nor tags are given or no model matches; ProviderError when every target fails.
+Missing: an unknown model id raises; a model with no health data reports a healthy default.
+Concurrency: async methods run on the event loop; health, cooldown and rate-limit state is shared across tasks and lives in the storage backend.
 """
+
+from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from enum import Enum
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-from skye.base.completion import CompletionRequest, CompletionResponse
+
+if TYPE_CHECKING:
+    from skye.base.completion import CompleteRequest, CompleteResponse
+
 
 
 class RoutingStrategy(Enum):
@@ -44,12 +53,8 @@ class RoutingStrategy(Enum):
     PRIORITY_BASED = "priority_based"
 
 
-class ModelRouterInterface(ABC):
-    """Abstract interface for model routing.
-
-    This interface defines the contract for routing requests to multiple
-    models with support for load balancing, fallbacks, and health tracking.
-    """
+class ModelSelectionInterface(ABC):
+    """Selection role of a model router: register models, choose one for a request and run the request."""
 
     @abstractmethod
     def register_model(self, model_id: str, model: Any) -> None:
@@ -62,8 +67,8 @@ class ModelRouterInterface(ABC):
         pass
 
     @abstractmethod
-    def select_model(self, request: CompletionRequest) -> str:
-        """Select a model for the request based on routing strategy.
+    async def select_model(self, request: CompleteRequest) -> str:
+        """Select a model for the request based on routing strategy (async: health and limits may live in a shared store).
 
         Args:
             request: The completion request.
@@ -80,7 +85,7 @@ class ModelRouterInterface(ABC):
         model: str | None = None,
         tags: list[str] | None = None,
         **kwargs: Any
-    ) -> CompletionResponse:
+    ) -> CompleteResponse:
         """Complete a request using the router.
 
         This method provides a unified interface for routing with flexible model
@@ -128,7 +133,7 @@ class ModelRouterInterface(ABC):
         model: str | None = None,
         tags: list[str] | None = None,
         **kwargs: Any
-    ) -> CompletionResponse:
+    ) -> CompleteResponse:
         """Complete a request using the router asynchronously.
 
         Args:
@@ -145,6 +150,10 @@ class ModelRouterInterface(ABC):
                 match the specified criteria.
         """
         pass
+
+
+class ModelHealthInterface(ABC):
+    """Health role of a model router: failures, cooldown and usage of each model."""
 
     @abstractmethod
     def mark_model_failed(self, model_id: str) -> None:
@@ -170,6 +179,42 @@ class ModelRouterInterface(ABC):
             >>> print(f"Success rate: {health.success_rate:.1%}")
         """
         pass
+
+    @abstractmethod
+    def get_usage_stats(self, model_id: str) -> Any:
+        """Get current usage statistics for a model.
+
+        Returns TPM/RPM usage, active requests, and other metrics.
+
+        Args:
+            model_id: The model deployment ID.
+
+        Returns:
+            UsageStats object with usage statistics.
+
+        Example:
+            >>> stats = router.get_usage_stats("gpt-4-deployment-1")
+            >>> print(f"TPM used: {stats.tpm_used}")
+        """
+        pass
+
+    @abstractmethod
+    def get_cooldown_models(self) -> list[Any]:
+        """Get list of models currently in cooldown.
+
+        Returns:
+            List of CooldownInfo objects with cooldown information.
+
+        Example:
+            >>> cooled_down = router.get_cooldown_models()
+            >>> for info in cooled_down:
+            ...     print(f"{info.model_id} cooled down until {info.cooldown_until}")
+        """
+        pass
+
+
+class RouterConfigurationInterface(ABC):
+    """Configuration role of a model router: strategy, fallbacks, retry and failure policies, cooldown, rate limits and tags."""
 
     @abstractmethod
     def set_routing_strategy(self, strategy: RoutingStrategy) -> None:
@@ -288,38 +333,6 @@ class ModelRouterInterface(ABC):
         pass
 
     @abstractmethod
-    def get_usage_stats(self, model_id: str) -> Any:
-        """Get current usage statistics for a model.
-
-        Returns TPM/RPM usage, active requests, and other metrics.
-
-        Args:
-            model_id: The model deployment ID.
-
-        Returns:
-            UsageStats object with usage statistics.
-
-        Example:
-            >>> stats = router.get_usage_stats("gpt-4-deployment-1")
-            >>> print(f"TPM used: {stats.tpm_used}")
-        """
-        pass
-
-    @abstractmethod
-    def get_cooldown_models(self) -> list[Any]:
-        """Get list of models currently in cooldown.
-
-        Returns:
-            List of CooldownInfo objects with cooldown information.
-
-        Example:
-            >>> cooled_down = router.get_cooldown_models()
-            >>> for info in cooled_down:
-            ...     print(f"{info.model_id} cooled down until {info.cooldown_until}")
-        """
-        pass
-
-    @abstractmethod
     def set_model_tags(self, model_id: str, tags: list[str]) -> None:
         """Set tags for a model deployment (for tag-based routing).
 
@@ -335,3 +348,12 @@ class ModelRouterInterface(ABC):
             >>> router.set_model_tags("gpt-3.5-free", ["free", "basic"])
         """
         pass
+
+
+class ModelRouterInterface(ModelSelectionInterface, ModelHealthInterface, RouterConfigurationInterface):
+    """Abstract interface for model routing.
+
+    This interface defines the contract for routing requests to multiple
+    models with support for load balancing, fallbacks, and health tracking.
+    """
+

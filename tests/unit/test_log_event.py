@@ -4,7 +4,7 @@ import logging
 
 import pytest
 
-from skye.base.completion import CompletionRequest, CompletionResponse, TokenUsage
+from skye.base.completion import CompleteRequest, CompleteResponse, TokenUsage
 from skye.base.exceptions import ValidationError
 from skye.base.interfaces.observer import EventType
 from skye.base.log_event import (
@@ -18,13 +18,13 @@ from skye.base.messages import UserMessage
 
 
 def _request():
-    return CompletionRequest(
+    return CompleteRequest(
         messages=[UserMessage(content="secret text")], model="gpt-4", max_tokens=10
     )
 
 
 def _response():
-    return CompletionResponse(
+    return CompleteResponse(
         model="gpt-4",
         provider="openai",
         content="ok",

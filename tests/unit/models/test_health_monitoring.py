@@ -10,7 +10,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from skye.base.completion import CompletionRequest, CompletionResponse, TokenUsage
+from skye.base.completion import CompleteRequest, CompleteResponse, TokenUsage
 from skye.base.health import HealthMetrics
 from skye.base.messages import UserMessage
 from skye.models.base import BaseEmbeddingProvider, BaseModelProvider
@@ -168,13 +168,13 @@ class MockModelProvider(BaseModelProvider):
         """Return mock client."""
         return MagicMock()
     
-    def _transform_request(self, request: CompletionRequest) -> dict:
+    def _transform_request(self, request: CompleteRequest) -> dict:
         """Transform request."""
         return {"model": request.model, "messages": []}
     
-    def _transform_response(self, response: dict) -> CompletionResponse:
+    def _transform_response(self, response: dict) -> CompleteResponse:
         """Transform response."""
-        return CompletionResponse(
+        return CompleteResponse(
             id="test-id",
             model="test-model",
             provider="test",
@@ -238,7 +238,7 @@ class TestModelProviderHealthTracking:
     def test_complete_records_success(self) -> None:
         """Test that complete() records successful requests."""
         provider = MockModelProvider()
-        request = CompletionRequest(
+        request = CompleteRequest(
             messages=[UserMessage(content="test")],
             model="test-model"
         )
@@ -254,7 +254,7 @@ class TestModelProviderHealthTracking:
         provider = MockModelProvider()
         provider._call_provider = MagicMock(side_effect=Exception("API error"))
         
-        request = CompletionRequest(
+        request = CompleteRequest(
             messages=[UserMessage(content="test")],
             model="test-model"
         )
@@ -276,7 +276,7 @@ class TestModelProviderHealthTracking:
         
         provider._call_provider = slow_call
         
-        request = CompletionRequest(
+        request = CompleteRequest(
             messages=[UserMessage(content="test")],
             model="test-model"
         )
@@ -290,7 +290,7 @@ class TestModelProviderHealthTracking:
     def test_stream_records_success(self) -> None:
         """Test that stream() records successful requests."""
         provider = MockModelProvider()
-        request = CompletionRequest(
+        request = CompleteRequest(
             messages=[UserMessage(content="test")],
             model="test-model",
             stream=True
@@ -307,7 +307,7 @@ class TestModelProviderHealthTracking:
         provider = MockModelProvider()
         provider._call_provider_stream = MagicMock(side_effect=Exception("Stream error"))
         
-        request = CompletionRequest(
+        request = CompleteRequest(
             messages=[UserMessage(content="test")],
             model="test-model",
             stream=True
@@ -322,7 +322,7 @@ class TestModelProviderHealthTracking:
     def test_get_health_metrics(self) -> None:
         """Test get_health_metrics() method."""
         provider = MockModelProvider()
-        request = CompletionRequest(
+        request = CompleteRequest(
             messages=[UserMessage(content="test")],
             model="test-model"
         )
@@ -430,7 +430,7 @@ class TestHealthMetricsIntegration:
     def test_mixed_success_and_failure(self) -> None:
         """Test tracking mixed success and failure."""
         provider = MockModelProvider()
-        request = CompletionRequest(
+        request = CompleteRequest(
             messages=[UserMessage(content="test")],
             model="test-model"
         )
@@ -458,7 +458,7 @@ class TestHealthMetricsIntegration:
     def test_health_metrics_persistence(self) -> None:
         """Test that health metrics persist across multiple calls."""
         provider = MockModelProvider()
-        request = CompletionRequest(
+        request = CompleteRequest(
             messages=[UserMessage(content="test")],
             model="test-model"
         )

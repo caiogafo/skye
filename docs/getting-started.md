@@ -15,12 +15,10 @@ extras you need.
 # Base: messages, completion, errors, config, Ports (standard library only)
 pip install skyeai
 
-# With one provider / feature extra
-pip install skyeai[openai]
-pip install skyeai[bedrock]
-
-# Several at once
-pip install skyeai[openai,memory]
+# Every provider is built in: no extra is needed to call OpenAI, Anthropic, Bedrock, Google, Azure or Cohere
+# A feature extra adds a library (exact token counts, Redis, YAML)
+pip install skyeai[tokens]
+pip install skyeai[memory,yaml]
 ```
 
 An extra pulls third-party libraries only where a component actually imports them; many
@@ -33,7 +31,7 @@ Import by **component** name; there is no layer in the path.
 
 ```python
 # base re-exports (always available)
-from skye import CompletionRequest, CompletionResponse
+from skye import CompleteRequest, CompleteResponse
 from skye import UserMessage, AssistantMessage
 
 # router (core)
@@ -75,13 +73,13 @@ uv pip install skyeai
 ### With Optional Extras
 
 ```bash
-# Single provider
-pip install skyeai[bedrock]
-uv pip install skyeai[bedrock]
+# A feature extra
+pip install skyeai[tokens]
+uv pip install skyeai[tokens]
 
 # Multiple extras
-pip install skyeai[bedrock,agents,memory]
-uv pip install skyeai[bedrock,agents,memory]
+pip install skyeai[memory,yaml]
+uv pip install skyeai[memory,yaml]
 
 # Everything
 pip install skyeai[all]

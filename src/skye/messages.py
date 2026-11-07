@@ -6,6 +6,7 @@ The code lives in `skye.base.messages`; import from here (or from `skye` for the
 from skye.base.messages import (
     AssistantMessage,
     CapabilityMessage,
+    CapabilityStatus,
     ContentChunk,
     SkyeMessage,
     SystemMessage,
@@ -16,6 +17,7 @@ from skye.base.messages import (
 __all__ = [
     "AssistantMessage",
     "CapabilityMessage",
+    "CapabilityStatus",
     "ContentChunk",
     "SkyeMessage",
     "SystemMessage",

@@ -41,7 +41,7 @@ provider library (design "Public API and lazy imports"; Requirement 2 of this sp
 base/
   __init__.py             package docstring ending "Codename: stratus."
   messages.py             SkyeMessage + role variants (User/Assistant/System/Capability), ContentChunk
-  completion.py           CompletionRequest, CompletionResponse, StreamChunk, TokenUsage, CapabilityCall
+  completion.py           CompleteRequest, CompleteResponse, StreamChunk, TokenUsage, CapabilityCall
   capability_schema.py    the capability contract (name, description, parameters); handlers live in tools
   openai_shape.py         read-only helpers to accept the OpenAI message/tool shape at the boundary
   health.py               HealthMetrics shared by adapters and the router's health tracking
@@ -66,9 +66,9 @@ base/
 
 `messages.py` defines `SkyeMessage` with the role literal `user | assistant | system | capability` and the subclasses
 `UserMessage`, `AssistantMessage`, `SystemMessage`, `CapabilityMessage`, plus `ContentChunk` for multimodal parts (design
-"Base contracts"). `completion.py` defines `CompletionRequest` and `CompletionResponse` and the one standard response schema:
+"Base contracts"). `completion.py` defines `CompleteRequest` and `CompleteResponse` and the one standard response schema:
 content, role, metadata, `TokenUsage`, model identifier and provider, normalized whatever the provider produced; a stream
-yields `StreamChunk` values in one format (Requirement 16.4, 16.5). `CapabilityCall` and `ExecutableCapabilityCall` live here
+yields `StreamChunk` values in one format (Requirement 16.4, 16.5). `CapabilityCall` (with its `execute()`, D45) lives here
 so adapters in `models` need no import of `tools` (design "Base contracts"). The capability schema (name, description,
 parameters) is a pure contract in `capability_schema.py`; the handlers and the registry stay in `tools`. `openai_shape.py`
 lets a caller pass messages and tools in the OpenAI shape, which the boundary converts to library types without subclassing
@@ -98,7 +98,7 @@ interpolation (00-rules).
 
 ### Token usage and cost (Requirement 4)
 
-`completion.py` carries `TokenUsage` (prompt, completion, total) in every `CompletionResponse`, and `ModelConfig` in
+`completion.py` carries `TokenUsage` (prompt, completion, total) in every `CompleteResponse`, and `ModelConfig` in
 `config.py` carries `cost_per_1k_prompt_tokens` / `cost_per_1k_completion_tokens` so a cost estimate can be attached to the
 response metadata and custom pricing accepted for private models (Requirement 19.1, 19.2). `base` defines the
 `cost_calculator` and `token_counter` Ports; the concrete counter and `CostCalculator` live in `models` (design "Extras and
@@ -131,8 +131,8 @@ class (`response_schema`) may still be a pydantic model: `base` only needs the c
 ## Data Models
 
 `base` is where the shared data models are defined, not consumed from elsewhere: the `SkyeMessage` role variants and
-`ContentChunk` (`messages.py`); `CompletionRequest`, `CompletionResponse`, `StreamChunk`, `TokenUsage`, `CapabilityCall`,
-`ExecutableCapabilityCall` (`completion.py`); `CapabilitySchema` (`capability_schema.py`); `HealthMetrics` (`health.py`); and
+`ContentChunk` (`messages.py`); `CompleteRequest`, `CompleteResponse`, `StreamChunk`, `TokenUsage`, `CapabilityCall`,
+`CapabilitySchema` (`capability_schema.py`); `HealthMetrics` (`health.py`); and
 the configuration models `SkyeConfig`, `ModelConfig`, `RateLimitConfig`, `RetryConfig`, `CooldownConfig`, `RouterConfig`
 (`config.py`). All of them are `@validated` dataclasses (Requirement 21.2, D24).
 
@@ -173,7 +173,7 @@ I/O or imports a component.
 
 ### Property 3: One response shape whatever the provider
 
-For any `CompletionResponse` a component produces, it carries content, role, metadata, token usage, model identifier and
+For any `CompleteResponse` a component produces, it carries content, role, metadata, token usage, model identifier and
 provider, and a stream yields `StreamChunk` values in one format.
 
 **Validates: Requirement 2 (Requirement 16.4, 16.5 of steering)**

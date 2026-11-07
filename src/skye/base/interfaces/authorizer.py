@@ -4,6 +4,10 @@ A call carries three identifiers (principal, action, resource) and returns a dec
 that is exactly one of ``permit`` or ``forbid``. Implemented by the ``policy`` Component;
 consumed by the runtime (for example the gateway) through injection or hooks, never by
 importing ``policy``. Standard library only, no I/O.
+
+Raises: never raises for a denial: a denial is the value ``forbid``; raises only on a malformed identifier.
+Missing: an unknown principal, action or resource is ``forbid`` (default deny), never an exception.
+Concurrency: ``authorize`` is a pure read; safe to call from many threads and tasks.
 """
 
 from enum import Enum

@@ -1,385 +1,46 @@
-"""Multimodal Input Example.
+"""Images in a message: from a URL, from a data URL and from a file.
 
-This example demonstrates how to use multimodal inputs (images) with Skye.
-
-Features shown:
-- Image from URL
-- Image from file path
-- Image from base64
-- Vision models (GPT-4 Vision, Claude 3 Vision, Gemini)
+``UserMessage(content=..., images=[...])`` takes image URLs (HTTP or data URLs). The client turns them into the shape each provider
+expects, so the same message works for OpenAI, Anthropic, Bedrock and Google vision models; ``examples/advanced/multimodal.py`` shows the
+conversions. Several images in one message are just a longer list. With OPENAI_API_KEY set the call is real; without a key a scripted
+client answers and the example says so.
 """
 
-import os
 import base64
+import sys
+import tempfile
 from pathlib import Path
-from skye import CompletionRequest
+
 from skye import UserMessage
-import skye
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))  # the shared offline helper lives in examples/
+from _offline import get_client  # noqa: E402
+
+# A 1x1 PNG, so the example needs no image file of its own
+PNG = base64.b64decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==")
 
 
-def image_from_url():
-    """Example using image from URL."""
-    print("=" * 60)
-    print("Multimodal - Image from URL")
-    print("=" * 60)
-    
-    api_key = os.getenv("OPENAI_API_KEY")
-    if not api_key:
-        print("⚠️  OPENAI_API_KEY environment variable not set")
-        return
-    
-    try:
-        client = skye.provider("openai", api_key=api_key)
-    except ImportError:
-        print("⚠️  OpenAI provider not available")
-        return
-    
-    print("""
-Using an image from a URL:
-
-```python
-request = CompletionRequest(
-    messages=[
-        UserMessage(
-            content="What's in this image?",
-            images=["https://example.com/image.jpg"]
-        )
-    ],
-    model="gpt-4-vision"
-)
-
-response = client.complete(request)
-print(response.content)
-```
-
-The image URL can be:
-- Public HTTP/HTTPS URL
-- Data URL (base64 encoded)
-- Any accessible image URL
-""")
+def data_url(png: bytes) -> str:
+    return "data:image/png;base64," + base64.b64encode(png).decode()
 
 
-def image_from_file():
-    """Example using image from file path."""
-    print("\n" + "=" * 60)
-    print("Multimodal - Image from File Path")
-    print("=" * 60)
-    
-    api_key = os.getenv("OPENAI_API_KEY")
-    if not api_key:
-        print("⚠️  OPENAI_API_KEY environment variable not set")
-        return
-    
-    try:
-        client = skye.provider("openai", api_key=api_key)
-    except ImportError:
-        print("⚠️  OpenAI provider not available")
-        return
-    
-    print("""
-Using an image from a file path:
+def main() -> None:
+    client = get_client("openai")
+    with tempfile.TemporaryDirectory() as folder:
+        path = Path(folder) / "pixel.png"
+        path.write_bytes(PNG)
+        sources = {
+            "url": "https://example.com/image.jpg",
+            "data url": data_url(PNG),
+            "file": data_url(path.read_bytes()),  # read the file and send it as a data URL
+        }
+        for label, image in sources.items():
+            message = UserMessage(content="What's in this image?", images=[image])
+            response = client.complete(messages=[message], model="gpt-4o", max_tokens=50)
+            print(f"{label}: {response.content[:60]}")
 
-```python
-from pathlib import Path
-
-image_path = Path("path/to/image.png")
-
-request = CompletionRequest(
-    messages=[
-        UserMessage(
-            content="Describe this image",
-            images=[str(image_path)]
-        )
-    ],
-    model="gpt-4-vision"
-)
-
-response = client.complete(request)
-print(response.content)
-```
-
-Supported formats:
-- .jpg, .jpeg
-- .png
-- .gif
-- .webp
-
-The image is automatically converted to base64 and sent to the provider.
-""")
-
-
-def image_from_base64():
-    """Example using base64 encoded image."""
-    print("\n" + "=" * 60)
-    print("Multimodal - Image from Base64")
-    print("=" * 60)
-    
-    api_key = os.getenv("OPENAI_API_KEY")
-    if not api_key:
-        print("⚠️  OPENAI_API_KEY environment variable not set")
-        return
-    
-    try:
-        client = skye.provider("openai", api_key=api_key)
-    except ImportError:
-        print("⚠️  OpenAI provider not available")
-        return
-    
-    print("""
-Using a base64 encoded image:
-
-```python
-import base64
-
-# Read image file
-with open("image.jpg", "rb") as f:
-    image_data = base64.b64encode(f.read()).decode()
-
-# Create data URL
-data_url = f"data:image/jpeg;base64,{image_data}"
-
-request = CompletionRequest(
-    messages=[
-        UserMessage(
-            content="What's in this image?",
-            images=[data_url]
-        )
-    ],
-    model="gpt-4-vision"
-)
-
-response = client.complete(request)
-print(response.content)
-```
-
-This is useful when:
-- You have image bytes in memory
-- You want to avoid file I/O
-- You're processing images from a stream
-""")
-
-
-def multiple_images():
-    """Example with multiple images."""
-    print("\n" + "=" * 60)
-    print("Multimodal - Multiple Images")
-    print("=" * 60)
-    
-    api_key = os.getenv("OPENAI_API_KEY")
-    if not api_key:
-        print("⚠️  OPENAI_API_KEY environment variable not set")
-        return
-    
-    try:
-        client = skye.provider("openai", api_key=api_key)
-    except ImportError:
-        print("⚠️  OpenAI provider not available")
-        return
-    
-    print("""
-Using multiple images in one request:
-
-```python
-request = CompletionRequest(
-    messages=[
-        UserMessage(
-            content="Compare these two images",
-            images=[
-                "https://example.com/image1.jpg",
-                "https://example.com/image2.jpg"
-            ]
-        )
-    ],
-    model="gpt-4-vision"
-)
-
-response = client.complete(request)
-print(response.content)
-```
-
-You can mix different image sources:
-- URLs
-- File paths
-- Base64 data URLs
-
-All are handled transparently by Skye.
-""")
-
-
-def vision_models():
-    """Example showing different vision models."""
-    print("\n" + "=" * 60)
-    print("Multimodal - Vision Models")
-    print("=" * 60)
-    
-    print("""
-Different providers support different vision models:
-
-**OpenAI:**
-- gpt-4-vision (GPT-4 with vision)
-- gpt-4-turbo (includes vision)
-- gpt-4o (multimodal)
-
-**Anthropic:**
-- claude-3-opus (vision capable)
-- claude-3-sonnet (vision capable)
-- claude-3-haiku (vision capable)
-
-**Google:**
-- gemini-pro-vision
-- gemini-1.5-pro (multimodal)
-
-**AWS Bedrock:**
-- anthropic.claude-3-opus (vision)
-- anthropic.claude-3-sonnet (vision)
-- anthropic.claude-3-haiku (vision)
-
-Example with Anthropic:
-
-```python
-import skye
-
-client = skye.provider(
-    "anthropic",
-    api_key="sk-ant-..."
-)
-
-request = CompletionRequest(
-    messages=[
-        UserMessage(
-            content="What's in this image?",
-            images=["https://example.com/image.jpg"]
-        )
-    ],
-    model="claude-3-sonnet-20240229"
-)
-
-response = client.complete(request)
-print(response.content)
-```
-""")
-
-
-def image_analysis_workflow():
-    """Example of a complete image analysis workflow."""
-    print("\n" + "=" * 60)
-    print("Multimodal - Image Analysis Workflow")
-    print("=" * 60)
-    
-    api_key = os.getenv("OPENAI_API_KEY")
-    if not api_key:
-        print("⚠️  OPENAI_API_KEY environment variable not set")
-        return
-    
-    try:
-        client = skye.provider("openai", api_key=api_key)
-    except ImportError:
-        print("⚠️  OpenAI provider not available")
-        return
-    
-    print("""
-Complete workflow for image analysis:
-
-```python
-from pathlib import Path
-from skye import CompletionRequest
-from skye import UserMessage
-import skye
-
-# Initialize provider
-client = skye.provider(
-    "openai",
-    api_key="sk-..."
-)
-
-# Step 1: Analyze image
-image_path = Path("screenshot.png")
-
-request = CompletionRequest(
-    messages=[
-        UserMessage(
-            content="Analyze this screenshot and describe what you see",
-            images=[str(image_path)]
-        )
-    ],
-    model="gpt-4-vision",
-    max_tokens=500
-)
-
-response = client.complete(request)
-analysis = response.content
-
-print("Analysis:", analysis)
-
-# Step 2: Ask follow-up question
-request = CompletionRequest(
-    messages=[
-        UserMessage(
-            content="Analyze this screenshot and describe what you see",
-            images=[str(image_path)]
-        ),
-        response.to_message(),
-        UserMessage(content="What are the main UI elements?")
-    ],
-    model="gpt-4-vision",
-    max_tokens=300
-)
-
-response = client.complete(request)
-print("UI Elements:", response.content)
-
-# Step 3: Extract structured data
-from skye.data import Validated, validated
-
-@validated
-class UIElement(Validated):
-    name: str
-    type: str
-    location: str
-
-request = CompletionRequest(
-    messages=[
-        UserMessage(
-            content="Extract UI elements from this screenshot",
-            images=[str(image_path)]
-        )
-    ],
-    model="gpt-4-vision",
-    response_schema=UIElement
-)
-
-response = client.complete(request)
-element = response.structured_output
-print(f"Element: {element.name} ({element.type})")
-```
-""")
-
-
-def main():
-    """Run all examples."""
-    print("\n" + "🖼️  " * 20)
-    print("SKYE - Multimodal Input Examples")
-    print("🖼️  " * 20)
-    
-    try:
-        image_from_url()
-        image_from_file()
-        image_from_base64()
-        multiple_images()
-        vision_models()
-        image_analysis_workflow()
-        
-        print("\n" + "=" * 60)
-        print("✅ Examples completed!")
-        print("=" * 60)
-        print("\nKey points:")
-        print("  • Images can be from URLs, file paths, or base64")
-        print("  • Skye handles format conversion automatically")
-        print("  • Different providers support different vision models")
-        print("  • Combine with structured outputs for data extraction")
-        
-    except Exception as e:
-        print(f"\n❌ Error: {e}")
+    both = UserMessage(content="Compare these two images", images=[sources["url"], sources["data url"]])
+    print("two images:", client.complete(messages=[both], model="gpt-4o", max_tokens=50).content[:60])
 
 
 if __name__ == "__main__":

@@ -1,4 +1,4 @@
-"""fastmcp-backed MCP client behind :class:`MCPClientPort` (Requirement 15).
+"""fastmcp-backed MCP client behind :class:`MCPClientInterface` (Requirement 15).
 
 fastmcp is imported lazily when a client is constructed, never at ``import skye`` or
 ``import skye.tools``. Everything fastmcp returns goes straight into
@@ -17,7 +17,7 @@ from skye.base.messages import SkyeMessage
 from skye.tools import mcp_boundary as boundary
 from skye.tools.interface import CapabilityInterface
 from skye.tools.mcp_boundary import MCPPrompt
-from skye.tools.mcp_client import MCPClientPort, _tool_value, _ToolsFacet
+from skye.tools.mcp_client import MCPClientInterface, _tool_value, _ToolsFacet
 from skye.tools.mcp_resource import Resource
 
 _T = TypeVar("_T")
@@ -44,7 +44,7 @@ def _skye_errors(fn: Callable[_P, Awaitable[_T]]) -> Callable[_P, Coroutine[Any,
     return wrapper
 
 
-class FastMCPClient(_ToolsFacet, MCPClientPort):
+class FastMCPClient(_ToolsFacet, MCPClientInterface):
     """Each call opens a short-lived ``fastmcp.Client`` session (stateless, like the built-in)."""
 
     def __init__(

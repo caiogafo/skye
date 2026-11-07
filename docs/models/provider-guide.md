@@ -8,29 +8,11 @@ last_updated: 2026-11-02
 
 ## Installation by Provider
 
-Each provider is available as an optional extra:
+Every provider is a built-in adapter in the standard library, so `pip install skyeai` is enough for all of them. Only feature extras add a library:
 
 ```bash
-# OpenAI
-pip install skyeai[openai]
-
-# Anthropic
-pip install skyeai[anthropic]
-
-# AWS Bedrock
-pip install skyeai[bedrock]
-
-# Azure OpenAI (served by the openai extra)
-pip install skyeai[openai]
-
-# Google
-pip install skyeai[google]
-
-# Cohere (embeddings)
-pip install skyeai[cohere]
-
-# All providers
-pip install skyeai[all-providers]
+pip install skyeai            # OpenAI, Anthropic, Azure OpenAI, Bedrock, Google, Cohere
+pip install skyeai[tokens]    # exact token counts (tiktoken)
 ```
 
 ## LLM Providers

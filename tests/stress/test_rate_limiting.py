@@ -19,7 +19,7 @@ from unittest.mock import patch
 
 import pytest
 
-from skye.base.completion import CompletionRequest, CompletionResponse, TokenUsage
+from skye.base.completion import CompleteRequest, CompleteResponse, TokenUsage
 from skye.base.exceptions import ProviderError
 from skye.base.interfaces.model import ModelInterface
 from skye.base.interfaces.router import RoutingStrategy
@@ -49,7 +49,7 @@ class MockModel(ModelInterface):
         self.call_count = 0
         self.lock = threading.Lock()
 
-    def complete(self, request: CompletionRequest) -> CompletionResponse:
+    def complete(self, request: CompleteRequest) -> CompleteResponse:
         """Simulate completion with realistic latency."""
         with self.lock:
             self.call_count += 1
@@ -58,7 +58,7 @@ class MockModel(ModelInterface):
         time.sleep(self.latency_ms / 1000.0)
 
         # Return successful response
-        return CompletionResponse(
+        return CompleteResponse(
             content="Test response",
             role="assistant",
             model=self.model_id,
@@ -71,17 +71,17 @@ class MockModel(ModelInterface):
             ),
         )
 
-    def stream(self, request: CompletionRequest):
+    def stream(self, request: CompleteRequest):
         """Stream completion (not implemented for mock)."""
         from skye.base.completion import StreamChunk
 
         yield StreamChunk(delta="Test", model=self.model_id)
 
-    async def acomplete(self, request: CompletionRequest) -> CompletionResponse:
+    async def acomplete(self, request: CompleteRequest) -> CompleteResponse:
         """Async version of complete."""
         return self.complete(request)
 
-    async def astream(self, request: CompletionRequest):
+    async def astream(self, request: CompleteRequest):
         """Async stream completion (not implemented for mock)."""
         from skye.base.completion import StreamChunk
 
@@ -119,7 +119,7 @@ class TestRateLimiting:
         model = MockModel("model-1", latency_ms=20, token_count=100)
         router.register_model("model-1", model, rpm=20)  # 20 requests per minute
 
-        request = CompletionRequest(
+        request = CompleteRequest(
             messages=[UserMessage(content="Test message")], model="model-1"
         )
 
@@ -198,7 +198,7 @@ class TestRateLimiting:
         model = MockModel("model-1", latency_ms=20, token_count=100)
         router.register_model("model-1", model, tpm=5000)  # 5000 tokens per minute
 
-        request = CompletionRequest(
+        request = CompleteRequest(
             messages=[UserMessage(content="Test message")], model="model-1"
         )
 
@@ -273,7 +273,7 @@ class TestRateLimiting:
         model = MockModel("model-1", latency_ms=10, token_count=50)
         router.register_model("model-1", model, rpm=100, tpm=5000)
 
-        request = CompletionRequest(
+        request = CompleteRequest(
             messages=[UserMessage(content="Test message")], model="model-1"
         )
 
@@ -331,7 +331,7 @@ class TestRateLimiting:
         model2 = MockModel("model-2", latency_ms=10, token_count=100)
         router_without_checks.register_model("model-2", model2, rpm=5, tpm=500)
 
-        request = CompletionRequest(
+        request = CompleteRequest(
             messages=[UserMessage(content="Test message")], model="model-1"
         )
 
@@ -395,7 +395,7 @@ class TestRateLimiting:
         model = MockModel("model-1", latency_ms=50, token_count=100)
         router.register_model("model-1", model, rpm=1000, tpm=100000)
 
-        request = CompletionRequest(
+        request = CompleteRequest(
             messages=[UserMessage(content="Test message")], model="model-1"
         )
 
@@ -482,7 +482,7 @@ class TestRateLimiting:
         model = MockModel("model-1", latency_ms=20, token_count=100)
         router.register_model("model-1", model, rpm=1000, tpm=100000)
 
-        request = CompletionRequest(
+        request = CompleteRequest(
             messages=[UserMessage(content="Test message")], model="model-1"
         )
 
@@ -546,7 +546,7 @@ class TestRateLimiting:
 
         # Make requests to each model
         for model_id in ["model-1", "model-2", "model-3"]:
-            request = CompletionRequest(
+            request = CompleteRequest(
                 messages=[UserMessage(content="Test message")], model=model_id
             )
 
@@ -604,7 +604,7 @@ class TestRateLimiting:
             router.register_model("model-2", model2, rpm=50, tpm=5000)
 
             # Make requests
-            request = CompletionRequest(
+            request = CompleteRequest(
                 messages=[UserMessage(content="Test message")], model="model-1"
             )
 
@@ -647,7 +647,7 @@ class TestRateLimiting:
         model = MockModel("model-1", latency_ms=10, token_count=100)
         router.register_model("model-1", model, rpm=10000, tpm=1000000)
 
-        request = CompletionRequest(
+        request = CompleteRequest(
             messages=[UserMessage(content="Test message")], model="model-1"
         )
 

@@ -15,6 +15,7 @@ Pages:
 
 - [Configuration](configuration.md)
 - [Core interfaces](interfaces.md)
+- [Extending Skye](extending.md): which Port to implement, where to register it, which example to copy
 
 ## Models are validated dataclasses
 

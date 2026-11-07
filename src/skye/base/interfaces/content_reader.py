@@ -2,6 +2,10 @@
 
 This module defines the abstract interface for content readers that load
 and process documents from various sources.
+
+Raises: ProviderError or ValidationError when a source cannot be read or has an unsupported type.
+Missing: an empty source yields an empty list, never ``None``.
+Concurrency: a reader holds no per-call state; ``read`` and ``aread`` may run in parallel.
 """
 
 from abc import ABC, abstractmethod

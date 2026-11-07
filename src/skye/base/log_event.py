@@ -7,11 +7,11 @@ telemetry plugin through ``ObserverInterface.log_event`` / ``EventHandlerInterfa
 
 Example:
     >>> import logging
-    >>> from skye.base.completion import CompletionRequest
+    >>> from skye.base.completion import CompleteRequest
     >>> from skye.base.log_event import model_invocation_start
     >>> from skye.base.messages import UserMessage
     >>>
-    >>> request = CompletionRequest(messages=[UserMessage(content="Hi")], model="gpt-4")
+    >>> request = CompleteRequest(messages=[UserMessage(content="Hi")], model="gpt-4")
     >>> event = model_invocation_start(request, provider="openai")
     >>> logging.getLogger("skye.models").info("model invocation", extra=event.log_extra())
 """
@@ -20,7 +20,7 @@ from datetime import datetime, timezone
 from typing import Any, Literal
 from uuid import uuid4
 
-from skye.base.completion import CompletionRequest, CompletionResponse
+from skye.base.completion import CompleteRequest, CompleteResponse
 from skye.base.interfaces.observer import EventType
 from skye.base.validated import Validated, field, validated
 
@@ -71,7 +71,7 @@ class ModelInvocationEvent(Validated):
         return {f"skye_{key}": value for key, value in self.to_dict().items()}
 
 
-def _request_details(request: CompletionRequest) -> dict[str, Any]:
+def _request_details(request: CompleteRequest) -> dict[str, Any]:
     """The loggable details of a request (no message content: it may hold personal data)."""
     return {
         "messages": len(request.messages) if request.messages is not None else 0,
@@ -83,7 +83,7 @@ def _request_details(request: CompletionRequest) -> dict[str, Any]:
 
 
 def model_invocation_start(
-    request: CompletionRequest, *, provider: str, correlation_id: str | None = None
+    request: CompleteRequest, *, provider: str, correlation_id: str | None = None
 ) -> ModelInvocationEvent:
     """The event for a request about to be sent.
 
@@ -102,7 +102,7 @@ def model_invocation_start(
 
 
 def model_invocation_end(
-    response: CompletionResponse, *, correlation_id: str, latency_ms: float | None = None
+    response: CompleteResponse, *, correlation_id: str, latency_ms: float | None = None
 ) -> ModelInvocationEvent:
     """The event for a response received.
 

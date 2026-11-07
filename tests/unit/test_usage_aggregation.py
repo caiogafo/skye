@@ -1,10 +1,10 @@
 """Token usage can be summed across several responses (Requirement 19.3)."""
 
-from skye.base.completion import CompletionResponse, TokenUsage
+from skye.base.completion import CompleteResponse, TokenUsage
 
 
-def _response(prompt: int, completion: int, **metadata: object) -> CompletionResponse:
-    return CompletionResponse(
+def _response(prompt: int, completion: int, **metadata: object) -> CompleteResponse:
+    return CompleteResponse(
         model="m",
         provider="p",
         content="x",
@@ -16,7 +16,7 @@ def _response(prompt: int, completion: int, **metadata: object) -> CompletionRes
     )
 
 
-def _total(responses: list[CompletionResponse]) -> TokenUsage:
+def _total(responses: list[CompleteResponse]) -> TokenUsage:
     return TokenUsage(
         prompt_tokens=sum(r.usage.prompt_tokens for r in responses),
         completion_tokens=sum(r.usage.completion_tokens for r in responses),

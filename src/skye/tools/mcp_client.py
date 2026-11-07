@@ -1,6 +1,6 @@
 """Tri-faceted MCP client in ``tools``: tools, prompts and resources behind one Port (Requirement 15).
 
-* :class:`MCPClientPort` is the one Port. :class:`BuiltinMCPClient` (stdlib JSON-RPC over
+* :class:`MCPClientInterface` is the one Port. :class:`BuiltinMCPClient` (stdlib JSON-RPC over
   stateless HTTP, built on ``skye.base.http``) and ``FastMCPClient``
   (``skye.tools.mcp_fastmcp``, lazily imported) both implement it and return the same
   Skye types: ``CapabilityInterface``
@@ -34,7 +34,7 @@ from skye.tools.schema import CapabilitySchema
 PROTOCOL_VERSION = "2025-06-18"
 
 
-class MCPClientPort(ABC):
+class MCPClientInterface(ABC):
     """The MCP client Port: three facets, identical Skye return types in every implementation."""
 
     # tools
@@ -64,7 +64,7 @@ class MCPClientPort(ABC):
 class MCPToolCapability(CapabilityInterface):
     """A Skye capability backed by a tool on an MCP server (executes through the client)."""
 
-    def __init__(self, schema: CapabilitySchema, client: MCPClientPort) -> None:
+    def __init__(self, schema: CapabilitySchema, client: MCPClientInterface) -> None:
         self._schema = schema
         self._client = client
 
@@ -97,7 +97,7 @@ class _ToolsFacet:
         return [MCPToolCapability(boundary.to_tool_schema(r), self) for r in raws]  # type: ignore[arg-type]
 
 
-class BuiltinMCPClient(_ToolsFacet, MCPClientPort):
+class BuiltinMCPClient(_ToolsFacet, MCPClientInterface):
     """Standard-library MCP client: JSON-RPC 2.0 over stateless HTTP POST (no session)."""
 
     def __init__(
@@ -223,7 +223,7 @@ def create_mcp_client(
     *,
     headers: dict[str, str] | None = None,
     timeout: float = 30.0,
-) -> MCPClientPort:
+) -> MCPClientInterface:
     """Build the MCP client for ``target`` (an HTTP URL, or anything fastmcp accepts).
 
     ``impl`` is ``"builtin"`` (default, standard library) or ``"fastmcp"``; any other value

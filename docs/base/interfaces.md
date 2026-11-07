@@ -13,7 +13,7 @@ Unified interface for all LLM providers:
 ```python
 from abc import ABC, abstractmethod
 from typing import Iterator
-from skye import CompletionResponse, StreamChunk
+from skye import CompleteResponse, StreamChunk
 from skye.messages import SkyeMessage
 
 class ModelInterface(ABC):
@@ -23,7 +23,7 @@ class ModelInterface(ABC):
         messages: list[SkyeMessage],
         model: str,
         **kwargs
-    ) -> CompletionResponse:
+    ) -> CompleteResponse:
         """Execute a synchronous completion request."""
         pass
     
@@ -33,7 +33,7 @@ class ModelInterface(ABC):
         messages: list[SkyeMessage],
         model: str,
         **kwargs
-    ) -> CompletionResponse:
+    ) -> CompleteResponse:
         """Execute an asynchronous completion request."""
         pass
     

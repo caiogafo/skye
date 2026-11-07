@@ -11,23 +11,32 @@ from skye.base.interfaces.config_loader import ConfigLoaderInterface
 from skye.base.interfaces.content_reader import ContentReaderInterface
 from skye.base.interfaces.cost_calculator import CostCalculatorInterface
 from skye.base.interfaces.decision import DecisionModel, DecisionResult
-from skye.base.interfaces.error_handler import ErrorHandlerInterface
 from skye.base.interfaces.event_handler import EventHandlerInterface
 from skye.base.interfaces.memory import MemoryInterface
 from skye.base.interfaces.model import ModelInterface
-from skye.base.interfaces.multimodal_handler import MultimodalHandlerInterface
 from skye.base.interfaces.observer import EventType, ObserverInterface
 from skye.base.interfaces.plugin import PluginInterface
-from skye.base.interfaces.prompt import PromptBuilderInterface
+from skye.base.interfaces.prompt import (
+    PromptBuilderInterface,
+    PromptRegistryInterface,
+    PromptRenderingInterface,
+    PromptSchemaInterface,
+)
 from skye.base.interfaces.registry import (
     ProviderRegistryInterface,
-    RouteRegistryInterface,
 )
-from skye.base.interfaces.router import ModelRouterInterface, RoutingStrategy
+from skye.base.interfaces.router import (
+    ModelHealthInterface,
+    ModelRouterInterface,
+    ModelSelectionInterface,
+    RouterConfigurationInterface,
+    RoutingStrategy,
+)
 from skye.base.interfaces.runnable import Runnable
 from skye.base.interfaces.safety import SafetyFilterInterface, SafetyResult
-from skye.base.interfaces.storage import StorageAdapterInterface, StorageBackend
+from skye.base.interfaces.storage import StorageBackend
 from skye.base.interfaces.token_counter import TokenCounterInterface
+from skye.base.interfaces.tool_provider import CapabilityContext, ToolProvider
 from skye.base.interfaces.vector_encoder import VectorEncoderInterface
 
 __all__ = [
@@ -35,11 +44,16 @@ __all__ = [
     "ModelInterface",
     "VectorEncoderInterface",
     "ModelRouterInterface",
+    "ModelSelectionInterface",
+    "ModelHealthInterface",
+    "RouterConfigurationInterface",
     "ProviderRegistryInterface",
-    "RouteRegistryInterface",
     "RoutingStrategy",
     # Prompt and message interfaces
     "PromptBuilderInterface",
+    "PromptRenderingInterface",
+    "PromptRegistryInterface",
+    "PromptSchemaInterface",
     # Composition and decision Ports
     "AuthorizerInterface",
     "Decision",
@@ -48,11 +62,12 @@ __all__ = [
     "DecisionModel",
     "DecisionResult",
     # Capability interfaces
+    "CapabilityContext",
     "CapabilityInterface",
     "CapabilitySchema",
+    "ToolProvider",
     # Memory and storage interfaces
     "MemoryInterface",
-    "StorageAdapterInterface",
     "StorageBackend",
     # Safety and filtering interfaces
     "SafetyFilterInterface",
@@ -65,10 +80,8 @@ __all__ = [
     "PluginInterface",
     # Content handling interfaces
     "ContentReaderInterface",
-    "MultimodalHandlerInterface",
     # Utility interfaces
     "CostCalculatorInterface",
     "TokenCounterInterface",
-    "ErrorHandlerInterface",
     "ConfigLoaderInterface",
 ]

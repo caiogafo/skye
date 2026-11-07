@@ -5,11 +5,8 @@ description = "Modular GenAI library with optional extras for building AI agents
 readme = "README.md"
 license = {text = "MIT"}
 authors = [{name = "Skye Team"}]
-requires-python = ">=3.10"
-dependencies = [
-    "pydantic>=2.0",
-    "tenacity>=8.0",
-]
+requires-python = ">=3.11"
+dependencies = []  # the core is the standard library only (decision D49; supersedes the pydantic and tenacity entries)
 
 [project.optional-dependencies]
 # Model providers: each has one built-in stdlib REST adapter (Requirement 20); vendor SDKs are
@@ -61,7 +58,6 @@ dev = [
     "responses>=0.23",
     "requests>=2.31",
     "httpx>=0.24",
-    "tomli>=2.0; python_version < '3.11'",
     # Official vendor SDKs + fastmcp: differential-test validation oracles only (Requirement 14).
     # This dev group is the single validation home: never a runtime dependency (Requirement 20).
     "openai>=1.0",
@@ -77,17 +73,17 @@ build-backend = "hatchling.build"
 
 [tool.black]
 line-length = 100
-target-version = ['py310']
+target-version = ['py311']
 
 [tool.ruff]
 line-length = 100
-target-version = "py310"
+target-version = "py311"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "N", "W", "UP"]
 
 [tool.mypy]
-python_version = "3.10"
+python_version = "3.11"
 strict = true
 warn_return_any = true
 warn_unused_configs = true

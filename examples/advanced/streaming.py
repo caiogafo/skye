@@ -3,16 +3,19 @@
 Each chunk has a ``delta`` (the new text) and, on the last one, a ``finish_reason``. This example prints the text as it arrives,
 counts the chunks and measures the time to the first token.
 
-Set OPENAI_API_KEY.
+With OPENAI_API_KEY set the example calls OpenAI; without a key it runs a scripted client and says so.
 """
 
 import asyncio
-import os
 import time
 
-import skye
-from skye import CompletionRequest
-from skye import UserMessage
+from skye import CompleteRequest, UserMessage
+
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))  # the shared offline helper lives in examples/
+from _offline import get_client  # noqa: E402
 
 
 def stream_sync(client) -> None:
@@ -29,7 +32,7 @@ def stream_sync(client) -> None:
 
 
 async def stream_async(client) -> None:
-    request = CompletionRequest(messages=[UserMessage(content="Write a two-line poem")], model="gpt-4", stream=True)
+    request = CompleteRequest(messages=[UserMessage(content="Write a two-line poem")], model="gpt-4", stream=True)
     print("async: ", end="")
     async for chunk in client.astream(request):
         print(chunk.delta, end="", flush=True)
@@ -37,12 +40,7 @@ async def stream_async(client) -> None:
 
 
 def main() -> None:
-    api_key = os.getenv("OPENAI_API_KEY")
-    if not api_key:
-        print("OPENAI_API_KEY not set, skipping")
-        return
-
-    client = skye.provider("openai", api_key=api_key)
+    client = get_client("openai")
     stream_sync(client)
     asyncio.run(stream_async(client))
 

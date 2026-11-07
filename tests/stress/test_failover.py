@@ -18,7 +18,7 @@ from typing import Any
 
 import pytest
 
-from skye.base.completion import CompletionRequest, CompletionResponse, TokenUsage
+from skye.base.completion import CompleteRequest, CompleteResponse, TokenUsage
 from skye.base.exceptions import ProviderError
 from skye.base.interfaces.model import ModelInterface
 from skye.base.interfaces.router import RoutingStrategy
@@ -55,7 +55,7 @@ class FailingMockModel(ModelInterface):
         self.failure_count = 0
         self.lock = threading.Lock()
 
-    def complete(self, request: CompletionRequest) -> CompletionResponse:
+    def complete(self, request: CompleteRequest) -> CompleteResponse:
         """Simulate completion with configurable failures."""
         with self.lock:
             self.call_count += 1
@@ -72,7 +72,7 @@ class FailingMockModel(ModelInterface):
             raise ProviderError(f"Simulated failure in {self.model_id}", provider=self.model_id)
 
         # Return successful response
-        return CompletionResponse(
+        return CompleteResponse(
             content="Test response",
             role="assistant",
             model=self.model_id,
@@ -85,17 +85,17 @@ class FailingMockModel(ModelInterface):
             ),
         )
 
-    def stream(self, request: CompletionRequest):
+    def stream(self, request: CompleteRequest):
         """Stream completion (not implemented for mock)."""
         from skye.base.completion import StreamChunk
 
         yield StreamChunk(delta="Test", model=self.model_id)
 
-    async def acomplete(self, request: CompletionRequest) -> CompletionResponse:
+    async def acomplete(self, request: CompleteRequest) -> CompleteResponse:
         """Async version of complete."""
         return self.complete(request)
 
-    async def astream(self, request: CompletionRequest):
+    async def astream(self, request: CompleteRequest):
         """Async stream completion (not implemented for mock)."""
         from skye.base.completion import StreamChunk
 
@@ -138,7 +138,7 @@ class TestFailoverScenarios:
         # Set up fallback chain
         router.set_fallbacks([FallbackConfig(primary="primary", fallbacks=["fallback"])])
 
-        request = CompletionRequest(
+        request = CompleteRequest(
             messages=[UserMessage(content="Test message")], model="primary"
         )
 
@@ -239,7 +239,7 @@ class TestFailoverScenarios:
             [AllowedFailsPolicyConfig(error_type="ProviderError", allowed_fails_per_minute=1)]
         )
 
-        request = CompletionRequest(
+        request = CompleteRequest(
             messages=[UserMessage(content="Test message")], model="primary"
         )
 
@@ -322,7 +322,7 @@ class TestFailoverScenarios:
             [FallbackConfig(primary="primary", fallbacks=["fallback1", "fallback2"])]
         )
 
-        request = CompletionRequest(
+        request = CompleteRequest(
             messages=[UserMessage(content="Test message")], model="primary"
         )
 
@@ -415,7 +415,7 @@ class TestFailoverScenarios:
             [FallbackConfig(primary="primary", fallbacks=["fallback1", "fallback2"])]
         )
 
-        request = CompletionRequest(
+        request = CompleteRequest(
             messages=[UserMessage(content="Test message")], model="primary"
         )
 
@@ -513,7 +513,7 @@ class TestFailoverScenarios:
             [AllowedFailsPolicyConfig(error_type="ProviderError", allowed_fails_per_minute=1)]
         )
 
-        request = CompletionRequest(
+        request = CompleteRequest(
             messages=[UserMessage(content="Test message")], model="primary"
         )
 
@@ -593,7 +593,7 @@ class TestFailoverScenarios:
 
         def make_request(request_id: int, model_id: str):
             """Make a request to a specific model."""
-            request = CompletionRequest(
+            request = CompleteRequest(
                 messages=[UserMessage(content="Test message")], model=model_id
             )
             try:
@@ -678,7 +678,7 @@ class TestFailoverScenarios:
 
         router.set_fallbacks([FallbackConfig(primary="primary", fallbacks=["fallback"])])
 
-        request = CompletionRequest(
+        request = CompleteRequest(
             messages=[UserMessage(content="Test message")], model="primary"
         )
 

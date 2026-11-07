@@ -40,19 +40,19 @@ honors.
 
 - [x] 3. REST adapters (one per provider)
   - [x] 3.1 OpenAI and Azure OpenAI (one family keyed by base URL + key)
-    - Evidence: `src/skye/models/llm/openai_compatible.py` (`OpenAIProvider`, `AzureOpenAIProvider`); `tests/unit/models/test_openai_provider.py`, `test_azure_provider.py`, `tests/unit/test_openai_shape.py`.
+    - Evidence: `src/skye/models/llm/openai_compatible.py` (`OpenAICompatibleProvider`), `openai.py` (`OpenAIProvider`), `azure.py` (`AzureOpenAIProvider`); `tests/unit/models/test_openai_provider.py`, `test_azure_provider.py`, `tests/unit/test_openai_shape.py`.
     - _Requirements: 9.3, 9.5, 9.6, 9.10, 22.1_
   - [x] 3.2 Anthropic (Messages API, system message separate)
-    - Evidence: `src/skye/models/llm/anthropic.py`; `tests/unit/models/test_anthropic_provider.py`.
+    - Evidence: `src/skye/models/llm/anthropic_compatible.py` (`AnthropicCompatibleProvider`) and `anthropic.py` (`AnthropicProvider`); `tests/unit/models/test_anthropic_provider.py`.
     - _Requirements: 9.3, 9.5, 9.6, 9.10_
   - [x] 3.3 Bedrock (Converse + stream, SigV4 via auth, boto3 not required)
     - Evidence: `src/skye/models/llm/bedrock.py`; `tests/unit/models/test_bedrock_provider.py`.
     - _Requirements: 9.3, 9.5, 9.9, 7.3_
   - [x] 3.4 Google adapter (formerly "Vertex AI", renamed `google`)
-    - Evidence: `src/skye/models/llm/google_provider.py` (`GoogleProvider`), registered as `"google"` in `src/skye/models/__init__.py`; `tests/unit/models/test_google_provider.py`.
+    - Evidence: `src/skye/models/llm/google.py` (`GoogleProvider`), registered as `"google"` in `src/skye/models/__init__.py`; `tests/unit/models/test_google_provider.py`.
     - _Requirements: 9.3; D19_
   - [x] 3.5 Google adapter authentication through the `auth` component
-    - Evidence: `src/skye/models/llm/google_provider.py` imports `AuthenticationInterface` from `skye.base.interfaces.authentication`, resolves credentials via `skye.auth.google.resolve_google_auth`, has `_initialize_client` return `None` (no vendor SDK), and exposes a lazy `authenticator` property that signs requests over the shared transport; `src/skye/auth/google.py`.
+    - Evidence: `src/skye/models/llm/google.py` imports `AuthenticationInterface` from `skye.base.interfaces.authentication`, resolves credentials via `skye.auth.google.resolve_google_auth`, has `_initialize_client` return `None` (no vendor SDK), and exposes a lazy `authenticator` property that signs requests over the shared transport; `src/skye/auth/google.py`.
     - _Requirements: 9.3, 11.1, 11.9_
 
 - [x] 4. Embedding adapters behind the `vector_encoder` Port

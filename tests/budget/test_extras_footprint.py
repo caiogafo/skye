@@ -39,13 +39,13 @@ EXTRA_PATHS: dict[str, list[str]] = {
     # auth: authentication and credentials (Layer 0). `rsa` is declared for RS256 signing
     # (`auth/rsa_signing.py`); the SigV4 signer and the other strategies are standard library.
     "auth": ["auth"],
-    "openai": ["models/llm/openai_compatible.py", "models/embeddings/openai_embeddings.py"],
+    "openai": ["models/llm/openai_compatible.py", "models/llm/openai.py", "models/llm/azure.py", "models/embeddings/openai_embeddings.py"],
     # tokens: exact token counting (`tiktoken`, lazy and optional; D33).
     "tokens": ["models/transport/token_counter.py"],
-    "anthropic": ["models/llm/anthropic.py"],
+    "anthropic": ["models/llm/anthropic_compatible.py", "models/llm/anthropic.py"],
     "bedrock": ["models/llm/bedrock.py", "models/embeddings/bedrock_embeddings.py"],
     "google": [
-        "models/llm/google_provider.py",
+        "models/llm/google.py",
         "models/embeddings/google_embeddings.py",
         "models/embeddings/google_multimodal_embeddings.py",
     ],

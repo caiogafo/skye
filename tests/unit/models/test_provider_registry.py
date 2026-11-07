@@ -2,7 +2,7 @@
 
 import pytest
 
-from skye.base.completion import CompletionRequest, CompletionResponse, StreamChunk
+from skye.base.completion import CompleteRequest, CompleteResponse, StreamChunk
 from skye.base.exceptions import ConfigurationError
 from skye.base.interfaces.model import ModelInterface
 from skye.base.interfaces.vector_encoder import VectorEncoderInterface
@@ -18,10 +18,10 @@ class MockModelProvider(ModelInterface):
         self.api_key = api_key
         self.config = kwargs
 
-    def complete(self, request: CompletionRequest) -> CompletionResponse:
+    def complete(self, request: CompleteRequest) -> CompleteResponse:
         from skye.base.completion import TokenUsage
 
-        return CompletionResponse(
+        return CompleteResponse(
             id="test-id",
             model="test-model",
             provider="mock",
@@ -31,14 +31,14 @@ class MockModelProvider(ModelInterface):
             usage=TokenUsage(prompt_tokens=10, completion_tokens=5, total_tokens=15),
         )
 
-    def stream(self, request: CompletionRequest):
+    def stream(self, request: CompleteRequest):
         yield StreamChunk(id="test-id", delta="Mock ", finish_reason=None, index=0)
         yield StreamChunk(id="test-id", delta="stream", finish_reason="stop", index=0)
 
-    async def acomplete(self, request: CompletionRequest) -> CompletionResponse:
+    async def acomplete(self, request: CompleteRequest) -> CompleteResponse:
         return self.complete(request)
 
-    async def astream(self, request: CompletionRequest):
+    async def astream(self, request: CompleteRequest):
         for chunk in self.stream(request):
             yield chunk
 
@@ -253,7 +253,7 @@ class TestProviderRegistry:
         ProviderRegistry.register_model_provider("mock", MockModelProvider)
 
         provider = ProviderRegistry.get_model_provider("mock", api_key="test-key")
-        request = CompletionRequest(
+        request = CompleteRequest(
             messages=[UserMessage(content="Hello")], model="test-model"
         )
 

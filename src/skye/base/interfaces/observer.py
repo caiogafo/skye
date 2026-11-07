@@ -2,11 +2,15 @@
 
 This module defines the abstract interface for observability, including
 event logging, metrics recording, and distributed tracing.
+
+Raises: never raises to the caller: an observer failure is logged and swallowed.
+Missing: ``end_trace`` for an unknown trace id is ignored.
+Concurrency: called from request threads and tasks; an implementation must be thread-safe and must not block.
 """
 
-from abc import ABC, abstractmethod
+from abc import abstractmethod
 from enum import Enum
-from typing import Any
+from typing import Any, Protocol, runtime_checkable
 
 
 class EventType(Enum):
@@ -22,7 +26,8 @@ class EventType(Enum):
     AGENT_COMPLETE = "agent_complete"
 
 
-class ObserverInterface(ABC):
+@runtime_checkable
+class ObserverInterface(Protocol):
     """Abstract interface for observability.
 
     This interface defines the contract for telemetry, logging, and tracing

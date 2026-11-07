@@ -2,6 +2,10 @@
 
 This module defines the abstract interface for vector encoding (embeddings)
 with support for both synchronous and asynchronous operations.
+
+Raises: ProviderError when the provider call fails, ValidationError for an empty or oversized input.
+Missing: an empty list of texts yields an empty list of vectors.
+Concurrency: ``encode`` blocks the thread, ``aencode`` runs on the event loop; an instance is shared by many calls.
 """
 
 from abc import ABC, abstractmethod

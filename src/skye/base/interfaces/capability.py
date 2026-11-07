@@ -14,6 +14,10 @@ Example:
     ...             parameters={"city": {"type": "string"}},
     ...             returns={"type": "object"}
     ...         )
+
+Raises: CapabilityExecutionError when the capability fails, ValidationError when the arguments do not match the schema.
+Missing: not applicable (a capability returns its own result; absence of a capability is the registry's concern).
+Concurrency: ``execute`` is called from the calling thread, ``aexecute`` from the event loop; an implementation must not assume it is called once at a time.
 """
 
 from abc import ABC, abstractmethod

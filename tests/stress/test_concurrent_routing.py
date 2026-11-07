@@ -18,7 +18,7 @@ from typing import Any
 
 import pytest
 
-from skye.base.completion import CompletionRequest, CompletionResponse, TokenUsage
+from skye.base.completion import CompleteRequest, CompleteResponse, TokenUsage
 from skye.base.exceptions import ProviderError
 from skye.base.interfaces.model import ModelInterface
 from skye.base.interfaces.router import RoutingStrategy
@@ -53,7 +53,7 @@ class MockModel(ModelInterface):
         self.max_concurrent_calls = 0
         self.lock = threading.Lock()
 
-    def complete(self, request: CompletionRequest) -> CompletionResponse:
+    def complete(self, request: CompleteRequest) -> CompleteResponse:
         """Simulate completion with realistic latency and failures."""
         with self.lock:
             self.call_count += 1
@@ -71,7 +71,7 @@ class MockModel(ModelInterface):
                 raise ProviderError(f"Simulated failure in {self.model_id}", provider=self.model_id)
 
             # Return successful response
-            return CompletionResponse(
+            return CompleteResponse(
                 content="Test response",
                 role="assistant",
                 model=self.model_id,
@@ -87,19 +87,19 @@ class MockModel(ModelInterface):
             with self.lock:
                 self.concurrent_calls -= 1
 
-    def stream(self, request: CompletionRequest):
+    def stream(self, request: CompleteRequest):
         """Stream completion (not implemented for mock)."""
         from skye.base.completion import StreamChunk
 
         yield StreamChunk(delta="Test", model=self.model_id)
 
-    async def acomplete(self, request: CompletionRequest) -> CompletionResponse:
+    async def acomplete(self, request: CompleteRequest) -> CompleteResponse:
         """Async version of complete."""
         # For now, just call sync version
         # In a real implementation, this would be truly async
         return self.complete(request)
 
-    async def astream(self, request: CompletionRequest):
+    async def astream(self, request: CompleteRequest):
         """Async stream completion (not implemented for mock)."""
         from skye.base.completion import StreamChunk
 
@@ -143,7 +143,7 @@ class TestConcurrentRouting:
         router.register_model("model-3", model3)
 
         # Create test request
-        request = CompletionRequest(
+        request = CompleteRequest(
             messages=[UserMessage(content="Test message")], model="model-1"
         )
 
@@ -261,7 +261,7 @@ class TestConcurrentRouting:
         router.register_model("model-2", model2, rpm=30, tpm=3000)
 
         # Create test request
-        request = CompletionRequest(
+        request = CompleteRequest(
             messages=[UserMessage(content="Test message")], model="model-1"
         )
 
@@ -345,7 +345,7 @@ class TestConcurrentRouting:
         router.register_model("model-1", model1)
         router.register_model("model-2", model2)
 
-        request = CompletionRequest(
+        request = CompleteRequest(
             messages=[UserMessage(content="Test message")], model="model-1"
         )
 
@@ -442,7 +442,7 @@ class TestConcurrentRouting:
             router.register_model("model-2", model2, rpm=100, tpm=10000)
             router.register_model("model-3", model3, rpm=100, tpm=10000)
 
-            request = CompletionRequest(
+            request = CompleteRequest(
                 messages=[UserMessage(content="Test message")], model="model-1"
             )
 
@@ -522,7 +522,7 @@ class TestConcurrentRouting:
         router.register_model("model-2", model2)
         router.register_model("model-3", model3)
 
-        request = CompletionRequest(
+        request = CompleteRequest(
             messages=[UserMessage(content="Test message")], model="model-1"
         )
 
@@ -599,7 +599,7 @@ class TestConcurrentRouting:
 
         # Create request - use model-1 for all requests
         # This test focuses on performance metrics, not distribution
-        request = CompletionRequest(
+        request = CompleteRequest(
             messages=[UserMessage(content="Test message")],
             model="model-1"
         )

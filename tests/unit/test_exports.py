@@ -72,16 +72,16 @@ def test_message_exports():
 def test_completion_exports():
     """Test that completion models are importable from skye.base.completion."""
     from skye.base.completion import (
-        CompletionRequest,
-        CompletionResponse,
+        CompleteRequest,
+        CompleteResponse,
         StreamChunk,
         TokenUsage,
     )
 
     # Verify they are classes
     assert isinstance(TokenUsage, type)
-    assert isinstance(CompletionRequest, type)
-    assert isinstance(CompletionResponse, type)
+    assert isinstance(CompleteRequest, type)
+    assert isinstance(CompleteResponse, type)
     assert isinstance(StreamChunk, type)
 
 
@@ -122,7 +122,6 @@ def test_interface_exports():
         RoutingStrategy,
         SafetyFilterInterface,
         SafetyResult,
-        StorageAdapterInterface,
         VectorEncoderInterface,
     )
 
@@ -136,7 +135,6 @@ def test_interface_exports():
     assert isinstance(SafetyResult, type)
     assert isinstance(ObserverInterface, type)
     assert isinstance(EventType, type)
-    assert isinstance(StorageAdapterInterface, type)
     assert isinstance(PluginInterface, type)
     assert isinstance(EventHandlerInterface, type)
     assert isinstance(VectorEncoderInterface, type)
@@ -148,7 +146,7 @@ def test_interface_exports():
 CURATED = ["messages", "completion", "exceptions", "config"]
 # The commonest names, loaded lazily on first access (decision D34).
 LAZY_NAMES = {
-    "UserMessage", "SystemMessage", "AssistantMessage", "CapabilityMessage", "CompletionRequest", "CompletionResponse",
+    "UserMessage", "SystemMessage", "AssistantMessage", "CapabilityMessage", "CompleteRequest", "CompleteResponse",
     "StreamChunk", "TokenUsage", "SkyeError", "ProviderError", "ConfigurationError", "ValidationError", "MissingExtraError",
 }
 

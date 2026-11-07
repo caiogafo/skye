@@ -13,11 +13,11 @@ satisfies (`Requirement N.k` of `10-requirements.md`) or the decision it honors.
   - [x] 1.1 Message types: `SkyeMessage` and the role variants, `ContentChunk`
     - Evidence: `src/skye/base/messages.py` (`SkyeMessage`, `UserMessage`, `AssistantMessage`, `SystemMessage`, `CapabilityMessage`).
     - _Requirements: 16.1_
-  - [x] 1.2 Completion contracts: `CompletionRequest`, `CompletionResponse`, `StreamChunk`, `TokenUsage`
+  - [x] 1.2 Completion contracts: `CompleteRequest`, `CompleteResponse`, `StreamChunk`, `TokenUsage`
     - Evidence: `src/skye/base/completion.py` (content, role, metadata, token usage, model id, provider; stream yields `StreamChunk`).
     - _Requirements: 16.4, 16.5, 19.1_
   - [x] 1.3 Capability contract and the OpenAI-shape boundary
-    - Evidence: `src/skye/base/capability_schema.py` (name, description, parameters), `src/skye/base/completion.py` (`CapabilityCall`, `ExecutableCapabilityCall`), `src/skye/base/openai_shape.py`.
+    - Evidence: `src/skye/base/capability_schema.py` (name, description, parameters), `src/skye/base/completion.py` (`CapabilityCall`, with `execute()` after D45), `src/skye/base/openai_shape.py`.
     - _Requirements: 16.1_
 
 - [x] 2. Port catalogue (one module per Port, no I/O, no component import)

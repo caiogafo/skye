@@ -36,6 +36,10 @@ class ReActAgent:
             "ReActAgent is a placeholder; the agent loop is not implemented yet"
         )
 
+    async def ainvoke(self, input: Any) -> Any:
+        """A thin alias of :meth:`invoke`."""
+        return await self.invoke(input)
+
 
 def register_agent_type(name: str, factory: AgentFactory, *, replace: bool = False) -> None:
     """Register an agent type under ``name``.

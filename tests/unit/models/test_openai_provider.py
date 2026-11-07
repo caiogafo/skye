@@ -16,10 +16,10 @@ from unittest.mock import Mock, patch
 import pytest
 from pydantic import BaseModel
 
-from skye.base.completion import CompletionRequest, CompletionResponse, StreamChunk
+from skye.base.completion import CompleteRequest, CompleteResponse, StreamChunk
 from skye.base.exceptions import ProviderError
 from skye.base.messages import SystemMessage, UserMessage
-from skye.models.llm.openai_compatible import OpenAIProvider
+from skye.models.llm.openai import OpenAIProvider
 from skye.models.transport.rest import JsonObject
 
 POST = "skye.models.transport.rest.post_json"
@@ -113,7 +113,7 @@ class TestOpenAIRequestTransformation:
     def test_transform_basic_request(self) -> None:
         """Test transformation of basic completion request."""
         provider = OpenAIProvider(api_key="sk-test")
-        request = CompletionRequest(
+        request = CompleteRequest(
             messages=[UserMessage(content="Hello")],
             model="gpt-4",
             temperature=0.7
@@ -131,7 +131,7 @@ class TestOpenAIRequestTransformation:
     def test_transform_with_system_message(self) -> None:
         """Test transformation with system message."""
         provider = OpenAIProvider(api_key="sk-test")
-        request = CompletionRequest(
+        request = CompleteRequest(
             messages=[
                 SystemMessage(content="You are helpful"),
                 UserMessage(content="Hello")
@@ -149,7 +149,7 @@ class TestOpenAIRequestTransformation:
     def test_transform_with_max_tokens(self) -> None:
         """Test transformation with max_tokens parameter."""
         provider = OpenAIProvider(api_key="sk-test")
-        request = CompletionRequest(
+        request = CompleteRequest(
             messages=[UserMessage(content="Hello")],
             model="gpt-4",
             max_tokens=100
@@ -162,7 +162,7 @@ class TestOpenAIRequestTransformation:
     def test_transform_with_stop_sequences(self) -> None:
         """Test transformation with stop sequences."""
         provider = OpenAIProvider(api_key="sk-test")
-        request = CompletionRequest(
+        request = CompleteRequest(
             messages=[UserMessage(content="Hello")],
             model="gpt-4",
             stop=["END", "STOP"]
@@ -179,7 +179,7 @@ class TestOpenAIRequestTransformation:
             age: int
         
         provider = OpenAIProvider(api_key="sk-test")
-        request = CompletionRequest(
+        request = CompleteRequest(
             messages=[UserMessage(content="Extract person info")],
             model="gpt-4",
             response_schema=Person
@@ -206,7 +206,7 @@ class TestOpenAIRequestTransformation:
                 }
             }
         ]
-        request = CompletionRequest(
+        request = CompleteRequest(
             messages=[UserMessage(content="What's the weather?")],
             model="gpt-4",
             capabilities=capabilities,
@@ -221,7 +221,7 @@ class TestOpenAIRequestTransformation:
     def test_transform_with_provider_metadata(self) -> None:
         """Test transformation with provider-specific metadata."""
         provider = OpenAIProvider(api_key="sk-test")
-        request = CompletionRequest(
+        request = CompleteRequest(
             messages=[UserMessage(content="Hello")],
             model="gpt-4",
             metadata={
@@ -269,7 +269,7 @@ class TestOpenAIResponseTransformation:
         
         result = provider._transform_response(mock_response)
         
-        assert isinstance(result, CompletionResponse)
+        assert isinstance(result, CompleteResponse)
         assert result.id == "chatcmpl-123"
         assert result.model == "gpt-4"
         assert result.provider == "openai"
@@ -416,10 +416,10 @@ class TestOpenAIProviderCalls:
         """Test successful completion call."""
         with patch(POST, return_value=_json_response()) as post:
             provider = OpenAIProvider(api_key="sk-test")
-            request = CompletionRequest(messages=[UserMessage(content="Hello")], model="gpt-4")
+            request = CompleteRequest(messages=[UserMessage(content="Hello")], model="gpt-4")
             result = provider.complete(request)
 
-        assert isinstance(result, CompletionResponse)
+        assert isinstance(result, CompleteResponse)
         assert result.content == "Test response"
         assert result.provider == "openai"
         post.assert_called_once()
@@ -433,7 +433,7 @@ class TestOpenAIProviderCalls:
         """Test error handling in complete."""
         with patch(POST, side_effect=Exception("API Error")):
             provider = OpenAIProvider(api_key="sk-test")
-            request = CompletionRequest(messages=[UserMessage(content="Hello")], model="gpt-4")
+            request = CompleteRequest(messages=[UserMessage(content="Hello")], model="gpt-4")
             with pytest.raises(ProviderError) as exc_info:
                 provider.complete(request)
 
@@ -444,7 +444,7 @@ class TestOpenAIProviderCalls:
         """Test successful streaming call."""
         with patch(STREAM, return_value=iter(_sse_chunks())) as stream:
             provider = OpenAIProvider(api_key="sk-test")
-            request = CompletionRequest(messages=[UserMessage(content="Hello")], model="gpt-4", stream=True)
+            request = CompleteRequest(messages=[UserMessage(content="Hello")], model="gpt-4", stream=True)
             chunks = list(provider.stream(request))
 
         assert len(chunks) == 3
@@ -463,10 +463,10 @@ class TestOpenAIAsyncSupport:
         """Test successful async completion (sync REST call run in an executor)."""
         with patch(POST, return_value=_json_response("Async response")) as post:
             provider = OpenAIProvider(api_key="sk-test")
-            request = CompletionRequest(messages=[UserMessage(content="Hello")], model="gpt-4")
+            request = CompleteRequest(messages=[UserMessage(content="Hello")], model="gpt-4")
             result = await provider.acomplete(request)
 
-        assert isinstance(result, CompletionResponse)
+        assert isinstance(result, CompleteResponse)
         assert result.content == "Async response"
         assert result.provider == "openai"
         assert post.call_args.args[0] == URL
@@ -542,7 +542,7 @@ class TestOpenAIToolCalling:
         mock_capability.get_schema.return_value = mock_schema
         
         provider = OpenAIProvider(model="gpt-4", api_key="sk-test")
-        request = CompletionRequest(
+        request = CompleteRequest(
             messages=[UserMessage(content="What's the weather in NYC?")],
             model="gpt-4",
             capabilities=[mock_capability],
@@ -570,7 +570,7 @@ class TestOpenAIToolCalling:
         mock_capability.get_schema.return_value = mock_schema
         
         provider = OpenAIProvider(model="gpt-4", api_key="sk-test")
-        request = CompletionRequest(
+        request = CompleteRequest(
             messages=[UserMessage(content="What's the weather?")],
             model="gpt-4",
             capabilities=[mock_capability],
@@ -595,7 +595,7 @@ class TestOpenAIToolCalling:
         mock_capability.get_schema.return_value = mock_schema
         
         provider = OpenAIProvider(model="gpt-4", api_key="sk-test")
-        request = CompletionRequest(
+        request = CompleteRequest(
             messages=[UserMessage(content="Calculate 2+2")],
             model="gpt-4",
             capabilities=[mock_capability],
@@ -799,7 +799,7 @@ class TestOpenAIToolCalling:
         mock_capability_2.get_schema.return_value = mock_schema_2
         
         # Create request with multiple capabilities
-        request = CompletionRequest(
+        request = CompleteRequest(
             messages=[UserMessage(content="Hello")],
             model="gpt-4",
             capabilities=[mock_capability_1, mock_capability_2]
@@ -833,7 +833,7 @@ class TestOpenAIToolCalling:
         )
         with patch(POST, return_value=response) as post:
             provider = OpenAIProvider(model="gpt-4", api_key="sk-test")
-            request = CompletionRequest(
+            request = CompleteRequest(
                 messages=[UserMessage(content="What's the weather in Boston?")],
                 model="gpt-4",
                 capabilities=[mock_capability],

@@ -12,11 +12,11 @@ Features:
 
 Example:
     >>> from skye.models.llm.bedrock import BedrockProvider
-    >>> from skye.base.completion import CompletionRequest
+    >>> from skye.base.completion import CompleteRequest
     >>> from skye.base.messages import UserMessage
     >>>
     >>> provider = BedrockProvider(region_name="us-east-1")
-    >>> request = CompletionRequest(
+    >>> request = CompleteRequest(
     ...     messages=[UserMessage(content="Hello")],
     ...     model="anthropic.claude-3-sonnet-20240229-v1:0"
     ... )
@@ -32,7 +32,7 @@ from collections.abc import Iterator
 from datetime import datetime, timezone
 from typing import Any
 
-from skye.base.completion import CompletionRequest, CompletionResponse, StreamChunk, TokenUsage
+from skye.base.completion import CompleteRequest, CompleteResponse, StreamChunk, TokenUsage
 from skye.models.base import BaseModelProvider
 from skye.models.transport.structured import STRUCTURED_TOOL, schema_of
 from skye.models.transport import rest
@@ -103,10 +103,18 @@ class BedrockProvider(BaseModelProvider):
         host = self.config.get("endpoint_url") or f"https://bedrock-runtime.{self.region_name}.amazonaws.com"
         return f"{host}/model/{model}/{operation}", body
 
-    async def acomplete(self, *args: Any, **kwargs: Any) -> CompletionResponse:  # type: ignore[override]
+    async def acomplete(
+        self,
+        messages: list[Any] | str | CompleteRequest | None = None,
+        model: str | None = None,
+        router: Any | None = None,
+        temperature: float | None = None,
+        max_tokens: int | None = None,
+        **kwargs: Any,
+    ) -> CompleteResponse:
         """Run :meth:`complete` in an executor so the event loop is not blocked."""
         loop = asyncio.get_running_loop()
-        return await loop.run_in_executor(None, lambda: self.complete(*args, **kwargs))
+        return await loop.run_in_executor(None, lambda: self.complete(messages, model, router, temperature, max_tokens, **kwargs))
 
     def _transform_messages(self, messages: list[Any]) -> list[dict[str, Any]]:
         """Transform Skye messages to Bedrock Converse API format.
@@ -255,11 +263,11 @@ class BedrockProvider(BaseModelProvider):
         
         return capability_calls if capability_calls else None
     
-    def _transform_request(self, request: CompletionRequest) -> dict[str, Any]:
-        """Transform CompletionRequest to Bedrock Converse API format.
+    def _transform_request(self, request: CompleteRequest) -> dict[str, Any]:
+        """Transform CompleteRequest to Bedrock Converse API format.
         
         Args:
-            request: The skye CompletionRequest
+            request: The skye CompleteRequest
             
         Returns:
             Dictionary in Bedrock Converse API format
@@ -342,14 +350,14 @@ class BedrockProvider(BaseModelProvider):
         
         return bedrock_request
     
-    def _transform_response(self, response: Any) -> CompletionResponse:
-        """Transform Bedrock response to CompletionResponse.
+    def _transform_response(self, response: Any) -> CompleteResponse:
+        """Transform Bedrock response to CompleteResponse.
         
         Args:
             response: The Bedrock response object
             
         Returns:
-            CompletionResponse in skye format
+            CompleteResponse in skye format
         """
         if isinstance(response, rest.JsonObject):
             response = response.to_dict()
@@ -400,7 +408,7 @@ class BedrockProvider(BaseModelProvider):
         }
         finish_reason = finish_reason_map.get(stop_reason, stop_reason)
         
-        return CompletionResponse(
+        return CompleteResponse(
             id=response.get("ResponseMetadata", {}).get("RequestId", ""),
             model=response.get("ResponseMetadata", {}).get("HTTPHeaders", {}).get("x-amzn-bedrock-model-id", ""),
             provider="bedrock",

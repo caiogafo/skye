@@ -1,10 +1,8 @@
-"""OpenAI-compatible model adapter (structure task 4.3).
+"""The OpenAI wire format, for any endpoint that speaks it (structure task 4.3).
 
 One parametrized adapter, ``OpenAICompatibleProvider``, serves every OpenAI wire-compatible
-endpoint, keyed by ``base_url`` + ``api_key``. ``OpenAIProvider`` and ``AzureOpenAIProvider``
-are thin configurations of it (Azure = endpoint + api_version + deployment).
-
-This module replaces the former openai_provider / azure_provider modules.
+endpoint (vLLM, Ollama, LM Studio, Together, ...), keyed by ``api_base`` + ``api_key``. What belongs to
+one vendor lives beside it: ``openai.py`` (``OpenAIProvider``) and ``azure.py`` (``AzureOpenAIProvider``).
 
 Features:
 - Standard-library REST transport (no vendor SDK)
@@ -15,12 +13,12 @@ Features:
 - Multimodal inputs (images)
 
 Example:
-    >>> from skye.models.llm.openai_compatible import OpenAIProvider
-    >>> from skye.base.completion import CompletionRequest
+    >>> from skye.models.llm.openai_compatible import OpenAICompatibleProvider
+    >>> from skye.base.completion import CompleteRequest
     >>> from skye.base.messages import UserMessage
     >>>
-    >>> provider = OpenAIProvider(api_key="sk-...")
-    >>> request = CompletionRequest(
+    >>> provider = OpenAICompatibleProvider(api_key="sk-...", api_base="http://localhost:8000/v1")
+    >>> request = CompleteRequest(
     ...     messages=[UserMessage(content="Hello")],
     ...     model="gpt-4"
     ... )
@@ -33,81 +31,64 @@ from collections.abc import Iterator
 from datetime import datetime, timezone
 from typing import Any
 
-from skye.base.completion import CompletionRequest, CompletionResponse, StreamChunk, TokenUsage
+from skye.base.completion import CompleteRequest, CompleteResponse, StreamChunk, TokenUsage
+from skye.base.exceptions import ConfigurationError
 from skye.base.messages import AssistantMessage
 from skye.models.base import BaseModelProvider
 from skye.models.transport.structured import schema_of, strict_schema
 from skye.models.transport import rest
 
-DEFAULT_API_BASE = "https://api.openai.com/v1"
-
 
 class OpenAICompatibleProvider(BaseModelProvider):
-    """OpenAI-compatible provider (default configuration: OpenAI itself).
-    
-    Implements the ModelInterface for OpenAI's API, supporting all GPT models
-    including GPT-4, GPT-3.5-turbo, o1, and o3 series.
-    
+    """Provider for any endpoint that speaks the OpenAI chat-completions format.
+
     Args:
-        api_key: OpenAI API key
-        api_base: Optional custom API base URL
-        organization: Optional organization ID
+        api_key: Key sent as a bearer token
+        api_base: Base URL of the endpoint, up to and including ``/v1``
         **kwargs: Additional configuration parameters
-    
+
     Example:
-        >>> provider = OpenAIProvider(api_key="sk-...")
+        >>> provider = OpenAICompatibleProvider(api_key="none", api_base="http://localhost:8000/v1")
         >>> response = provider.complete(request)
     """
 
-    
+    #: Base URL used when ``api_base`` is not given; a vendor subclass sets it.
+    default_api_base: str | None = None
     #: Provider label reported in responses / model info.
-    provider_name = "openai"
+    provider_name = "openai_compatible"
     #: Metadata keys with this prefix are forwarded to the API as extra params.
     metadata_prefix = "openai_"
     #: Whether response metadata carries ``system_fingerprint``.
-    reports_fingerprint = True
+    reports_fingerprint = False
 
-    def __init__(
-        self,
-        api_key: str,
-        api_base: str | None = None,
-        organization: str | None = None,
-        **kwargs: Any
-    ) -> None:
-        """Initialize OpenAI provider.
-        
+    def __init__(self, api_key: str, api_base: str | None = None, **kwargs: Any) -> None:
+        """Initialize the provider.
+
         Args:
-            api_key: OpenAI API key
-            api_base: Optional custom API base URL
-            organization: Optional organization ID
+            api_key: Key sent as a bearer token
+            api_base: Base URL of the endpoint (default: ``default_api_base``)
             **kwargs: Additional configuration parameters
         """
-        super().__init__(
-            api_key=api_key,
-            api_base=api_base,
-            organization=organization,
-            **kwargs
-        )
+        super().__init__(api_key=api_key, api_base=api_base, **kwargs)
         self.api_key = api_key
         self.api_base = api_base
-        self.organization = organization
-    
+
     def _initialize_client(self) -> Any:
         """No vendor client: requests go through the standard-library REST transport."""
         return None
 
     def _endpoint_url(self) -> str:
         """Chat-completions URL."""
-        return f"{(self.api_base or DEFAULT_API_BASE).rstrip('/')}/chat/completions"
+        base = self.api_base or self.default_api_base
+        if not base:
+            raise ConfigurationError("api_base is required for an OpenAI-compatible endpoint")
+        return f"{base.rstrip('/')}/chat/completions"
 
     def _auth_headers(self) -> dict[str, str]:
         """Authentication headers for the endpoint."""
-        headers = {"Authorization": f"Bearer {self.api_key}"}
-        if self.organization:
-            headers["OpenAI-Organization"] = self.organization
-        return headers
+        return {"Authorization": f"Bearer {self.api_key}"}
 
-    def _model_name(self, request: CompletionRequest) -> str:
+    def _model_name(self, request: CompleteRequest) -> str:
         """Model identifier sent to the endpoint."""
         return request.model
     
@@ -226,11 +207,11 @@ class OpenAICompatibleProvider(BaseModelProvider):
         
         return capability_calls
     
-    def _transform_request(self, request: CompletionRequest) -> dict[str, Any]:
-        """Transform CompletionRequest to OpenAI format.
+    def _transform_request(self, request: CompleteRequest) -> dict[str, Any]:
+        """Transform CompleteRequest to OpenAI format.
         
         Args:
-            request: The skye CompletionRequest
+            request: The skye CompleteRequest
             
         Returns:
             Dictionary in OpenAI API format
@@ -295,14 +276,14 @@ class OpenAICompatibleProvider(BaseModelProvider):
         
         return openai_request
     
-    def _transform_response(self, response: Any) -> CompletionResponse:
-        """Transform OpenAI response to CompletionResponse.
+    def _transform_response(self, response: Any) -> CompleteResponse:
+        """Transform OpenAI response to CompleteResponse.
         
         Args:
             response: The OpenAI response object
             
         Returns:
-            CompletionResponse in skye format
+            CompleteResponse in skye format
         """
         choice = response.choices[0]
         message = choice.message
@@ -330,7 +311,7 @@ class OpenAICompatibleProvider(BaseModelProvider):
                 for tc in message.tool_calls
             ]
         
-        return CompletionResponse(
+        return CompleteResponse(
             id=response.id,
             model=response.model,
             provider=self.provider_name,
@@ -395,13 +376,21 @@ class OpenAICompatibleProvider(BaseModelProvider):
             provider=self.provider_name,
         )
 
-    async def acomplete(self, *args: Any, **kwargs: Any) -> CompletionResponse:  # type: ignore[override]
+    async def acomplete(
+        self,
+        messages: list[Any] | str | CompleteRequest | None = None,
+        model: str | None = None,
+        router: Any | None = None,
+        temperature: float | None = None,
+        max_tokens: int | None = None,
+        **kwargs: Any,
+    ) -> CompleteResponse:
         """Run :meth:`complete` in an executor so the event loop is not blocked.
 
-        Takes the same arguments as :meth:`complete`: ``messages=..., model=...`` or a ``CompletionRequest``.
+        Takes the same arguments as :meth:`complete`: ``messages=..., model=...`` or a ``CompleteRequest``.
         """
         loop = asyncio.get_running_loop()
-        return await loop.run_in_executor(None, lambda: self.complete(*args, **kwargs))
+        return await loop.run_in_executor(None, lambda: self.complete(messages, model, router, temperature, max_tokens, **kwargs))
 
     def format_capability_results(self, results: list[Any]) -> list[dict[str, Any]]:
         """Format capability results for OpenAI.
@@ -454,59 +443,4 @@ class OpenAICompatibleProvider(BaseModelProvider):
         }
 
 
-class OpenAIProvider(OpenAICompatibleProvider):
-    """OpenAI configuration of the compatible adapter (``base_url`` defaults to OpenAI)."""
-
-
-class AzureOpenAIProvider(OpenAICompatibleProvider):
-    """Azure OpenAI expressed as configuration of the OpenAI-compatible adapter.
-
-    Azure differs only in client construction (endpoint + api_version), the deployment name
-    standing in for the model, the ``azure_`` metadata prefix and no ``system_fingerprint``.
-
-    Args:
-        azure_endpoint: Azure OpenAI endpoint URL (e.g. https://myresource.openai.azure.com/)
-        api_key: Azure OpenAI API key
-        api_version: Azure OpenAI API version (e.g. 2024-02-15-preview)
-        deployment_name: Name of the deployment (e.g. gpt-4)
-    """
-
-    provider_name = "azure"
-    metadata_prefix = "azure_"
-    reports_fingerprint = False
-
-    def __init__(
-        self,
-        azure_endpoint: str,
-        api_key: str,
-        api_version: str,
-        deployment_name: str,
-        **kwargs: Any,
-    ) -> None:
-        BaseModelProvider.__init__(
-            self,
-            azure_endpoint=azure_endpoint,
-            api_key=api_key,
-            api_version=api_version,
-            deployment_name=deployment_name,
-            **kwargs,
-        )
-        self.azure_endpoint = azure_endpoint
-        self.api_key = api_key
-        self.api_version = api_version
-        self.deployment_name = deployment_name
-
-    def _endpoint_url(self) -> str:
-        return (
-            f"{self.azure_endpoint.rstrip('/')}/openai/deployments/{self.deployment_name}"
-            f"/chat/completions?api-version={self.api_version}"
-        )
-
-    def _auth_headers(self) -> dict[str, str]:
-        return {"api-key": self.api_key}
-
-    def _model_name(self, request: CompletionRequest) -> str:
-        return self.deployment_name
-
-
-__all__ = ["OpenAICompatibleProvider", "OpenAIProvider", "AzureOpenAIProvider"]
+__all__ = ["OpenAICompatibleProvider"]

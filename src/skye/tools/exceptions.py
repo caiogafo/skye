@@ -6,20 +6,15 @@ validation, and execution.
 
 from typing import Any
 
-from skye.base.exceptions import SkyeError
+from skye.base.exceptions import CapabilityError, CapabilityExecutionError
 
-
-class CapabilityError(SkyeError):
-    """Base exception for capability-related errors.
-
-    All capability-specific exceptions inherit from this class.
-
-    Args:
-        message: Human-readable error message
-        details: Optional dictionary containing additional error context
-    """
-
-    pass
+__all__ = [
+    "CapabilityCallParsingError",
+    "CapabilityError",
+    "CapabilityExecutionError",
+    "CapabilityNotFoundError",
+    "CapabilityValidationError",
+]
 
 
 class CapabilityNotFoundError(CapabilityError):
@@ -48,21 +43,6 @@ class CapabilityValidationError(CapabilityError):
 
     def __init__(self, message: str, capability_name: str, **kwargs: Any) -> None:
         """Initialize CapabilityValidationError with capability name."""
-        details = {"capability_name": capability_name, **kwargs}
-        super().__init__(message, details)
-
-
-class CapabilityExecutionError(CapabilityError):
-    """Raised when capability execution fails.
-
-    Args:
-        message: Human-readable error message
-        capability_name: Name of the capability that failed execution
-        **kwargs: Additional context to include in details
-    """
-
-    def __init__(self, message: str, capability_name: str, **kwargs: Any) -> None:
-        """Initialize CapabilityExecutionError with capability name."""
         details = {"capability_name": capability_name, **kwargs}
         super().__init__(message, details)
 

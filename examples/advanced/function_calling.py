@@ -4,15 +4,17 @@
 directly to the call; when the model asks for several of them, ``execute_capability_calls`` runs them and returns one result message
 for each. A capability that raises does not stop the others: its message carries the error, which goes back to the model.
 
-Set OPENAI_API_KEY.
+With OPENAI_API_KEY set the example calls OpenAI; without a key a scripted client asks for both capabilities.
 """
 
-import asyncio
-import os
-
-import skye
 from skye import UserMessage
 from skye.tools import capability
+
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))  # the shared offline helper lives in examples/
+from _offline import get_client  # noqa: E402
 
 
 @capability
@@ -37,13 +39,8 @@ def get_population(location: str) -> str:
     return {"Paris": "2.1 million", "London": "8.9 million"}.get(location, "Unknown")
 
 
-async def main() -> None:
-    api_key = os.getenv("OPENAI_API_KEY")
-    if not api_key:
-        print("OPENAI_API_KEY not set, skipping")
-        return
-
-    client = skye.provider("openai", api_key=api_key)
+def main() -> None:
+    client = get_client("openai")
     question = [UserMessage(content="What is the weather in Paris, and how many people live there?")]
     capabilities = [get_weather, get_population]
 
@@ -54,7 +51,7 @@ async def main() -> None:
             print("the model asks for:", call.name, call.arguments)
 
         # All requested calls are executed; a call that raises yields a message with the error instead of stopping the rest
-        results = await response.execute_capability_calls()
+        results = response.execute_capability_calls()
         for message in results:
             print(f"  {message.capability_name}: {message.content}")
 
@@ -67,4 +64,4 @@ async def main() -> None:
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    main()

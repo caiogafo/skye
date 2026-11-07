@@ -27,9 +27,6 @@ from skye.base.interfaces.decision import (
     DecisionModel,
     DecisionResult,
 )
-from skye.base.interfaces.error_handler import (
-    ErrorHandlerInterface,
-)
 from skye.base.interfaces.event_handler import (
     EventHandlerInterface,
 )
@@ -40,9 +37,6 @@ from skye.base.interfaces.memory import (
 from skye.base.interfaces.model import (
     ModelInterface,
 )
-from skye.base.interfaces.multimodal_handler import (
-    MultimodalHandlerInterface,
-)
 from skye.base.interfaces.observer import (
     EventType,
     ObserverInterface,
@@ -52,13 +46,18 @@ from skye.base.interfaces.plugin import (
 )
 from skye.base.interfaces.prompt import (
     PromptBuilderInterface,
+    PromptRegistryInterface,
+    PromptRenderingInterface,
+    PromptSchemaInterface,
 )
 from skye.base.interfaces.registry import (
     ProviderRegistryInterface,
-    RouteRegistryInterface,
 )
 from skye.base.interfaces.router import (
+    ModelHealthInterface,
     ModelRouterInterface,
+    ModelSelectionInterface,
+    RouterConfigurationInterface,
     RoutingStrategy,
 )
 from skye.base.interfaces.runnable import (
@@ -69,11 +68,14 @@ from skye.base.interfaces.safety import (
     SafetyResult,
 )
 from skye.base.interfaces.storage import (
-    StorageAdapterInterface,
     StorageBackend,
 )
 from skye.base.interfaces.token_counter import (
     TokenCounterInterface,
+)
+from skye.base.interfaces.tool_provider import (
+    CapabilityContext,
+    ToolProvider,
 )
 from skye.base.interfaces.vector_encoder import (
     VectorEncoderInterface,
@@ -82,6 +84,7 @@ from skye.base.interfaces.vector_encoder import (
 __all__ = [
     "AuthenticationInterface",
     "AuthorizerInterface",
+    "CapabilityContext",
     "CapabilityInterface",
     "CapabilitySchema",
     "ConfigLoaderInterface",
@@ -90,25 +93,28 @@ __all__ = [
     "Decision",
     "DecisionModel",
     "DecisionResult",
-    "ErrorHandlerInterface",
     "EventHandlerInterface",
     "EventType",
     "MemoryEntryLike",
     "MemoryInterface",
+    "ModelHealthInterface",
     "ModelInterface",
     "ModelRouterInterface",
-    "MultimodalHandlerInterface",
+    "ModelSelectionInterface",
     "ObserverInterface",
     "PluginInterface",
     "PromptBuilderInterface",
+    "PromptRegistryInterface",
+    "PromptRenderingInterface",
+    "PromptSchemaInterface",
     "ProviderRegistryInterface",
-    "RouteRegistryInterface",
+    "RouterConfigurationInterface",
     "RoutingStrategy",
     "Runnable",
     "SafetyFilterInterface",
     "SafetyResult",
-    "StorageAdapterInterface",
     "StorageBackend",
     "TokenCounterInterface",
+    "ToolProvider",
     "VectorEncoderInterface",
 ]

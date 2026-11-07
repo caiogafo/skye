@@ -53,10 +53,10 @@ The migration is done and was verified green on 2026-11-02. The only open work i
     - Split `providers/base.py` into `models/base.py` plus `models/transport/{http,streaming,retry,error_mapping,token_counter,multimodal}.py`; `http.py` re-exports `base/http.py`; `streaming.py` is a stdlib SSE parser; `retry.py` keeps the max-3-retries policy. Behavior-preserving split.
     - _Requirements: 4_
   - [x] 4.3 Consolidate the LLM adapters and implement Runnable
-    - Collapse `openai_provider` + `azure_provider` into `models/llm/openai_compatible.py`; move `anthropic_provider → models/llm/anthropic.py` and `bedrock_provider → models/llm/bedrock.py` (via the SigV4 signer, no boto3 required); make the model adapters implement the `Runnable` Port.
+    - Collapse `openai_provider` + `azure_provider` into `models/llm/openai.py`; move `anthropic_provider → models/llm/anthropic.py` and `bedrock_provider → models/llm/bedrock.py` (via the SigV4 signer, no boto3 required); make the model adapters implement the `Runnable` Port.
     - _Requirements: 4, 11_
   - [x] 4.4 Google own-dialect adapter (formerly Vertex) — stdlib REST, not SDK
-    - `models/llm/google_provider.py` and `models/embeddings/google_*.py` as their own dialect; class `GoogleProvider`, registered name `"google"`, extra `google` (Assumption A6; SDK package stays `google-cloud-aiplatform`).
+    - `models/llm/google.py` and `models/embeddings/google_*.py` as their own dialect; class `GoogleProvider`, registered name `"google"`, extra `google` (Assumption A6; SDK package stays `google-cloud-aiplatform`).
     - DONE (2026-11-02): `google_provider.py` and the three Google embedding adapters call the REST API (`:generateContent`, `:streamGenerateContent?alt=sse`, `:predict`) through `models/transport/rest.py`; authentication is `auth/google.py` (access token, metadata server, API key; service-account JWT and Workload Identity are the `auth` milestone). No `google.cloud`/`vertexai` import remains; `tests/budget/test_boundary_rule.py` enforces it.
     - _Requirements: 4, 20_
   - [x] 4.5 Move remote_api onto the stdlib transport (eliminate the HTTP leak)
@@ -223,7 +223,7 @@ The migration is done and was verified green on 2026-11-02. The only open work i
     - _Requirements: 15.1_
 
 - [ ] 14. Reduce the core (open: waits for the owner's decision O4)
-  - [ ] 14.1 Replace `pydantic` with dataclasses in the core, with its own validation and serialization for `CompletionRequest` and `CompletionResponse`; tests green at every step.
+  - [ ] 14.1 Replace `pydantic` with dataclasses in the core, with its own validation and serialization for `CompleteRequest` and `CompleteResponse`; tests green at every step.
     - Note: the pydantic stack is about 7.7 MB of the 8.9 MB core on Linux and about 37 ms of the 91 ms of `import skye`; the measure is in `docs/budgets.md`. No code is changed before O4 is decided.
     - _Requirements: 7.1, 7.9; O4_
   - [ ] 14.2 Replace `tenacity` with a retry of our own in the standard library (backoff and jitter, sync and async).
@@ -659,7 +659,7 @@ Checklist boxes were replaced by (open) and (done) so that these old tasks are n
 - (done) 16.1 Remove ProviderRegistry and standardize provider interface
   - Remove all ProviderRegistry usage from codebase
   - Ensure all code uses `skye.provider()` interface exclusively
-  - Update provider.complete() to accept parameters directly (not CompletionRequest objects)
+  - Update provider.complete() to accept parameters directly (not CompleteRequest objects)
   - Update all examples to use direct parameter passing
   - Update all tests to use `skye.provider()` interface
   - Update documentation to remove ProviderRegistry references
@@ -779,7 +779,7 @@ Checklist boxes were replaced by (open) and (done) so that these old tasks are n
   - Update tests/unit/test_completion.py
   - Fix capabilities field tests
   - Fix tool_choice validation tests
-  - Ensure CompletionRequest model validation works
+  - Ensure CompleteRequest model validation works
   - _Requirements: 1.2, 1.3_
 
 - (done) 31. Fix failing exports test
@@ -857,7 +857,7 @@ This implementation plan breaks down the development of skye (base package) into
     - Define Pydantic model with prompt_tokens, completion_tokens, total_tokens
     - _Requirements: 4.2, 7.1_
   
-  - (done) 4.2 Create CompletionRequest model
+  - (done) 4.2 Create CompleteRequest model
     - Define Pydantic model with messages, model, temperature, max_tokens, etc.
     - Add response_format and response_schema fields for structured outputs
     - Add capabilities field (renamed from tools)
@@ -865,7 +865,7 @@ This implementation plan breaks down the development of skye (base package) into
     - Add validation for top_p range (0.0-1.0)
     - _Requirements: 2.3, 4.1, 10.2_
   
-  - (done) 4.3 Create CompletionResponse model
+  - (done) 4.3 Create CompleteResponse model
     - Define Pydantic model with id, model, provider, content, usage, etc.
     - Add structured_output field for parsed structured responses
     - Implement get_output() method
@@ -1036,7 +1036,7 @@ This implementation plan breaks down the development of skye (base package) into
     - Verify with `uv run python -c "from skye.interfaces.observer import ObserverInterface; print(ObserverInterface.__abstractmethods__)"`
     - _Requirements: 5.2, 9.1, 9.2, 9.3_
   
-  - (done) 7.7 Create StorageAdapterInterface
+  - (done, removed in D41) 7.7 Create StorageAdapterInterface
     - Define abstract base class
     - Add save() method signature
     - Add query() method signature
@@ -1196,8 +1196,8 @@ This implementation plan breaks down the development of skye (base package) into
     - _Requirements: 1.1, 4.1, 4.5_
   
   - (open)* 10.3 Write completion model tests
-    - Test CompletionRequest validation
-    - Test CompletionResponse with structured outputs
+    - Test CompleteRequest validation
+    - Test CompleteResponse with structured outputs
     - Test StreamChunk model
     - Test TokenUsage model
     - Run with `uv run pytest tests/unit/test_completion.py -v`
@@ -1253,7 +1253,7 @@ When designing interfaces and implementations, reference MCP server patterns:
 
 When implementing structured output support:
 1. Use Pydantic's `model_json_schema()` to generate JSON schemas
-2. Store the schema in CompletionRequest.response_format
+2. Store the schema in CompleteRequest.response_format
 3. Parse and validate responses using the Pydantic model
 4. Handle provider-specific differences in ModelInterface implementations
 

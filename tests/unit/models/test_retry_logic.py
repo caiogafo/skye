@@ -13,7 +13,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from skye.base.completion import CompletionRequest, CompletionResponse, TokenUsage
+from skye.base.completion import CompleteRequest, CompleteResponse, TokenUsage
 from skye.base.exceptions import ProviderError
 from skye.base.messages import UserMessage
 from skye.models.base import BaseModelProvider
@@ -35,7 +35,7 @@ class MockProvider(BaseModelProvider):
         return {"model": request.model, "messages": []}
 
     def _transform_response(self, response):
-        return CompletionResponse(
+        return CompleteResponse(
             id="test-id",
             model="test-model",
             provider="mock",
@@ -87,7 +87,7 @@ class TestRetryDecorator:
     def test_retry_decorator_success_on_first_try(self) -> None:
         """Test that decorator doesn't retry on success."""
         provider = MockProvider()
-        request = CompletionRequest(
+        request = CompleteRequest(
             messages=[UserMessage(content="test")], model="test-model"
         )
 
@@ -100,7 +100,7 @@ class TestRetryDecorator:
         """Test that decorator retries on ProviderError."""
         provider = MockProvider()
         provider.fail_count = 2  # Fail twice, succeed on third try
-        request = CompletionRequest(
+        request = CompleteRequest(
             messages=[UserMessage(content="test")], model="test-model"
         )
 
@@ -113,7 +113,7 @@ class TestRetryDecorator:
         """Test that decorator raises after max retries exceeded."""
         provider = MockProvider()
         provider.fail_count = 10  # Fail more times than max retries
-        request = CompletionRequest(
+        request = CompleteRequest(
             messages=[UserMessage(content="test")], model="test-model"
         )
 
@@ -127,7 +127,7 @@ class TestRetryDecorator:
         """Test that retry uses exponential backoff."""
         provider = MockProvider()
         provider.fail_count = 1  # Fail once, succeed on second try
-        request = CompletionRequest(
+        request = CompleteRequest(
             messages=[UserMessage(content="test")], model="test-model"
         )
 
@@ -155,7 +155,7 @@ class TestRetryDecorator:
                 return {}
 
             def _transform_response(self, response):
-                return CompletionResponse(
+                return CompleteResponse(
                     id="test",
                     model="test",
                     provider="mock",
@@ -199,7 +199,7 @@ class TestRetryDecorator:
                 return {"provider": "mock"}
 
         provider = CustomRetryProvider()
-        request = CompletionRequest(
+        request = CompleteRequest(
             messages=[UserMessage(content="test")], model="test-model"
         )
 
@@ -218,7 +218,7 @@ class TestRetryDecorator:
                 return {}
 
             def _transform_response(self, response):
-                return CompletionResponse(
+                return CompleteResponse(
                     id="test",
                     model="test",
                     provider="mock",
@@ -258,7 +258,7 @@ class TestRetryDecorator:
                 return {"provider": "mock"}
 
         provider = FailingProvider()
-        request = CompletionRequest(
+        request = CompleteRequest(
             messages=[UserMessage(content="test")], model="test-model"
         )
 
@@ -294,7 +294,7 @@ class TestRetryWithStreaming:
                 return {}
 
             def _transform_response(self, response):
-                return CompletionResponse(
+                return CompleteResponse(
                     id="test",
                     model="test",
                     provider="mock",
@@ -335,7 +335,7 @@ class TestRetryWithStreaming:
                 return {"provider": "mock"}
 
         provider = StreamingProvider()
-        request = CompletionRequest(
+        request = CompleteRequest(
             messages=[UserMessage(content="test")], model="test-model"
         )
 

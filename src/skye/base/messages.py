@@ -18,6 +18,7 @@ Example:
 import base64
 from collections.abc import Mapping
 from datetime import datetime, timezone
+from enum import Enum
 from typing import Any, Literal
 from uuid import uuid4
 
@@ -210,6 +211,24 @@ class SystemMessage(SkyeMessage):
     role: Literal["system"] = "system"
 
 
+class CapabilityStatus(str, Enum):
+    """How a capability call ended.
+
+    A ``str`` enum, so a status compares equal to its text (``CapabilityStatus.OK == "ok"``) and is saved and loaded as that text.
+
+    Values:
+        OK: the capability ran and returned (whatever the text of its result is).
+        ERROR: the call failed: unknown capability, bad arguments, or an exception of the capability.
+        DENIED: a policy or hook refused the call, so it did not run.
+        SKIPPED: the call was left out, for example after the failure limit of an agent.
+    """
+
+    OK = "ok"
+    ERROR = "error"
+    DENIED = "denied"
+    SKIPPED = "skipped"
+
+
 @validated
 class CapabilityMessage(SkyeMessage):
     """Message containing capability execution results.
@@ -220,6 +239,7 @@ class CapabilityMessage(SkyeMessage):
     Attributes:
         capability_id: Unique identifier for the capability call.
         capability_name: Name of the capability that was executed.
+        status: How the call ended (``CapabilityStatus``); ``ok`` unless said otherwise.
 
     Example:
         >>> msg = CapabilityMessage(
@@ -234,6 +254,12 @@ class CapabilityMessage(SkyeMessage):
     role: Literal["capability"] = "capability"
     capability_id: str
     capability_name: str
+    status: CapabilityStatus = CapabilityStatus.OK
+
+    @property
+    def is_error(self) -> bool:
+        """True when the call did not succeed: its status is anything but ``ok``."""
+        return self.status is not CapabilityStatus.OK
 
     def to_dict(self) -> dict[str, Any]:
         """Convert capability message to dictionary format.

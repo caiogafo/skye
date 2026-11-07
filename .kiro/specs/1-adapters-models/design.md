@@ -30,10 +30,13 @@ models/
   registry.py             ProviderRegistry + provider() factory; implements the registry Port
   lazy_import.py          LazyImporter: first-use import, MissingExtraError on absence
   llm/
-    openai_compatible.py  OpenAIProvider, AzureOpenAIProvider (one adapter family keyed by base URL + key)
-    anthropic.py          AnthropicProvider (Messages API)
+    openai_compatible.py  OpenAICompatibleProvider (the OpenAI wire format, keyed by base URL + key)
+    openai.py             OpenAIProvider (OpenAI's endpoint, organization header, fingerprint)
+    azure.py              AzureOpenAIProvider (endpoint, api version, deployment)
+    anthropic_compatible.py  AnthropicCompatibleProvider (Messages wire format, keyed by base URL + key)
+    anthropic.py          AnthropicProvider (Anthropic endpoint and label)
     bedrock.py            BedrockProvider (Converse + Converse stream, SigV4 via auth; boto3 not required)
-    google_provider.py    GoogleProvider (Google dialect)
+    google.py             GoogleProvider (Google dialect)
   embeddings/
     openai_embeddings.py  OpenAIEmbeddingProvider
     bedrock_embeddings.py BedrockEmbeddingProvider (Titan)
@@ -85,7 +88,7 @@ exception in `ProviderError` with provider name, original error and error type (
 
 ### Provider adapters (REST)
 
-`base.py` holds `BaseModelProvider`, a template-method base: `complete`/`stream` accept either a `CompletionRequest` or
+`base.py` holds `BaseModelProvider`, a template-method base: `complete`/`stream` accept either a `CompleteRequest` or
 boto3-style arguments, delegate to the retried internals, and record health. Each concrete adapter implements the
 provider-specific steps only — `_initialize_client`, `_transform_request`, `_transform_response`, `_transform_stream_chunk`,
 `_transform_messages`, `_transform_capabilities`, `_extract_capability_calls`, `format_capability_results`,
@@ -95,11 +98,11 @@ outside its adapter (Requirement 9.5, 9.10, 6.1). Where an external shape exists
 boundary (Requirement 9.5).
 
 Adapter families (design "Transport and providers"):
-- `llm/openai_compatible.py` — `OpenAIProvider` and `AzureOpenAIProvider` are one family keyed by base URL and key, covering
+- `llm/openai_compatible.py` — `OpenAICompatibleProvider` is the family keyed by base URL and key; `openai.py` and `azure.py` hold only what is specific to OpenAI and to Azure. Together they cover
   OpenAI, Azure OpenAI and the OpenAI-compatible ecosystem.
-- `llm/anthropic.py` — `AnthropicProvider` over the Messages API, with the system message carried separately.
+- `llm/anthropic_compatible.py` — `AnthropicCompatibleProvider` (the Messages wire format, keyed by base URL and key) and `llm/anthropic.py` — `AnthropicProvider`, only the Anthropic endpoint and label, over the Messages API, with the system message carried separately.
 - `llm/bedrock.py` — `BedrockProvider` over Converse and Converse stream, signed with SigV4 from `auth`; boto3 is not required.
-- `llm/google_provider.py` — `GoogleProvider`, the Google dialect (formerly "Vertex AI", renamed `google` per D19; Requirement 9.3).
+- `llm/google.py` — `GoogleProvider`, the Google dialect (formerly "Vertex AI", renamed `google` per D19; Requirement 9.3).
 
 Each adapter exposes `invoke` (the `Runnable` Port), which delegates to `acomplete`, so a model is a step in a flow or a team
 member (design "Composition").
@@ -164,7 +167,7 @@ router's health tracking and for observability exporters through the observer Po
 ## Data Models
 
 `models` defines no new wire schema; it consumes and produces the `base` contracts (design "Base contracts"): a request is a
-`CompletionRequest`, a response a `CompletionResponse` (content, role, metadata, token usage, model identifier, provider), a
+`CompleteRequest`, a response a `CompleteResponse` (content, role, metadata, token usage, model identifier, provider), a
 stream yields `StreamChunk`; messages are the `SkyeMessage` role variants; a capability call is a library `CapabilityCall`. The
 only `models`-local structure is `JsonObject` in `transport/rest.py`, a read-only attribute view over decoded provider JSON used
 inside the adapter boundary and never exposed through a Port. New structures are dataclasses, not pydantic (Requirement 21.2,
@@ -193,7 +196,7 @@ credentials or network are missing (Requirement 9.4, 23.1, D14). The comparison 
 
 ### Property 1: One Port shape whatever the provider
 
-For any provider adapter and any valid `CompletionRequest`, a completion returns a `CompletionResponse` carrying content, role,
+For any provider adapter and any valid `CompleteRequest`, a completion returns a `CompleteResponse` carrying content, role,
 token usage, model identifier and provider, and a streamed completion yields `StreamChunk` values, regardless of which adapter
 served it.
 

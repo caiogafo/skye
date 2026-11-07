@@ -56,7 +56,7 @@ import pytest
 import asyncio
 import time
 from skye.router import ModelRouter
-from skye.base.completion import CompletionRequest
+from skye.base.completion import CompleteRequest
 from skye.base.messages import UserMessage
 
 @pytest.mark.stress
@@ -74,7 +74,7 @@ async def test_concurrent_routing_100_requests():
     
     async def make_request(request_id: int):
         """Make a single request."""
-        request = CompletionRequest(
+        request = CompleteRequest(
             messages=[UserMessage(content=f"Request {request_id}")],
             model="gpt-3.5-turbo"
         )

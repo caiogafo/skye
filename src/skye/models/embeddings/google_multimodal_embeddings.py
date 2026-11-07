@@ -27,7 +27,7 @@ from skye.auth.google import resolve_google_auth
 from skye.base import http
 from skye.base.interfaces.authentication import AuthenticationInterface
 from skye.models.base import BaseEmbeddingProvider
-from skye.models.llm.google_provider import _model_url
+from skye.models.llm.google import _model_url
 from skye.models.transport import rest
 from skye.models.transport.multimodal import ImageHandler
 

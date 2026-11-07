@@ -1,245 +1,34 @@
-"""Google Provider Example (Boto3-style Skye API).
+"""Google (Gemini on Vertex AI) through ``skye.provider("google")``: completion and streaming.
 
-This version demonstrates:
-- Basic completion with Google (Gemini models)
-- Streaming responses
-- GCP project and location configuration
-- Simple client creation: skye.provider("google")
+Google needs a GCP project and a location. Set GCP_PROJECT_ID (and GCP_LOCATION if it is not ``us-central1``); without a project a scripted
+client answers and the example says so.
 """
 
 import os
-import skye
-from skye import UserMessage, SystemMessage
+import sys
+from pathlib import Path
+
+from skye import SystemMessage, UserMessage
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))  # the shared offline helper lives in examples/
+from _offline import provider_or_scripted  # noqa: E402
+
+MODEL = "gemini-1.5-pro"
 
 
-def basic_completion():
-    """Basic completion using Google."""
-    print("=" * 60)
-    print("Google - Basic Completion")
-    print("=" * 60)
-    
-    project_id = os.getenv("GCP_PROJECT_ID")
-    location = os.getenv("GCP_LOCATION", "us-central1")
-    
-    if not project_id:
-        print("⚠️  GCP_PROJECT_ID environment variable not set")
-        print("   Set it with: export GCP_PROJECT_ID='your-project-id'")
-        return
-    
-    try:
-        client = skye.provider(
-            "google",
-            project_id=project_id,
-            location=location
-        )
-    except ImportError as e:
-        print(f"⚠️  Error: {e}")
-        print("\nTo use Google, install with: pip install skyeai[google]")
-        return
-    
-    messages = [
-        SystemMessage(content="You are a helpful assistant."),
-        UserMessage(content="What is the capital of France?"),
-    ]
-    
-    response = client.complete(
-        messages=messages,
-        model="gemini-1.5-pro",
-        temperature=0.7,
-        max_tokens=100,
-    )
-    
-    print("\nResponse:")
-    print("  Text:", response.content)
-    print("  Model:", response.model)
-    print("  Tokens:", response.usage.total_tokens)
-    print("  Finish reason:", response.finish_reason)
+def main() -> None:
+    project = os.getenv("GCP_PROJECT_ID")
+    client = provider_or_scripted("google", bool(project), "set GCP_PROJECT_ID", project_id=project, location=os.getenv("GCP_LOCATION", "us-central1"))
 
+    messages = [SystemMessage(content="You are a helpful assistant."), UserMessage(content="What is the capital of France?")]
+    response = client.complete(messages=messages, model=MODEL, temperature=0.7, max_tokens=100)
+    print("answer:", response.content)
+    print(f"model={response.model} tokens={response.usage.total_tokens} finish={response.finish_reason}")
 
-def streaming_example():
-    """Streaming completion using Google."""
-    print("\n" + "=" * 60)
-    print("Google - Streaming")
-    print("=" * 60)
-    
-    project_id = os.getenv("GCP_PROJECT_ID")
-    location = os.getenv("GCP_LOCATION", "us-central1")
-    
-    if not project_id:
-        print("⚠️  GCP_PROJECT_ID environment variable not set")
-        return
-    
-    client = skye.provider(
-        "google",
-        project_id=project_id,
-        location=location
-    )
-    
-    messages = [UserMessage(content="Write a short story about a robot learning to paint.")]
-    
-    print("\nStreaming response:")
-    print("-" * 40)
-    
-    for chunk in client.stream(messages=messages, model="gemini-1.5-pro"):
+    print("stream: ", end="")
+    for chunk in client.stream(messages=[UserMessage(content="Write a two-line poem about Python")], model=MODEL):
         print(chunk.delta, end="", flush=True)
-    
-    print("\n" + "-" * 40)
-
-
-def multiple_models():
-    """Run the same prompt on different Gemini models."""
-    print("\n" + "=" * 60)
-    print("Google - Multiple Models")
-    print("=" * 60)
-    
-    project_id = os.getenv("GCP_PROJECT_ID")
-    location = os.getenv("GCP_LOCATION", "us-central1")
-    
-    if not project_id:
-        print("⚠️  GCP_PROJECT_ID environment variable not set")
-        return
-    
-    client = skye.provider(
-        "google",
-        project_id=project_id,
-        location=location
-    )
-    
-    models = [
-        "gemini-1.5-pro",
-        "gemini-1.5-flash",
-        "gemini-1.0-pro",
-    ]
-    
-    prompt = "What is artificial intelligence?"
-    messages = [UserMessage(content=prompt)]
-    
-    print(f"\nPrompt: {prompt}")
-    print("-" * 40)
-    
-    for model in models:
-        print(f"\nModel: {model}")
-        response = client.complete(messages=messages, model=model, max_tokens=80)
-        print("  Response:", response.content[:80], "...")
-        print("  Tokens:", response.usage.total_tokens)
-
-
-def cloud_run_example():
-    """Example for Google Cloud Run deployment."""
-    print("\n" + "=" * 60)
-    print("Google - Cloud Run Deployment")
-    print("=" * 60)
-    
-    print("""
-Example Cloud Run service using Skye with Google:
-
-```python
-import skye
-from skye import UserMessage
-from flask import Flask, request, jsonify
-
-app = Flask(__name__)
-
-# Initialize client (uses Application Default Credentials)
-client = skye.provider(
-    "google",
-    project_id="your-project-id",
-    location="us-central1"
-)
-
-@app.route("/complete", methods=["POST"])
-def complete():
-    data = request.json
-    messages = [UserMessage(content=data["prompt"])]
-    
-    response = client.complete(
-        messages=messages,
-        model="gemini-1.5-pro"
-    )
-    
-    return jsonify({
-        "text": response.content,
-        "tokens": response.usage.total_tokens
-    })
-
-if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=8080)
-```
-
-Deployment:
-1. Create Dockerfile with skyeai[google]
-2. Deploy to Cloud Run
-3. Set service account with Google permissions
-4. Cloud Run provides authentication automatically
-""")
-
-
-def configuration_example():
-    """Example showing Google configuration options."""
-    print("\n" + "=" * 60)
-    print("Google - Configuration")
-    print("=" * 60)
-    
-    print("""
-Google configuration options:
-
-```python
-import skye
-
-# Basic configuration
-client = skye.provider(
-    "google",
-    project_id="your-project-id",
-    location="us-central1"  # or "europe-west1", "asia-northeast1", etc.
-)
-
-# With custom credentials
-client = skye.provider(
-    "google",
-    project_id="your-project-id",
-    location="us-central1",
-    credentials_path="/path/to/service-account.json"
-)
-```
-
-Environment variables:
-```bash
-export GCP_PROJECT_ID="your-project-id"
-export GCP_LOCATION="us-central1"
-export GOOGLE_APPLICATION_CREDENTIALS="/path/to/service-account.json"
-```
-
-Authentication methods:
-1. Application Default Credentials (recommended for GCP)
-2. Service account JSON file
-3. gcloud CLI authentication
-""")
-
-
-def main():
-    """Run all examples."""
-    print("\n" + "🌐 " * 20)
-    print("SKYE - Google Provider Examples")
-    print("🌐 " * 20)
-    
-    try:
-        basic_completion()
-        streaming_example()
-        multiple_models()
-        cloud_run_example()
-        configuration_example()
-        
-        print("\n" + "=" * 60)
-        print("✅ Examples completed!")
-        print("=" * 60)
-        
-    except Exception as e:
-        print(f"\n❌ Error: {e}")
-        print("\nMake sure you have:")
-        print("  1. Installed skyeai[google]: pip install skyeai[google]")
-        print("  2. Set GCP_PROJECT_ID environment variable")
-        print("  3. Configured GCP authentication (gcloud auth or service account)")
-        print("  4. Enabled Google API in your GCP project")
+    print()
 
 
 if __name__ == "__main__":

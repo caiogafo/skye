@@ -1,31 +1,27 @@
 """Estimating request cost with CostCalculator (Live).
 
-This example runs real library code end to end. It creates an OpenAI client with
-``skye.provider`` and makes one completion, then turns the response's ``TokenUsage``
-into a dollar estimate with ``CostCalculator``.
+It makes one completion, then turns the response's ``TokenUsage`` into a dollar
+estimate with ``CostCalculator``.
 
 ``CostCalculator`` ships pricing for the common models (per one million tokens),
 supports custom pricing for fine-tuned or private models, and returns ``0.0`` for a
 model it does not know.
 
-Set OPENAI_API_KEY to run the live completion; the script prints a skip note and
-returns when it is unset.
+With OPENAI_API_KEY set the completion is real; without a key a scripted client answers (its usage is a fixed number).
 """
 
-import os
-
-import skye
 from skye import UserMessage
 from skye.models import CostCalculator
 
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))  # the shared offline helper lives in examples/
+from _offline import get_client  # noqa: E402
+
 
 def main() -> None:
-    api_key = os.getenv("OPENAI_API_KEY")
-    if not api_key:
-        print("OPENAI_API_KEY not set, skipping")
-        return
-
-    client = skye.provider("openai", api_key=api_key)
+    client = get_client("openai")
 
     model = "gpt-4"
     response = client.complete(

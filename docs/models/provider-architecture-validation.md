@@ -144,7 +144,7 @@ class NewProvider(BaseModelProvider):
 ```
 User Code
   ↓
-CompletionRequest (Skye format)
+CompleteRequest (Skye format)
   ↓
 Router (provider-agnostic)
   ↓
@@ -170,7 +170,7 @@ Provider Client
 _transform_response()
   └─ _extract_capability_calls()
   ↓
-CompletionResponse (Skye format)
+CompleteResponse (Skye format)
   ↓
 User Code
 ```

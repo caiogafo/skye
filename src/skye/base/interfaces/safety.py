@@ -10,10 +10,14 @@ Example:
     ...     def validate_input(self, content: str) -> SafetyResult:
     ...         # Implementation here
     ...         pass
+
+Raises: never raises for unsafe content: unsafety is the result; raises only on a non-string input.
+Missing: empty content is safe; ``get_policies`` returns an empty list when none are configured.
+Concurrency: filters hold no per-call state; safe from many threads and tasks.
 """
 
-from abc import ABC, abstractmethod
-from typing import Any
+from abc import abstractmethod
+from typing import Any, Protocol, runtime_checkable
 
 from skye.base.validated import Validated, field, validated
 
@@ -45,7 +49,8 @@ class SafetyResult(Validated):
     metadata: dict[str, Any] = field(default_factory=dict)
 
 
-class SafetyFilterInterface(ABC):
+@runtime_checkable
+class SafetyFilterInterface(Protocol):
     """Abstract interface for safety filtering.
 
     This interface defines the contract for content moderation and safety

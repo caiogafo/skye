@@ -1,177 +1,19 @@
-# Skye Provider Examples
+# providers
 
-This directory contains examples demonstrating the simplified boto3-style API for Skye providers.
+What you learn: providers. Read in this order:
 
-## Quick Start
+1. `anthropic_example.py`: Anthropic through ``skye.provider("anthropic")``: completion and streaming
+2. `azure_example.py`: Azure OpenAI through ``skye.provider("azure")``: completion and streaming
+3. `bedrock_example.py`: AWS Bedrock through ``skye.provider("bedrock")``: completion and streaming
+4. `bring_your_own_adapter.py`: Bring your own adapter: any object with ``async def invoke(self, input)`` is a ``Runnable``
+5. `embeddings_example.py`: Embeddings through ``skye.provider(..., provider_type="embedding")``
+6. `google_example.py`: Google (Gemini on Vertex AI) through ``skye.provider("google")``: completion and streaming
+7. `multimodal_example.py`: Images in a message: from a URL, from a data URL and from a file
+8. `openai_example.py`: OpenAI through ``skye.provider("openai")``: completion and streaming
+9. `structured_output_example.py`: Structured output with a dataclass: field constraints, lists and the request-object form
 
-```python
-import skye
-from skye import UserMessage, SystemMessage
+Run: `python examples/providers/anthropic_example.py`
 
-# Create a client
-client = skye.provider("openai", api_key="sk-...")
+What you see: printed results; with no key a scripted client answers and the example prints which mode ran.
 
-# Simple completion
-response = client.complete(
-    messages=[UserMessage(content="What is AI?")],
-    model="gpt-4"
-)
-
-print(response.content)
-print(response.usage.total_tokens)
-```
-
-## Supported Providers
-
-### OpenAI
-
-```python
-client = skye.provider("openai", api_key="sk-...")
-response = client.complete(
-    messages=[UserMessage(content="Hello")],
-    model="gpt-4",
-    temperature=0.7
-)
-```
-
-**Installation:** `pip install skyeai[openai]`
-
-### AWS Bedrock
-
-```python
-client = skye.provider("bedrock", region="us-east-1")
-response = client.complete(
-    messages=[UserMessage(content="Hello")],
-    model="anthropic.claude-3-sonnet-20240229-v1:0"
-)
-```
-
-**Installation:** `pip install skyeai[bedrock]`
-
-### Anthropic
-
-```python
-client = skye.provider("anthropic", api_key="sk-ant-...")
-response = client.complete(
-    messages=[UserMessage(content="Hello")],
-    model="claude-3-sonnet-20240229"
-)
-```
-
-**Installation:** `pip install skyeai[anthropic]`
-
-### Azure OpenAI
-
-```python
-client = skye.provider(
-    "azure",
-    api_key="...",
-    azure_endpoint="https://your-resource.openai.azure.com",
-    api_version="2024-02-15-preview"
-)
-response = client.complete(
-    messages=[UserMessage(content="Hello")],
-    model="gpt-4"  # Your deployment name
-)
-```
-
-**Installation:** `pip install skyeai[azure]`
-
-### Google
-
-```python
-client = skye.provider(
-    "google",
-    project_id="your-project-id",
-    location="us-central1"
-)
-response = client.complete(
-    messages=[UserMessage(content="Hello")],
-    model="gemini-1.5-pro"
-)
-```
-
-**Installation:** `pip install skyeai[google]`
-
-## API Reference
-
-### Creating a Client
-
-```python
-client = skye.provider(name, **config)
-```
-
-- `name`: Provider name ("openai", "bedrock", "anthropic", "azure", "google")
-- `**config`: Provider-specific configuration
-
-### Completion
-
-```python
-response = client.complete(
-    messages=[...],
-    model="...",
-    temperature=0.7,
-    max_tokens=100
-)
-```
-
-**Parameters:**
-- `messages`: List of `SkyeMessage` objects or a string
-- `model`: Model identifier
-- `temperature`: Sampling temperature (0.0-2.0)
-- `max_tokens`: Maximum tokens to generate
-
-**Returns:** `CompletionResponse` with:
-- `response.content`: Generated text
-- `response.model`: Model used
-- `response.usage.total_tokens`: Total tokens used
-- `response.finish_reason`: Finish reason
-
-### Streaming
-
-```python
-for chunk in client.stream(messages=[...], model="..."):
-    print(chunk.delta, end="", flush=True)
-```
-
-### Async Completion
-
-```python
-response = await client.acomplete(
-    messages=[...],
-    model="..."
-)
-```
-
-## Message Types
-
-```python
-from skye import UserMessage, SystemMessage, AssistantMessage
-
-messages = [
-    SystemMessage(content="You are a helpful assistant."),
-    UserMessage(content="What is AI?"),
-    AssistantMessage(content="AI stands for..."),
-    UserMessage(content="Tell me more")
-]
-```
-
-## Examples
-
-- `bedrock_example.py` - AWS Bedrock with Claude and Titan models
-- `openai_example.py` - OpenAI GPT models
-- `anthropic_example.py` - Anthropic Claude models
-- `azure_example.py` - Azure OpenAI deployments
-- `google_example.py` - Google Gemini models
-
-## Running Examples
-
-```bash
-# Set your API keys
-export OPENAI_API_KEY="sk-..."
-export ANTHROPIC_API_KEY="sk-ant-..."
-export AWS_PROFILE="your-profile"
-
-# Run an example
-python examples/providers/openai_example.py
-```
+What you need: `pip install skyeai`; a provider key only to call a real service.

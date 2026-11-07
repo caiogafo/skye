@@ -17,20 +17,20 @@ Example:
     >>> from skye import UserMessage
     >>>
     >>> client = skye.provider("bedrock", region="us-east-1")
-    >>> response = client.complete(
+    >>> response = client.complete(  # doctest: +SKIP
     ...     messages=[UserMessage(content="Hello")],
     ...     model="anthropic.claude-3-sonnet-20240229-v1:0"
     ... )
-    >>> print(response.content)
+    >>> print(response.content)  # doctest: +SKIP
 """
 
 __version__ = "0.1.0"
 
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Literal, overload
 
 
 if TYPE_CHECKING:
-    from skye.base.completion import CompletionRequest, CompletionResponse, StreamChunk, TokenUsage
+    from skye.base.completion import CompleteRequest, CompleteResponse, StreamChunk, TokenUsage
     from skye.base.exceptions import (
         ConfigurationError,
         MissingExtraError,
@@ -48,8 +48,8 @@ _LAZY = {
     "SystemMessage": "skye.base.messages",
     "AssistantMessage": "skye.base.messages",
     "CapabilityMessage": "skye.base.messages",
-    "CompletionRequest": "skye.base.completion",
-    "CompletionResponse": "skye.base.completion",
+    "CompleteRequest": "skye.base.completion",
+    "CompleteResponse": "skye.base.completion",
     "StreamChunk": "skye.base.completion",
     "TokenUsage": "skye.base.completion",
     "SkyeError": "skye.base.exceptions",
@@ -72,6 +72,14 @@ def __getattr__(name: str) -> Any:
     value = getattr(importlib.import_module(module), name)
     globals()[name] = value
     return value
+
+
+@overload
+def provider(name: str, *, provider_type: Literal["embedding"], **config: Any) -> "VectorEncoderInterface": ...
+
+
+@overload
+def provider(name: str, *, provider_type: Literal["model"] = ..., **config: Any) -> "ModelInterface": ...
 
 
 def provider(name: str, **config: Any) -> "ModelInterface | VectorEncoderInterface":

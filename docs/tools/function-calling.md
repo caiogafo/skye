@@ -40,11 +40,11 @@ response = client.complete(
 # Check if model requested capability calls
 if response.has_capability_calls():
     # Option 1: Execute automatically (no registry needed!)
-    capability_messages = await response.execute_capability_calls()
+    capability_messages = await response.aexecute_capability_calls()
     
     # Option 2: Execute individually with control
     capability_messages = []
-    for capability in response.get_capability_calls():
+    for capability in response.capability_calls:
         # Execute with LLM-provided arguments
         msg = capability.execute()
         
@@ -57,7 +57,7 @@ if response.has_capability_calls():
     overrides = {
         "call_123": {"units": "celsius"}  # Override specific call arguments
     }
-    capability_messages = await response.execute_capability_calls(
+    capability_messages = await response.aexecute_capability_calls(
         argument_overrides=overrides
     )
     
@@ -131,5 +131,5 @@ response = client.complete(
 **Important**: In all cases, you can execute capabilities without the registry:
 ```python
 if response.has_capability_calls():
-    messages = await response.execute_capability_calls()  # No registry needed!
+    messages = await response.aexecute_capability_calls()  # No registry needed!
 ```

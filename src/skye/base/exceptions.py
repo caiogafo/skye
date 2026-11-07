@@ -106,7 +106,18 @@ class ValidationError(SkyeError, ValueError):
         super().__init__(message, details)
 
 
-class CapabilityExecutionError(SkyeError):
+class CapabilityError(SkyeError):
+    """Base exception for capability-related errors.
+
+    All capability-specific exceptions inherit from this class.
+
+    Args:
+        message: Human-readable error message
+        details: Optional dictionary containing additional error context
+    """
+
+
+class CapabilityExecutionError(CapabilityError):
     """Error during capability execution.
 
     Raised when a capability fails to execute properly.
@@ -119,7 +130,7 @@ class CapabilityExecutionError(SkyeError):
 
     def __init__(self, message: str, capability_name: str, **kwargs: Any) -> None:
         """Initialize CapabilityExecutionError with capability context."""
-        details = {"capability": capability_name, **kwargs}
+        details = {"capability_name": capability_name, **kwargs}
         super().__init__(message, details)
 
 

@@ -4,7 +4,7 @@ import json
 
 import pytest
 
-from skye.base.completion import CompletionResponse, TokenUsage
+from skye.base.completion import CompleteResponse, TokenUsage
 from skye.tools.capability_call_handler import CapabilityCallHandler
 from skye.tools.capability_models import CapabilityCall, CapabilityResult
 from skye.tools.exceptions import CapabilityCallParsingError
@@ -48,7 +48,7 @@ class MockProvider:
     def __init__(self, provider_name: str):
         self.provider_name = provider_name
     
-    def parse_capability_calls(self, response: CompletionResponse) -> list[CapabilityCall]:
+    def parse_capability_calls(self, response: CompleteResponse) -> list[CapabilityCall]:
         """Parse capability calls based on provider type."""
         if self.provider_name.lower() in ("openai", "azure"):
             return self._parse_openai_capability_calls(response)
@@ -74,7 +74,7 @@ class MockProvider:
         else:
             return []
     
-    def _parse_openai_capability_calls(self, response: CompletionResponse) -> list[CapabilityCall]:
+    def _parse_openai_capability_calls(self, response: CompleteResponse) -> list[CapabilityCall]:
         """Parse OpenAI/Azure capability calls."""
         tool_calls_data = response.metadata.get("tool_calls", [])
         if not tool_calls_data:
@@ -100,7 +100,7 @@ class MockProvider:
             )
         return capability_calls
     
-    def _parse_anthropic_capability_calls(self, response: CompletionResponse) -> list[CapabilityCall]:
+    def _parse_anthropic_capability_calls(self, response: CompleteResponse) -> list[CapabilityCall]:
         """Parse Anthropic capability calls."""
         content_blocks = response.metadata.get("content", [])
         capability_calls = []
@@ -116,7 +116,7 @@ class MockProvider:
                 )
         return capability_calls
     
-    def _parse_bedrock_capability_calls(self, response: CompletionResponse) -> list[CapabilityCall]:
+    def _parse_bedrock_capability_calls(self, response: CompleteResponse) -> list[CapabilityCall]:
         """Parse Bedrock capability calls."""
         output = response.metadata.get("output", {})
         message = output.get("message", {})
@@ -135,7 +135,7 @@ class MockProvider:
                 )
         return capability_calls
     
-    def _parse_google_capability_calls(self, response: CompletionResponse) -> list[CapabilityCall]:
+    def _parse_google_capability_calls(self, response: CompleteResponse) -> list[CapabilityCall]:
         """Parse Google capability calls."""
         candidates = response.metadata.get("candidates", [])
         if not candidates:
@@ -322,7 +322,7 @@ class TestParseOpenAICapabilityCalls:
 
     def test_parse_openai_tool_calls_success(self, handler, openai_provider):
         """Test parsing valid OpenAI tool calls."""
-        response = CompletionResponse(
+        response = CompleteResponse(
             model="gpt-4",
             provider="openai",
             content="",
@@ -354,7 +354,7 @@ class TestParseOpenAICapabilityCalls:
 
     def test_parse_openai_multiple_tool_calls(self, handler, openai_provider):
         """Test parsing multiple OpenAI tool calls."""
-        response = CompletionResponse(
+        response = CompleteResponse(
             model="gpt-4",
             provider="openai",
             content="",
@@ -390,7 +390,7 @@ class TestParseOpenAICapabilityCalls:
 
     def test_parse_openai_empty_tool_calls(self, handler, openai_provider):
         """Test parsing response with no tool calls."""
-        response = CompletionResponse(
+        response = CompleteResponse(
             model="gpt-4",
             provider="openai",
             content="Hello",
@@ -405,7 +405,7 @@ class TestParseOpenAICapabilityCalls:
 
     def test_parse_openai_invalid_json_arguments(self, handler, openai_provider):
         """Test parsing OpenAI tool call with invalid JSON arguments."""
-        response = CompletionResponse(
+        response = CompleteResponse(
             model="gpt-4",
             provider="openai",
             content="",
@@ -432,7 +432,7 @@ class TestParseOpenAICapabilityCalls:
 
     def test_parse_openai_missing_id(self, handler, openai_provider):
         """Test parsing OpenAI tool call with missing id."""
-        response = CompletionResponse(
+        response = CompleteResponse(
             model="gpt-4",
             provider="openai",
             content="",
@@ -460,7 +460,7 @@ class TestParseAnthropicCapabilityCalls:
 
     def test_parse_anthropic_tool_calls_success(self, handler, anthropic_provider):
         """Test parsing valid Anthropic tool calls."""
-        response = CompletionResponse(
+        response = CompleteResponse(
             model="claude-3-sonnet",
             provider="anthropic",
             content="",
@@ -490,7 +490,7 @@ class TestParseAnthropicCapabilityCalls:
 
     def test_parse_anthropic_mixed_content(self, handler, anthropic_provider):
         """Test parsing Anthropic response with mixed content blocks."""
-        response = CompletionResponse(
+        response = CompleteResponse(
             model="claude-3-sonnet",
             provider="anthropic",
             content="",
@@ -516,7 +516,7 @@ class TestParseAnthropicCapabilityCalls:
 
     def test_parse_anthropic_empty_content(self, handler, anthropic_provider):
         """Test parsing Anthropic response with no content."""
-        response = CompletionResponse(
+        response = CompleteResponse(
             model="claude-3-sonnet",
             provider="anthropic",
             content="Hello",
@@ -535,7 +535,7 @@ class TestParseBedrockCapabilityCalls:
 
     def test_parse_bedrock_tool_calls_success(self, handler, bedrock_provider):
         """Test parsing valid Bedrock tool calls."""
-        response = CompletionResponse(
+        response = CompleteResponse(
             model="anthropic.claude-3-sonnet",
             provider="bedrock",
             content="",
@@ -573,7 +573,7 @@ class TestParseBedrockCapabilityCalls:
 
     def test_parse_bedrock_empty_output(self, handler, bedrock_provider):
         """Test parsing Bedrock response with no output."""
-        response = CompletionResponse(
+        response = CompleteResponse(
             model="anthropic.claude-3-sonnet",
             provider="bedrock",
             content="Hello",
@@ -592,7 +592,7 @@ class TestParseGoogleCapabilityCalls:
 
     def test_parse_google_tool_calls_success(self, handler, google_provider):
         """Test parsing valid Google tool calls."""
-        response = CompletionResponse(
+        response = CompleteResponse(
             model="gemini-pro",
             provider="google",
             content="",
@@ -631,7 +631,7 @@ class TestParseGoogleCapabilityCalls:
 
     def test_parse_google_multiple_function_calls(self, handler, google_provider):
         """Test parsing multiple Google function calls."""
-        response = CompletionResponse(
+        response = CompleteResponse(
             model="gemini-pro",
             provider="google",
             content="",
@@ -669,7 +669,7 @@ class TestParseGoogleCapabilityCalls:
 
     def test_parse_google_empty_candidates(self, handler, google_provider):
         """Test parsing Google response with no candidates."""
-        response = CompletionResponse(
+        response = CompleteResponse(
             model="gemini-pro",
             provider="google",
             content="Hello",
@@ -688,7 +688,7 @@ class TestParseAzureCapabilityCalls:
 
     def test_parse_azure_tool_calls_success(self, handler, azure_provider):
         """Test parsing valid Azure tool calls."""
-        response = CompletionResponse(
+        response = CompleteResponse(
             model="gpt-4",
             provider="azure",
             content="",
@@ -720,7 +720,7 @@ class TestParseUnsupportedProvider:
 
     def test_parse_unsupported_provider(self, handler, unsupported_provider):
         """Test parsing with unsupported provider."""
-        response = CompletionResponse(
+        response = CompleteResponse(
             model="test-model",
             provider="unknown",
             content="Hello",

@@ -20,15 +20,17 @@
 
 [core]
 # Install with no extras.
-max_distributions = 12              # now 10
-max_installed_mb = 11               # now 9.0
-allowed_dependencies = ["pydantic", "tenacity"]
+# Decision D49: the core has no third-party dependency. The only distribution is skyeai itself; the limits below are set for that
+# target and are to be re-measured (`now` unknown) once the pydantic and tenacity imports are migrated. Until then the budget tests fail on purpose.
+max_distributions = 2               # target 1 (skyeai); was 12, 10 with pydantic and tenacity
+max_installed_mb = 3                # was 11, 9.0 with pydantic-core (compiled); the package alone is under 1 MB of source
+allowed_dependencies = []
 # Modules that fail to import on a core-only install. Each entry must be fixed
 # (move the import behind LazyImporter, or declare the dependency) and removed.
 # The test fails if an entry starts working, so the list cannot go stale.
 # Compiled (non pure-Python) distributions in the core install. Target: none.
 # The test fails if the set changes, in either direction.
-known_compiled = ["pydantic-core"]
+known_compiled = []
 known_import_failures = []
 
 # Third-party libraries imported at module level in src/skye, with the number of
@@ -47,6 +49,7 @@ max_cold_start_ms = 300             # best of 5, now about 95 on a laptop
 target_cold_start_ms = 150          # where the path should stay on a laptop
 runs = 5
 
+# Migration debt under D49: these imports remain in the code and must reach zero, then the entries are deleted (target: empty).
 [imports.max_files]
 pydantic = 5
 tenacity = 1

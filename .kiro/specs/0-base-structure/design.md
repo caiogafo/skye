@@ -20,7 +20,7 @@ src/skye/
 ├── base/                       # Layer 0 — standard library only, no I/O (Req 2, 3)
 │   ├── __init__.py
 │   ├── messages.py             # core message models
-│   ├── completion.py           # CompletionRequest / CompletionResponse
+│   ├── completion.py           # CompleteRequest / CompleteResponse
 │   ├── capability_schema.py    # pure capability schema/contract (lets completion drop its tools import)
 │   ├── exceptions.py           # SkyeError hierarchy, incl. MissingExtraError
 │   ├── config.py               # configuration loading
@@ -68,7 +68,7 @@ src/skye/
 │   │   └── multimodal.py       # multimodal content handling
 │   ├── llm/                    # large language model adapters (stdlib REST dialects)
 │   │   ├── __init__.py
-│   │   ├── openai_compatible.py # OpenAI + Azure + OpenAI-compatible ecosystem (parametrized by base_url/api_key)
+│   │   ├── openai_compatible.py # OpenAI wire format (parametrized by base_url/api_key); openai.py and azure.py hold the vendor specifics
 │   │   ├── anthropic.py        # Anthropic Messages API (/v1/messages)
 │   │   └── bedrock.py          # AWS Bedrock via shared SigV4 over urllib
 │   ├── embeddings/             # embedding model adapters
@@ -174,7 +174,7 @@ The structure spec defines **where** data models live and the boundary rules the
 | Model group | Location | Description | Boundary rule |
 |-------------|----------|-------------|---------------|
 | Messages | `base/messages.py` | `SkyeMessage` and role variants (user/assistant/system/capability) | stdlib-only; no import of layers >0 (Req 3) |
-| Completion | `base/completion.py` | `CompletionRequest` / `CompletionResponse` | references the capability **schema** in base, not the `tools` Component (removes `completion`→`capabilities`, Req 2) |
+| Completion | `base/completion.py` | `CompleteRequest` / `CompleteResponse` | references the capability **schema** in base, not the `tools` Component (removes `completion`→`capabilities`, Req 2) |
 | Capability schema | `base/capability_schema.py` | pure capability contract (name, description, parameter schema) | pure contract in base; runtime handlers/registry stay in `tools` |
 | Error hierarchy | `base/exceptions.py` | `SkyeError` and subclasses incl. `MissingExtraError` | stdlib-only (Req 3, 6) |
 | Config | `base/config.py` | configuration loading and `${VAR}` substitution | stdlib-only (Req 3, 2) |
@@ -226,10 +226,10 @@ Every current file maps to a target location, or is marked split/merge/delete wi
 | `providers/health.py` | **merge** → `skye/router/health_tracker.py` | Health is consumed by routing; recommend merging into the router health tracker rather than keeping it in models. |
 | `providers/registry.py` | merge → `skye/models/registry.py` (impl) behind `base/interfaces/registry.py` (port) | Unify the two registries (Overlap 10.1). |
 | `providers/lazy_import.py` | `skye/base/` thin `missing_extra` helper over stdlib `importlib` | Reduced from a bespoke importer to a thin `MissingExtraError` wrapper over stdlib `importlib` (or removed in favor of stdlib + the helper); stdlib keeps base compliant (Req 2, 6; see Lazy imports). |
-| `providers/llm/openai_provider.py` + `providers/llm/azure_provider.py` | **collapse** → `skye/models/llm/openai_compatible.py` | One parametrized stdlib-REST adapter; Azure is the same `/v1/chat/completions` dialect with a different `base_url` and auth header (Dependency policy). |
+| `providers/llm/openai_provider.py` + `providers/llm/azure_provider.py` | **collapse** → `skye/models/llm/openai_compatible.py` (+ `openai.py`, `azure.py`) | One parametrized stdlib-REST adapter; Azure is the same `/v1/chat/completions` dialect with a different `base_url` and auth header (Dependency policy). |
 | `providers/llm/anthropic_provider.py` | `skye/models/llm/anthropic.py` | Anthropic Messages API (`/v1/messages`) over stdlib REST; no SDK (Dependency policy). |
 | `providers/llm/bedrock_provider.py` | `skye/models/llm/bedrock.py` | AWS Bedrock via shared stdlib SigV4 signer over `urllib`; no boto3 required (Dependency policy). |
-| `providers/llm/vertex_provider.py` | `skye/models/llm/google_provider.py` (own dialect, flagged) | The provider is renamed `google` (Assumption A6); it may need its own dialect rather than the OpenAI-compatible adapter. |
+| `providers/llm/vertex_provider.py` | `skye/models/llm/google.py` (own dialect, flagged) | The provider is renamed `google` (Assumption A6); it may need its own dialect rather than the OpenAI-compatible adapter. |
 | `providers/embeddings/*` | `skye/models/embeddings/*` | Embedding adapters over the same stdlib transport; Cohere via the OpenAI-compatible path where applicable; Google embeddings may need their own dialect (Requirement 4; Dependency policy). |
 | `capabilities/__init__.py` | `skye/tools/__init__.py` | Rename capabilities → tools (naming + MCP term, Req 1). |
 | `capabilities/registry.py` | `skye/tools/registry.py` | Tools registry. |
@@ -642,7 +642,7 @@ class BaseModelProvider(ABC):
     """Base class for all model providers with transformation methods."""
     
     @abstractmethod
-    def _transform_request(self, request: CompletionRequest) -> dict[str, Any]:
+    def _transform_request(self, request: CompleteRequest) -> dict[str, Any]:
         """Transform Skye request to provider-specific format.
         
         This method handles ALL provider-specific transformations:
@@ -654,7 +654,7 @@ class BaseModelProvider(ABC):
         pass
     
     @abstractmethod
-    def _transform_response(self, response: Any) -> CompletionResponse:
+    def _transform_response(self, response: Any) -> CompleteResponse:
         """Transform provider response to Skye format.
         
         This method handles ALL provider-specific transformations:
@@ -1127,13 +1127,13 @@ pip install skyeai[all]               # Everything
 ```python
 ## Install: pip install skyeai[bedrock]
 
-from skye.completion import CompletionRequest
+from skye.completion import CompleteRequest
 from skye.messages import UserMessage
 from skye.providers.bedrock import BedrockModel
 
 model = BedrockModel(model_id="anthropic.claude-3-sonnet")
 response = model.complete(
-    CompletionRequest(
+    CompleteRequest(
         messages=[UserMessage(content="Hello")],
         model="claude-3-sonnet"
     )
@@ -1155,7 +1155,6 @@ response = model.complete(
 │  │  - MemoryInterface                                │  │
 │  │  - SafetyFilterInterface                          │  │
 │  │  - ObserverInterface                              │  │
-│  │  - StorageAdapterInterface                        │  │
 │  │  - PluginInterface                                │  │
 │  │  - EventHandlerInterface                          │  │
 │  │  - VectorEncoderInterface                         │  │
@@ -1167,8 +1166,8 @@ response = model.complete(
 │  │  - SkyeMessage, UserMessage, AssistantMessage   │  │
 │  │  - SystemMessage, CapabilityMessage               │  │
 │  │  - ContentChunk                                   │  │
-│  │  - CompletionRequest                              │  │
-│  │  - CompletionResponse                             │  │
+│  │  - CompleteRequest                              │  │
+│  │  - CompleteResponse                             │  │
 │  │  - StreamChunk                                    │  │
 │  │  - TokenUsage                                     │  │
 │  │  - ModelConfig, RateLimitConfig, RetryConfig    │  │
@@ -1328,28 +1327,28 @@ The core abstraction for LLM provider interactions.
 ```python
 from abc import ABC, abstractmethod
 from typing import Iterator, Optional
-from skye.models import CompletionRequest, CompletionResponse, StreamChunk
+from skye.models import CompleteRequest, CompleteResponse, StreamChunk
 
 class ModelInterface(ABC):
     """Abstract interface for LLM providers."""
     
     @abstractmethod
-    def complete(self, request: CompletionRequest) -> CompletionResponse:
+    def complete(self, request: CompleteRequest) -> CompleteResponse:
         """Execute a synchronous completion request."""
         pass
     
     @abstractmethod
-    def stream(self, request: CompletionRequest) -> Iterator[StreamChunk]:
+    def stream(self, request: CompleteRequest) -> Iterator[StreamChunk]:
         """Execute a streaming completion request."""
         pass
     
     @abstractmethod
-    async def acomplete(self, request: CompletionRequest) -> CompletionResponse:
+    async def acomplete(self, request: CompleteRequest) -> CompleteResponse:
         """Execute an asynchronous completion request."""
         pass
     
     @abstractmethod
-    async def astream(self, request: CompletionRequest) -> Iterator[StreamChunk]:
+    async def astream(self, request: CompleteRequest) -> Iterator[StreamChunk]:
         """Execute an asynchronous streaming completion request."""
         pass
     
@@ -1543,7 +1542,7 @@ class ObserverInterface(ABC):
         pass
 ```
 
-#### 7. StorageAdapterInterface
+#### 7. StorageAdapterInterface (removed in D41: nothing implemented or used it)
 
 Abstraction for data persistence backends.
 
@@ -1618,7 +1617,7 @@ Abstraction for event handling during execution.
 ```python
 from abc import ABC, abstractmethod
 from typing import Dict, Any, List, Optional
-from skye.models import SkyeMessage, CompletionResponse
+from skye.models import SkyeMessage, CompleteResponse
 
 class EventHandlerInterface(ABC):
     """Abstract interface for execution event handlers."""
@@ -1629,7 +1628,7 @@ class EventHandlerInterface(ABC):
         pass
     
     @abstractmethod
-    def on_model_invoke_end(self, response: CompletionResponse, **kwargs) -> None:
+    def on_model_invoke_end(self, response: CompleteResponse, **kwargs) -> None:
         """Called when model invocation completes."""
         pass
     
@@ -1751,7 +1750,7 @@ Abstraction for intelligent model routing and load balancing.
 from abc import ABC, abstractmethod
 from typing import List, Optional, Dict, Any
 from enum import Enum
-from skye.models import CompletionRequest, CompletionResponse, ModelConfig
+from skye.models import CompleteRequest, CompleteResponse, ModelConfig
 
 class RoutingStrategy(Enum):
     """Available routing strategies."""
@@ -1771,17 +1770,17 @@ class ModelRouterInterface(ABC):
         pass
     
     @abstractmethod
-    def select_model(self, request: CompletionRequest) -> ModelConfig:
+    def select_model(self, request: CompleteRequest) -> ModelConfig:
         """Select the best model configuration based on routing strategy."""
         pass
     
     @abstractmethod
-    def route_request(self, request: CompletionRequest) -> CompletionResponse:
+    def route_request(self, request: CompleteRequest) -> CompleteResponse:
         """Route request to selected model with fallback support."""
         pass
     
     @abstractmethod
-    async def aroute_request(self, request: CompletionRequest) -> CompletionResponse:
+    async def aroute_request(self, request: CompleteRequest) -> CompleteResponse:
         """Route request asynchronously with fallback support."""
         pass
     
@@ -1827,12 +1826,12 @@ class ContentChunk(BaseModel):
 
 **Message Models** (see Message Types section above for SkyeMessage, UserMessage, AssistantMessage, SystemMessage, CapabilityMessage)
 
-**CompletionRequest Model**:
+**CompleteRequest Model**:
 ```python
 from pydantic import BaseModel, Field
 from typing import List, Optional, Dict, Any, Type
 
-class CompletionRequest(BaseModel):
+class CompleteRequest(BaseModel):
     """Request for model completion."""
     messages: List[SkyeMessage]
     model: str
@@ -1859,13 +1858,13 @@ class TokenUsage(BaseModel):
     total_tokens: int
 ```
 
-**CompletionResponse Model**:
+**CompleteResponse Model**:
 ```python
 from pydantic import BaseModel
 from typing import Optional, Dict, Any, Union
 from datetime import datetime
 
-class CompletionResponse(BaseModel):
+class CompleteResponse(BaseModel):
     """Response from model completion."""
     id: str
     model: str
@@ -1935,14 +1934,14 @@ Skye-core provides built-in support for structured outputs, allowing models to r
 
 ```python
 from pydantic import BaseModel
-from skye.models import CompletionRequest, UserMessage
+from skye.models import CompleteRequest, UserMessage
 
 class PersonInfo(BaseModel):
     name: str
     age: int
     occupation: str
 
-request = CompletionRequest(
+request = CompleteRequest(
     messages=[UserMessage(content="Extract person info: John is 30 and works as an engineer")],
     model="gpt-4",
     response_schema=PersonInfo
@@ -2162,7 +2161,7 @@ skye/
 ├── src/
 │   └── skye/
 │       ├── __init__.py              # Core exports
-│       ├── completion.py            # CompletionRequest, CompletionResponse, etc.
+│       ├── completion.py            # CompleteRequest, CompleteResponse, etc.
 │       ├── messages.py              # UserMessage, AssistantMessage, etc.
 │       ├── memory.py                # MemoryEntry, etc.
 │       ├── exceptions.py            # SkyeError hierarchy

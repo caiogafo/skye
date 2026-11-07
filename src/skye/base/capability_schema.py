@@ -1,39 +1,15 @@
-"""Pure capability schema contract (name, description, parameter schema).
+"""Capability registry view for ``base``; ``CapabilitySchema`` is defined once, in ``skye.base.interfaces.capability``.
 
-Standard library only. This is the contract ``base`` shares with the tools
-Component: runtime handlers, registries and Pydantic runtime models stay in
-``tools``. Mirrors the shape of
-``skye.tools.schema.CapabilitySchema``.
+Standard library only. The runtime handlers and registries stay in ``tools``.
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
 from typing import Any, Protocol
 
+from skye.base.interfaces.capability import CapabilitySchema
 
-@dataclass(frozen=True)
-class CapabilitySchema:
-    """Immutable description of a capability.
-
-    Attributes:
-        name: Unique identifier (e.g. "weather.get_current").
-        description: Human-readable description.
-        parameters: JSON Schema for the input parameters.
-        returns: JSON Schema for the return type.
-    """
-
-    name: str
-    description: str
-    parameters: dict[str, Any] = field(default_factory=dict)
-    returns: dict[str, Any] = field(default_factory=dict)
-
-    def __post_init__(self) -> None:
-        for attr in ("name", "description"):
-            value = getattr(self, attr)
-            if not isinstance(value, str) or not value.strip():
-                raise ValueError(f"{attr} cannot be empty or whitespace")
-            object.__setattr__(self, attr, value.strip())
+__all__ = ["CapabilityRegistryLike", "CapabilitySchema"]
 
 
 class CapabilityRegistryLike(Protocol):

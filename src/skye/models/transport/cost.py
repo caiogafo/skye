@@ -15,9 +15,10 @@ Example:
 """
 
 from skye.base.completion import TokenUsage
+from skye.base.interfaces.cost_calculator import CostCalculatorInterface
 
 
-class CostCalculator:
+class CostCalculator(CostCalculatorInterface):
     """Calculate API costs based on token usage.
 
     This class provides methods to estimate costs for API calls based on

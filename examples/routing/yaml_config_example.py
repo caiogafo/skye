@@ -8,7 +8,6 @@ import os
 import re
 from pathlib import Path
 
-from skye import UserMessage
 from skye.router import ModelRouter
 
 # In production the variables referenced as ${VAR} in the YAML are set externally. Here every one that is not set gets a placeholder,
@@ -40,43 +39,13 @@ async def main():
     print(f"Custom router strategy: {router_custom.strategy.value}")
     print(f"Custom cooldown: {router_custom.cooldown_seconds}s")
 
-    # Use the router to make a request
-    print("\nMaking a completion request...")
-
-    try:
-        # The router will automatically select the best target based on strategy
-        response = router.complete(
-            messages=[UserMessage(content="Hello, how are you?")],
-            model="gpt-3.5-turbo",  # Use the alias defined in YAML
-            max_tokens=50
-        )
-        print(f"Response: {response.content}")
-
-        # Example with async
-        print("\nMaking async request...")
-        response = await router.acomplete(
-            messages=[UserMessage(content="What is Python?")],
-            model="gpt-3.5-turbo",
-            max_tokens=30
-        )
-        print(f"Async response: {response.content}")
-
-        # Check router health metrics
-        print("\nRouter health metrics:")
-        for alias in router.list_aliases():
-            # Get model IDs for this alias
-            model_ids = [
-                mid for mid in router.models.keys() if mid.startswith(f"{alias}:")
-            ]
-            for model_id in model_ids:
-                health = router.get_model_health(model_id)
-                print(f"  {model_id}:")
-                print(f"    Success rate: {health.success_rate:.1%}")
-                print(f"    Total requests: {health.total_requests}")
-                print(f"    Active requests: {health.active_requests}")
-
-    except Exception as e:
-        print(f"Error: {e}")
+    # No request is made here: the keys are placeholders. With real keys, `router.complete(messages=..., model="gpt-3.5-turbo")`
+    # picks a target by strategy and falls back on failure.
+    print("\nRouter health metrics:")
+    for alias in router.list_aliases():
+        for model_id in [mid for mid in router.models if mid.startswith(f"{alias}:")]:
+            health = router.get_model_health(model_id)
+            print(f"  {model_id}: success rate {health.success_rate:.1%}, total requests {health.total_requests}")
 
 
 if __name__ == "__main__":

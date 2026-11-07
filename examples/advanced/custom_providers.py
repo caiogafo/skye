@@ -1,7 +1,7 @@
 """A custom provider: extend the base model provider, register it, and use it like any other.
 
 ``BaseModelProvider`` keeps what is common to every provider (the ``complete``/``stream``/``acomplete`` entry points, health tracking, retry)
-and leaves the transformation to the subclass: how a request becomes the wire format, how the answer becomes a ``CompletionResponse``.
+and leaves the transformation to the subclass: how a request becomes the wire format, how the answer becomes a ``CompleteResponse``.
 Once registered, ``skye.provider("shout")`` returns it, and a router can balance it with the others.
 
 If you only need to wrap an SDK or a function, a ``Runnable`` is lighter: see ``examples/providers/bring_your_own_adapter.py``.
@@ -10,7 +10,7 @@ If you only need to wrap an SDK or a function, a ``Runnable`` is lighter: see ``
 from typing import Any
 
 import skye
-from skye import CompletionResponse, StreamChunk, TokenUsage
+from skye import CompleteResponse, StreamChunk, TokenUsage
 from skye import SkyeError
 from skye import UserMessage
 from skye.models import BaseModelProvider
@@ -45,8 +45,8 @@ class ShoutProvider(BaseModelProvider):
             yield {"id": "shout-1", "delta": word + " "}
 
     # How the answer becomes the library's types
-    def _transform_response(self, response: Any) -> CompletionResponse:
-        return CompletionResponse(
+    def _transform_response(self, response: Any) -> CompleteResponse:
+        return CompleteResponse(
             id=response["id"],
             model=response["model"],
             provider=self.provider_name,

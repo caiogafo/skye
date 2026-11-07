@@ -212,7 +212,7 @@ Validation Results
 Core library code never needs to know about specific providers:
 ```python
 # Router code (provider-agnostic)
-def route_request(self, request: CompletionRequest) -> CompletionResponse:
+def route_request(self, request: CompleteRequest) -> CompleteResponse:
     provider = self._select_provider(request.model)
     return provider.complete(request)  # Provider handles all transformations
 ```

@@ -5,7 +5,6 @@ of capabilities with support for namespacing, validation, semantic search,
 and thread-safe operations.
 """
 
-import json
 import logging
 import threading
 from difflib import SequenceMatcher
@@ -17,6 +16,9 @@ from skye.tools.exceptions import (
 )
 from skye.tools.interface import CapabilityInterface
 from skye.tools.schema import CapabilitySchema
+from skye.base.capability_execution import arun_capability_call, format_capability_result
+from skye.base.completion import CapabilityCall
+from skye.base.interfaces.tool_provider import CapabilityContext
 from skye.base.messages import CapabilityMessage
 
 logger = logging.getLogger(__name__)
@@ -502,13 +504,8 @@ class CapabilityRegistry:
             if return_raw:
                 return result
 
-            # Convert result to string for CapabilityMessage
-            if isinstance(result, str):
-                content = result
-            elif isinstance(result, dict):
-                content = json.dumps(result)
-            else:
-                content = str(result)
+            # Convert result to text for CapabilityMessage (a value JSON cannot hold is rendered, never raised)
+            content = format_capability_result(result)
 
             # Return as CapabilityMessage
             return CapabilityMessage(
@@ -593,13 +590,8 @@ class CapabilityRegistry:
             if return_raw:
                 return result
 
-            # Convert result to string for CapabilityMessage
-            if isinstance(result, str):
-                content = result
-            elif isinstance(result, dict):
-                content = json.dumps(result)
-            else:
-                content = str(result)
+            # Convert result to text for CapabilityMessage (a value JSON cannot hold is rendered, never raised)
+            content = format_capability_result(result)
 
             # Return as CapabilityMessage
             return CapabilityMessage(
@@ -622,3 +614,26 @@ class CapabilityRegistry:
                 capability_name=capability_name,
                 original_error=str(e),
             ) from e
+
+    # --- the ToolProvider Port: how an agent takes its toolset from this registry ------------------------------------------------
+
+    def add(self, capability: CapabilityInterface) -> None:
+        """Add a capability (the object ``@capability`` returns) to this registry; the same as ``register``."""
+        self.register(capability)
+
+    async def list_schemas(self, operation: str | None = None) -> "list[CapabilitySchema]":
+        """The schemas of every registered capability. A local registry has no operations, so ``operation`` selects nothing."""
+        with self._registry_lock:
+            capabilities = [self._capabilities[name] for name in sorted(self._capabilities)]
+        return [capability.get_schema() for capability in capabilities]
+
+    async def run(self, call: CapabilityCall, context: CapabilityContext | None = None) -> CapabilityMessage:
+        """Run one call and say how it ended; never raises. ``context`` is for providers that need a scope; a local run ignores it."""
+        return await arun_capability_call(self.get(call.name), call.id, call.name, call.arguments)
+
+    async def close(self) -> None:
+        """A local registry holds nothing to release."""
+
+    def list(self) -> "list[str]":
+        """The registered capability names, sorted: a thin alias of ``list_all`` (the name users of other libraries try first)."""
+        return self.list_all()

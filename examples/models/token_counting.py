@@ -7,7 +7,7 @@ per-message overhead each model uses for formatting. Exact counts for GPT models
 from ``tiktoken``, which ships with the ``openai`` extra. That extra is absent in this
 offline harness, so ``TokenCounter`` falls back to its standard-library approximation
 (about four characters per token). The numbers printed here are that approximation; with
-``skyeai[openai]`` installed the same calls return exact counts for GPT models.
+``skyeai`` installed the same calls return exact counts for GPT models.
 """
 
 import skye  # noqa: F401  (imported so the example reads like user code)
@@ -34,7 +34,7 @@ def main() -> None:
     print(f"  messages: {len(messages)}")
     print(f"  tokens  : {message_tokens}")
 
-    print("\nInstall skyeai[openai] (tiktoken) for exact GPT token counts.")
+    print("\nInstall skyeai (tiktoken) for exact GPT token counts.")
 
 
 if __name__ == "__main__":
