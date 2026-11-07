@@ -4,7 +4,7 @@ previous_name: uxui
 ---
 
 # Design Document: uxui
-Builds on: #[[file:.kiro/steering/11-design.md]] (sections: Ports, Composition, Public API and lazy imports, Extension points, Correctness properties, Testing).
+Builds on: #[[file:.kiro/steering/11-design.md]] (sections: Ports, Composition, Public API and lazy imports, The `.skye` language, Extension points, Correctness properties, Testing).
 The system view (facades, the Port rules, the execution primitive and `ToolProvider`, the router shorthand, the new checks) is in those sections.
 This file holds the detail of this spec: the baseline of the audit, the mechanism of each check, where each lives, and which open decision blocks
 which task.
@@ -27,7 +27,7 @@ Level P1 blocks or misleads a user, P2 costs time, P3 is polish. "Done" means th
 
 | # | Finding | Level | Requirement | Task | Open decision |
 |---|---|---|---|---|---|
-| 1 | The first examples end in "skipping": nothing runs offline | P1 | 24.4 | 5.3, 5.4 | O26 |
+| 1 | The first examples end in "skipping": nothing runs offline | P1 | 24.4 | 5.3, 5.4 | D38 |
 | 2 | Install lines are wrong after the extras changes | P1 | 24.6 | 5.5 | |
 | 3 | Examples end in a raw traceback | P1 | 24.4 | 5.2, 5.4 | |
 | 4 | `providers/router_example.py` is empty | P1 | 24.5 | 5.1 | |
@@ -35,32 +35,32 @@ Level P1 blocks or misleads a user, P2 costs time, P3 is polish. "Done" means th
 | 6 | READMEs name files and commands that do not exist | P2 | 24.8 | 5.6 | |
 | 7 | Overlapping examples (function calling three times, YAML twice) | P2 | 24.5 | 5.7 | |
 | 8 | Large files hide the point (nine over 300 lines) | P2 | 24.5 | 5.8 | |
-| 9 | Placeholder keys reach the real network | P2 | 24.4 | 5.2, 5.3 | O26 |
+| 9 | Placeholder keys reach the real network | P2 | 24.4 | 5.2, 5.3 | D38 |
 | 10 | The value proposition (one prompt, several providers, fallback) is not shown | P2 | 24.2 | 5.10 | |
 | 11 | Banners, emoji and `print` walls | P3 | 24.7 | 5.9 | |
 | 12 | No learning path | P3 | 24.8 | 5.6 | |
-| 13 | The package docstring shows `response.text`, which does not exist | P1 | 15.9 | 6.1, 6.2 | O27 |
+| 13 | The package docstring shows `response.text`, which does not exist | P1 | 15.9 | 6.1, 6.2 | D39 |
 | 14 | The commonest imports need `skye.base.*` | P1 | 7.14 | 1.1 to 1.3 (done) | |
 | 15 | Three `CapabilitySchema`, two `CapabilityExecutionError` | P1 | 22.4 | 2.1 to 2.3 | |
-| 16 | `Interface`, "Port", `Runnable`, `DecisionModel`, `StorageBackend`, `MCPClientPort` | P2 | 22.3 | 4.1, 4.2, 3.10 | O25, O28 |
-| 17 | Capability, tool and function call used interchangeably | P2 | 22.1, 22.3 | 4.1, 4.3 | O27 |
+| 16 | `Interface`, "Port", `Runnable`, `DecisionModel`, `StorageBackend`, `MCPClientPort` | P2 | 22.3 | 4.1, 4.2, 3.10 | D37, D40 |
+| 17 | Capability, tool and function call used interchangeably | P2 | 22.1, 22.3 | 4.1, 4.3 | D39 |
 | 18 | Import depth is inconsistent | P2 | 7.14 | 1.1 to 1.3 (done) | |
-| 19 | The same names exported from `skye.router` and `skye.store` | P2 | 22.4 | 4.5 | O28 |
-| 20 | Sync and async naming: `invoke` without `ainvoke` | P2 | 22.5 | 4.1, 4.3 | O27 |
-| 21 | Verbs without a rule (`get_`, `list_`, `set_`, `register_`, ...) | P3 | 22.5 | 4.1, 4.3 | O27 |
-| 22 | File and class names in `models/` and `tools/` | P3 | 22.6 | 4.4 | |
-| 23 | Empty packages look public; stale install text in the docstring | P3 | 22.6, 15.9 | 4.6, 6.1 | O28 |
-| 24 | Import cost is not predictable from the name (pydantic in `router`, `tools`) | P3 | 7.4 | 6.4 | O4 |
-| 25 | `ModelInterface` does not describe the call users make | P1 | 16.6 | 3.5 | O24 |
+| 19 | The same names exported from `skye.router` and `skye.store` | P2 | 22.4 | 4.5 | D40 |
+| 20 | Sync and async naming: `invoke` without `ainvoke` | P2 | 22.5 | 4.1, 4.3 | D39 |
+| 21 | Verbs without a rule (`get_`, `list_`, `set_`, `register_`, ...) | P3 | 22.5 | 4.1, 4.3 | D39 |
+| 22 | File and class names in `models/` and `tools/` | P3 | 22.6 | 4.4 | dropped: names stay |
+| 23 | Empty packages look public; stale install text in the docstring | P3 | 22.6, 15.9 | 4.6, 6.1 | D40 |
+| 24 | Import cost is not predictable from the name (pydantic in `router`, `tools`) | P3 | 7.4 | 6.4 | D49 |
+| 25 | `ModelInterface` does not describe the call users make | P1 | 16.6 | 3.5 | D36 |
 | 26 | `ModelInterface.astream` is typed as an `Iterator` and awaited | P1 | 16.6 | 3.3 | |
 | 27 | `select_model` is sync in the router Port, `async` in the router | P1 | 16.6 | 3.4 | |
-| 28 | Two ways to be a Port (20 abstract bases, 4 `Protocol`s) | P2 | 16.7 | 3.10 | O25 |
+| 28 | Two ways to be a Port (20 abstract bases, 4 `Protocol`s) | P2 | 16.7 | 3.10 | D37 |
 | 29 | The compliance checker compares names only | P2 | 16.7 | 3.1, 3.2 | |
-| 30 | Six Ports have an implementation that does not satisfy them | P2 | 16.9 | 3.6 | O29 |
+| 30 | Six Ports have an implementation that does not satisfy them | P2 | 16.9 | 3.6 | D41 |
 | 31 | Thirteen abstract Ports have no inheriting implementation; five have no test or example | P2 | 16.9 | 3.8 | |
 | 32 | Error contracts are missing (`Raises:` in 8 of 23 Port modules) | P2 | 16.8 | 3.7 | |
-| 33 | Overlapping Ports (two storage Ports, `Runnable` and `ModelInterface`) | P3 | 16.9 | 3.6, 3.9 | O29 |
-| 34 | Uneven Port size (1 to 22 methods) | P3 | 16.9 | 3.9 | O29 |
+| 33 | Overlapping Ports (two storage Ports, `Runnable` and `ModelInterface`) | P3 | 16.9 | 3.6, 3.9 | D41 |
+| 34 | Uneven Port size (1 to 22 methods) | P3 | 16.9 | 3.9 | D41 |
 | 35 | A user cannot find which Port to implement | P3 | 15.10 | 6.3, 4.1 | |
 
 ## From the 27 rules to the requirements
@@ -108,7 +108,7 @@ a class and a Port and compares, for every public method of the Port:
 - the form: `def`, `async def`, async generator (`inspect.iscoroutinefunction`, `inspect.isasyncgenfunction`);
 - the return annotation by name, only when both sides have one.
 A method the implementation adds is allowed; a method it omits, a parameter it renames or a `def` it makes `async def` fails. For a `Protocol`
-the methods are read from the protocol's own members, so the same function serves both kinds (decision O25 does not change the checker).
+the methods are read from the protocol's own members, so the same function serves both kinds (decision D37 does not change the checker).
 `tests/unit/test_port_compliance.py` gets one parametrized case per pair (built-in implementation, Port) and, for each exported Port that has
 none, a reference implementation of a few lines kept in the test (Requirement 16.9). Known mismatches (`ModelInterface` against
 `BaseModelProvider`, `ModelRouterInterface.select_model`) are listed in `KNOWN_MISMATCHES`, which only shrinks. The comparison done for the audit
@@ -128,8 +128,8 @@ on a Port whose docstring lacks the three labels. The wording of each contract c
   that is not there, or names a command whose file does not exist. `examples/README.md` carries the numbered reading order.
 - **Install lines (5.5).** A test finds every `pip install skyeai[...]` in `examples/`, `docs/` and `README.md`, and fails when an extra does not
   exist in `pyproject.toml` or is listed in `known_empty` of `budgets.toml` (it installs nothing).
-- **Offline demo model (5.3).** Blocked on O26. The examples keep their two modes: with a key they call the service; without one they use the
-  demo model and print which one they use. Until O26 is decided, 5.2 makes the missing-key and missing-server branches print guidance and a
+- **Offline demo model (5.3).** Decided in D38. The examples keep their two modes: with a key they call the service; without one they use the
+  demo model and print which one they use. Until 5.3 is done, 5.2 makes the missing-key and missing-server branches print guidance and a
   sample of the output, so no example ends in a traceback.
 
 ### Docstrings (tasks 6.1, 6.2)
@@ -145,11 +145,11 @@ exported Port: kind, Port, registry or place to register, example file, and stat
 Three reports of 2026-11-04 looked at the same surface from three angles: how close it is to what a user knows (familiarity), how much a user
 must write and decide (simplicity), and the low-level tool-call path and what an agent needs from it (tools). They proposed different fixes to
 the same problem in eight places; `.agents/tasks/uxui-reconciliation.md` gives the single answer used in each case. The decisions they settled
-are rules now in steering; the questions they left open are O24 to O33. The work they add, beyond the 35 findings:
+are rules now in steering; the questions they left open (O24 to O33) are taken as D36 to D48 (O24 to O33 as D36 to D45; D46 to D48 added after the review). The work they add, beyond the 35 findings:
 
 ### The execution primitive (tools report L2, A1; steering 16.10)
 One function in `base`, next to the capability Port, runs a single call: it never raises and returns a `CapabilityMessage` whose outcome says ok,
-error, denied or skipped (O30). `CompletionResponse.execute_capability_calls`, the executable call, the registry and `CapabilityCallHandler`
+error, denied or skipped (`CapabilityStatus`, D42). `CompletionResponse.execute_capability_calls`, the executable call, the registry and `CapabilityCallHandler`
 delegate to it, so the four execution paths and three result types of today collapse to one behaviour; `registry.execute` stays the one path that
 raises, documented as "I called it myself". Living in `base` lets `agents`, `teams` and `flows` use it without importing `tools` (the layer
 table). A change to it (a timeout, the outcome field) reaches the agent, the manual loop and the single call at once — the reason it is built
@@ -159,47 +159,126 @@ first (task 3.11).
 A Port in `base/interfaces` with three methods — list the schemas for an operation, run one call with a context, optionally close. The capability
 registry implements it and the gateway client implements it, so an agent takes its toolset one way (Requirement 42.1). The context carries the
 scope token and the operation description (42.3) and is a separate argument, never folded into the model's `**arguments` where a key could clash
-(task 3.12). Blocked in part on O32 (who writes the operation description, the existing O12).
+(task 3.12). Capability registration is decided (D44); who writes the operation description stays with the existing O12.
 
 ### The router shorthand (simplicity report S1; steering 22.8)
 `ModelRouter({"alias": ["provider/model", ...]})` builds the same `RouteConfig`, `ModelTarget` and `FallbackConfig` as the full form (first entry
 primary, the rest fallbacks); the provider is read from the `"provider/model"` string and the API key from the provider's standard variable.
-One syntax only: the `from_list` form the familiarity report first proposed is dropped (reconciliation 2). `skye.Router` is the lazy alias
-(task 4.3, under O27's extension). The full form (strategy, retry policies, explicit `FallbackConfig`, YAML) stays first-class and documented;
+One syntax only: the `from_list` form the familiarity report first proposed is dropped (reconciliation 2). `skye.Router` is not added (D39).
+The full form (strategy, retry policies, explicit `FallbackConfig`, YAML) stays first-class and documented;
 an explicit value always wins over a default (task 4.7).
 
 ### Typed `provider()` (simplicity report S2; steering 22.9)
 `@overload` so the default returns the model client and `provider_type="embedding"` the embedding client, and the quickstart type-checks with no
 cast. A combined client type that exposes both `complete` and `encode` is a larger option the simplicity report raises; it is **not** decided
-here (added to O28's surface clean-up) (task 4.8).
+here (not added, D40) (task 4.8).
 
-### Guessability aliases (familiarity report C1 to C5; steering 22.7, open decision O27)
-Thin aliases that store no second value: `CompletionResponse.text` → `content`; `tool_choice`/`tools` accepted as `capability_choice`/`capabilities`
-(one input name, no second field); `CapabilityRegistry.list()` → `list_all`; `Validated.model_dump`/`model_validate`/`model_json_schema` →
-`dump`/`from_mapping`/`json_schema`; `skye.Router`, and `skye.tool` for `skye.tools.capability`. O27 as written covers only `text`, `list()`,
-`kind=`, `tool_choice`, `ainvoke`; the Pydantic-style methods, `skye.Router`, `skye.tool` and `tools=` extend it or wait (reconciliation 6, 8).
-`skye.completion(...)` as a callable module is rejected: a facade may only re-export (Requirement 7.15); it is a documentation line only. A test
-records each name as `exists` or `known_missing`, the list only shrinking (task 4.9, steering property 20).
+### Guessability aliases (familiarity report C1 to C5; steering 22.7, decision D39)
+Thin aliases that store no second value: `CompleteResponse.text` → `content`, `CapabilityRegistry.list()` → `list_all`, `Runnable.ainvoke` beside
+`invoke`. These three are added. `tool_choice`/`tools`, `kind=`, `skye.Router`, `skye.tool` and `Validated.model_dump`/`model_validate`/
+`model_json_schema` are not added: the documentation names the word that exists (one vocabulary, Requirement 22.1; one name per thing, 22.4).
+`content` is the text of the reply; a non-text output will get its own field when it exists, and `text` stays the text part.
+`skye.completion(...)` as a callable module is rejected: a facade may only re-export (Requirement 7.15). A test records each name as `exists`
+or `known_missing`, the list only shrinking (task 4.9, steering property 20).
 
-### Decisions this section adds (O30 to O33)
-| Decision | Question | Blocks |
+## The `.skye` language (not built yet)
+**Status: the parser is not written, and none of the examples below has been run through a parser.** The syntax was drafted with the owner in
+two interviews (decisions D49 to D61) and the reference examples were written by hand. This spec owns the public surface of the language (the
+syntax a user types, the load calls, the error messages); the parser and the grammar belong to `base`, the flow engine to `3-runtime-flows`,
+the router mapping to the router spec and the bundled prompts to `prompts-support` task 18. System view: `11-design.md`, section "The `.skye`
+language"; requirements: Requirement 54 of steering.
+
+### Syntax in one page
+```
+file        = block*
+block       = KIND [LABEL] "{" (attribute | block)* "}"          KIND: router | flow | prompt (and, inside a flow: step, parallel, choice, context)
+attribute   = NAME "=" value                                      one per line, or comma-separated on one line
+value       = string | number | bool | list | map | reference | expression | duration
+string      = "text" | """multi-line text"""
+duration    = "30s" | "5m" | "24h"                                a string with a unit; a bare number is a load error (D58)
+reference   = registry.NAME | flow.NAME | router.NAME | prompt.NAME | step.NAME.output | context.FIELD | env.NAME | item     (D57)
+expression  = comparison, and / or / not, + - * /, in, names from the context, and len min max abs round str int float     (D55; checked with ast)
+comment     = # to end of line
+```
+- A step moves on with attributes: `next = "X"`, `on_error = "Y"`, `on_timeout = "Z"`; `next = end` finishes (D54). A step with no `next` is a load
+  error. Without `on_error` the step goes to the default error end; without `on_timeout` a timeout is an error.
+- `choice` holds `when <expr> { ... }` branches and a mandatory `else` (D55). `parallel` has `join` (`all`|`any`) and `on_branch_error` (`cancel`|`continue`) (D56).
+- `foreach = <list>` runs a step or a sub-flow for each element and `item` is the current one; a step that can be re-entered has `max_visits = N` (D56).
+- `set field = expr` and `emit "event"` live inside the step and run when it finishes with success; a step with no `run` is allowed when it has `set`,
+  `emit` or `foreach` (D58). `retry` is a map, `retry = { max = 3, after = "2s", backoff = true }`, and `retry = 3` is the short form (D54).
+- The `router` block uses the field names of today's YAML and `ModelTarget`, except that a name ending in `_seconds` drops the suffix because its value
+  is a duration (`cooldown`, `retry_after`); `fallback = [...]` is written inside the route; `route "x" = ["provider/model", ...]` is the shorthand (D59).
+- The `prompt` block of version 1 has `variables`, `message "<role>"` (`system`, `user`, `assistant`), `placeholder`, `text`, `when`, `each` and `{{ }}`;
+  inside it the variables are written bare, the one exception to the prefixes of D57 (D60).
+
+### Load-time errors the checker must report
+Each row is a short file and the message `skye check` prints; together they are the conformance cases of the parser and the examples a model learns from.
+| Mistake | Message (file:line:column omitted) |
+|---|---|
+| `next = "B"` with no step `B` | unknown step "B" in "next". Defined steps: A, Fan, Write. Did you mean "Write"? |
+| A step with no `next` | step "Fetch" has no next. Add: next = "<step>" or next = end |
+| A `choice` with no `else` | choice "Decide" has no else. Add: else { next = "<step>" } |
+| A loop with no bound | step "Write" can be entered again (Decide -> Write) but has no max_visits. Add: max_visits = 4 |
+| `run = registry.plannr` not in the registry | step "Plan": "plannr" is not in the registry. Known: planner, web_search, ... |
+| A reference with no prefix | "planner" has no prefix. Use registry.planner, flow.planner or router.planner |
+| A context field not declared | "context.qualty" is not declared. Declared: topic, loops, quality |
+| An unreachable step | step "Orphan" can not be reached from the start |
+| `wait` or `on_event` in a version 1 file | "wait" needs persistence and is not available in this version |
+| A wrong type in `set` | "quality" is number, the value is a string |
+| A call outside the allowed list | call "open(...)" is not allowed in an expression. Allowed: len, min, max, abs, round, str, int, float |
+| A typo in a field name | unknown field "timout" in step "Search". Did you mean "timeout"? |
+| A bare number as a duration | timeout = 30 is not a duration. Use "30s", "5m" or "24h" |
+| An invalid prompt role | role "bot" is not valid. Use system, user or assistant |
+| An old router field | "cooldown_seconds" was renamed "cooldown" and takes a duration such as "60s" |
+| A `fallback` naming a missing route | route "azure-gpt4" has no route "claud" in fallback. Did you mean "claude"? |
+| An `env.NAME` with no value at run time | ConfigurationError: env.OPENAI_API_KEY is not set (router "main", route "gpt-4", target 1) |
+
+### Scope and the reference set
+Version 1 covers routers, flows (sequence, condition, parallel, bounded loop, retry, timeout, error branch, `foreach`, typed context with `set` and
+`emit`, an agent, a team, a model through the router or a sub-flow as a step) and the reduced `prompt` block. Version 2 is written and not built:
+waiting for events with persistence and resume, `to_mermaid()`, `include`, and in prompts the examples, multimodal content, output schema and the
+partial; the delivery guarantee of persistence is open decision O34 and the fate of `prompts/engine.py` O35. The full reference set (four routers, seven
+prompts, nine flows) was drafted in `.agents/tasks/uxui-dsl-examples.md`, a working file that is not versioned; task 8.1 turns it into fixtures under
+`tests/fixtures/skye/` so the conformance suite lives in the repository.
+
+### Loading
+```python
+import skye
+from skye.flows import Flow
+from skye.router import ModelRouter
+
+spec   = skye.load("app.skye")                                   # parses and validates; returns the blocks by kind and name
+router = ModelRouter.from_file("app.skye", name="main")
+flow   = Flow.from_file("app.skye", name="research", registry={"planner": planner, "web_search": web_search})
+result = flow.run({"topic": "mermaid state machines"})
+```
+**Naming to settle with the owner before task 8.4.** D61 writes `Router.from_file`, D52 writes `skye.Flow`, and the reference examples write
+`skye.Router.from_file`. The router class that exists is `ModelRouter`, and D39 records `skye.Router` as `known_missing` (not added). The block above
+uses the component paths, which need no new top-level name; whether `Router` and `Flow` become top-level names is a question for the owner, not
+decided here.
+
+## Decisions taken and the tasks they unblock
+The owner took O24 to O33 as D36 to D45 (`.kiro/steering/12-decisions.md`). None blocks a task any more.
+| Decision | Taken | Task |
 |---|---|---|
-| O30 | the outcome of a call: `status` (ok/error/denied/skipped) or a boolean | 3.11 |
-| O31 | the batch method: make it sync and add `aexecute_...`, or keep async | 3.11 |
-| O32 | registration of a decorated capability (`registry.add`, `@capability(register=True)`, or an implicit global) | 3.12 |
-| O33 | one call type with `execute()`, or two types renamed | 3.11 |
-
-## Open decisions and the tasks they block
-| Decision | Question | Blocks |
-|---|---|---|
-| O24 | the call shape of `ModelInterface` | 3.5 |
-| O25 | `Protocol` or abstract base for a Port | 3.10 |
-| O26 | an offline demo provider: public, examples-only, or none | 5.3 |
-| O27 | aliases: `text`, `list()`, `kind=`, `tool_choice`, `ainvoke`, and its extension to `skye.Router`, the Pydantic-style methods, `skye.tool` | 4.3, 4.9, part of 6.1 |
-| O28 | router re-exports, `MCPClientPort`, placeholder packages, a combined client type | 4.2, 4.5, 4.6, 4.8 |
-| O29 | the six unreconciled Ports, the two storage Ports, splitting large Ports | 3.6, 3.9 |
-| O30 to O33 | the tool-call outcome, the batch method name, capability registration, the executable call | 3.11, 3.12 |
-Related and not blocking: O4 (pydantic removal) sets when 2.2 can finish, O20 (examples first) is the practice this spec follows for the
+| D36 (O24) | the model Port takes `messages`, `model` and options or one request; `CompleteRequest`/`CompleteResponse`; module stays `skye.completion` | 3.5 |
+| D37 (O25) | `Protocol` for Ports implemented as plain classes, abstract base for Ports with default behaviour | 3.10 |
+| D38 (O26) | a scripted model only in `examples/`; the real provider when a key exists | 5.3, 5.10 |
+| D39 (O27) | aliases `text`, `list()`, `ainvoke`; no others | 4.3, 4.9 |
+| D40 (O28) | drop the router storage re-exports, `MCPClientInterface`, `ImportError` in placeholder packages, no combined client type | 4.2, 4.5, 4.6 |
+| D41 (O29) | per-Port reconciliation, `StorageAdapterInterface` removed, `ModelInterface` does not extend `Runnable`, large Ports split by role | 3.6, 3.9 |
+| D42 (O30) | `CapabilityStatus` enum on `CapabilityMessage` | 3.11 |
+| D43 (O31) | `execute_capability_calls` sync plus `aexecute_capability_calls` | 3.11 |
+| D44 (O32) | no implicit global registry | 3.12 |
+| D45 (O33) | one `CapabilityCall` type with `execute()` | 3.11 |
+| D46 | non-text output as typed content blocks (Converse-like, Python types) | not built; first non-text adapter |
+| D47 | gateway client not written here; contract noted in the gateway spec | none |
+| D48 | `CapabilityCallHandler`, `Runnable.ainvoke`, `get_instance()` stay as known debt | none |
+| D50 | one declarative language, `.skye`, for routers, flows and prompts; parser in `base` taking text | 8.1 to 8.4 |
+| D59 | the `router` block is the reference format; fields 1:1 with today's YAML; `fallback` inside the route; the shorthand is additive | 8.4, 8.6 |
+| D61 | the written grammar, the JSON Schema, `skye check`, `.gitattributes`, and the loading API `Flow.from_file`, `Router.from_file`, `skye.load` | 8.2 to 8.5 |
+Related and not blocking: D49 (taken: the core has no third-party dependency) closes O4, so the pydantic copy of `CapabilitySchema` leaves with the code
+migration, which is a separate task, and the budget tests fail by design until it is done; O20 (examples first) is the practice this spec follows for the
 extension points.
 
 ## Correctness Properties
@@ -270,12 +349,25 @@ For each guessable-name alias, it returns the value of the name it delegates to 
 shrinks.
 **Validates: Requirement 18 (Requirements 22.7 and 22.9 of steering)**
 
+### Property 16: The load API is the same for every kind
+For any `.skye` file, `Flow.from_file`, `Router.from_file` and `skye.load` accept the same `path` and report an error with the file, the line and
+the column; for a file that holds one block of the requested kind, `name` may be left out.
+**Validates: Requirement 19 (Requirements 54.3 and 54.9 of steering)**
+
+### Property 17: A `.skye` example in the documentation passes `skye check`
+For any `.skye` block shown in `docs/`, `examples/` or `README.md`, `skye check` reports no error.
+**Validates: Requirement 19 (Requirements 54.1 and 54.8 of steering)**
+
 ## Superseded (history)
 - The folder was `.kiro/specs/uxui/` with, at first, two files — `report.md` (the audit, three parts) and `rules.md` (27 rules and their status) —
   and later four more: `familiarity-report.md`, `simplicity-report.md`, `tools-report.md` and `reconciliation.md`. All were exempted from the spec
   tests by name. They are now under `.agents/tasks/` as `uxui-audit-report.md`, `uxui-audit-rules.md`, `uxui-familiarity-report.md`,
-  `uxui-simplicity-report.md`, `uxui-tools-report.md` and `uxui-reconciliation.md`, and their content is in steering (requirements, decisions O24
-  to O33), in the tables above and in `tasks.md`.
+  `uxui-simplicity-report.md`, `uxui-tools-report.md` and `uxui-reconciliation.md`, and their content is in steering (requirements, decisions D36
+  to D45), in the tables above and in `tasks.md`.
+- Three more working files were in the folder for the `.skye` language: `dsl-decisions.md` (the decisions, with working numbers), `dsl-examples.md` (the
+  reference examples) and `kiro-handoff-dsl.md` (the instruction to bring the specs in line). They are now `.agents/tasks/uxui-dsl-decisions.md`,
+  `uxui-dsl-examples.md` and `uxui-kiro-handoff-dsl.md`. The decisions are D49 to D61 and O34, O35 in steering (the working numbers D54 to D76 map to the
+  official ones in the first lines of `uxui-dsl-decisions.md`); the syntax, the error table and the scope are in "The `.skye` language" above.
 - Rules 1 to 4, 7 and 8 were applied before this spec (facades, decision D34, Requirement 7.14, `tests/budget/test_public_imports.py`); they are
   tasks 1.1 to 1.3, ticked.
 
@@ -287,8 +379,13 @@ shrinks.
     { "id": 1, "tasks": ["2.2", "2.3", "3.2", "3.7", "4.1", "4.7", "4.8", "5.5", "5.6", "5.7", "5.9", "6.2", "6.4"] },
     { "id": 2, "tasks": ["3.8", "4.4", "5.4", "5.8", "6.3"] },
     { "id": 3, "tasks": ["3.5", "3.6", "3.9", "3.10", "3.11", "3.12", "4.2", "4.3", "4.5", "4.6", "4.9", "5.3", "5.10"] },
-    { "id": 4, "tasks": ["7.1"] }
+    { "id": 4, "tasks": ["7.1"] },
+    { "id": 5, "tasks": ["8.2", "8.3", "8.5"] },
+    { "id": 6, "tasks": ["8.1", "8.4"] },
+    { "id": 7, "tasks": ["8.6"] }
   ]
 }
 ```
-Wave 3 waits for the owner's decisions (O24 to O29); wave 2 follows the tests of wave 1 because it removes entries from their allowlists.
+Wave 3 follows the decisions D36 to D45; wave 2 follows the tests of wave 1 because it removes entries from their allowlists. Waves 5 to 7 are the
+`.skye` language: the grammar, the checker and `.gitattributes` first, the conformance suite and the loading API once the parser exists, the
+conversion of the router examples and YAML tests last.

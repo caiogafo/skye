@@ -221,12 +221,12 @@ Written without the project name (it is being chosen); `<pkg>` is the import pac
 3. THE library SHALL let plugins be registered and discovered dynamically.
 4. THE library SHALL return every completion in one standard format with message content, role, metadata, token usage, model identifier and provider, and SHALL normalize provider-specific response fields to that schema.
 5. WHEN streaming is enabled, THE library SHALL yield response chunks in one standard format.
-6. A Port SHALL describe the call its users make: each method SHALL have the parameter names, the `def` or `async def` form and the return type of the implementations, and an asynchronous stream SHALL be typed `AsyncIterator`; IF a Port and an implementation differ, THEN the difference is a defect of one of them and SHALL NOT be hidden by `type: ignore`.
+6. A Port SHALL describe the call its users make: each method SHALL have the parameter names, the `def` or `async def` form and the return type of the implementations, and an asynchronous stream SHALL be typed `AsyncIterator`; THE model Port SHALL take `messages`, `model` and options, or one `CompleteRequest` as the first argument (decision D36); IF a Port and an implementation differ, THEN the difference is a defect of one of them and SHALL NOT be hidden by `type: ignore`.
 7. THE compliance check of Requirement 16.2 SHALL compare, for every method, the parameter names and kinds and the `def` or `async def` form, for abstract base classes and for `Protocol` Ports alike, and ONE test SHALL run every built-in implementation through it.
 8. EVERY Port docstring SHALL state its error contract: what it raises (a `SkyeError` subclass), what it returns when something is missing, whether it may be called from several threads or tasks, and, for hooks and observers, that their exceptions are logged and swallowed.
-9. A Port that has no implementation and no test SHALL NOT be exported until a component needs it, and a Port with many methods SHALL be split by role so that a caller takes only the part it uses.
-10. ONE primitive SHALL run a single capability call, never raise, and return a `CapabilityMessage` whose outcome says whether the call succeeded, failed, was denied or was skipped; THE response methods, the executable call, the registry and the call handler SHALL delegate to it, and its synchronous and asynchronous forms SHALL follow the `x` and `ax` rule (Requirement 22.5); the primitive SHALL live in `base`, next to the capability Port, so that a runtime component uses it without importing `tools` (open decisions O30, O31).
-11. THE toolset of a runtime component SHALL reach it through one Port (list the schemas for an operation, run one call, optionally close), implemented by the capability registry and by the gateway client; A call SHALL carry an explicit context (a scope token, the operation description) separate from the arguments the model chose (Requirement 42; open decision O32).
+9. A Port that has no implementation and no test SHALL NOT be exported until a component needs it, and a Port with many methods SHALL be split by role so that a caller takes only the part it uses; a Port is a `Protocol` when third parties implement it as a plain class and an abstract base when it carries default behaviour to inherit (decision D37, D41).
+10. ONE primitive SHALL run a single capability call, never raise, and return a `CapabilityMessage` whose `status` is a `CapabilityStatus` (`ok`, `error`, `denied` or `skipped`) and whose `is_error` is derived from it (decision D42); THE response methods, the executable call, the registry and the call handler SHALL delegate to it, and its synchronous and asynchronous forms SHALL follow the `x` and `ax` rule (Requirement 22.5, decision D43) and there SHALL be one call type, `CapabilityCall`, with an `execute()` (decision D45); the primitive SHALL live in `base`, next to the capability Port, so that a runtime component uses it without importing `tools`.
+11. THE toolset of a runtime component SHALL reach it through one Port (list the schemas for an operation, run one call, optionally close), implemented by the capability registry and by the gateway client; A call SHALL carry an explicit context (a scope token, the operation description) separate from the arguments the model chose (Requirement 42; decision D44).
 12. THE type of `capabilities` on a request and of `capability_calls` on a response SHALL name the capability types of `base`, not `Any`, so that an editor helps where the user writes the loop; A success value that is not JSON SHALL be rendered as text, never raised as the tool's own error.
 
 ### Requirement 17: Router and model configuration
@@ -278,8 +278,8 @@ Written without the project name (it is being chosen); `<pkg>` is the import pac
 
 #### Acceptance Criteria
 
-1. THE library SHALL type-hint every public API and SHALL support Python 3.10 and higher.
-2. THE library SHALL define new data structures as dataclasses and SHALL NOT add pydantic models; moving the existing models is open decision O4.
+1. THE library SHALL type-hint every public API and SHALL support Python 3.11 and higher (decision D49).
+2. THE library SHALL define data structures as dataclasses and SHALL NOT use pydantic in the core; the existing pydantic models move to dataclasses under decision D49, which closed the former open decision O4.
 3. WHEN invalid data reaches a data model, THE library SHALL raise a `ValidationError` with field-specific errors.
 
 ### Requirement 22: Terminology
@@ -290,11 +290,11 @@ Written without the project name (it is being chosen); `<pkg>` is the import pac
 
 1. THE library SHALL use "Capability" in type names, variable names, documentation and prompts for what an LLM can invoke, and not "Tool".
 2. WHEN the capability-related code is scanned, THE result SHALL show no "Tool" terminology, except the MCP wire terms and the folder `tools`.
-3. THE glossary SHALL state once that capability, tool and function call name the same thing, and that a Port is a class named `*Interface`, with the documented exceptions `Runnable`, `DecisionModel` and `StorageBackend`.
+3. THE glossary SHALL state once that capability, tool and function call name the same thing, and that a Port is a class named `*Interface`, with the documented exceptions `Runnable`, `DecisionModel` and `StorageBackend` (`MCPClientPort` becomes `MCPClientInterface`, decision D40).
 4. A PUBLIC name SHALL be defined once and any other path SHALL re-export it; a new public class SHALL NOT reuse the name of another public class, and a test SHALL fail on a public name defined twice in the library.
 5. A name SHALL say what a user does or has: verbs for actions and nouns for things, the synchronous and asynchronous forms being `x` and `ax`, `get_x` reading one thing, `list_x` many, `set_x` configuring and `register` adding.
 6. A file SHALL be named after the one idea in it (a provider file `<provider>.py`, an embeddings file `<provider>_embeddings.py`), and a new public module or package SHALL have one short name.
-7. WHERE a name a user of a reference library (the OpenAI SDK, LiteLLM, Pydantic) would try is missing, THE library MAY add it as a thin alias that stores no second value and adds no behaviour, and a test SHALL record each such name with the state `exists` or `known_missing`, the list of missing names only shrinking (open decision O27); THE library SHALL NOT add a second way to do a thing that is not such an alias.
+7. WHERE a name a user of a reference library (the OpenAI SDK, LiteLLM, Pydantic) would try is missing, THE library MAY add it as a thin alias that stores no second value and adds no behaviour, and a test SHALL record each such name with the state `exists` or `known_missing`, the list of missing names only shrinking, the accepted aliases being `text`, `list()` and `ainvoke` (decision D39); THE library SHALL NOT add a second way to do a thing that is not such an alias.
 8. WHERE a configuration object is verbose for the common case (the router), THE library MAY offer one shorthand on the existing constructor that builds the same objects and hides none of the full form, with one syntax and no second constructor; A value the user gives SHALL always win over a default.
 9. THE one call that creates a client, `<pkg>.provider(name, **config)`, SHALL be typed so that the common call type-checks with no cast: the default returns the model client and `provider_type="embedding"` the embedding client.
 
@@ -687,6 +687,9 @@ Written without the project name (it is being chosen); `<pkg>` is the import pac
 1. THE `flows` component SHALL define a step with a name (`step_name`), an error handler (`on_error`), conditions and branching, and each step SHALL hold a `Runnable`.
 2. THE `flows` component SHALL run steps in sequence, SHALL run in parallel the steps declared as parallel, and SHALL apply the step's error handler when it fails.
 3. THE `flows` component SHALL detect a flow that contains itself, directly or transitively (Requirement 5.3).
+4. THE `flows` component SHALL import only `base` (and `prompts` when enabled) and SHALL resolve every step by name from a registry that the caller passes, never by import (decision D52).
+5. THE first version of `flows` SHALL cover sequence, conditions, parallel steps, bounded loops, retry, timeout and errors; waiting for an external event with persistence and resume SHALL be built in a later version (decision D51), and WHEN a first-version file uses `wait` or `on_event`, THEN THE loader SHALL reject it with a message that says the feature is not available yet.
+6. THE `flows` component SHALL read a flow from the `.skye` language (Requirement 54).
 
 ### Requirement 51: Guard
 
@@ -718,3 +721,21 @@ Written without the project name (it is being chosen); `<pkg>` is the import pac
 2. THE `observe` component SHALL accept new exporters through its registry (Requirement 6.1).
 3. WHERE an exporter has no standard-library path, THE `observe` extra SHALL declare only that library (Requirement 7.1).
 4. THE runtime components SHALL reach `observe` only through the observer Port, never by import (Requirement 4.1).
+
+### Requirement 54: The `.skye` language
+
+**User Story:** As a developer, and as an AI agent that writes configuration for a developer, I want one readable language for routers, flows and prompts, so that I can read what the system will do and generate it without learning several formats.
+
+#### Acceptance Criteria
+
+1. THE library SHALL read routers, flows and prompts from files with the extension `.skye`, written in one HCL-like language with blocks (`router`, `flow`, `prompt`), `key = value` attributes, `#` comments, maps and lists; a file MAY hold several blocks (decision D50).
+2. THE parser SHALL be written in the standard library, SHALL live in `base`, and SHALL take text, not a path; THE components that read files SHALL read the text and call it (Requirement 3.2: `base` does no file I/O).
+3. WHEN a file has an error, THE loader SHALL raise an error that names the file, the line, the column, the reason and, where there is one, the fix (for example the nearest name), and SHALL report every error it can find in the file in one raise.
+4. THE loader SHALL check, before anything runs: that every `next`, `on_error`, `on_timeout` and `fallback` names a block that exists; that every step has a `next`; that a `choice` has an `else`; that a step that can be re-entered has `max_visits`; that every reference has a known prefix (`registry.`, `flow.`, `router.`, `prompt.`, `step.`, `context.`, `env.`, `item`) and resolves; that every context field is declared and every `set` has the declared type; that every duration is a string with a unit (decisions D54 to D58).
+5. WHEN an expression is evaluated, THE library SHALL use only comparison, `and`/`or`/`not`, arithmetic, `in` and the functions `len`, `min`, `max`, `abs`, `round`, `str`, `int`, `float`, checked with `ast`, and SHALL NOT use `eval` or `exec`; IF an expression calls anything else, THEN THE loader SHALL reject it (decision D55).
+6. THE router block SHALL accept every field that `RouteConfig`, `ModelTarget`, `FallbackConfig`, `RetryPolicyConfig` and the allowed-fails policy accept, under the same names (a name ending in `_seconds` drops the suffix and takes a duration string), and SHALL accept the shorthand `route "x" = ["provider/model", ...]`; THE existing YAML and JSON files SHALL stay readable (decision D59).
+7. THE prompt block of the first version SHALL hold `variables`, `message "<role>"` with the roles `system`, `user` and `assistant`, `placeholder`, `text`, `when`, `each` and `{{ }}` interpolation, and SHALL give the same messages as the bundled `.jinja` templates it replaces, checked by an equivalence test (decision D60).
+8. THE library SHALL provide `skye check <file>` that applies Requirement 54.3 and 54.4 to a file and prints the errors, and a JSON Schema of the blocks (decision D61).
+9. THE library SHALL load a file with `Flow.from_file(path, name=..., registry=...)`, `Router.from_file(path, name=...)` and `skye.load(path)`; WHEN the file holds one block of the requested kind, THE `name` MAY be left out (decision D61).
+10. THE language SHALL NOT include another file, and SHALL NOT wait for events with persistence, in its first version (decision D51).
+11. THE `.skye` language SHALL NOT add a third-party library to any component (Requirement 7.1; decision D49).

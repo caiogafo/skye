@@ -43,10 +43,10 @@ component imports; an extra that imports none is empty and listed in `known_empt
 ## Python
 - Always run commands through **uv** (`uv run pytest`, `uv run ruff check`, `uv run mypy`, `uv run black`); never plain `pytest`,
   `python` or `pip`. **Black** formats, **Ruff** lints, **mypy** runs in strict mode; configuration lives in `pyproject.toml`.
-- Minimum **Python 3.10** (`target-version = py310`). Modern type hints: `list[str]`, `dict[str, Any]`, `X | None`, not `List`,
+- Minimum **Python 3.11** (`target-version = py311`, D49). Modern type hints: `list[str]`, `dict[str, Any]`, `X | None`, not `List`,
   `Dict` or `Optional[...]`. All public APIs are fully type-hinted. Python only; the library is I/O bound.
-- **Dataclasses, not pydantic.** New data structures use `dataclasses`; do not add pydantic models. Pydantic is a legacy core
-  dependency being removed (open decision O4). Steering must never present pydantic as the standard.
+- **Dataclasses, not pydantic.** New data structures use `dataclasses`; do not add pydantic models. Pydantic and tenacity are
+  removed from the core (D49: `dependencies = []`); code that still imports them is legacy being migrated. Steering must never present pydantic as the standard.
 - I/O provides sync and async forms; async methods are prefixed with `a` (`acomplete`, `aencode`). Never block in an async function.
 - Errors use the `SkyeError` hierarchy and keep context (`raise ... from e`). Use context managers for resources.
 - Public APIs have Google-style docstrings; a component's package docstring ends with `Codename: <name>.`.
@@ -59,7 +59,7 @@ component imports; an extra that imports none is empty and listed in `known_empt
 - **Capability, not Tool**, in type names: `CapabilityCall`, `CapabilityResult`, `CapabilityCallHandler`. The MCP wire terms stay as
   MCP defines them, and the component folder is literally `tools`.
 - Messages: `SkyeMessage`, `UserMessage`, `AssistantMessage`, `SystemMessage`, `CapabilityMessage`; `ContentChunk`;
-  `CompletionRequest`, `CompletionResponse`.
+  `CompleteRequest`, `CompleteResponse`.
 - **Avoid LangChain-style names**: no `BaseMessage`, `HumanMessage`, `AIMessage`, `Document`/`DocumentLoader`, `Embeddings`,
   `OutputParser`, `Callback`/`CallbackHandler`.
 

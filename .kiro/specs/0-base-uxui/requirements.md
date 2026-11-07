@@ -11,13 +11,15 @@ This spec covers the public surface of Skye as a user meets it: the import paths
 examples, and the first docstring a user reads. It comes from a three-part audit (the examples, the names and imports, the contracts of the
 Ports; 35 findings, in `design.md`), from the 27 rules derived from it, and from three follow-up reports (familiarity, simplicity, tools) whose
 conflicts are resolved in one place. Those rules are now criteria in `.kiro/steering/10-requirements.md`
-(Requirements 7.14, 7.15, 15.9, 15.10, 16.6 to 16.9, 22.3 to 22.6 and 24.4 to 24.8) and the questions the audit left to the owner are the open
-decisions O24 to O29 in `.kiro/steering/12-decisions.md`. Here each requirement is one user story and each acceptance criterion is a pointer
+(Requirements 7.14, 7.15, 15.9, 15.10, 16.6 to 16.9, 22.3 to 22.6 and 24.4 to 24.8) and the questions the audit left to the owner are decisions
+D36 to D45 (first the open decisions O24 to O33) in `.kiro/steering/12-decisions.md`. Here each requirement is one user story and each acceptance criterion is a pointer
 of the form `THE spec SHALL realize Requirement N.k of #[[file:.kiro/steering/10-requirements.md]]`, never a copy of the criterion. The number
 after `Requirement` in a heading below is local to this file; the number in a criterion is the steering one. Fetch a steering requirement with
 `grep -n -A25 "^### Requirement 24:" .kiro/steering/10-requirements.md`. The raw audit and the follow-up reports are kept under `.agents/tasks/`
 (`uxui-audit-report.md`, `uxui-audit-rules.md`, `uxui-familiarity-report.md`, `uxui-simplicity-report.md`, `uxui-tools-report.md`,
-`uxui-reconciliation.md`); the folder of this spec was called `uxui` before decision D35.
+`uxui-reconciliation.md`); the folder of this spec was called `uxui` before decision D35. The `.skye` language (Requirement 54, decisions D49 to D61)
+adds the last story, Requirement 19: loading a router, a flow or a prompt from a file; its design and the working files it came from
+(`uxui-dsl-decisions.md`, `uxui-dsl-examples.md`, `uxui-kiro-handoff-dsl.md`) are described in `design.md`.
 
 ## Requirements
 
@@ -173,6 +175,8 @@ after `Requirement` in a heading below is local to this file; the number in a cr
 #### Acceptance Criteria
 
 1. THE spec SHALL realize Requirement 22.8 of #[[file:.kiro/steering/10-requirements.md]].
+2. THE spec SHALL realize Requirement 54.6 of #[[file:.kiro/steering/10-requirements.md]].
+3. THE spec SHALL honor decision D59 of #[[file:.kiro/steering/12-decisions.md]].
 
 ### Requirement 18: Names a newcomer tries
 
@@ -182,3 +186,17 @@ after `Requirement` in a heading below is local to this file; the number in a cr
 
 1. THE spec SHALL realize Requirement 22.7 of #[[file:.kiro/steering/10-requirements.md]].
 2. THE spec SHALL realize Requirement 22.9 of #[[file:.kiro/steering/10-requirements.md]].
+
+### Requirement 19: Load a router, a flow or a prompt from a `.skye` file
+
+**User Story:** As a developer, I want to write a router, a flow or a prompt in one readable file and load it with one call that tells me exactly where a mistake is, so that I can read what the system will do and let a model write it for me.
+
+#### Acceptance Criteria
+
+1. THE spec SHALL realize Requirement 54.1 of #[[file:.kiro/steering/10-requirements.md]].
+2. THE spec SHALL realize Requirement 54.3 of #[[file:.kiro/steering/10-requirements.md]].
+3. THE spec SHALL realize Requirement 54.6 of #[[file:.kiro/steering/10-requirements.md]].
+4. THE spec SHALL realize Requirement 54.8 of #[[file:.kiro/steering/10-requirements.md]].
+5. THE spec SHALL realize Requirement 54.9 of #[[file:.kiro/steering/10-requirements.md]].
+6. THE spec SHALL honor decision D50 of #[[file:.kiro/steering/12-decisions.md]].
+7. THE spec SHALL honor decision D61 of #[[file:.kiro/steering/12-decisions.md]].

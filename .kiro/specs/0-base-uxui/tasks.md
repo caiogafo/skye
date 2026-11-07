@@ -5,8 +5,7 @@
 This plan closes the findings of the 2026-11-03 audit of the public surface (`.agents/tasks/uxui-audit-report.md`), grouped by
 mechanism: the import facades (done before this spec), name collisions, Port conformance, naming and vocabulary, the examples, and
 docstrings. Each task cites the local requirement it satisfies (`N.k` of `requirements.md`) and, where useful, the steering
-requirement or decision directly. A task blocked on an open decision says so and is not started before the owner decides (never
-guess the answer in code). Tasks that belong to another spec (`models:8.2`, `prompts-support` task 3) are not repeated here.
+requirement or decision directly. A task that depended on an open decision names the decision (D36 to D45, taken by the owner) it follows. Tasks that belong to another spec (`models:8.2`, `prompts-support` task 3) are not repeated here.
 
 ## Tasks
 
@@ -20,214 +19,293 @@ guess the answer in code). Tasks that belong to another spec (`models:8.2`, `pro
   - [x] 1.3 `tests/budget/test_public_imports.py`
     - Evidence: scans `examples/`, `docs/`, `README.md`; fails on a path deeper than two levels or through `skye.base`.
     - _Requirements: 1.1, 1.2_
-  - [ ] 1.4 Facade purity test
+  - [x] 1.4 Facade purity test
+    - Evidence: `tests/budget/test_facade_purity.py` (parametrized over the six facades).
     - Add `tests/budget/test_facade_purity.py`: parse each facade module with `ast`; fail on a `def`, a `class`, or an assignment other
       than `__all__`/a lazy-name table; fail when a name in `__all__` is not defined by the module it re-exports from. See
       `design.md` "Facades only re-export".
     - _Requirements: 1.2; D34_
 
-- [ ] 2. One name, one home
-  - [ ] 2.1 Duplicate-name test
+- [x] 2. One name, one home
+  - [x] 2.1 Duplicate-name test
+    - Evidence: `tests/budget/test_unique_names.py`; `KNOWN_DUPLICATES` holds `CapabilitySchema` (pydantic copy in `tools`, leaves with O4) and `CapabilityInterface` (older copy in `tools`, found by the test).
     - Add `tests/budget/test_unique_names.py`: walk `src/skye` with `ast`, collect public `class` definitions, fail on a name defined
       in two modules except `KNOWN_DUPLICATES` (seeded with `CapabilitySchema`: 3 modules, `CapabilityExecutionError`: 2); the list
       only shrinks, like `known_leaks`.
     - _Requirements: 2.1_
-  - [ ] 2.2 Resolve `CapabilityExecutionError`
+  - [x] 2.2 Resolve `CapabilityExecutionError`
+    - Evidence: `CapabilityError` and `CapabilityExecutionError` are defined in `base/exceptions.py`; `tools/exceptions.py` re-exports them; details key is `capability_name`.
     - One definition in `base.exceptions`; `tools.exceptions` re-exports it; update the differential test that imports the `tools`
       one for the reason recorded in the audit (finding 15).
     - _Requirements: 2.1_
-  - [ ] 2.3 Resolve `CapabilitySchema`
+  - [x] 2.3 Resolve `CapabilitySchema`
+    - Evidence: `base/capability_schema.py` re-exports the `Validated` class of `base/interfaces/capability.py`; only the pydantic copy in `tools/schema.py` remains, tracked in `KNOWN_DUPLICATES` until O4.
     - Three definitions (`base.interfaces.capability`, `base.capability_schema`, `tools.schema`, the last pydantic). Coordinate with
       the pydantic removal of `0-base-structure` (group 14, O4): the pydantic one is retired there, not duplicated here; this task
       makes the other two agree (one dataclass, one re-export) and removes the entry from `KNOWN_DUPLICATES` once the pydantic one
       is gone.
     - _Requirements: 2.1; O4_
 
-- [ ] 3. Port contracts
-  - [ ] 3.1 Signature-aware compliance checker
+- [x] 3. Port contracts
+  - [x] 3.1 Signature-aware compliance checker
+    - Evidence: `port_signature_mismatches`, `validate_port_signatures`, `port_methods` in `src/skye/utils/validation.py`.
     - Extend `utils/validation.validate_interface_compliance` (or add a sibling function) to compare, per Port method: parameter
       names and kinds in order (ignoring `self`/`cls`), `def`/`async def`/async-generator form, and the return annotation by name
       when both sides declare one; accept `Protocol` Ports, not only `ABC`. See `design.md` "Port conformance by signature".
     - _Requirements: 5.2; 16.7 of steering_
-  - [ ] 3.2 One test for every built-in implementation
+  - [x] 3.2 One test for every built-in implementation
+    - Evidence: `tests/unit/test_port_signatures.py`; `KNOWN_MISMATCHES` has 8 pairs (seven `ModelInterface` implementations, `BasePromptBuilder`).
     - `tests/unit/test_port_compliance.py`: one parametrized case per (implementation, Port) pair found in `src`, plus a short
       reference implementation for each exported Port that has none; `KNOWN_MISMATCHES` seeded with the three P1 findings below and
       only shrinking.
     - _Requirements: 5.2_
-  - [ ] 3.3 Fix `ModelInterface.astream` typing
+  - [x] 3.3 Fix `ModelInterface.astream` typing
+    - Evidence: `ModelInterface.astream` is an async generator typed `AsyncIterator[StreamChunk]`.
     - `async def astream(...) -> Iterator[StreamChunk]` becomes an async generator typed `AsyncIterator[StreamChunk]`; update the
       Port docstring example to `async for`.
     - _Requirements: 5.1; 16.6 of steering_
-  - [ ] 3.4 Align `select_model` sync/async
+  - [x] 3.4 Align `select_model` sync/async
+    - Evidence: the Port now declares `async def select_model`. Open: `models/base.py` (about lines 551 and 701) calls `router.select_model(messages)` without `await`, a defect that predates this task.
     - `ModelRouterInterface.select_model` and `ModelRouter.select_model` must agree. Check the callers first, then change the one
       that costs less: the audit found the Port sync and the router `async def`, so a caller that follows the Port gets a coroutine
       where it expects a `str`.
     - _Requirements: 5.1; 16.6 of steering_
-  - [ ] 3.5 The model Port's call shape — blocked on O24
-    - Once O24 is decided, make `ModelInterface.complete`/`stream`/`acomplete`/`astream` match the chosen shape so `custom_providers.py`
-      and `bring_your_own_adapter.py` can implement the Port directly, with no `type: ignore[misc,override]`.
-    - _Requirements: 5.1; O24_
-  - [ ] 3.6 Reconcile six unimplemented Ports — blocked on O29 for the per-row choice
-    - `TokenCounterInterface`, `CostCalculatorInterface`, `ConfigLoaderInterface`, `MultimodalHandlerInterface`,
-      `ErrorHandlerInterface`, `RouteRegistryInterface`: for each, make the implementation satisfy the Port, change the Port, or
-      remove it from `__all__` until a component needs it, per the owner's choice in O29.
-    - _Requirements: 7.1; O29_
-  - [ ] 3.7 Port docstring footer
+  - [x] 3.5 The model Port's call shape — decided in D36
+    - Evidence: `ModelInterface` and the provider overrides take `messages`/`model`/options or one `CompleteRequest`; no `type: ignore[override]` left; `KNOWN_MISMATCHES` is empty; `_select_with_router` in `models/base.py` awaits `select_model`.
+    - D36: `ModelInterface.complete`/`stream`/`acomplete`/`astream` take `messages`, `model` and options, and also accept one `CompleteRequest` as the
+      first argument; rename `CompletionRequest`/`CompletionResponse` to `CompleteRequest`/`CompleteResponse` across `src`, `examples`, `docs` and
+      tests (the module stays `skye.completion`); remove the `type: ignore[misc,override]` of `custom_providers.py` and `bring_your_own_adapter.py`.
+    - _Requirements: 5.1; D36_
+  - [x] 3.6 Reconcile six unimplemented Ports — decided in D41
+    - Evidence: `TokenCounter` and `CostCalculator` inherit their Ports; `ConfigLoaderInterface` reduced to `load`; `MultimodalHandlerInterface`, `ErrorHandlerInterface`, `RouteRegistryInterface`, `StorageAdapterInterface` removed from `skye.interfaces`, `extending.md` and the tests.
+    - D41: make `models.TokenCounter` and `models.CostCalculator` satisfy their Ports; change `ConfigLoaderInterface` to the methods of
+      `base.config.ConfigLoader`; remove `MultimodalHandlerInterface`, `ErrorHandlerInterface` and `RouteRegistryInterface` and
+      `StorageAdapterInterface` from `__all__` (and the facade, the extension page and the tests that list them); `ModelInterface` does not extend `Runnable`.
+    - _Requirements: 7.1; D41_
+  - [x] 3.7 Port docstring footer
+    - Evidence: footer in the 22 Port modules; `tests/unit/test_port_docstrings.py`. Wording came from Port docstrings and a few implementations; Kiro or the owner should review it against the code.
     - Add `Raises:`, `Missing:`, `Concurrency:` to each of the 23 Port modules under `base/interfaces/`; a test
       (`tests/unit/test_port_docstrings.py`) fails on a missing label. Content comes from reading each implementation, not guessed.
     - _Requirements: 6.1_
-  - [ ] 3.8 Reference implementations for untested Ports
+  - [x] 3.8 Reference implementations for untested Ports
+    - Evidence: reference implementations for 18 Ports in `tests/unit/test_port_signatures.py`.
     - For `MultimodalHandlerInterface`, `CostCalculatorInterface`, `TokenCounterInterface`, `ErrorHandlerInterface`,
       `ConfigLoaderInterface` (named by neither a test nor an example per the audit) and any Port still bare after 3.6, add the
       small in-memory implementation that 3.2's test exercises.
     - _Requirements: 7.1_
-  - [ ] 3.9 Split the largest Ports — blocked on O29 for the role boundaries
-    - `ModelRouterInterface` (16 methods) and `PromptBuilderInterface` (22 methods) split by role (selection, health, configuration;
-      rendering, registry, schema) once O29 settles the boundaries; a caller that needs only one role types against it.
-    - _Requirements: 7.1; O29_
-  - [ ] 3.11 One execution primitive — blocked on O30, O31, O33 for the outcome and the method shape
-    - Add one function in `base`, next to the capability Port, that runs a single call, never raises, and returns a `CapabilityMessage` with
-      the outcome chosen in O30; make `CompletionResponse.execute_capability_calls`, the executable call, `CapabilityRegistry` and
-      `CapabilityCallHandler` delegate to it (`registry.execute` stays the raising path); give the batch method the sync/async shape chosen
-      in O31 and the call type chosen in O33. Also fix the low-level defects that need no decision: `json.dumps(result, default=str)` so a
-      `datetime` in a result is not the tool's error (L5); accept a name key in `argument_overrides` (L6); type `capability_calls` as
-      `list[CapabilityCall]` and `capabilities` as the list-or-registry union (L3); drop the `skyeai[capabilities]` try/except (L7); import
-      `CapabilityCall` from the facade path (L8). Test that every path returns an equal message and that a tool's `"Error:"` text is `ok`.
-      See `design.md` "The execution primitive".
-    - _Requirements: 15.1, 15.2; 16.10, 16.12 of steering; O30, O31, O33_
-  - [ ] 3.12 The `ToolProvider` Port — blocked on O32 and the agent-runtime design (O12)
-    - Define the Port in `base/interfaces` (list schemas for an operation, run one call with an explicit `context`, optionally close);
-      `CapabilityRegistry` and the gateway client implement it; the context carries the scope token and operation description, never folded
-      into the model's arguments. Resolve capability registration per O32 so `create_agent(capabilities=[...])` has something to resolve names
-      against. See `design.md` "The `ToolProvider` Port".
-    - _Requirements: 16.1, 16.2; 16.11 of steering; O32_
-  - [ ] 3.10 Protocol-vs-ABC convention — blocked on O25
-    - Write the rule in steering once O25 is decided (which Ports are `Protocol`, which stay abstract bases) and apply it to
-      `MCPClientPort` → `MCPClientInterface` if the O28 naming choice also lands.
-    - _Requirements: 7.1; O25; O28_
+  - [x] 3.9 Split the largest Ports — decided in D41
+    - Evidence: `ModelRouterInterface` composes `ModelSelectionInterface`, `ModelHealthInterface`, `RouterConfigurationInterface`; `PromptBuilderInterface` composes `PromptRenderingInterface`, `PromptRegistryInterface`, `PromptSchemaInterface`; combined names still work.
+    - D41: split `ModelRouterInterface` into selection, health and configuration parts, and `PromptBuilderInterface` into rendering, registry and
+      schema parts; the router and the builders implement all the parts; a caller that needs one role types against it.
+    - _Requirements: 7.1; D41_
+  - [x] 3.11 One execution primitive — decided in D42, D43, D45
+    - Evidence: `src/skye/base/capability_execution.py` (`run_capability_call`, `arun_capability_call`); `CapabilityStatus`; `CapabilityCall.execute()`; `execute_capability_calls` sync and `aexecute_capability_calls`; `tests/unit/test_capability_execution.py`. `CapabilityCallHandler` still returns `CapabilityResult` and shares only the formatter and status (its tests depend on it).
+    - D42, D43, D45: add one function in `base`, next to the capability Port, that runs a single call, never raises and returns a
+      `CapabilityMessage` whose `status` is `CapabilityStatus` (`str` enum: ok, error, denied, skipped; `is_error` derived); make
+      `CompleteResponse.execute_capability_calls` (now sync, with `aexecute_capability_calls`), `CapabilityCall.execute()`, `CapabilityRegistry` and
+      `CapabilityCallHandler` delegate to it (`registry.execute` stays the raising path); remove `ExecutableCapabilityCall` and `get_capability_calls()`.
+      Also fix the low-level defects: `json.dumps(result, default=str)` so a `datetime` in a result is not the tool's error (L5); accept a name key in
+      `argument_overrides` (L6); type `capability_calls` as `list[CapabilityCall]` and `capabilities` as the list-or-registry union (L3); drop the
+      `skyeai[capabilities]` try/except (L7); import `CapabilityCall` from the facade path (L8). Test that every path returns an equal message and that
+      a tool's `"Error:"` text has the status `ok`. See `design.md` "The execution primitive".
+    - _Requirements: 15.1, 15.2; 16.10, 16.12 of steering; D42; D43; D45_
+  - [x] 3.12 The `ToolProvider` Port — decided in D44
+    - Evidence: `src/skye/base/interfaces/tool_provider.py` (`ToolProvider`, `CapabilityContext`); `CapabilityRegistry` implements it; `tests/unit/test_tool_provider.py`. The gateway client is not done: `skye.gateway` has no code yet.
+    - D44: define the Port in `base/interfaces` (list schemas for an operation, run one call with an explicit `context`, optionally close);
+      `CapabilityRegistry` and the gateway client implement it; the context carries the scope token and the operation description, never folded into
+      the model's arguments. `@capability` registers nothing: `registry.add(fn)` and `create_agent(capabilities=[fn])` take objects, and a name resolves
+      only in a registry the user passes. See `design.md` "The `ToolProvider` Port".
+    - _Requirements: 16.1, 16.2; 16.11 of steering; D44_
+  - [x] 3.10 Protocol-vs-ABC convention — decided in D37
+    - Evidence: `ObserverInterface`, `SafetyFilterInterface`, `MemoryInterface` are runtime-checkable `Protocol`s; the rule is in `.kiro/steering/11-design.md`.
+    - D37: write the rule in steering (Ports that third parties implement as plain classes are `Protocol`s: authentication, authorizer, decision,
+      runnable, observer, safety, memory; Ports with default behaviour to inherit stay abstract bases) and convert `ObserverInterface`,
+      `SafetyFilterInterface` and `MemoryInterface` to `Protocol`s. `MCPClientPort` becomes `MCPClientInterface` (D40, task 4.2).
+    - _Requirements: 7.1; D37; D40_
 
-- [ ] 4. Naming and vocabulary
-  - [ ] 4.1 Naming convention and vocabulary in the wiki
+- [x] 4. Naming and vocabulary
+  - [x] 4.1 Naming convention and vocabulary in the wiki
+    - Evidence: "Words used in the code and the documentation" in `docs/glossary.md`.
     - Add the convention of Requirement 22.5 (verbs/nouns, `x`/`ax`, `get_`/`list_`/`set_`/`register`) and the Port/Interface and
       capability/tool/function-call glossary lines (22.1, 22.3) to `docs/glossary.md`.
     - _Requirements: 3.1, 4.1, 4.2_
-  - [ ] 4.2 `MCPClientPort` naming — blocked on O28
-    - Rename to `MCPClientInterface` if O28 chooses that, or document it as the third exception alongside `Runnable`, `DecisionModel`,
-      `StorageBackend`.
-    - _Requirements: 3.1; O28_
-  - [ ] 4.3 Guessability aliases — blocked on O27, one sub-task per alias
-    - `CompletionResponse.text`, `CapabilityRegistry.list()`, `skye.provider(..., kind="embedding")`, `tool_choice`, `ainvoke`: add
-      only the ones the owner accepts in O27, each as a thin alias with no new behavior.
-    - _Requirements: 3.1; O27_
-  - [ ] 4.4 File naming in `models/` and `tools/`
-    - Rename for consistency (`openai_compatible.py`'s classes, the `mcp_*` files of `tools`) once 1.1 to 1.3 make the import path
-      irrelevant to users; update internal imports only, no public path changes.
+  - [x] 4.2 `MCPClientPort` naming — decided in D40
+    - Evidence: `MCPClientInterface` in `src`, tests and docs.
+    - D40: rename `MCPClientPort` to `MCPClientInterface` in `src`, tests, docs and examples.
+    - _Requirements: 3.1; D40_
+  - [x] 4.3 Guessability aliases — decided in D39
+    - Evidence: `CompleteResponse.text`, `CapabilityRegistry.list()`, `ainvoke` on `BaseModelProvider` and `ReActAgent`; the `Runnable` Protocol still requires only `invoke`, so a user class with only `invoke` keeps working.
+    - D39: add `CompleteResponse.text` (read-only, returns `content`), `CapabilityRegistry.list()` (returns `list_all()`) and `ainvoke` beside
+      `Runnable.invoke`; each a thin alias with no new behaviour. Nothing else is added.
+    - _Requirements: 3.1; D39_
+  - [x] 4.4 File naming in `models/` and `tools/`
+    - Evidence: `google_provider.py` is now `google.py`; the old `openai_compatible.py` is split into `openai_compatible.py` (`OpenAICompatibleProvider`, the shared wire format), `openai.py` (`OpenAIProvider`) and `azure.py` (`AzureOpenAIProvider`), so every vendor file of `models/llm` is named after its provider (`anthropic.py` beside `anthropic_compatible.py`, `bedrock.py`, `openai.py`, `azure.py`, `google.py`); imports, budget tests, docs and the `1-adapters-models` and `0-base-structure` specs follow. `skye.auth.openai_compatible` is a different module and keeps its name.
     - _Requirements: 3.2_
-  - [ ] 4.5 `skye.router` storage re-exports — blocked on O28
-    - Keep as a documented alias or drop at 0.1.0, per O28.
-    - _Requirements: 2.1; O28_
-  - [ ] 4.6 Placeholder packages raise a clear error — blocked on O28
-    - If O28 chooses it, add a module-level `__getattr__` to `skye.flows`, `skye.gateway`, `skye.teams`, `skye.policy`, `skye.observe`,
-      `skye.guard` that raises `ImportError("skye.<name> is planned, not available yet")` on an attribute a user might expect.
-    - _Requirements: 3.2; O28_
-  - [ ] 4.7 Router shorthand
+  - [x] 4.5 `skye.router` storage re-exports — decided in D40
+    - Evidence: `tests/unit/router/test_router_exports.py`.
+    - D40: remove the six storage re-exports from `skye.router`; examples and docs import them from `skye.store`.
+    - _Requirements: 2.1; D40_
+  - [x] 4.6 Placeholder packages raise a clear error — decided in D40
+    - Evidence: `tests/unit/test_placeholder_packages.py`.
+    - D40: add a module-level `__getattr__` to `skye.flows`, `skye.gateway`, `skye.teams`, `skye.policy`, `skye.observe` and `skye.guard` that raises
+      `ImportError("skye.<name> is planned, not available yet")` for an unknown attribute.
+    - _Requirements: 3.2; D40_
+  - [x] 4.7 Router shorthand
+    - Evidence: `expand_route_shorthand` and the `routes` dict form in `src/skye/router/model_router.py`; `tests/unit/router/test_router_shorthand.py`. The `routing/` examples are rewritten under 5.7/5.8.
     - `ModelRouter({"alias": ["provider/model", ...]})` builds the same `RouteConfig`, `ModelTarget` and `FallbackConfig` (first entry
       primary, the rest fallbacks), reads the provider from the string and the API key from the provider's standard variable, and leaves
       the full form first-class; one syntax only (no `from_list`). A test asserts the shorthand and the explicit form build an equal router
       and that an explicit field is never overwritten by a default. Rewrite the `routing/` examples to start with the shorthand (feeds 5.7,
       5.8). See `design.md` "The router shorthand".
     - _Requirements: 17.1; 22.8 of steering_
-  - [ ] 4.8 Typed `provider()` — the combined client type is blocked on O28
+  - [x] 4.8 Typed `provider()` — the combined client type is not added (D40)
+    - Evidence: `@overload`s in `src/skye/__init__.py` and `src/skye/models/registry.py`; `tests/unit/test_provider_typing.py` (mypy run is skipped when mypy is absent).
     - Add `@overload` so the default call returns the model client and `provider_type="embedding"` the embedding client, and a type-checker
       test over the quickstart lines (no cast, no `ignore`). The larger "one combined client exposing `complete` and `encode`" option waits
-      for O28.
-    - _Requirements: 18.2; 22.9 of steering; O28_
-  - [ ] 4.9 Guessability aliases and their test — blocked on O27 for the set
-    - Add only the aliases O27 accepts (and its extension to `skye.Router`, `Validated.model_dump`/`model_validate`/`model_json_schema`,
-      `skye.tool`, `tools=`), each delegating with no second value stored; `skye.completion(...)` stays a documentation line (facade purity,
-      1.4). Add `tests/budget/test_guessable_names.py` with each name as `exists` or `known_missing`, the list only shrinking. See
-      `design.md` "Guessability aliases".
-    - _Requirements: 18.1, 18.2; 22.7 of steering; O27_
+      for D40.
+    - _Requirements: 18.2; 22.9 of steering; D40_
+  - [x] 4.9 Guessability aliases and their test — decided in D39
+    - Evidence: `tests/budget/test_guessable_names.py`.
+    - D39: the test `tests/budget/test_guessable_names.py` records `text`, `list()` and `ainvoke` as `exists` and `tool_choice`/`tools`, `kind=`,
+      `skye.Router`, `skye.tool` and the Pydantic-style methods as `known_missing` (documented, not added); the list only shrinks.
+    - _Requirements: 18.1, 18.2; 22.7 of steering; D39_
 
-- [ ] 5. Examples
-  - [ ] 5.1 Delete the empty example
+- [x] 5. Examples
+  - [x] 5.1 Delete the empty example
+    - Evidence: `examples/providers/router_example.py` removed.
     - Remove `examples/providers/router_example.py` (0 bytes); routing is already covered by `examples/routing/`.
     - _Requirements: 9.3_
-  - [ ] 5.2 Guard the four tracebacks
+  - [x] 5.2 Guard the four tracebacks
+    - Evidence: the four examples print guidance instead of a traceback.
     - `capabilities/mcp_client.py`, `tools/mcp_fastmcp.py` (check for a server first, print how to start one or set
       `MCP_SERVER_URL`), `serverless/serverless_router_example.py` (catch the `${VAR}` `ConfigurationError`),
       `routing/yaml_config_example.py` (stop after showing the loaded router instead of making a real call with a placeholder key).
     - _Requirements: 8.1, 8.2_
-  - [ ] 5.3 Offline demo provider — blocked on O26
-    - Once O26 is decided, replace the "skipping" branches of `basic/quickstart.py`, `async_and_streaming.py`,
-      `models/cost_tracking.py`, `advanced/function_calling.py`, `advanced/streaming.py`, `advanced/structured_output.py`,
-      `routing/fallbacks_and_health.py` with a call to the chosen demo path, printing which mode ran.
-    - _Requirements: 8.1; O26_
-  - [ ] 5.4 Offline-run test
+  - [x] 5.3 Offline demo provider — decided in D38
+    - Evidence: `examples/_offline.py` (scripted model or the real provider when a key exists), used by the examples named in the task.
+    - D38: one scripted model in `examples/` (a shared helper, not in the package) replaces the "skipping" branches of `basic/quickstart.py`,
+      `async_and_streaming.py`, `models/cost_tracking.py`, `advanced/function_calling.py`, `advanced/streaming.py`,
+      `advanced/structured_output.py` and `routing/fallbacks_and_health.py`; with a provider key the example uses the real provider; each prints which mode ran.
+    - _Requirements: 8.1; D38_
+  - [x] 5.4 Offline-run test
+    - Evidence: `tests/examples/test_examples_offline.py` (written, not yet run).
     - `tests/examples/test_examples_offline.py`: run each example in a subprocess with provider environment variables unset and
       outbound sockets refused; fail on a non-zero exit or on `Traceback` in the output.
     - _Requirements: 8.1_
-  - [ ] 5.5 Install-line test and fix
+  - [x] 5.5 Install-line test and fix
+    - Evidence: `tests/budget/test_install_lines.py`; `KNOWN_STALE` holds `docs/getting-started.md` and `docs/models/provider-guide.md`, to fix next.
     - `tests/budget/test_install_lines.py`: find every `pip install skyeai[...]` in `examples/`, `docs/`, `README.md`; fail when the
       extra does not exist or is in `known_empty`. Fix `examples/README.md` (lines about `[openai]`, `[openai,anthropic,bedrock]`),
       `providers/openai_example.py`, `providers/google_example.py`, `capabilities/mcp_server.py` (the `fastmcp` version range),
       and the package docstring (6.1 also touches this file).
     - _Requirements: 10.1, 10.2_
-  - [ ] 5.6 README-matches-folder test and fix
+  - [x] 5.6 README-matches-folder test and fix
+    - Evidence: `tests/budget/test_example_readmes.py`; a README in each folder; reading order in `examples/README.md`.
     - `tests/budget/test_example_readmes.py`: a folder's README lists exactly its `*.py` files; fails on `basic/README.md`'s
       `streaming_example.py` reference and on folders with no README (`auth/`, `base/`, `memory/`, `models/`, `prompts/`, `store/`,
       `tools/`). Add the missing READMEs (five lines: what you learn, the command, what you see, what you need) and a numbered
       reading order in `examples/README.md`.
     - _Requirements: 11.1, 11.2_
-  - [ ] 5.7 Merge or cut duplicate examples
+  - [x] 5.7 Merge or cut duplicate examples
+    - Evidence: kept `advanced/function_calling.py` and `routing/yaml_config_example.py`; the three duplicates are deleted.
     - Keep the short one of each pair and link the long one as "reference" or delete it: `advanced/function_calling.py` over
       `capabilities/function_calling_example.py` and `providers/function_calling_example.py`; `routing/yaml_config_example.py` over
       `routing/yaml_config.py`; the short `prompts/` duplicates are handled by `prompts-support` task 3, not here.
     - _Requirements: 9.3_
-  - [ ] 5.8 Size test and split
+  - [x] 5.8 Size test and split
+    - Evidence: `tests/budget/test_example_size.py`; every example is at most 80 lines except `advanced/custom_providers.py` (90, the only `KNOWN_LONG` entry).
     - `tests/budget/test_example_size.py`: fail above about 80 lines unless listed in `KNOWN_LONG` (seeded with the nine files over
       300 lines named in the audit); split or cut each, moving exhaustive variants to the docs wiki.
     - _Requirements: 9.1_
-  - [ ] 5.9 Plain-output test and fix
+  - [x] 5.9 Plain-output test and fix
+    - Evidence: `tests/budget/test_example_output_style.py`; only `prompts/` is allowlisted.
     - `tests/budget/test_example_output_style.py`: fail on a `"=" * N` banner row or an emoji character in a `print` literal, unless
       listed; remove the banners and emoji rows, aligning labels as `basic/configuration.py` already does.
     - _Requirements: 9.2_
-  - [ ] 5.10 The value-proposition example — blocked on O26 for the demo path
-    - `examples/advanced/value_proposition.py` (or similar): one prompt, run against two or three providers, with a fallback when
-      one fails; runnable against the demo provider once O26 lands.
-    - _Requirements: 9.3; O26_
+  - [x] 5.10 The value-proposition example — decided in D38
+    - Evidence: `examples/advanced/value_proposition.py`.
+    - D38: `examples/advanced/value_proposition.py`: one prompt, run against two or three providers, with a fallback when one fails; real
+      providers when keys exist, the scripted model otherwise.
+    - _Requirements: 9.3; D38_
 
-- [ ] 6. Docstrings and discoverability
-  - [ ] 6.1 Fix the package docstring
+- [x] 6. Docstrings and discoverability
+  - [x] 6.1 Fix the package docstring
+    - Evidence: `src/skye/__init__.py` docstring already uses `response.content` and no `skyeai[bedrock]` line.
     - `src/skye/__init__.py`: `response.text` → `response.content`; the stale `pip install skyeai[bedrock]` line.
     - _Requirements: 12.1_
-  - [ ] 6.2 Docstring doctest gate
+  - [x] 6.2 Docstring doctest gate
+    - Evidence: `tests/unit/test_docstrings.py`.
     - `tests/unit/test_docstrings.py`: run `doctest` on the package docstring and each Port module docstring, with
       `# doctest: +SKIP` on network-needing lines.
     - _Requirements: 12.1_
-  - [ ] 6.3 Extension page
+  - [x] 6.3 Extension page
+    - Evidence: `docs/base/extending.md`; completeness test in `tests/docs/test_docs.py`.
     - `docs/base/extending.md` (or similar, in the `base` wiki section): one table, kind of extension / Port / registry / example
       file / status, seeded from "Extension points" of `11-design.md` and extended to every exported Port; a docs test fails when a
       name in `skye.interfaces.__all__` has no row.
     - _Requirements: 13.1, 13.2_
-  - [ ] 6.4 Document import cost per package
+  - [x] 6.4 Document import cost per package
+    - Evidence: `docs/budgets.md`.
     - `docs/budgets.md`: one line per component package stating whether it loads pydantic, until the pydantic removal (O4) makes
       this moot.
     - _Requirements: 7.4 of steering; O4_
 
-- [ ] 7. Checkpoint
-  - [ ] 7.1 Ensure all tests pass, ask the user if questions arise
-    - Run `uv run pytest tests/ -q` and `uv run pytest tests/budget -q`; confirm every new allowlist (`KNOWN_DUPLICATES`,
-      `KNOWN_MISMATCHES`, `KNOWN_LONG`) is non-empty only where a real, named debt remains.
+- [ ] 7. Checkpoint (run by Kiro, not by the implementer)
+  - [ ] 7.1 Run the whole test suite and fix what fails; ask the user if questions arise
+    - Kiro runs `uv run pytest tests/ -q` and `uv run pytest tests/budget -q`. The implementation of the other tasks was written without
+      running the suite, so expect to repair failures in the new tests and in the code they guard: do that here, one failure at a time.
+    - Confirm every new allowlist (`KNOWN_DUPLICATES`, `KNOWN_MISMATCHES`, `KNOWN_LONG`) is non-empty only where a real, named debt remains.
+    - Report which tasks are still unticked: after D36 to D45 only the split of long examples in 5.8 may remain.
+    - _Requirements: all_
+
+- [ ] 8. The `.skye` language: public surface (spec only until the parser exists)
+  - Note: nothing here is built and no example has been run through a parser. The parser itself (text in, syntax tree out, standard library, in
+    `base`) is a task of `0-base-base`, to be added when it is designed; the tasks below follow it. The syntax, the error table and the scope are in
+    `design.md`, "The `.skye` language". The decisions are D49 to D61; the delivery guarantee for persistence (O34) and the fate of
+    `prompts/engine.py` (O35) are open and not needed for version 1.
+  - [ ] 8.1 The conformance suite of the parser
+    - Turn the reference examples (four routers, seven prompts, nine flows; drafted in `.agents/tasks/uxui-dsl-examples.md`) into fixtures under
+      `tests/fixtures/skye/`, and the table of load-time errors of `design.md` into a parametrized test: every version 1 example must parse and
+      validate, every version 2 example must be rejected with the "not available in this version" message, and every row of the error table must give
+      the stated message with the file, line and column.
+    - _Requirements: 19.1, 19.2; D50; D51_
+  - [ ] 8.2 The grammar, as a wiki page
+    - Write the grammar in EBNF from the syntax page of `design.md` as `docs/base/skye-language.md` (front matter, linked from the `base` section index),
+      with the block kinds, the references and prefixes, the expression grammar and the allowed functions; a `.skye` example in it passes `skye check`.
+    - _Requirements: 19.1; D50; D55; D57_
+  - [ ] 8.3 `skye check` and the JSON Schema of the blocks
+    - Provide `skye check <file>` (an entry point that reads the file, calls the parser and the block validators and prints every error with file, line,
+      column, reason and fix, written to be pasted back to a model) and ship the JSON Schema of the `router`, `flow` and `prompt` blocks generated from the
+      block dataclasses. A test runs `skye check` over every `.skye` block in `docs/`, `examples/` and `README.md` (Property 17).
+    - _Requirements: 19.2, 19.4; D61_
+  - [ ] 8.4 The loading API
+    - `skye.load(path)`, `Flow.from_file(path, name=..., registry=...)` and the router's `from_file(path, name=...)`: the same `path`, errors with file, line
+      and column, and `name` optional when the file holds one block of the kind (Property 16). The class names (`Router` against `ModelRouter`, `Flow`
+      at the top level or in `skye.flows`) are settled with the owner first; see `design.md`, "Loading".
+    - _Requirements: 19.2, 19.5; D61_
+  - [ ] 8.5 `.gitattributes`
+    - Add `.gitattributes` with `*.skye linguist-language=HCL` so GitHub highlights the files until a dedicated grammar exists.
+    - _Requirements: 19.1; D61_
+  - [ ] 8.6 Convert the router examples and the YAML tests to `.skye`
+    - When the parser exists, rewrite the router examples under `examples/routing/` and the YAML router tests as `.skye` files (the `router` block is the
+      reference format; JSON and YAML files stay readable), including the shorthand `route "x" = [...]`, the fallback written inside the route and the
+      renamed duration fields (`cooldown`, `retry_after`). Examples stay within the size and plain-output tests of group 5.
+    - _Requirements: 17.2, 17.3, 19.3; D59_
 
 ## Notes
 
-- Tasks blocked on an open decision are not started before the owner decides; do not guess the answer in code (see `design.md`,
-  "Open decisions and the tasks they block").
+- Specs outside this one name the things D36 to D45 rename or remove: `CompletionRequest`/`CompletionResponse` (`0-base-base`, `1-adapters-models`,
+  `0-base-structure`, steering `11-design.md`, `00-rules.md`), `MCPClientPort` (`2-services-tools`), `StorageAdapterInterface` and the other removed
+  Ports (`0-base-structure`), `ExecutableCapabilityCall` and `get_capability_calls` (`0-base-base`, `2-services-tools`). The change that does 3.5,
+  3.6, 3.11 and 4.2 updates those lines in the same commit; their evidence of work already done keeps the old name with a "renamed in D3x" note.
+- The open decisions O24 to O33 are taken (D36 to D45 of `.kiro/steering/12-decisions.md`); each task cites its decision. Where a task
+  text still says "once O.. is decided", read the decision as taken and follow it.
 - `models:8.2` (pydantic structured-output examples) and `prompts-support` task 3 (stale `examples/prompts/`) are tracked in their
   own specs and are not duplicated here, even though they appear in the audit (findings behind Requirement 24's pydantic/D20
   contradictions).
 - Group 1 is done; its evidence is the committed facades and `tests/budget/test_public_imports.py`.
+- Group 8 (the `.skye` language) is not built: it waits for the parser. D49 (no third-party dependency) is taken; the code that still imports pydantic
+  and tenacity is migrated in a separate task, and the budget tests fail by design until it is done.
 
 ## Task Dependency Graph
 

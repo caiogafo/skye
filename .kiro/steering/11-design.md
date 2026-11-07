@@ -90,7 +90,7 @@ Three checks run on every import: no upward import; no import outside the compon
 ## Components
 | Component | Layer | Role | Ports consumed |
 |---|---|---|---|
-| `base` | 0 | core models, errors, configuration, all Ports, `missing_extra` helper, `http.py` | none (standard library only) |
+| `base` | 0 | core models, errors, configuration, all Ports, `missing_extra` helper, `http.py`, the `.skye` parser (text in, syntax tree out) | none (standard library only) |
 | `auth` | 0 | strategies, credential sources, token cache, SigV4 | implements `authentication` |
 | `models` | 1 | adapters for language, embedding and decision models; shared transport, retry, error mapping, token counting; implements `runnable` | `model`, `decision`, `vector_encoder`, `registry`, `cost_calculator`, `error_handler`, `token_counter`, `runnable`; credentials through `auth` |
 | `store` | 1 | in-memory, file, DynamoDB, Redis backends | `storage`; credentials through `auth` |
@@ -104,7 +104,7 @@ Three checks run on every import: no upward import; no import outside the compon
 | `gateway` | 3 | the library acting as an MCP server, toolset per operation | `capability`; optionally `decision`; optional services by injection |
 | `agents` | 3 | agent loop, BaseAgent, hooks, agent-type registry | `runnable`, `model`; per enabled hook `capability`, `prompt`; optional services by injection |
 | `teams` | 3 | coordinate units toward a shared objective; owns the team-role concept | `runnable` only; optionally `prompt` |
-| `flows` | 3 | sequence units into steps | `runnable` only; optionally `prompt` |
+| `flows` | 3 | sequence units into steps; reads a `flow` block of a `.skye` file and runs it | `runnable` only; optionally `prompt` |
 
 ## Ports (all in `base/interfaces`)
 `model`, `decision`, `runnable`, `storage`, `registry`, `cost_calculator`, `error_handler`, `token_counter`, `memory`,
@@ -117,15 +117,21 @@ make (Requirement 16.6). Its docstring ends with a fixed footer: what it raises,
 several threads or tasks may call it, and, for hooks and observers, that their exceptions are logged and swallowed (Requirement 16.8).
 The compliance check compares every method by parameter names and kinds and by `def` or `async def`, for abstract bases and
 `Protocol`s alike, and one test runs every built-in implementation through it (Requirement 16.7). A Port that nothing implements
-and nothing tests is not exported (Requirement 16.9). Whether a Port is a `Protocol` or an abstract base is open decision O25.
+and nothing tests is not exported (Requirement 16.9). The kind of a Port follows one rule (D37): a Port that third parties implement as a plain class is a
+`@runtime_checkable` `Protocol` (`AuthenticationInterface`, `AuthorizerInterface`, `DecisionModel`, `Runnable`, `ObserverInterface`,
+`SafetyFilterInterface`, `MemoryInterface`), so a class with the right methods satisfies it with no base class and `isinstance` works; a
+Port that carries default behaviour to inherit (`ModelInterface` with `BaseModelProvider`: retry, health) stays an abstract base. A Port
+that is a Protocol keeps its `@abstractmethod`s, so a class that does inherit it and misses a method still fails when instantiated.
+A concrete class that cannot inherit its Port (`ConfigLoader` and `ConfigLoaderInterface`, which import each other's module) satisfies
+it by structure, and a test checks the signatures.
 
 One primitive runs a single capability call: it never raises and returns a `CapabilityMessage` whose outcome says succeeded, failed,
-denied or skipped (Requirement 16.10, open decision O30). It lives in `base`, beside the capability Port, so `agents`, `teams` and
+denied or skipped (Requirement 16.10, decision D42). It lives in `base`, beside the capability Port, so `agents`, `teams` and
 `flows` call it without importing `tools`. The response methods, the executable call, the registry and the call handler all delegate to
 it, so one behaviour holds on every path; `registry.execute` is the one documented exception that raises ("I called it myself"). A
 runtime component reaches its toolset through one Port — list the schemas for an operation, run one call, optionally close — implemented
 by the capability registry and by the gateway client, and every call carries a context (scope token, operation description) separate
-from the model's arguments (Requirement 16.11, open decision O32).
+from the model's arguments (Requirement 16.11, decision D44).
 
 ## Composition
 `agents`, `teams`, `flows` compose each other and model adapters without importing each other, because each holds its children
@@ -151,12 +157,12 @@ Adding one never edits a file outside the owner; a check rejects it otherwise.
 
 ## Base contracts
 `base` holds the shapes every component shares. Message types: `SkyeMessage` with the role variants (`UserMessage`, `AssistantMessage`,
-`SystemMessage`, `CapabilityMessage`) and `ContentChunk`. Completion: `CompletionRequest` and `CompletionResponse` (content, role,
+`SystemMessage`, `CapabilityMessage`) and `ContentChunk`. Completion: `CompleteRequest` and `CompleteResponse` (content, role,
 metadata, token usage, model identifier, provider; streaming yields chunks in one format). The capability schema (name, description,
 parameters) is a pure contract in `base`; handlers and the registry stay in `tools`. Errors: `SkyeError` with `ProviderError`
 (provider context, status), `ConfigurationError`, `ValidationError` (field and value), `CapabilityExecutionError` and `MissingExtraError`;
-wrapped errors keep the original message and stack. Configuration sources, in priority order: code, environment, file (YAML or JSON);
-`${VAR}` is substituted; invalid values raise `ConfigurationError`. The Ports are listed in "Ports"; each performs no I/O.
+wrapped errors keep the original message and stack. Configuration sources, in priority order: code, environment, file (JSON, a `.skye` file, or YAML with the `yaml` extra, D53);
+`${VAR}` is substituted in JSON and YAML and `env.NAME` is the form in `.skye`; invalid values raise `ConfigurationError`. The Ports are listed in "Ports"; each performs no I/O.
 
 ## Public API and lazy imports
 A user-facing path has at most two levels and never goes through `<pkg>.base` or into a module inside a component (Requirement 7.14, D34).
@@ -167,7 +173,7 @@ The public paths are thin facades that only re-export `base` (Requirement 7.15):
 examples, the documentation and the `README.md`.
 
 A name a user of the OpenAI SDK, LiteLLM or Pydantic would try may be added as a thin alias that stores no second value (Requirement
-22.7, open decision O27); a test records each such name as `exists` or `known_missing` and the missing list only shrinks. A verbose
+22.7, decision D39); a test records each such name as `exists` or `known_missing` and the missing list only shrinks. A verbose
 configuration object may offer one shorthand on its existing constructor that builds the same objects and hides none of the full form,
 with one syntax and no second constructor (Requirement 22.8): the router takes `{"alias": ["provider/model", ...]}` and builds the same
 `RouteConfig`, `ModelTarget` and `FallbackConfig`. `provider(name, **config)` is typed so the common call type-checks with no cast
@@ -177,11 +183,35 @@ with one syntax and no second constructor (Requirement 22.8): the router takes `
 (wrapping the `ImportError`, naming the extra). Each optional component imports its heavy library inside the function that first
 needs it. A breaking rename is acceptable while the version is 0.x and the migration is documented.
 
+## The `.skye` language
+One declarative language, HCL-like, written from scratch in the standard library, for the `router`, `flow` and `prompt` blocks (Requirement
+54, D50). A file holds one or more blocks; each file is self-sufficient, with no `include` in version 1.
+
+Where it lives. The parser is in `base` and takes **text**, never a path, because `base` does no file I/O (Requirement 3.2); it returns a
+neutral syntax tree. The component that owns a block reads the file, calls the parser and validates the tree into its own dataclasses: the
+`router` component into the router configuration, `flows` into a flow, `prompts` into a prompt (D50, D61). The loaders are
+`Flow.from_file(path, name=..., registry=...)`, `Router.from_file(path, name=...)` and `skye.load(path)`, which returns every block of the
+file. `flows` still imports only `base`: a step is a `Runnable` resolved by name from a registry the caller passes (D52), never by import.
+
+What the loader checks before anything runs (Requirement 54.4): every `next`, `on_error`, `on_timeout` and `fallback` names a block that
+exists, every step has a `next`, a `choice` has an `else`, a step that can be re-entered has `max_visits`, every reference has a known
+prefix and resolves, every context field is declared and typed, every duration is a string with a unit. Errors carry the file, line,
+column, reason and the fix, and all errors of a file are reported together (54.3). Expressions are restricted to comparison, `and`/`or`/`not`,
+arithmetic, `in` and a fixed list of functions, checked with `ast` and never evaluated with `eval` or `exec` (54.5, D55); one expression
+grammar in `base` serves the flow guards and the prompt interpolation.
+
+Scope. Version 1: routers, flows (sequence, conditions, parallel, bounded loops, retry, timeout, errors, `foreach`) and the reduced `prompt`
+block that replaces the 18 bundled `.jinja` templates, checked by an equivalence test (D51, D60). Version 2, written but not built: waiting for
+events with persistence and resume (`wait`, `on_event`; version 1 reserves both words and rejects them with a clear message), `to_mermaid()`,
+`include`, and in prompts the examples, multimodal content, output schema and `bind`. Tools of version 1: the written grammar, a JSON Schema of
+the blocks and `skye check <file>` (D61). Existing JSON and YAML router files stay readable (D59). The language adds no third-party library
+to any component (D49).
+
 ## Transport and providers
 One shared transport in `models/transport`: `http.py` (JSON over `urllib`, bearer and API-key headers, timeouts; the helper itself is
 `base/http.py`), `streaming.py` (stdlib parsing of `text/event-stream`), `retry.py` (3 retries after the first attempt),
 `error_mapping.py`, `token_counter.py`, `cost.py`, `multimodal.py`. SigV4 signing is in `auth` and reused by Bedrock. Three adapter
-families under `models/llm` (and analogues for embeddings): `openai_compatible` (one adapter keyed by base URL and key: OpenAI, Azure and
+families under `models/llm` (and analogues for embeddings): `openai_compatible` (one adapter keyed by base URL and key, with `openai` and `azure` holding what is specific to each: OpenAI, Azure and
 the OpenAI-compatible ecosystem), `anthropic` (Messages API), `bedrock` (Converse with SigV4, boto3 not required); Google has its own
 dialect. Streaming parsing and signing are written once and reused. The provider-SDK extras are driven to zero; the residual extras
 are `memory`, `observe` if no stdlib path exists, `mcp` and `auth`.
@@ -242,6 +272,10 @@ well-formed. 10. The transport and the adapters import no provider SDK or third-
 offline, exits 0 and ends in no traceback, and every install line names a real extra. 18. The first docstring of the package and of
 each Port runs. 19. Every execution path returns the same `CapabilityMessage` for the same call, and a tool's own `"Error:"` text is not
 marked as a failure. 20. A guessable-name alias stores no second value, and the known-missing list only shrinks.
+21. The `.skye` parser imports only the standard library, takes text and never a path. 22. Every load error names the file, line and column.
+23. No `.skye` expression is evaluated with `eval` or `exec`, and one that calls anything outside the allowed list is rejected.
+24. A loop over steps is bounded, and a flow that can run forever does not load. 25. Every `.skye` example in the documentation passes
+`skye check`, and the examples of the language pass the parser.
 
 ## Codename placement
 
@@ -262,4 +296,5 @@ Front matter of the spec and the docs section; one italic line under the section
 Deterministic checks guard the architecture: the import matrix, the codename test, the extras footprint test, the clean-import test,
 the steering test, the no-old-name test, the public-imports test, and the differential tests. The public surface adds the Port
 conformance test, the duplicate-name test, the example-quality tests (offline run, size, README against folder, install lines) and the
-docstring test (properties 14 to 18). A requirement that has no test names the reason.
+docstring test (properties 14 to 18). The `.skye` language adds a conformance suite built from its reference examples and from the table of
+load-time errors, and the `skye check` run over the documentation (properties 21 to 25). A requirement that has no test names the reason.
