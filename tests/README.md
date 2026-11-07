@@ -52,9 +52,10 @@ Shared test fixtures and mock data used across all test categories.
 
 **Files:**
 - `mock_responses.py` - Mock API responses for testing
-- `sample_configs.py` - YAML configuration fixtures
+- `sample_configs.py` - `.skye` router texts and configuration dictionaries
 - `sample_config.json` - JSON configuration example
-- `sample_config.yaml` - YAML configuration example
+- `skye/` - `.skye` files of the language (routers, flows, prompts)
+- `legacy_router_yaml/` - the old YAML router examples, as JSON, kept only for the equivalence test of the `.skye` conversion
 - `images/` - Sample images for multimodal testing
 
 ## Running Tests
@@ -130,9 +131,9 @@ import pytest
 from skye.router import ModelRouter
 
 @pytest.mark.integration
-def test_router_with_yaml_config():
-    """Test router loading from YAML configuration."""
-    router = ModelRouter.from_yaml("tests/fixtures/sample_config.yaml")
+def test_router_with_skye_config():
+    """Test router loading from a .skye file."""
+    router = ModelRouter.from_file("tests/fixtures/skye/routers.skye", name="r1")
     assert router is not None
     # Test routing behavior
 ```
@@ -146,7 +147,7 @@ from skye.router import ModelRouter
 @pytest.mark.stress
 async def test_concurrent_routing():
     """Test router with 100+ concurrent requests."""
-    router = ModelRouter.from_yaml("tests/fixtures/sample_config.yaml")
+    router = ModelRouter.from_file("tests/fixtures/skye/routers.skye", name="r1")
     
     async def make_request():
         return await router.aroute_request(request)

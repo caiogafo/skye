@@ -16,6 +16,7 @@ Pages:
 - [Configuration](configuration.md)
 - [Core interfaces](interfaces.md)
 - [Extending Skye](extending.md): which Port to implement, where to register it, which example to copy
+- [The .skye language](skye-language.md): grammar, blocks, references, expressions, errors, `skye check` and `skye new`
 
 ## Models are validated dataclasses
 

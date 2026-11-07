@@ -200,7 +200,7 @@ class Validated:
         """Build an instance from a mapping, ignoring keys that are not fields.
 
         Args:
-            data: The values, for example parsed from a JSON or YAML file.
+            data: The values, for example parsed from a JSON file.
 
         Returns:
             The validated instance.

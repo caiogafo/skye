@@ -25,7 +25,7 @@ integration/
 │   ├── test_anthropic_integration.py
 │   └── test_multi_provider.py
 └── routes/             # Router integration tests
-    ├── test_yaml_routing.py
+    ├── test_skye_routing.py
     ├── test_fallback_chains.py
     └── test_rate_limit_integration.py
 ```
@@ -80,10 +80,10 @@ from skye.base.completion import CompleteRequest
 from skye.base.messages import UserMessage
 
 @pytest.mark.integration
-def test_router_with_yaml_config():
-    """Test router loading and execution from YAML configuration."""
-    # Load router from YAML
-    router = ModelRouter.from_yaml("tests/fixtures/sample_config.yaml")
+def test_router_with_skye_config():
+    """Test router loading and execution from a .skye file."""
+    # Load router from a .skye file
+    router = ModelRouter.from_file("tests/fixtures/skye/routers.skye", name="r1")
     
     # Create request
     request = CompleteRequest(
@@ -152,7 +152,7 @@ def test_router_with_capabilities():
     registry.register(get_weather)
     
     # Create router
-    router = ModelRouter.from_yaml("tests/fixtures/sample_config.yaml")
+    router = ModelRouter.from_file("tests/fixtures/skye/routers.skye", name="r1")
     
     # Create request with capabilities
     request = CompleteRequest(
@@ -180,7 +180,7 @@ from skye.base.exceptions import ProviderError
 @pytest.mark.integration
 def test_fallback_chain_execution():
     """Test router fallback chain when primary fails."""
-    router = ModelRouter.from_yaml("tests/fixtures/fallback_config.yaml")
+    router = ModelRouter.from_file("tests/fixtures/skye/routers.skye", name="r1")
     
     # Create request
     request = CompleteRequest(
@@ -240,7 +240,7 @@ from skye.router import ModelRouter
 @pytest.fixture
 def configured_router():
     """Create and configure a router for testing."""
-    router = ModelRouter.from_yaml("tests/fixtures/sample_config.yaml")
+    router = ModelRouter.from_file("tests/fixtures/skye/routers.skye", name="r1")
     yield router
     # Cleanup if needed
     router.cleanup()
@@ -264,7 +264,7 @@ import asyncio
 @pytest.mark.asyncio
 async def test_async_routing():
     """Test async routing workflow."""
-    router = ModelRouter.from_yaml("tests/fixtures/sample_config.yaml")
+    router = ModelRouter.from_file("tests/fixtures/skye/routers.skye", name="r1")
     
     request = CompleteRequest(
         messages=[UserMessage(content="Hello")],
@@ -282,12 +282,12 @@ import pytest
 from skye.router import ModelRouter
 
 @pytest.mark.integration
-def test_yaml_config_loading():
-    """Test loading router from YAML with env vars."""
+def test_skye_config_loading():
+    """Test loading router from .skye with env vars."""
     import os
     os.environ["TEST_API_KEY"] = "test-key-123"
     
-    router = ModelRouter.from_yaml("tests/fixtures/env_var_config.yaml")
+    router = ModelRouter.from_file("tests/fixtures/skye/routers.skye", name="r1")
     
     # Verify configuration was loaded correctly
     assert router is not None
@@ -316,7 +316,7 @@ def test_yaml_config_loading():
 Integration tests should verify:
 - **End-to-end workflows** - Complete user scenarios
 - **Component interactions** - How components work together
-- **Configuration loading** - YAML, JSON, environment variables
+- **Configuration loading** - `.skye`, JSON, environment variables
 - **Error handling** - Graceful degradation and recovery
 
 ## Related Documentation

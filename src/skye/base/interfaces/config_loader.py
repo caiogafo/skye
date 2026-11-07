@@ -39,7 +39,7 @@ class ConfigLoaderInterface(ABC):
         applying them in order of precedence: code > environment > file.
 
         Args:
-            config_path: Optional path to YAML or JSON configuration file.
+            config_path: Optional path to a JSON configuration file (YAML is not read).
             overrides: Optional dictionary of configuration values to override.
 
         Returns:
@@ -50,7 +50,7 @@ class ConfigLoaderInterface(ABC):
 
         Example:
             >>> config = loader.load(
-            ...     config_path=Path("config.yaml"),
+            ...     config_path=Path("config.json"),
             ...     overrides={"log_level": "DEBUG"}
             ... )
         """

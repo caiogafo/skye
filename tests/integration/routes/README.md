@@ -5,7 +5,7 @@ Integration tests for router functionality with real configurations and workflow
 ## Test Coverage
 
 This directory contains tests for:
-- **YAML configuration loading** - Loading and using YAML router configurations
+- **`.skye` configuration loading** - Loading and using `.skye` router configurations
 - **Fallback chain execution** - Testing fallback chains end-to-end
 - **Rate limiting integration** - Rate limiting with real request patterns
 - **Multi-provider routing** - Routing across multiple providers
@@ -13,7 +13,7 @@ This directory contains tests for:
 
 ## Test Files
 
-- `test_yaml_routing.py` - YAML configuration and routing tests
+- `test_skye_routing.py` - `.skye` configuration and routing tests
 - `test_fallback_chains.py` - Fallback chain execution tests
 - `test_rate_limit_integration.py` - Rate limiting integration tests
 - `test_multi_provider_routing.py` - Multi-provider routing tests
@@ -25,13 +25,13 @@ This directory contains tests for:
 pytest tests/integration/routes/
 
 # Run specific test file
-pytest tests/integration/routes/test_yaml_routing.py
+pytest tests/integration/routes/test_skye_routing.py
 ```
 
 ## Testing Approach
 
 Router integration tests should:
-- Use real YAML configurations
+- Use real .skye configurations
 - Test complete routing workflows
 - Verify fallback chains execute correctly
 - Test rate limiting with realistic request patterns

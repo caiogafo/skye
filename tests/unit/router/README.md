@@ -10,7 +10,7 @@ This directory contains tests for:
 - **Rate limiting** - TPM/RPM tracking and enforcement
 - **Health tracking** - Model health monitoring and cooldowns
 - **Fallback chains** - Fallback execution logic
-- **YAML configuration** - Router configuration from YAML files
+- **`.skye` configuration** - Router configuration from `.skye` and JSON files
 
 ## Test Files
 

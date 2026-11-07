@@ -1,17 +1,19 @@
 """Configuration models for the model router.
 
-This module contains all Pydantic models used for router configuration,
+This module contains all validated dataclasses used for router configuration,
 including targets, routes, fallbacks, and policies.
 """
 
+import dataclasses
+from collections.abc import Mapping
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field
-
 from skye.base.interfaces.router import RoutingStrategy
+from skye.base.validated import Validated, field, validated
 
 
-class ModelTarget(BaseModel):
+@validated
+class ModelTarget(Validated):
     """A single model target/endpoint configuration.
 
     Args:
@@ -43,52 +45,97 @@ class ModelTarget(BaseModel):
         ... )
     """
 
-    model: str = Field(..., description="Actual model identifier")
-    provider: str = Field(..., description="Provider name")
-    api_key: str | None = Field(None, description="API key for authentication")
-    api_base: str | None = Field(None, description="Base URL for API calls")
-    api_version: str | None = Field(None, description="API version")
-    region: str | None = Field(None, description="Deployment region")
-    timeout: float | None = Field(None, description="Request timeout in seconds")
-    max_retries: int | None = Field(None, description="Maximum retry attempts")
-    weight: float = Field(1.0, description="Weight for weighted routing")
-    tpm: int | None = Field(None, description="Tokens per minute limit")
-    rpm: int | None = Field(None, description="Requests per minute limit")
-    tags: list[str] = Field(default_factory=list, description="Tags for routing")
-    metadata: dict[str, Any] = Field(default_factory=dict, description="Additional metadata")
+    model: str = field(description="Actual model identifier")
+    provider: str = field(description="Provider name")
+    api_key: str | None = field(default=None, description="API key for authentication")
+    api_base: str | None = field(default=None, description="Base URL for API calls")
+    api_version: str | None = field(default=None, description="API version")
+    region: str | None = field(default=None, description="Deployment region")
+    timeout: float | None = field(default=None, description="Request timeout in seconds")
+    max_retries: int | None = field(default=None, description="Maximum retry attempts")
+    weight: float = field(default=1.0, description="Weight for weighted routing")
+    tpm: int | None = field(default=None, description="Tokens per minute limit")
+    rpm: int | None = field(default=None, description="Requests per minute limit")
+    tags: list[str] = field(default_factory=list, description="Tags for routing")
+    metadata: dict[str, Any] = field(default_factory=dict, description="Additional metadata")
 
-    model_config = ConfigDict(extra="allow")
+    extras: dict[str, Any] = field(default_factory=dict, init=False, repr=False, compare=False)
+    #: The fields that were written with ``${NAME}``, as written (the value itself is already substituted); used to export a
+    #: router without its secrets (``ModelRouter.to_config``, ``to_skye``).
+    env_refs: dict[str, str] = field(default_factory=dict, init=False, repr=False, compare=False)
 
-    def model_post_init(self, __context: Any) -> None:
-        """Post-initialization to substitute environment variables in string fields.
-
-        This method is called automatically after model initialization and
-        substitutes ${VAR_NAME} patterns with environment variable values
-        in all string fields.
-        """
+    def __post_init__(self) -> None:
+        """Validate the fields, then substitute ${VAR_NAME} patterns in the declared string fields."""
+        super().__post_init__()
         self._substitute_env_vars()
 
     def _substitute_env_vars(self) -> None:
         """Substitute ${VAR_NAME} patterns with environment variables in string fields.
 
-        This method processes all string fields in the model and replaces
+        This method processes all declared string fields and replaces
         environment variable references with their actual values. It uses
-        the substitute_env_vars function from skye.base.config.
+        the substitute_env_vars function from skye.base.config. Extra fields
+        are kept as given.
 
         Raises:
             ConfigurationError: If a referenced environment variable is not found.
         """
         from skye.base.config import substitute_env_vars
 
-        # Substitute in all string fields (access model_fields from class, not instance)
-        for field_name in self.__class__.model_fields:
-            value = getattr(self, field_name)
-            if isinstance(value, str):
+        for f in dataclasses.fields(self):
+            value = getattr(self, f.name)
+            if f.init and isinstance(value, str):
                 substituted = substitute_env_vars(value)
-                setattr(self, field_name, substituted)
+                if substituted != value:
+                    self.env_refs[f.name] = value
+                setattr(self, f.name, substituted)
+
+    @classmethod
+    def from_dict(cls, data: Mapping[str, Any]) -> "ModelTarget":
+        """Build a target from a mapping; keys that are not declared fields are kept as extra fields."""
+        return cls(**data)
+
+    def to_dict(self) -> dict[str, Any]:
+        """The declared fields and the extra fields as plain dicts and lists."""
+        dumped = super().to_dict()
+        dumped.pop("extras", None)
+        dumped.update(self.extras)
+        return dumped
 
 
-class RouteConfig(BaseModel):
+_declared_init = ModelTarget.__init__
+
+
+def _init_with_extras(self: ModelTarget, **kwargs: Any) -> None:
+    """Accept keyword arguments the class does not declare and keep them as attributes (``extras``)."""
+    names = {f.name for f in dataclasses.fields(ModelTarget) if f.init}
+    extras = {key: kwargs.pop(key) for key in list(kwargs) if key not in names}
+    _declared_init(self, **kwargs)
+    self.extras.update(extras)
+    for key, value in extras.items():
+        setattr(self, key, value)
+
+
+_init_with_extras.__doc__ = _declared_init.__doc__
+ModelTarget.__init__ = _init_with_extras  # type: ignore[method-assign]
+
+
+def _ignore_unknown_keywords(cls: type) -> type:
+    """Make a configuration class drop keyword arguments it does not declare (unknown keys in a file are ignored)."""
+    declared_init = cls.__init__  # type: ignore[misc]
+
+    def init(self: Any, **kwargs: Any) -> None:
+        names = {f.name for f in dataclasses.fields(cls) if f.init}
+        declared_init(self, **{key: value for key, value in kwargs.items() if key in names})
+
+    init.__doc__ = declared_init.__doc__
+    cls.__init__ = init  # type: ignore[misc]
+    return cls
+
+
+@_ignore_unknown_keywords
+@validated
+class RouteConfig(Validated):
     """Configuration for a route with one or more targets.
 
     A route defines an alias that maps to one or more model targets.
@@ -113,15 +160,17 @@ class RouteConfig(BaseModel):
         ... )
     """
 
-    alias: str = Field(..., description="Alias name for this route")
-    targets: list[ModelTarget] = Field(..., min_length=1, description="Model targets")
-    strategy: RoutingStrategy = Field(
-        RoutingStrategy.ROUND_ROBIN, description="Routing strategy"
+    alias: str = field(description="Alias name for this route")
+    targets: list[ModelTarget] = field(min_length=1, description="Model targets")
+    strategy: RoutingStrategy = field(
+        default=RoutingStrategy.ROUND_ROBIN, description="Routing strategy"
     )
-    fallback_on_error: bool = Field(True, description="Try next target on error")
+    fallback_on_error: bool = field(default=True, description="Try next target on error")
 
 
-class FallbackConfig(BaseModel):
+@_ignore_unknown_keywords
+@validated
+class FallbackConfig(Validated):
     """Configuration for fallback chains.
 
     Defines which models to try if the primary model fails.
@@ -137,11 +186,13 @@ class FallbackConfig(BaseModel):
         ... )
     """
 
-    primary: str = Field(..., description="Primary model ID")
-    fallbacks: list[str] = Field(..., min_length=1, description="Fallback model IDs")
+    primary: str = field(description="Primary model ID")
+    fallbacks: list[str] = field(min_length=1, description="Fallback model IDs")
 
 
-class RetryPolicyConfig(BaseModel):
+@_ignore_unknown_keywords
+@validated
+class RetryPolicyConfig(Validated):
     """Configuration for retry policies per error type.
 
     Defines how many times to retry for different error types.
@@ -157,11 +208,13 @@ class RetryPolicyConfig(BaseModel):
         ... )
     """
 
-    error_type: str = Field(..., description="Error type")
-    max_retries: int = Field(..., ge=0, description="Maximum retry attempts")
+    error_type: str = field(description="Error type")
+    max_retries: int = field(ge=0, description="Maximum retry attempts")
 
 
-class AllowedFailsPolicyConfig(BaseModel):
+@_ignore_unknown_keywords
+@validated
+class AllowedFailsPolicyConfig(Validated):
     """Configuration for allowed fails before cooldown.
 
     Defines how many failures of each type are allowed per minute
@@ -178,13 +231,14 @@ class AllowedFailsPolicyConfig(BaseModel):
         ... )
     """
 
-    error_type: str = Field(..., description="Error type")
-    allowed_fails_per_minute: int = Field(
-        ..., ge=0, description="Allowed failures per minute"
+    error_type: str = field(description="Error type")
+    allowed_fails_per_minute: int = field(
+        ge=0, description="Allowed failures per minute"
     )
 
 
-class ModelHealthMetrics(BaseModel):
+@validated
+class ModelHealthMetrics(Validated):
     """Health metrics for a model.
 
     Contains comprehensive health and performance metrics.
@@ -200,28 +254,27 @@ class ModelHealthMetrics(BaseModel):
         ... )
     """
 
-    model_id: str = Field(..., description="Model identifier")
-    success_count: int = Field(0, ge=0, description="Number of successful requests")
-    failure_count: int = Field(0, ge=0, description="Number of failed requests")
-    total_requests: int = Field(0, ge=0, description="Total requests")
-    success_rate: float = Field(0.0, ge=0.0, le=1.0, description="Success rate (0.0-1.0)")
-    average_latency_ms: float = Field(0.0, ge=0.0, description="Average latency in ms")
-    min_latency_ms: float | None = Field(None, description="Minimum latency in ms")
-    max_latency_ms: float | None = Field(None, description="Maximum latency in ms")
-    last_success_time: float | None = Field(None, description="Last success timestamp")
-    last_failure_time: float | None = Field(None, description="Last failure timestamp")
-    is_in_cooldown: bool = Field(False, description="Whether model is in cooldown")
-    cooldown_until: float | None = Field(None, description="Cooldown end timestamp")
-    failure_reasons: dict[str, int] = Field(
+    model_id: str = field(description="Model identifier")
+    success_count: int = field(default=0, ge=0, description="Number of successful requests")
+    failure_count: int = field(default=0, ge=0, description="Number of failed requests")
+    total_requests: int = field(default=0, ge=0, description="Total requests")
+    success_rate: float = field(default=0.0, ge=0.0, le=1.0, description="Success rate (0.0-1.0)")
+    average_latency_ms: float = field(default=0.0, ge=0.0, description="Average latency in ms")
+    min_latency_ms: float | None = field(default=None, description="Minimum latency in ms")
+    max_latency_ms: float | None = field(default=None, description="Maximum latency in ms")
+    last_success_time: float | None = field(default=None, description="Last success timestamp")
+    last_failure_time: float | None = field(default=None, description="Last failure timestamp")
+    is_in_cooldown: bool = field(default=False, description="Whether model is in cooldown")
+    cooldown_until: float | None = field(default=None, description="Cooldown end timestamp")
+    failure_reasons: dict[str, int] = field(
         default_factory=dict, description="Failure counts by reason"
     )
-    active_requests: int = Field(0, ge=0, description="Currently active requests")
-    tags: list[str] = Field(default_factory=list, description="Model tags")
-
-    model_config = ConfigDict(extra="forbid")
+    active_requests: int = field(default=0, ge=0, description="Currently active requests")
+    tags: list[str] = field(default_factory=list, description="Model tags")
 
 
-class UsageStats(BaseModel):
+@validated
+class UsageStats(Validated):
     """Usage statistics for a model.
 
     Contains rate limit usage and request statistics.
@@ -236,19 +289,18 @@ class UsageStats(BaseModel):
         ... )
     """
 
-    model_id: str = Field(..., description="Model identifier")
-    tpm_used: int = Field(0, ge=0, description="Tokens used this minute")
-    tpm_limit: int | None = Field(None, description="Tokens per minute limit")
-    rpm_used: int = Field(0, ge=0, description="Requests made this minute")
-    rpm_limit: int | None = Field(None, description="Requests per minute limit")
-    active_requests: int = Field(0, ge=0, description="Currently active requests")
-    total_requests: int = Field(0, ge=0, description="Total requests made")
-    total_failures: int = Field(0, ge=0, description="Total failures")
-
-    model_config = ConfigDict(extra="forbid")
+    model_id: str = field(description="Model identifier")
+    tpm_used: int = field(default=0, ge=0, description="Tokens used this minute")
+    tpm_limit: int | None = field(default=None, description="Tokens per minute limit")
+    rpm_used: int = field(default=0, ge=0, description="Requests made this minute")
+    rpm_limit: int | None = field(default=None, description="Requests per minute limit")
+    active_requests: int = field(default=0, ge=0, description="Currently active requests")
+    total_requests: int = field(default=0, ge=0, description="Total requests made")
+    total_failures: int = field(default=0, ge=0, description="Total failures")
 
 
-class CooldownInfo(BaseModel):
+@validated
+class CooldownInfo(Validated):
     """Information about a model in cooldown.
 
     Example:
@@ -259,8 +311,6 @@ class CooldownInfo(BaseModel):
         ... )
     """
 
-    model_id: str = Field(..., description="Model identifier")
-    cooldown_until: float = Field(..., description="Cooldown end timestamp")
-    reason: str = Field(..., description="Reason for cooldown")
-
-    model_config = ConfigDict(extra="forbid")
+    model_id: str = field(description="Model identifier")
+    cooldown_until: float = field(description="Cooldown end timestamp")
+    reason: str = field(description="Reason for cooldown")

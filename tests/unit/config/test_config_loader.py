@@ -8,9 +8,9 @@ from skye.base.config import ConfigLoader, ModelConfig, SkyeConfig
 from skye.base.exceptions import ConfigurationError
 
 
-def test_config_loader_from_yaml():
-    """Test loading configuration from YAML file."""
-    config_path = Path("tests/fixtures/sample_config.yaml")
+def test_config_loader_from_full_json():
+    """Test loading a complete configuration (models, plugins, rate limits) from a JSON file."""
+    config_path = Path("tests/fixtures/sample_config_full.json")
     config = ConfigLoader.load(config_path=config_path)
 
     assert isinstance(config, SkyeConfig)
@@ -96,9 +96,9 @@ def test_only_three_skye_prefixed_env_vars(monkeypatch):
 
 
 def test_skye_config_env_names_the_config_file(monkeypatch):
-    monkeypatch.setenv("SKYE_CONFIG", "tests/fixtures/sample_config.yaml")
+    monkeypatch.setenv("SKYE_CONFIG", "tests/fixtures/sample_config_full.json")
     assert ConfigLoader.load().log_level == ConfigLoader.load(
-        config_path=Path("tests/fixtures/sample_config.yaml")
+        config_path=Path("tests/fixtures/sample_config_full.json")
     ).log_level
 
 
@@ -131,7 +131,7 @@ def test_config_loader_from_code_overrides():
 def test_config_loader_precedence(monkeypatch):
     """Test configuration precedence: code > env > file."""
     # 1. Load from file (lowest precedence)
-    config_path = Path("tests/fixtures/sample_config.yaml")
+    config_path = Path("tests/fixtures/sample_config_full.json")
 
     # 2. Set environment variables (medium precedence)
     monkeypatch.setenv("SKYE_LOG_LEVEL", "WARNING")
@@ -171,13 +171,13 @@ def test_config_loader_no_sources():
 
 def test_config_loader_nonexistent_file():
     """Test loading from nonexistent file raises ConfigurationError."""
-    config_path = Path("tests/fixtures/nonexistent.yaml")
+    config_path = Path("tests/fixtures/nonexistent.json")
 
     with pytest.raises(ConfigurationError) as exc_info:
         ConfigLoader.load(config_path=config_path)
 
     assert "Configuration file not found" in str(exc_info.value)
-    assert "nonexistent.yaml" in str(exc_info.value)
+    assert "nonexistent.json" in str(exc_info.value)
 
 
 def test_config_loader_invalid_file_format():
@@ -199,21 +199,14 @@ def test_config_loader_invalid_file_format():
         temp_path.unlink()
 
 
-def test_config_loader_invalid_yaml():
-    """Test loading invalid YAML raises ConfigurationError."""
-    import tempfile
-
-    with tempfile.NamedTemporaryFile(suffix=".yaml", delete=False, mode="w") as f:
-        f.write("log_level: INFO\n  invalid: indentation\n")
-        temp_path = Path(f.name)
-
-    try:
-        with pytest.raises(ConfigurationError) as exc_info:
-            ConfigLoader.load(config_path=temp_path)
-
-        assert "Failed to parse configuration file" in str(exc_info.value)
-    finally:
-        temp_path.unlink()
+def test_config_loader_rejects_yaml(tmp_path):
+    """The library reads no YAML (D62): the error names the supported formats instead of a parse failure."""
+    path = tmp_path / "skye.yaml"
+    path.write_text("log_level: INFO\n", encoding="utf-8")
+    with pytest.raises(ConfigurationError) as exc_info:
+        ConfigLoader.load(config_path=path)
+    message = str(exc_info.value)
+    assert "YAML is not read" in message and ".skye" in message and "JSON" in message
 
 
 def test_config_loader_invalid_json():
@@ -234,11 +227,11 @@ def test_config_loader_invalid_json():
 
 
 def test_config_loader_empty_file():
-    """Test loading empty configuration file."""
+    """Test loading an empty configuration object."""
     import tempfile
 
-    with tempfile.NamedTemporaryFile(suffix=".yaml", delete=False, mode="w") as f:
-        f.write("")
+    with tempfile.NamedTemporaryFile(suffix=".json", delete=False, mode="w") as f:
+        f.write("{}")
         temp_path = Path(f.name)
 
     try:
@@ -254,8 +247,8 @@ def test_config_loader_non_dict_root():
     """Test loading file with non-dict root raises ConfigurationError."""
     import tempfile
 
-    with tempfile.NamedTemporaryFile(suffix=".yaml", delete=False, mode="w") as f:
-        f.write("- item1\n- item2\n")  # List at root level
+    with tempfile.NamedTemporaryFile(suffix=".json", delete=False, mode="w") as f:
+        f.write('["item1", "item2"]')  # List at root level
         temp_path = Path(f.name)
 
     try:
@@ -376,18 +369,11 @@ def test_config_validation_file_with_invalid_data():
     """Test that loading a file with invalid data raises ConfigurationError."""
     import tempfile
 
-    # Create a YAML file with invalid model configuration
-    with tempfile.NamedTemporaryFile(suffix=".yaml", delete=False, mode="w") as f:
+    # Create a JSON file with invalid model configuration
+    with tempfile.NamedTemporaryFile(suffix=".json", delete=False, mode="w") as f:
         f.write(
-            """
-log_level: INFO
-models:
-  invalid-model:
-    model_id: test
-    # Missing required 'provider' field
-    temperature: 0.7
-"""
-        )
+            '{"log_level": "INFO", "models": {"invalid-model": {"model_id": "test", "temperature": 0.7}}}'
+        )  # the required 'provider' field is missing
         temp_path = Path(f.name)
 
     try:
@@ -402,7 +388,7 @@ models:
 def test_config_validation_env_with_invalid_data(monkeypatch):
     """Test that environment variables with invalid data raise ConfigurationError."""
     # Set up a scenario where we have a valid file but invalid env override
-    config_path = Path("tests/fixtures/sample_config.yaml")
+    config_path = Path("tests/fixtures/sample_config_full.json")
 
     # This won't actually cause validation error because Pydantic will accept
     # string values for most fields, but we can test the validation mechanism

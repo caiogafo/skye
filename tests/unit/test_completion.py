@@ -3,7 +3,7 @@
 from datetime import datetime
 
 import pytest
-from pydantic import BaseModel
+from skye.base.validated import Validated, validated
 
 from skye.base.completion import (
     CompleteRequest,
@@ -123,7 +123,8 @@ class TestCompleteRequest:
     def test_structured_output_fields(self):
         """Test response_format and response_schema fields."""
 
-        class OutputSchema(BaseModel):
+        @validated
+        class OutputSchema(Validated):
             answer: str
             confidence: float
 
@@ -263,7 +264,8 @@ class TestCompleteResponse:
     def test_get_output_structured(self):
         """Test get_output returns structured output when available."""
 
-        class Person(BaseModel):
+        @validated
+        class Person(Validated):
             name: str
             age: int
 

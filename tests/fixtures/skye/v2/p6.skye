@@ -1,0 +1,9 @@
+# P6. A partial prompt and a composed prompt: version 2.
+prompt "review_python" {
+  from = prompt.review_base
+  bind = { language = "Python" }
+}
+prompt "review_with_security" {
+  parts     = [prompt.review_base, prompt.security_rules]
+  separator = "\n\n"
+}

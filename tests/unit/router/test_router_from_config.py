@@ -1,7 +1,6 @@
-"""Integration tests for ModelRouter YAML configuration loading.
+"""Integration tests for ModelRouter.from_config_dict().
 
-Tests the ModelRouter.from_yaml() and ModelRouter.from_config_dict() methods
-to ensure proper router instantiation from configuration.
+File loading (.skye and JSON) is tested in test_router_file.py; the library reads no YAML (decision D62).
 """
 
 import os
@@ -72,13 +71,12 @@ class TestModelRouterFromConfigDict:
 
     def setup_method(self):
         """Set up test fixtures."""
-        # Register mock provider for testing
+        self._saved = dict(ProviderRegistry._model_providers)
         ProviderRegistry.register_model_provider("mock", MockProvider)
 
     def teardown_method(self):
-        """Clean up test fixtures."""
-        # Clear provider registry
-        ProviderRegistry._model_providers = {}
+        """Restore the provider registry, so later tests still find the real providers."""
+        ProviderRegistry._model_providers = self._saved
 
     def test_from_config_dict_minimal(self):
         """Test creating router from minimal config dict."""
@@ -231,227 +229,13 @@ class TestModelRouterFromConfigDict:
         assert router.cooldown_seconds == 120.0
 
 
-class TestModelRouterFromYAML:
-    """Tests for ModelRouter.from_yaml() class method."""
-
-    def setup_method(self):
-        """Set up test fixtures."""
-        # Register mock provider for testing
-        ProviderRegistry.register_model_provider("mock", MockProvider)
-
-    def teardown_method(self):
-        """Clean up test fixtures."""
-        # Clear provider registry
-        ProviderRegistry._model_providers = {}
-
-    def test_from_yaml_minimal(self):
-        """Test creating router from minimal YAML file."""
-        yaml_content = """
-routes: []
-"""
-
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
-            f.write(yaml_content)
-            temp_path = f.name
-
-        try:
-            router = ModelRouter.from_yaml(temp_path)
-
-            assert router is not None
-            assert router.strategy == RoutingStrategy.ROUND_ROBIN
-        finally:
-            os.unlink(temp_path)
-
-    def test_from_yaml_with_routes(self):
-        """Test creating router from YAML with routes."""
-        yaml_content = """
-routes:
-  - alias: "test-model"
-    targets:
-      - model: "gpt-3.5-turbo"
-        provider: "mock"
-        api_key: "sk-test"
-        tpm: 200000
-        rpm: 2000
-    strategy: "rate_limit_aware"
-
-strategy: "round_robin"
-"""
-
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
-            f.write(yaml_content)
-            temp_path = f.name
-
-        try:
-            router = ModelRouter.from_yaml(temp_path)
-
-            assert router.is_alias("test-model")
-            route = router.get_route("test-model")
-            assert route is not None
-            assert route.strategy == RoutingStrategy.RATE_LIMIT_AWARE
-        finally:
-            os.unlink(temp_path)
-
-    def test_from_yaml_with_env_vars(self):
-        """Test creating router from YAML with environment variables."""
-        # Set test environment variable
-        os.environ["TEST_API_KEY"] = "sk-real-key-123"
-
-        yaml_content = """
-routes:
-  - alias: "test-model"
-    targets:
-      - model: "gpt-3.5-turbo"
-        provider: "mock"
-        api_key: "${TEST_API_KEY}"
-        tpm: 200000
-"""
-
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
-            f.write(yaml_content)
-            temp_path = f.name
-
-        try:
-            router = ModelRouter.from_yaml(temp_path)
-
-            assert router.is_alias("test-model")
-            # The API key should have been substituted during target creation
-        finally:
-            os.unlink(temp_path)
-            del os.environ["TEST_API_KEY"]
-
-    def test_from_yaml_with_path_object(self):
-        """Test creating router from YAML using Path object."""
-        yaml_content = """
-routes:
-  - alias: "test-model"
-    targets:
-      - model: "gpt-3.5-turbo"
-        provider: "mock"
-        api_key: "sk-test"
-"""
-
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
-            f.write(yaml_content)
-            temp_path = Path(f.name)
-
-        try:
-            router = ModelRouter.from_yaml(temp_path)
-
-            assert router.is_alias("test-model")
-        finally:
-            temp_path.unlink()
-
-    def test_from_yaml_kwargs_override(self):
-        """Test that kwargs override YAML values."""
-        yaml_content = """
-routes: []
-strategy: "round_robin"
-cooldown_seconds: 60.0
-"""
-
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
-            f.write(yaml_content)
-            temp_path = f.name
-
-        try:
-            router = ModelRouter.from_yaml(
-                temp_path, strategy="least_busy", cooldown_seconds=120.0
-            )
-
-            assert router.strategy == RoutingStrategy.LEAST_BUSY
-            assert router.cooldown_seconds == 120.0
-        finally:
-            os.unlink(temp_path)
-
-    def test_from_yaml_file_not_found(self):
-        """Test that missing YAML file raises ConfigurationError."""
-        with pytest.raises(ConfigurationError):
-            ModelRouter.from_yaml("/nonexistent/path/config.yaml")
-
-    def test_from_yaml_complex_configuration(self):
-        """Test creating router from complex YAML configuration."""
-        yaml_content = """
-routes:
-  - alias: "gpt-4"
-    targets:
-      - model: "gpt-4"
-        provider: "mock"
-        api_key: "sk-test-1"
-        tpm: 100000
-        rpm: 1000
-        tags: ["premium"]
-      - model: "gpt-4-turbo"
-        provider: "mock"
-        api_key: "sk-test-2"
-        api_base: "https://api.openai.com/v1"
-        tpm: 80000
-        rpm: 800
-    strategy: "rate_limit_aware"
-
-  - alias: "gpt-3.5-turbo"
-    targets:
-      - model: "gpt-3.5-turbo"
-        provider: "mock"
-        api_key: "sk-test-3"
-        tpm: 200000
-        rpm: 2000
-    strategy: "round_robin"
-
-fallbacks:
-  - primary: "gpt-4"
-    fallbacks: ["gpt-3.5-turbo"]
-
-retry_policies:
-  - error_type: "RateLimitError"
-    max_retries: 3
-
-allowed_fails_policies:
-  - error_type: "RateLimitError"
-    allowed_fails_per_minute: 100
-
-strategy: "least_busy"
-cooldown_seconds: 120.0
-enable_pre_call_checks: false
-"""
-
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
-            f.write(yaml_content)
-            temp_path = f.name
-
-        try:
-            router = ModelRouter.from_yaml(temp_path)
-
-            # Verify router settings
-            assert router.strategy == RoutingStrategy.LEAST_BUSY
-            assert router.cooldown_seconds == 120.0
-            assert router.pre_call_checks_enabled is False
-
-            # Verify routes
-            assert router.is_alias("gpt-4")
-            assert router.is_alias("gpt-3.5-turbo")
-
-            # Verify fallbacks
-            assert "gpt-4" in router.fallbacks
-            assert router.fallbacks["gpt-4"] == ["gpt-3.5-turbo"]
-
-            # Verify policies
-            assert router.retry_policy["RateLimitError"] == 3
-            assert router.allowed_fails_policy["RateLimitError"] == 100
-        finally:
-            os.unlink(temp_path)
-
-
 class TestModelTargetEnvVarSubstitution:
     """Tests for ModelTarget environment variable substitution."""
 
     def test_model_target_env_var_substitution(self):
         """Test that ModelTarget substitutes environment variables."""
-        from skye.base.config import _env_var_cache
         from skye.router.model_router import ModelTarget
 
-        # Clear cache to avoid interference from other tests
-        _env_var_cache.clear()
 
         # Set test environment variables
         os.environ["TEST_API_KEY_UNIQUE"] = "sk-real-key-456"
@@ -471,7 +255,6 @@ class TestModelTargetEnvVarSubstitution:
         finally:
             del os.environ["TEST_API_KEY_UNIQUE"]
             del os.environ["TEST_API_BASE_UNIQUE"]
-            _env_var_cache.clear()
 
     def test_model_target_missing_env_var(self):
         """Test that missing environment variable raises ConfigurationError."""

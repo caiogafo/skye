@@ -78,3 +78,17 @@ The requirements themselves live in `.kiro/steering/10-requirements.md`; each re
 1. THE spec SHALL realize Requirement 21.1 of #[[file:.kiro/steering/10-requirements.md]].
 2. THE spec SHALL realize Requirement 21.2 of #[[file:.kiro/steering/10-requirements.md]].
 3. THE spec SHALL realize Requirement 21.3 of #[[file:.kiro/steering/10-requirements.md]].
+
+### Requirement 7: The `.skye` parser
+
+**User Story:** As a developer, and as an AI agent writing configuration for one, I want one parser in `base` that reads the `.skye` language from text and reports every error with its place and a fix, so that routers, flows and prompts are read the same way and a mistake is easy to repair.
+
+#### Acceptance Criteria
+
+1. THE spec SHALL realize Requirement 54.1 of #[[file:.kiro/steering/10-requirements.md]].
+2. THE spec SHALL realize Requirement 54.2 of #[[file:.kiro/steering/10-requirements.md]].
+3. THE spec SHALL realize Requirement 54.3 of #[[file:.kiro/steering/10-requirements.md]].
+4. THE spec SHALL realize Requirement 54.4 of #[[file:.kiro/steering/10-requirements.md]].
+5. THE spec SHALL realize Requirement 54.5 of #[[file:.kiro/steering/10-requirements.md]].
+6. THE spec SHALL realize Requirement 54.8 of #[[file:.kiro/steering/10-requirements.md]].
+7. THE spec SHALL realize Requirement 54.11 of #[[file:.kiro/steering/10-requirements.md]].

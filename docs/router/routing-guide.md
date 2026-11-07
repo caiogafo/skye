@@ -8,7 +8,7 @@ last_updated: 2026-11-02
 
 ## Overview
 
-Skye provides a unified, comprehensive routing solution with health tracking, rate limiting, and advanced features. All configurations use Pydantic models for type safety and validation.
+Skye provides a unified, comprehensive routing solution with health tracking, rate limiting, and advanced features. All configurations are validated dataclasses (`skye.base.validated`) for type safety and validation.
 
 ## Key Features
 
@@ -20,7 +20,7 @@ Skye provides a unified, comprehensive routing solution with health tracking, ra
 - **Cooldown Mechanisms**: Temporarily disable failing models
 - **Tag-Based Routing**: Route based on model tags (e.g., "premium", "fast")
 - **Pre-Call Checks**: Filter out models exceeding rate limits before making calls
-- **Pydantic Models**: All configurations and metrics use Pydantic for validation
+- **Validated dataclasses**: All configurations and metrics are validated dataclasses (`to_dict`, `to_json`, `from_dict`)
 
 ## Quick Start
 
@@ -167,7 +167,7 @@ print(f"Response: {response.content}")
 
 ## Configuration Models
 
-All configurations use Pydantic models for type safety:
+All configurations are validated dataclasses for type safety:
 
 ### ModelTarget
 
@@ -278,7 +278,7 @@ router.set_allowed_fails_policy(policies)
 
 ## Metrics and Monitoring
 
-All metrics are returned as Pydantic models:
+All metrics are returned as validated dataclasses:
 
 ### ModelHealthMetrics
 
@@ -439,7 +439,7 @@ router.set_routing_strategy(RoutingStrategy.LATENCY_BASED)
 ## Best Practices
 
 1. **Use Constructor Configuration**: Configure everything upfront for clarity
-2. **Use Pydantic Models**: All configurations use Pydantic for validation
+2. **Use the Config Classes**: All configurations are validated dataclasses
 3. **Set Rate Limits**: Prevent exceeding provider quotas
 4. **Configure Fallbacks**: Ensure high availability
 5. **Monitor Health**: Regularly check model health metrics

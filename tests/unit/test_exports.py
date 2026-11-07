@@ -148,6 +148,8 @@ CURATED = ["messages", "completion", "exceptions", "config"]
 LAZY_NAMES = {
     "UserMessage", "SystemMessage", "AssistantMessage", "CapabilityMessage", "CompleteRequest", "CompleteResponse",
     "StreamChunk", "TokenUsage", "SkyeError", "ProviderError", "ConfigurationError", "ValidationError", "MissingExtraError",
+    # The `.skye` loading API (decision D61): `skye.load(path)` and `skye.Flow` (task 8.4 of the uxui spec).
+    "load", "Flow",
 }
 
 

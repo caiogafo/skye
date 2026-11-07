@@ -1,7 +1,7 @@
 """Tests for CapabilityCall and CapabilityResult models."""
 
 import pytest
-from pydantic import ValidationError as PydanticValidationError
+from skye.base.exceptions import ValidationError as ValidationError
 
 from skye.base.exceptions import ValidationError
 from skye.tools.capability_models import CapabilityCall, CapabilityResult
@@ -100,7 +100,7 @@ class TestCapabilityCallValidation:
 
     def test_accept_empty_id_string(self) -> None:
         """Test that empty id string is accepted (validation at provider level)."""
-        # Empty strings are technically valid at Pydantic level
+        # Empty strings are technically valid at the type level
         # Provider-specific validation would happen elsewhere
         tool_call = CapabilityCall(
             id="",
@@ -110,7 +110,7 @@ class TestCapabilityCallValidation:
 
     def test_accept_empty_name_string(self) -> None:
         """Test that empty name string is accepted (validation at provider level)."""
-        # Empty strings are technically valid at Pydantic level
+        # Empty strings are technically valid at the type level
         # Provider-specific validation would happen elsewhere
         tool_call = CapabilityCall(
             id="call_123",
@@ -219,7 +219,7 @@ class TestCapabilityResultValidation:
 
     def test_reject_missing_capability_call_id(self) -> None:
         """Test that missing capability_call_id is rejected."""
-        with pytest.raises(PydanticValidationError) as exc_info:
+        with pytest.raises(ValidationError) as exc_info:
             CapabilityResult(
                 name="test_tool",
                 result="success",
@@ -228,7 +228,7 @@ class TestCapabilityResultValidation:
 
     def test_reject_missing_name(self) -> None:
         """Test that missing name is rejected."""
-        with pytest.raises(PydanticValidationError) as exc_info:
+        with pytest.raises(ValidationError) as exc_info:
             CapabilityResult(
                 capability_call_id="call_123",
                 result="success",
@@ -323,7 +323,7 @@ class TestCapabilityResultSerialization:
             result={"temperature": 72},
         )
 
-        data = result.model_dump()
+        data = result.to_dict()
 
         assert data["capability_call_id"] == "call_123"
         assert data["name"] == "weather.get_current"
@@ -339,7 +339,7 @@ class TestCapabilityResultSerialization:
             error=None,
         )
 
-        json_str = result.model_dump_json()
+        json_str = result.to_json()
 
         assert "call_123" in json_str
         assert "weather.get_current" in json_str
@@ -364,7 +364,7 @@ class TestCapabilityResultSerialization:
         """Test creating CapabilityResult from JSON string."""
         json_str = '{"capability_call_id": "call_789", "name": "test_tool", "result": "success", "error": null}'
 
-        result = CapabilityResult.model_validate_json(json_str)
+        result = CapabilityResult.from_json(json_str)
 
         assert result.capability_call_id == "call_789"
         assert result.name == "test_tool"
@@ -380,7 +380,7 @@ class TestCapabilityResultSerialization:
             error="Tool execution failed",
         )
 
-        data = result.model_dump()
+        data = result.to_dict()
 
         assert data["error"] == "Tool execution failed"
         assert data["result"] is None
@@ -394,7 +394,7 @@ class TestCapabilityResultSerialization:
             error="Tool execution failed",
         )
 
-        json_str = result.model_dump_json()
+        json_str = result.to_json()
 
         assert "Tool execution failed" in json_str
         assert "call_error" in json_str

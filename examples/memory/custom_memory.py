@@ -3,8 +3,8 @@
 The planned memory API is a Port, ``skye.base.interfaces.memory.MemoryInterface``; no
 concrete store ships in ``src`` yet. This example focuses on the extension point: a user
 subclass of ``MemoryInterface`` with its own retrieval strategy, exercised end to end. The
-user-facing entry shape is a plain ``@dataclass`` satisfying ``MemoryEntryLike`` (NOT
-pydantic; the concrete ``MemoryEntry`` model is not imported).
+user-facing entry shape is a plain ``@dataclass`` satisfying ``MemoryEntryLike`` (the
+concrete ``MemoryEntry`` model is not imported).
 
 Everything here runs offline with no provider.
 """

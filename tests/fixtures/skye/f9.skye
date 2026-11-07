@@ -1,0 +1,47 @@
+# F9. Everything together: a research flow (the version 1 variant, without the approval step).
+router "main" { route "smart" = ["openai/gpt-4", "openai/gpt-3.5-turbo"] }
+
+flow "research" {
+  context { topic = string, loops = number(0), quality = number(0) }
+
+  step "Plan" {
+    run      = registry.planner
+    input    = { topic = context.topic }
+    retry    = { max = 2, after = "1s" }
+    next     = "Fan"
+    on_error = "Failed"
+  }
+
+  parallel "Fan" {
+    join            = "all"
+    on_branch_error = "continue"
+    step "Web"  { run = registry.web_search, input = { query = context.topic }, timeout = "30s", retry = 3 }
+    step "Docs" { run = registry.read_docs,  input = { topic = context.topic } }
+    next     = "Write"
+    on_error = "Failed"
+  }
+
+  step "Write" {
+    run        = router.main
+    input      = { model = "smart", notes = [step.Web.output, step.Docs.output], round = context.loops }
+    max_visits = 4
+    next       = "Review"
+  }
+
+  step "Review" {
+    run   = registry.reviewer
+    input = { draft = step.Write.output, criteria = ["accuracy", "clarity"] }
+    set quality = step.Review.output.score
+    next  = "Decide"
+  }
+
+  choice "Decide" {
+    when context.quality >= 0.8 { next = "Publish" }
+    when context.loops >= 3     { next = "Failed" }
+    else { set loops = context.loops + 1
+           next = "Fan" }
+  }
+
+  step "Publish" { run = registry.publisher,       emit "research.published", next = end }
+  step "Failed"  { run = registry.notify_failure,  next = end }
+}

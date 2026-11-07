@@ -91,7 +91,7 @@ def test_a_provider_error_keeps_the_http_status(monkeypatch):
     import io
     import urllib.error
 
-    monkeypatch.setattr("tenacity.nap.time.sleep", lambda seconds: None)
+    monkeypatch.setattr("skye.models.transport.retry.time.sleep", lambda seconds: None)
 
     def urlopen(req: Any, *a: Any, **k: Any) -> Any:
         raise urllib.error.HTTPError(req.full_url, 429, "Too Many Requests", {}, io.BytesIO(b"{}"))  # type: ignore[arg-type]

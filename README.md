@@ -23,7 +23,7 @@ Skye provides a foundational layer for building AI agents and intelligent applic
 
 ```bash
 pip install skyeai            # the base: messages, completion, errors, config, Ports (standard library only)
-pip install skyeai[yaml]      # add only what you need: yaml, auth, memory, postgres, mcp, ...
+pip install skyeai[memory]    # add only what you need: tokens, auth, memory, postgres, mcp, ...
 ```
 
 Every extra is optional and loaded lazily. All extras and install options: [getting started](docs/getting-started.md).
@@ -52,7 +52,7 @@ Runnable examples are in [`examples/`](examples/README.md), one folder per topic
 |---|---|
 | [`examples/basic`](examples/basic/) | quick start, async and streaming, configuration, completion requests |
 | [`examples/providers`](examples/providers/README.md) | OpenAI, Anthropic, Azure, Bedrock, Google, embeddings, multimodal, structured output, function calling, your own adapter |
-| [`examples/routing`](examples/routing/README.md) | the router: strategies, YAML configuration, fallbacks, health and usage |
+| [`examples/routing`](examples/routing/README.md) | the router: strategies, `.skye` configuration, fallbacks, health and usage |
 | [`examples/capabilities`](examples/capabilities/README.md) | local functions, remote APIs, function calling, the MCP client |
 | [`examples/advanced`](examples/advanced/README.md) | multimodal, structured output, function calling, streaming, prompt engineering, your own provider |
 | [`examples/prompts`](examples/prompts/) | templates, few-shot examples, roles, multimodal prompts |
@@ -71,7 +71,7 @@ The documentation is a wiki with one section per component; start from [`docs/in
 | Core interfaces and configuration | [interfaces](docs/base/interfaces.md), [configuration](docs/base/configuration.md) |
 | Providers, embeddings, multimodal, streaming | [provider guide](docs/models/provider-guide.md) |
 | Function calling and capabilities | [function calling](docs/tools/function-calling.md) |
-| Routing, YAML, health, fallbacks | [router overview](docs/router/overview.md), [routing guide](docs/router/routing-guide.md) |
+| Routing, `.skye` files, health, fallbacks | [router overview](docs/router/overview.md), [routing guide](docs/router/routing-guide.md) |
 | Lazy loading and serverless deployment | [deployment](docs/deployment.md) |
 | Size and load budgets | [budgets](docs/budgets.md) |
 | Codename glossary | [glossary](docs/glossary.md) |
@@ -102,4 +102,3 @@ Skye is inspired by:
 - **Clean Architecture** - For architectural principles
 - **Amazon Bedrock AgentCore Gateway** - For the gateway model (targets, inbound and outbound authorization, policy on every tool call)
 - **Cedar** - For the policy model (principal, action, resource, context; default deny; forbid overrides permit)
-- **Pydantic** - For data validation, until the models move to dataclasses (`base` already has)

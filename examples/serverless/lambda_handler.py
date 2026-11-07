@@ -2,16 +2,22 @@
 
 Skye is built for serverless architectures, where the size of the library and its cold start make a difference. The core imports only
 the standard library; a provider is called over REST with the standard library, so nothing else is shipped. This file shows the shape
-of a handler (written for AWS Lambda, but any serverless runtime works the same way).
+of a handler (written for AWS Lambda, but any serverless runtime works the same way). Without AWS credentials a scripted client
+answers and the example says so.
 """
 
 import os
+import sys
+from pathlib import Path
 
-import skye
 from skye import UserMessage
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))  # the shared offline helper lives in examples/
+from _offline import provider_or_scripted  # noqa: E402
+
+READY = bool(os.getenv("AWS_ACCESS_KEY_ID") or os.getenv("AWS_PROFILE"))
 # Created at cold start, reused by every warm invocation. Credentials come from the provider's standard variables.
-CLIENT = skye.provider("bedrock", region=os.getenv("AWS_REGION", "us-east-1"))
+CLIENT = provider_or_scripted("bedrock", READY, "configure AWS credentials", region=os.getenv("AWS_REGION", "us-east-1"))
 MODEL = os.getenv("MODEL_ID", "anthropic.claude-3-sonnet-20240229-v1:0")
 
 

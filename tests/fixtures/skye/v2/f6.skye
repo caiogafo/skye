@@ -1,0 +1,23 @@
+# F6. Human approval with a time limit: version 2 (needs persistence).
+flow "publish" {
+  context { revisions = number(0), feedback = string("") }
+
+  step "Draft" {
+    run   = registry.writer
+    input = { feedback = context.feedback }
+    next  = "Approval"
+  }
+
+  step "Approval" {
+    wait       = ["approved", "changes_requested", "rejected"]
+    timeout    = "24h"
+    on_event "approved"          { next = "Publish" }
+    on_event "changes_requested" { set revisions = context.revisions + 1
+                                   next = "Draft" }
+    on_event "rejected"          { next = "Cancelled" }
+    on_timeout = "Cancelled"
+  }
+
+  step "Publish"   { run = registry.publisher,        next = end }
+  step "Cancelled" { run = registry.notify_cancelled, next = end }
+}

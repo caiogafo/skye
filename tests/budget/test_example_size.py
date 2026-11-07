@@ -13,7 +13,9 @@ EXAMPLES = ROOT / "examples"
 LIMIT = 80
 EXEMPT_FOLDERS = {"prompts"}
 
-# custom_providers.py is edited by the model-Port change (task 3.5); it shrinks there.
+# custom_providers.py stays long because BaseModelProvider has 11 abstract methods that every provider must write (streaming and
+# capability hooks included). Making them optional with safe defaults is proposal S5.5 of the simplicity report; it is not a task
+# or a decision yet. The cap is the file's size today and only shrinks.
 KNOWN_LONG: dict[str, int] = {
     "advanced/custom_providers.py": 90,
 }

@@ -37,7 +37,11 @@ QUICKSTART = textwrap.dedent(
 def test_provider_has_one_overload_per_kind(fn):
     overloads = typing.get_overloads(fn)
     assert len(overloads) == 2
-    returns = {str(o.__annotations__["return"]).strip("'\"").split(".")[-1] for o in overloads}
+    # An annotation is a class when the module has no `from __future__ import annotations`, and a string when it has.
+    returns = {
+        getattr(o.__annotations__["return"], "__name__", None) or str(o.__annotations__["return"]).strip("'\"").split(".")[-1]
+        for o in overloads
+    }
     assert returns == {"ModelInterface", "VectorEncoderInterface"}
 
 

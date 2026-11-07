@@ -1,5 +1,5 @@
 ---
-title: "Router overview (load balancing, YAML, health, fallbacks)"
+title: "Router overview (load balancing, .skye files, health, fallbacks)"
 status: current
 last_updated: 2026-11-02
 ---
@@ -62,18 +62,18 @@ response = router.complete(
 )
 ```
 
-## Router Configuration from YAML
+## Router Configuration from a `.skye` file
 
 ```python
 from skye.router import ModelRouter
 
-# Load router from YAML file with environment variable substitution
-router = ModelRouter.from_yaml("router_config.yaml")  # reading YAML needs the extra: pip install skyeai[yaml]
+# Load the router from a .skye file; env.NAME is replaced by the environment variable
+router = ModelRouter.from_file("router_config.skye")  # a JSON file works too; the library reads no YAML
 
 # Use the router
 response = router.complete(
     messages=[UserMessage(content="Hello!")],
-    model="gpt-3.5-turbo"  # Alias defined in YAML
+    model="gpt-3.5-turbo"  # Alias defined in the file
 )
 
 # Or use tag-based selection
@@ -83,44 +83,50 @@ response = router.complete(
 )
 ```
 
-Example YAML configuration:
-```yaml
-# router_config.yaml
-routes:
-  - alias: "gpt-3.5-turbo"
-    strategy: "rate_limit_aware"
-    targets:
-      - model: "gpt-3.5-turbo"
-        provider: "openai"
-        api_key: "${OPENAI_API_KEY}"
-        tpm: 200000
-        rpm: 2000
-        tags: ["fast", "cheap", "general"]
-      - model: "gpt-3.5-turbo"
-        provider: "azure"
-        api_key: "${AZURE_API_KEY}"
-        api_base: "${AZURE_API_BASE}"
-        tpm: 100000
-        rpm: 1000
-        tags: ["fast", "cheap", "general", "enterprise"]
-  - alias: "gpt-4"
-    strategy: "least_busy"
-    targets:
-      - model: "gpt-4"
-        provider: "openai"
-        api_key: "${OPENAI_API_KEY}"
-        tpm: 100000
-        rpm: 500
-        tags: ["smart", "expensive", "reasoning"]
+Example `.skye` configuration (a `.yaml` or `.yml` file is rejected with a `ConfigurationError`; rewrite it as below, or in
+Python write `router.to_skye("main")` to a file):
 
-fallbacks:
-  - primary: "gpt-4"
-    fallbacks: ["gpt-3.5-turbo"]
-
-retry_policies:
-  - error_type: "RateLimitError"
-    max_retries: 3
+```skye
+# router_config.skye
+router "main" {
+  route "gpt-3.5-turbo" {
+    strategy = "rate_limit_aware"
+    target {
+      model = "gpt-3.5-turbo"
+      provider = "openai"
+      api_key = env.OPENAI_API_KEY
+      tpm = 200000
+      rpm = 2000
+      tags = ["fast", "cheap", "general"]
+    }
+    target {
+      model = "gpt-3.5-turbo"
+      provider = "azure"
+      api_key = env.AZURE_API_KEY
+      api_base = env.AZURE_API_BASE
+      tpm = 100000
+      rpm = 1000
+      tags = ["fast", "cheap", "general", "enterprise"]
+    }
+  }
+  route "gpt-4" {
+    strategy = "least_busy"
+    fallback = ["gpt-3.5-turbo"]   # if gpt-4 fails, try gpt-3.5-turbo
+    target {
+      model = "gpt-4"
+      provider = "openai"
+      api_key = env.OPENAI_API_KEY
+      tpm = 100000
+      rpm = 500
+      tags = ["smart", "expensive", "reasoning"]
+    }
+  }
+  retry_policy "RateLimitError" { max_retries = 3 }
+}
 ```
+
+The same router as JSON (`ModelRouter.from_file("router_config.json")`) is the dictionary of `ModelRouter.from_config_dict`, with
+`"${OPENAI_API_KEY}"` for the keys. Complete examples: `examples/routing/router_config.skye`.
 
 ## Flexible Model Selection
 

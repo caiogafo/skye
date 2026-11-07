@@ -200,3 +200,13 @@ adds the last story, Requirement 19: loading a router, a flow or a prompt from a
 5. THE spec SHALL realize Requirement 54.9 of #[[file:.kiro/steering/10-requirements.md]].
 6. THE spec SHALL honor decision D50 of #[[file:.kiro/steering/12-decisions.md]].
 7. THE spec SHALL honor decision D61 of #[[file:.kiro/steering/12-decisions.md]].
+
+### Requirement 20: No YAML
+
+**User Story:** As a user deploying to a serverless runtime, I want the library to read no YAML, so that the install carries no YAML library and there is one configuration language for the router, the flow and the prompt.
+
+#### Acceptance Criteria
+
+1. THE spec SHALL realize Requirement 54.12 of #[[file:.kiro/steering/10-requirements.md]].
+2. THE spec SHALL realize Requirement 7.12 of #[[file:.kiro/steering/10-requirements.md]].
+3. THE spec SHALL honor decision D62 of #[[file:.kiro/steering/12-decisions.md]].

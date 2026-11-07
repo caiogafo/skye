@@ -1,0 +1,33 @@
+# F7. Composition: an agent, a team, a model through the router, and a sub-flow as steps (version 1).
+router "main" { route "smart" = ["openai/gpt-4", "openai/gpt-3.5-turbo"] }
+
+flow "research_one" {
+  context { topic = string }
+  step "Search" { run = registry.web_search, input = { query = context.topic }, next = end }
+}
+
+flow "report" {
+  context { topics = list }
+
+  step "Plan" {
+    run   = registry.planner_agent
+    input = { topics = context.topics }
+    next  = "Research"
+  }
+  step "Research" {
+    run     = flow.research_one
+    foreach = context.topics
+    input   = { topic = item }
+    next    = "Draft"
+  }
+  step "Draft" {
+    run   = router.main
+    input = { model = "smart", messages = [{ role = "user", content = step.Research.output }] }
+    next  = "Review"
+  }
+  step "Review" {
+    run   = registry.review_team
+    input = { draft = step.Draft.output }
+    next  = end
+  }
+}

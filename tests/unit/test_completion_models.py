@@ -2,7 +2,7 @@
 """Unit tests for completion models."""
 
 import pytest
-from pydantic import BaseModel
+from skye.base.validated import Validated, validated
 
 from skye.base.completion import CompleteRequest, CompleteResponse, StreamChunk, TokenUsage
 from skye.base.exceptions import ValidationError
@@ -53,7 +53,8 @@ def test_completion_response():
     assert response.role == "assistant"
 
     # Structured response
-    class Person(BaseModel):
+    @validated
+    class Person(Validated):
         name: str
         age: int
 

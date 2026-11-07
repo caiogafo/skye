@@ -1,7 +1,10 @@
 """Tests for CapabilitySchema model."""
 
+import dataclasses
+
 import pytest
-from pydantic import ValidationError
+
+from skye.base.exceptions import ValidationError
 
 from skye.tools.schema import CapabilitySchema
 
@@ -67,7 +70,7 @@ class TestCapabilitySchemaCreation:
             description="Test schema",
         )
 
-        with pytest.raises(ValidationError):
+        with pytest.raises(dataclasses.FrozenInstanceError):
             schema.name = "modified"  # type: ignore
 
 

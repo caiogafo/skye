@@ -277,6 +277,7 @@ The owner took O24 to O33 as D36 to D45 (`.kiro/steering/12-decisions.md`). None
 | D50 | one declarative language, `.skye`, for routers, flows and prompts; parser in `base` taking text | 8.1 to 8.4 |
 | D59 | the `router` block is the reference format; fields 1:1 with today's YAML; `fallback` inside the route; the shorthand is additive | 8.4, 8.6 |
 | D61 | the written grammar, the JSON Schema, `skye check`, `.gitattributes`, and the loading API `Flow.from_file`, `Router.from_file`, `skye.load` | 8.2 to 8.5 |
+| D62 | the library reads no YAML: no parser, no `yaml` extra, no PyYAML; a `.yaml` file is rejected with a message naming `.skye` and JSON | 9.1 to 9.5 |
 Related and not blocking: D49 (taken: the core has no third-party dependency) closes O4, so the pydantic copy of `CapabilitySchema` leaves with the code
 migration, which is a separate task, and the budget tests fail by design until it is done; O20 (examples first) is the practice this spec follows for the
 extension points.

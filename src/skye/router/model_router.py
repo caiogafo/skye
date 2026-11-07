@@ -17,7 +17,8 @@ This module provides a complete routing solution with support for:
 import logging
 import os
 import time
-from typing import Any, Optional
+from collections.abc import Coroutine
+from typing import Any, Optional, TypeVar
 
 from skye.base.completion import CompleteRequest, CompleteResponse
 from skye.base.exceptions import ConfigurationError, ProviderError
@@ -35,6 +36,7 @@ from .config_models import (
     UsageStats,
 )
 from .health_tracker import ModelHealth, RateLimitTracker
+from .skye_file import API_KEY_VARIABLES
 from .routing_strategies import RoutingStrategySelector
 from skye.base.interfaces import StorageBackend
 from skye.store.memory import InMemoryBackend
@@ -42,7 +44,10 @@ from skye.store.memory import InMemoryBackend
 logger = logging.getLogger(__name__)
 
 
-def _run_sync(coro: Any) -> Any:
+_T = TypeVar("_T")
+
+
+def _run_sync(coro: Coroutine[Any, Any, _T]) -> _T:
     """Run a coroutine to completion from synchronous code.
 
     With no running loop, ``asyncio.run`` is used. Inside a running loop the coroutine runs in
@@ -60,14 +65,36 @@ def _run_sync(coro: Any) -> Any:
         return executor.submit(asyncio.run, coro).result()
 
 
-# The standard environment variable of each provider's API key, read by the router shorthand.
-_API_KEY_VARIABLES = {
-    "openai": "OPENAI_API_KEY",
-    "anthropic": "ANTHROPIC_API_KEY",
-    "azure": "AZURE_OPENAI_API_KEY",
-    "google": "GOOGLE_API_KEY",
-    "cohere": "COHERE_API_KEY",
+
+
+#: The retry policy and the cooldown policy a router starts with (a file or ``to_config`` lists only what differs).
+DEFAULT_RETRY_POLICY: dict[str, int] = {
+    "RateLimitError": 3,
+    "TimeoutError": 2,
+    "ServerError": 2,
+    "AuthenticationError": 0,
 }
+DEFAULT_ALLOWED_FAILS_POLICY: dict[str, int] = {
+    "RateLimitError": 100,
+    "ContentPolicyViolationError": 1000,
+}
+
+
+def _target_config(target: ModelTarget, include_secrets: bool) -> dict[str, Any]:
+    """The configuration dictionary of one target, with the secrets left out unless asked for."""
+    config = {
+        key: item
+        for key, item in target.to_dict().items()
+        if item is not None and item != [] and item != {} and key not in target.extras
+    }
+    if config.get("weight") == 1.0:
+        del config["weight"]
+    for key, original in target.env_refs.items():
+        if key in config:
+            config[key] = original  # as written: ${NAME}, not the value
+    if "api_key" in config and "api_key" not in target.env_refs and not include_secrets:
+        del config["api_key"]
+    return config
 
 
 def expand_route_shorthand(shorthand: dict[str, list[str]]) -> tuple[list[RouteConfig], list[FallbackConfig]]:
@@ -91,7 +118,7 @@ def expand_route_shorthand(shorthand: dict[str, list[str]]) -> tuple[list[RouteC
             provider, _, model = entry.partition("/")
             if not provider or not model:
                 raise ConfigurationError(f"Route '{alias}': '{entry}' is not of the form 'provider/model'")
-            targets.append(ModelTarget(model=model, provider=provider, api_key=os.environ.get(_API_KEY_VARIABLES.get(provider, ""))))
+            targets.append(ModelTarget(model=model, provider=provider, api_key=os.environ.get(API_KEY_VARIABLES.get(provider, ""))))
         routes.append(RouteConfig(alias=alias, targets=[targets[0]]))
         names = []
         for number, target in enumerate(targets[1:], start=1):
@@ -221,16 +248,8 @@ class ModelRouter(ModelRouterInterface):
         self.health: dict[str, ModelHealth] = {}
         self.rate_limits: dict[str, RateLimitTracker] = {}
         self.fallbacks: dict[str, list[str]] = {}
-        self.retry_policy: dict[str, int] = {
-            "RateLimitError": 3,
-            "TimeoutError": 2,
-            "ServerError": 2,
-            "AuthenticationError": 0,
-        }
-        self.allowed_fails_policy: dict[str, int] = {
-            "RateLimitError": 100,
-            "ContentPolicyViolationError": 1000,
-        }
+        self.retry_policy: dict[str, int] = dict(DEFAULT_RETRY_POLICY)
+        self.allowed_fails_policy: dict[str, int] = dict(DEFAULT_ALLOWED_FAILS_POLICY)
 
         self._round_robin_index: dict[str, int] = {}  # Per-alias round-robin index
 
@@ -279,48 +298,34 @@ class ModelRouter(ModelRouterInterface):
             asyncio.run(self.storage_backend.connect())
 
     @classmethod
-    def from_yaml(cls, yaml_path: str | Any, **kwargs) -> "ModelRouter":
-        """Create a ModelRouter from a YAML configuration file.
+    def from_file(cls, path: str | Any, name: str | None = None, **kwargs: Any) -> "ModelRouter":
+        """Create a ModelRouter from a ``.skye`` or JSON configuration file.
 
-        This class method loads router configuration from a YAML file and
-        creates a ModelRouter instance with the specified configuration.
-        Environment variables in the YAML file (using ${VAR_NAME} syntax)
-        are automatically substituted.
+        A ``.skye`` file holds a ``router`` block (decisions D59, D62); a JSON file holds the configuration object. The
+        library reads no YAML: a ``.yaml`` or ``.yml`` file raises a ``ConfigurationError`` that names the supported formats.
+        ``env.NAME`` (in ``.skye``) and ``${NAME}`` (in JSON) are replaced by the environment variable.
 
         Args:
-            yaml_path: Path to the YAML configuration file.
-            **kwargs: Additional keyword arguments to override config values.
+            path: Path to the ``.skye`` or ``.json`` file.
+            name: The label of the router block when a ``.skye`` file holds several.
+            **kwargs: Router settings that override the file (``strategy``, ``cooldown_seconds``, ...).
 
         Returns:
-            ModelRouter instance configured from the YAML file.
+            ModelRouter instance configured from the file.
 
         Raises:
-            ConfigurationError: If the file doesn't exist, can't be parsed,
-                or contains invalid configuration.
+            ConfigurationError: If the file is missing, is YAML, does not parse, or names an unset variable.
 
         Example:
-            >>> # Create router from YAML file
-            >>> router = ModelRouter.from_yaml("router_config.yaml")
-            >>>
-            >>> # Override specific settings
-            >>> router = ModelRouter.from_yaml(
-            ...     "router_config.yaml",
-            ...     cooldown_seconds=120.0
-            ... )
+            >>> router = ModelRouter.from_file("router.skye")  # doctest: +SKIP
+            >>> router = ModelRouter.from_file("router.skye", name="main", cooldown_seconds=120.0)  # doctest: +SKIP
         """
-        from skye.base.config import load_router_config
+        from .skye_file import load_router_config
 
-        # Load configuration from YAML
-        config_dict = load_router_config(yaml_path)
-
-        # Merge with kwargs (kwargs take precedence)
-        config_dict.update(kwargs)
-
-        # Create router from config dict
-        return cls.from_config_dict(config_dict)
+        return cls.from_config_dict(load_router_config(path, name, keep_target_references=True), **kwargs)
 
     @classmethod
-    def from_config_dict(cls, config: dict[str, Any], **kwargs) -> "ModelRouter":
+    def from_config_dict(cls, config: dict[str, Any], **kwargs: Any) -> "ModelRouter":
         """Create a ModelRouter from a configuration dictionary.
 
         This class method creates a ModelRouter instance from a configuration
@@ -446,8 +451,8 @@ class ModelRouter(ModelRouterInterface):
         allowed_fails_policies = []
         for policy_dict in config.get("allowed_fails_policies", []):
             try:
-                policy = AllowedFailsPolicyConfig(**policy_dict)
-                allowed_fails_policies.append(policy)
+                fails_policy = AllowedFailsPolicyConfig(**policy_dict)
+                allowed_fails_policies.append(fails_policy)
             except Exception as e:
                 raise ConfigurationError(
                     f"Failed to parse allowed fails policy configuration: {e}",
@@ -464,6 +469,70 @@ class ModelRouter(ModelRouterInterface):
             retry_policies=retry_policies if retry_policies else None,
             allowed_fails_policies=allowed_fails_policies if allowed_fails_policies else None,
         )
+
+    def to_config(self, *, include_secrets: bool = False) -> dict[str, Any]:
+        """The configuration dictionary of this router: ``ModelRouter.from_config_dict(router.to_config())`` rebuilds it.
+
+        Routes, targets, the fallback chains, the strategy, the cooldown, the pre-call checks, and the retry and cooldown
+        policies that differ from the defaults are listed. **Secrets are not exported by default:** a value that was written
+        as ``${NAME}`` (an API key, a base URL) is exported as ``${NAME}``, and an API key that was written in clear is left
+        out (the target then reads its provider's standard environment variable). Pass ``include_secrets=True`` to export the
+        keys as they are, for example to a private file. State that is not configuration (health, usage, the storage backend,
+        provider instances) and extra fields a target was given are not exported.
+
+        Args:
+            include_secrets: Export API keys written in clear.
+
+        Returns:
+            A dictionary in the shape that :meth:`from_config_dict` and the JSON router files use.
+        """
+        routes: list[dict[str, Any]] = []
+        for alias, route in self.aliases.items():
+            routes.append(
+                {
+                    "alias": alias,
+                    "targets": [_target_config(target, include_secrets) for target in route.targets],
+                    "strategy": route.strategy.value,
+                    "fallback_on_error": route.fallback_on_error,
+                }
+            )
+        return {
+            "strategy": self.strategy.value,
+            "cooldown_seconds": self.cooldown_seconds,
+            "enable_pre_call_checks": self.pre_call_checks_enabled,
+            "routes": routes,
+            "fallbacks": [{"primary": primary, "fallbacks": list(names)} for primary, names in self.fallbacks.items()],
+            "retry_policies": [
+                {"error_type": name, "max_retries": count}
+                for name, count in self.retry_policy.items()
+                if DEFAULT_RETRY_POLICY.get(name) != count
+            ],
+            "allowed_fails_policies": [
+                {"error_type": name, "allowed_fails_per_minute": count}
+                for name, count in self.allowed_fails_policy.items()
+                if DEFAULT_ALLOWED_FAILS_POLICY.get(name) != count
+            ],
+        }
+
+    def to_skye(self, name: str | None = None, *, include_secrets: bool = False) -> str:
+        """The ``router`` block of a ``.skye`` file that rebuilds this router (``ModelRouter.from_file`` reads it back).
+
+        The text is in the full form (one ``route`` block per alias, ``fallback = [...]`` inside the route), keys are written as
+        ``env.NAME`` where the router had ``${NAME}`` and are left out otherwise (see :meth:`to_config`), and it has no comments.
+        A route's strategy is written only when it differs from the router's.
+
+        Args:
+            name: The label of the block (``router "name" { ... }``); none by default.
+            include_secrets: Write API keys that were given in clear (they are then in the text).
+
+        Returns:
+            The ``.skye`` text, which passes ``skye check``.
+        """
+        from skye.base.dsl import to_text
+
+        from .skye_file import config_to_router_spec
+
+        return str(to_text(config_to_router_spec(self.to_config(include_secrets=include_secrets), name)))
 
     def _register_route(self, route: RouteConfig) -> None:
         """Register a route configuration with alias and targets."""
@@ -483,7 +552,7 @@ class ModelRouter(ModelRouterInterface):
 
             ProviderRegistry = get_provider_registry()
 
-            provider_config = {
+            provider_config: dict[str, Any] = {
                 "model": target.model,
             }
             if target.api_key:
@@ -792,7 +861,7 @@ class ModelRouter(ModelRouterInterface):
         allowed_fails = self.allowed_fails_policy[error_type]
         recent_fails = health_metrics.get('failure_reasons', {}).get(error_type, 0)
 
-        return recent_fails >= allowed_fails
+        return bool(recent_fails >= allowed_fails)
 
     async def _is_model_available(self, model_id: str, request: CompleteRequest) -> bool:
         """Check if a model is available for routing."""

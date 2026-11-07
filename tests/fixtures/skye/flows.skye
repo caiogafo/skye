@@ -1,0 +1,129 @@
+# F1 to F5 and F8 of the reference examples (version 1).
+
+# F1. A straight sequence
+flow "summarize_url" {
+  context { url = string }
+
+  step "Fetch" {
+    run   = registry.fetch_page
+    input = { url = context.url }
+    next  = "Summarize"
+  }
+  step "Summarize" {
+    run   = registry.summarizer
+    input = { text = step.Fetch.output }
+    next  = end
+  }
+}
+
+# F2. A condition
+flow "triage" {
+  context { ticket = string, priority = number(0) }
+
+  step "Classify" {
+    run   = registry.classifier
+    input = { text = context.ticket }
+    next  = "Route"
+  }
+
+  choice "Route" {
+    when step.Classify.output.label == "billing"                      { next = "Billing" }
+    when step.Classify.output.label == "bug" and context.priority >= 3 { next = "Escalate" }
+    else                                                               { next = "General" }
+  }
+
+  step "Billing"  { run = registry.billing_agent, next = end }
+  step "Escalate" { run = registry.oncall_agent,  next = end }
+  step "General"  { run = registry.support_agent, next = end }
+}
+
+# F3. Parallel steps
+flow "gather" {
+  context { topic = string }
+
+  parallel "Fan" {
+    join            = "all"          # all | any
+    on_branch_error = "cancel"       # cancel | continue
+
+    step "Web"    { run = registry.web_search,   input = { query = context.topic } }
+    step "Docs"   { run = registry.read_docs,    input = { topic = context.topic } }
+    step "Papers" { run = registry.paper_search, input = { query = context.topic }, retry = 2 }
+
+    next     = "Merge"
+    on_error = "Failed"
+  }
+
+  step "Merge" {
+    run   = registry.merger
+    input = { parts = [step.Web.output, step.Docs.output, step.Papers.output] }
+    next  = end
+  }
+  step "Failed" { run = registry.notify_failure, next = end }
+}
+
+# F4. A bounded loop: write, review, repeat
+flow "write_and_review" {
+  context { brief = string, revisions = number(0), quality = number(0) }
+
+  step "Write" {
+    run        = registry.writer
+    input      = { brief = context.brief, round = context.revisions }
+    max_visits = 4
+    next       = "Review"
+  }
+
+  step "Review" {
+    run   = registry.reviewer
+    input = { draft = step.Write.output }
+    set quality = step.Review.output.score
+    next  = "Decide"
+  }
+
+  choice "Decide" {
+    when context.quality >= 0.8   { next = end }
+    when context.revisions >= 3   { next = "GiveUp" }
+    else { set revisions = context.revisions + 1
+           next = "Write" }
+  }
+
+  step "GiveUp" { run = registry.escalate_to_human, next = end }
+}
+
+# F5. Retry, timeout and error handling
+flow "call_with_care" {
+  context { query = string }
+
+  step "Search" {
+    run        = registry.web_search
+    input      = { query = context.query }
+    timeout    = "30s"
+    retry      = { max = 3, after = "2s", backoff = true }
+    next       = "Answer"
+    on_timeout = "Fallback"
+    on_error   = "Fallback"
+  }
+
+  step "Fallback" { run = registry.cached_answer, input = { query = context.query }, next = end }
+  step "Answer"   { run = registry.answerer,      input = { results = step.Search.output }, next = end }
+}
+
+# F8. Setting the context and emitting events
+flow "ingest" {
+  context { source = string, count = number(0) }
+
+  step "Read" {
+    run   = registry.reader
+    input = { source = context.source }
+    set count = len(step.Read.output.items)
+    emit "ingest.started"
+    next  = "Check"
+  }
+
+  choice "Check" {
+    when context.count == 0 { next = "Empty" }
+    else                    { next = "Process" }
+  }
+
+  step "Process" { run = registry.processor, input = { items = step.Read.output.items }, next = end }
+  step "Empty"   { emit "ingest.empty", next = end }
+}

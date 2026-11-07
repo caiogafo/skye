@@ -1,0 +1,37 @@
+# Simple Skye router configuration
+# ================================
+# A small router for demonstration. It only needs OPENAI_API_KEY to be set.
+
+router "simple" {
+  # Default strategy, cooldown (default "60s") and pre-call checks (default true)
+  strategy = "rate_limit_aware"
+
+  # Basic GPT-3.5 Turbo route with rate limiting
+  route "gpt-3.5-turbo" {
+    target {
+      model = "gpt-3.5-turbo"
+      provider = "openai"
+      api_key = env.OPENAI_API_KEY
+      tpm = 200000
+      rpm = 2000
+      tags = ["fast", "cost-effective"]
+    }
+  }
+
+  # GPT-4 route with round-robin; if it fails, the router tries gpt-3.5-turbo
+  route "gpt-4" {
+    strategy = "round_robin"
+    fallback = ["gpt-3.5-turbo"]
+    target {
+      model = "gpt-4"
+      provider = "openai"
+      api_key = env.OPENAI_API_KEY
+      tpm = 100000
+      rpm = 1000
+      tags = ["premium", "high-quality"]
+    }
+  }
+
+  retry_policy "RateLimitError" { max_retries = 3 }
+  allowed_fails_policy "RateLimitError" { allowed_fails_per_minute = 100 }
+}

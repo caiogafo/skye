@@ -70,7 +70,7 @@ async def test_concurrent_routing_100_requests():
     - Success rate
     - Memory usage
     """
-    router = ModelRouter.from_yaml("tests/fixtures/sample_config.yaml")
+    router = ModelRouter.from_file("tests/fixtures/skye/routers.skye", name="r1")
     
     async def make_request(request_id: int):
         """Make a single request."""
@@ -141,7 +141,7 @@ async def test_rate_limiting_enforcement():
     - Rate limit tracking is accurate
     - Pre-call checks work correctly
     """
-    router = ModelRouter.from_yaml("tests/fixtures/rate_limit_config.yaml")
+    router = ModelRouter.from_file("tests/fixtures/skye/routers.skye", name="r1")
     
     # Configure with strict rate limits
     target = router.routes[0].targets[0]
@@ -245,7 +245,7 @@ async def test_failover_under_load():
     - Cooldown mechanism functions properly
     - Fallback chains execute correctly
     """
-    router = ModelRouter.from_yaml("tests/fixtures/fallback_config.yaml")
+    router = ModelRouter.from_file("tests/fixtures/skye/routers.skye", name="r1")
     
     # Simulate primary model failures
     failure_count = 0

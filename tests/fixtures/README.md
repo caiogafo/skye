@@ -28,28 +28,28 @@ def test_provider(mock_api):
 ```
 
 ### `sample_configs.py`
-YAML configuration strings and dictionaries for testing configuration loading and router setup.
+`.skye` router texts and configuration dictionaries for testing router loading and setup. The library reads no YAML.
 
 **Contents:**
-- `BASIC_ROUTER_CONFIG_YAML` - Simple single-route configuration
-- `ENV_VAR_ROUTER_CONFIG_YAML` - Configuration with environment variables
-- `MULTI_PROVIDER_ROUTER_CONFIG_YAML` - Multi-provider configuration with fallbacks
-- `FALLBACK_ROUTER_CONFIG_YAML` - Configuration with fallback chains
-- `INVALID_ROUTER_CONFIG_YAML` - Invalid configuration for error testing
-- `ALL_STRATEGIES_ROUTER_CONFIG_YAML` - Configuration with all routing strategies
+- `BASIC_ROUTER_CONFIG_SKYE` - Simple single-route configuration
+- `ENV_VAR_ROUTER_CONFIG_SKYE` - Configuration with environment variables
+- `MULTI_PROVIDER_ROUTER_CONFIG_SKYE` - Multi-provider configuration with fallbacks
+- `FALLBACK_ROUTER_CONFIG_SKYE` - Configuration with fallback chains
+- `INVALID_ROUTER_CONFIG_SKYE` - Invalid configuration for error testing
+- `ALL_STRATEGIES_ROUTER_CONFIG_SKYE` - Configuration with all routing strategies
 - Configuration dictionaries for programmatic testing
 - Sample model target configurations
 
 **Usage:**
 ```python
-from tests.fixtures.sample_configs import BASIC_ROUTER_CONFIG_YAML
+from tests.fixtures.sample_configs import BASIC_ROUTER_CONFIG_SKYE
 import tempfile
 
-def test_yaml_loading():
-    with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml') as f:
-        f.write(BASIC_ROUTER_CONFIG_YAML)
+def test_skye_loading():
+    with tempfile.NamedTemporaryFile(mode='w', suffix='.skye') as f:
+        f.write(BASIC_ROUTER_CONFIG_SKYE)
         f.flush()
-        router = ModelRouter.from_yaml(f.name)
+        router = ModelRouter.from_file(f.name)
         assert router is not None
 ```
 
@@ -63,14 +63,14 @@ from skye.base.config import load_config
 config = load_config("tests/fixtures/sample_config.json")
 ```
 
-### `sample_config.yaml`
-Example YAML configuration file for testing YAML configuration loading.
+### `skye/`
+`.skye` files of the language (routers, flows, prompts), used by the language and router tests.
 
 **Usage:**
 ```python
 from skye.router import ModelRouter
 
-router = ModelRouter.from_yaml("tests/fixtures/sample_config.yaml")
+router = ModelRouter.from_file("tests/fixtures/skye/routers.skye", name="r1")
 ```
 
 ### `images/`
@@ -159,9 +159,9 @@ def test_config_loading():
 ```python
 from pathlib import Path
 
-def test_yaml_loading():
-    config_path = Path("tests/fixtures/sample_config.yaml")
-    router = ModelRouter.from_yaml(str(config_path))
+def test_skye_loading():
+    config_path = Path("tests/fixtures/skye/routers.skye")
+    router = ModelRouter.from_file(config_path, name="r1")
     assert router is not None
 ```
 

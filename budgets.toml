@@ -20,10 +20,11 @@
 
 [core]
 # Install with no extras.
-# Decision D49: the core has no third-party dependency. The only distribution is skyeai itself; the limits below are set for that
-# target and are to be re-measured (`now` unknown) once the pydantic and tenacity imports are migrated. Until then the budget tests fail on purpose.
-max_distributions = 2               # target 1 (skyeai); was 12, 10 with pydantic and tenacity
-max_installed_mb = 3                # was 11, 9.0 with pydantic-core (compiled); the package alone is under 1 MB of source
+# Decision D49: the core has no third-party dependency. The only distribution is skyeai itself.
+# Measured 2026-11-07 (task 14.4 of 0-base-structure): wheel built with `uv build --wheel`, installed with `uv pip install --no-deps` in a
+# fresh venv (Python 3.13, macOS arm64; the wheel is pure Python, py3-none-any): 1 distribution, 1.13 MB (the whole package, no compiled file).
+max_distributions = 1               # now 1 (skyeai); was 12, 10 with pydantic and tenacity
+max_installed_mb = 2                # now 1.1; was 11, 9.0 with pydantic-core (compiled)
 allowed_dependencies = []
 # Modules that fail to import on a core-only install. Each entry must be fixed
 # (move the import behind LazyImporter, or declare the dependency) and removed.
@@ -43,25 +44,23 @@ known_import_failures = []
 #
 # Why this number. A thin Python function on AWS Lambda starts in about 100 to 300 ms (the init phase); `import boto3` alone costs
 # 150 to 250 ms; an init of 500 to 2000 ms is usually acceptable for an LLM application, because a model call takes seconds. The
-# library therefore keeps its own cold path under one `import boto3`: 300 ms best of 5 on a CI runner, which is about three times
-# what a laptop measures. A SDK-based client (OpenAI, Anthropic, boto3) adds seconds; that is what the standard-library adapters avoid.
-max_cold_start_ms = 300             # best of 5, now about 95 on a laptop
-target_cold_start_ms = 150          # where the path should stay on a laptop
+# library therefore keeps its own cold path under one `import boto3`: 200 ms best of 5 on a CI runner, which is about three times
+# what a laptop measures (56 ms best of 10 on 2026-11-07, clean core install). A SDK-based client (OpenAI, Anthropic, boto3) adds seconds; that is what the standard-library adapters avoid.
+max_cold_start_ms = 200             # best of 5, now about 56 on a laptop (was 300, about 95 with pydantic)
+target_cold_start_ms = 100          # where the path should stay on a laptop
 runs = 5
 
-# Migration debt under D49: these imports remain in the code and must reach zero, then the entries are deleted (target: empty).
+# D49: the core has no third-party import. A library that comes back must be listed here with its file count (target: empty).
 [imports.max_files]
-pydantic = 5
-tenacity = 1
 
 [load]
 # `import skye` in a fresh interpreter. Module count, time and memory are measured
 # in a clean core-only environment (tests/budget/test_footprint_budget.py), because a
 # development environment has extra libraries installed. The forbidden-import check
 # also runs in every normal test run.
-max_modules_loaded = 340            # now 293
-max_import_ms = 250                 # best of 5, now about 95 on a laptop (CI runners are slower)
-max_rss_delta_mb = 32               # now about 24
+max_modules_loaded = 80             # now 58 (was 340, 293 with pydantic)
+max_import_ms = 100                 # best of 5, now about 16 on a laptop (CI runners are slower)
+max_rss_delta_mb = 16               # now about 5
 # Importing skye must not import any provider SDK or optional dependency.
 # Known leaks: libraries that `import skye` still imports when they are installed.
 # Empty: tools/remote_api.py now uses the stdlib transport (skye.base.http). The test
@@ -79,7 +78,7 @@ forbidden_at_import = [
 preinstalled = ["boto3", "botocore", "s3transfer", "jmespath", "python-dateutil", "six", "urllib3"]
 unzipped_limit_mb = 250             # hard AWS limit for code plus layers
 profile_extra = "bedrock"           # the serverless profile: core + this extra
-max_profile_mb = 30                 # core + bedrock without the preinstalled libraries, now about 9
+max_profile_mb = 3                  # core + bedrock without the preinstalled libraries, now 1.1 (bedrock has no library of its own)
 
 # Megabytes added over the core install, preinstalled libraries excluded, and the number of
 # compiled distributions added over the core install (target 0 for every extra).
@@ -102,13 +101,6 @@ target_over_core_mb = 1
 max_compiled_over_core = 0
 max_over_core_mb = 13
 target_over_core_mb = 4
-
-# The yaml Extra declares only `pyyaml`, which reads a YAML file (router and library configuration; JSON needs nothing). It is the only
-# way to read YAML, so it is not in the core: the standard install carries no YAML library. Measured on Linux x86_64 2026-11-02: +2.9 MB.
-[extras.yaml]
-max_compiled_over_core = 1
-max_over_core_mb = 3
-target_over_core_mb = 1
 
 # The postgres Extra declares only `asyncpg`, for the PostgreSQL store backend. Its compiled wheel is large (+14.0 MB on Linux x86_64,
 # 2026-11-02), which is why it is not part of the memory Extra: only who uses PostgreSQL installs it.

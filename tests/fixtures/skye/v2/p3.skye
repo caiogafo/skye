@@ -1,0 +1,12 @@
+# P3. Few-shot examples with a selector: version 2.
+prompt "classify" {
+  variables = { ticket = string }
+  examples {
+    selector = "semantic"
+    limit    = 3
+    format   = "Ticket: {{ input }}\nLabel: {{ output }}"
+    item { input = "I was charged twice",      output = "billing" }
+    item { input = "The app crashes on start", output = "bug" }
+  }
+  message "user" { text = "Classify the support ticket into one label.\nTicket: {{ ticket }}\nLabel:" }
+}

@@ -16,9 +16,9 @@ extras you need.
 pip install skyeai
 
 # Every provider is built in: no extra is needed to call OpenAI, Anthropic, Bedrock, Google, Azure or Cohere
-# A feature extra adds a library (exact token counts, Redis, YAML)
+# A feature extra adds a library (exact token counts, Redis)
 pip install skyeai[tokens]
-pip install skyeai[memory,yaml]
+pip install skyeai[memory]
 ```
 
 An extra pulls third-party libraries only where a component actually imports them; many
@@ -48,7 +48,7 @@ from skye.models import OpenAIProvider, AnthropicProvider
 from skye.router import ModelRouter
 from skye import UserMessage
 
-router = ModelRouter.from_yaml("router_config.yaml")  # a YAML file needs the extra: pip install skyeai[yaml]
+router = ModelRouter.from_file("router_config.skye")  # a `router` block of a .skye file, or a JSON file
 response = router.complete(messages=[UserMessage(content="Hello!")], model="gpt-4")
 print(response.content)
 ```
@@ -78,8 +78,8 @@ pip install skyeai[tokens]
 uv pip install skyeai[tokens]
 
 # Multiple extras
-pip install skyeai[memory,yaml]
-uv pip install skyeai[memory,yaml]
+pip install skyeai[memory,auth]
+uv pip install skyeai[memory,auth]
 
 # Everything
 pip install skyeai[all]
@@ -88,12 +88,11 @@ uv pip install skyeai[all]
 
 ### Available Extras
 
-The standard installation (`pip install skyeai`) has only `pydantic` and `tenacity` and works without any extra. Each extra installs one
+The standard installation (`pip install skyeai`) has no third-party dependency and works without any extra. Each extra installs one
 optional library, only for what you ask for:
 
 | Extra | What it enables | Library installed |
 |-------|-----------------|-------------------|
-| `yaml` | reading a YAML file (router and library configuration; JSON needs nothing) | pyyaml |
 | `auth` | RS256 signing for service-account authentication | rsa |
 | `memory` | the Redis store backend | redis |
 | `postgres` | the PostgreSQL store backend | asyncpg (compiled) |

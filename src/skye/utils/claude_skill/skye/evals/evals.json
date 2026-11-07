@@ -1,0 +1,88 @@
+{
+  "skill_name": "skye",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "I need a Skye router file for my app: try gpt-4o-mini first, and if it fails fall back to Claude Haiku. My OpenAI and Anthropic keys are in the usual environment variables. Write it to router.skye and make sure it is valid.",
+      "expected_output": "A router.skye with one route, valid according to skye check, with no key written in the file.",
+      "files": [],
+      "expectations": [
+        "The file is a .skye file with a router block, not YAML or JSON",
+        "The primary model is openai/gpt-4o-mini and the fallback is anthropic/claude-haiku, in that order (the shorthand route or a route with a fallback)",
+        "No literal API key appears in the file; keys are left to the standard variables or written as env.NAME",
+        "The assistant ran skye check on the file and it reported ok"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "Write a Skye flow that searches the web and reads our docs at the same time, then has a reviewer agent check the result. If the review score is under 0.8, redo the search, at most 3 times. The steps are Python functions I pass in: web_search, read_docs, reviewer.",
+      "expected_output": "A flow.skye with a parallel block, a review step, a choice with else and a bounded loop, that passes skye check with --registry web_search,read_docs,reviewer.",
+      "files": [],
+      "expectations": [
+        "The two searches are inside a parallel block, not two sequential steps",
+        "Every step and every parallel block has a next (or next = end)",
+        "The choice has an else branch",
+        "The loop is bounded: one step in the cycle has max_visits, or the count is tracked in a declared context field and checked in a when branch",
+        "Steps are referenced as registry.NAME (registry.web_search and so on), never as bare strings",
+        "The assistant ran skye check, with the registry names, and fixed every message until it reported ok"
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "Here is a Jinja prompt template from our old code:\n\n[SYSTEM]\nYou are {{ persona }}.{% if domain %} Specialised in {{ domain }}.{% endif %}\n[USER]\n{{ question }}\n{% if context %}Context: {{ context }}{% endif %}\n\nConvert it to a Skye prompt block.",
+      "expected_output": "A prompt block with variables, a system message and a user message, using when instead of if tags.",
+      "files": [],
+      "expectations": [
+        "The result is a prompt block with a variables declaration that covers persona, domain, question and context",
+        "The [SYSTEM] and [USER] markers become message \"system\" and message \"user\" blocks",
+        "The {% if %} conditions become when blocks and no {% %} tag is left in the output",
+        "The assistant ran skye check on the result and it reported ok"
+      ]
+    },
+    {
+      "id": 4,
+      "prompt": "Add an approval step to my Skye flow: after the draft is written it should wait until a manager approves or rejects it (it can take days), then publish or cancel.",
+      "expected_output": "The assistant explains that waiting for an event is not available in version 1 and offers the nearest workable design, without writing wait or on_event.",
+      "files": [],
+      "expectations": [
+        "The assistant says that wait and on_event are not available yet (version 2, they need persistence)",
+        "The assistant does not put wait or on_event in a .skye file as if they worked",
+        "The assistant offers an alternative that works today, such as two flows (before and after the approval) started by the Python program",
+        "Any .skye it writes passes skye check"
+      ]
+    },
+    {
+      "id": 5,
+      "prompt": "I have a router_config.yaml for the old Skye version and I want to keep using PyYAML to load it. Can you show me how?",
+      "expected_output": "The assistant says Skye reads no YAML and shows how to rewrite the file as .skye.",
+      "files": [],
+      "expectations": [
+        "The assistant says the library does not read YAML and has no yaml extra",
+        "The assistant offers to rewrite the configuration as a .skye router block (or JSON for the library configuration)",
+        "The assistant does not tell the user to install or depend on PyYAML for Skye"
+      ]
+    },
+    {
+      "id": 6,
+      "prompt": "In my Skye flow I want a parallel block that has another parallel block inside it, and a choice in one of the branches. Show me how to write it.",
+      "expected_output": "The assistant explains that a parallel holds only steps and shows the composition with a sub-flow.",
+      "files": [],
+      "expectations": [
+        "The assistant says a parallel block cannot hold another parallel or a choice",
+        "The assistant shows the inner part as its own flow, run from a branch with run = flow.NAME",
+        "The .skye it writes passes skye check"
+      ]
+    },
+    {
+      "id": 7,
+      "prompt": "I am adding a new config dataclass to the Skye library for the memory component. Should I use a pydantic BaseModel like the old ones? Show me the class.",
+      "expected_output": "A @validated dataclass from skye.base.validated, with no pydantic.",
+      "files": [],
+      "expectations": [
+        "The assistant says the core is standard library only and does not use pydantic",
+        "The class uses the validated dataclass of the library (@validated and Validated from skye.base.validated, with field() where needed)",
+        "No import of pydantic, tenacity or yaml appears in the code it writes"
+      ]
+    }
+  ]
+}

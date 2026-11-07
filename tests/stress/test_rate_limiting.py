@@ -465,7 +465,7 @@ class TestRateLimiting:
         assert len(successful) == 100, "All requests should succeed with generous limits"
         assert avg_latency < 1.0, "Average latency should be reasonable"
 
-    def test_rate_limit_tracking_accuracy(self):
+    def test_rate_limit_tracking_accuracy(self, monkeypatch):
         """Test rate limit tracking accuracy with concurrent requests.
 
         Verifies:
@@ -476,6 +476,16 @@ class TestRateLimiting:
 
         **Validates: Requirements 7.2**
         """
+        # The counters are kept per fixed one-minute window. The 50 requests take over a second, so a
+        # minute boundary in the middle would split them between two windows and the test would fail
+        # about once in fifty runs. One window for the whole test keeps it deterministic.
+        from skye.router.health_tracker import RateLimitTracker
+
+        monkeypatch.setattr(
+            RateLimitTracker,
+            "_get_window_key",
+            lambda self, metric_type: f"rate_limit:{self.model_id}:{metric_type}:window-0",
+        )
         router = ModelRouter(strategy=RoutingStrategy.ROUND_ROBIN)
 
         # Register model

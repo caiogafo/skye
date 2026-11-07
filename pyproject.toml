@@ -8,6 +8,9 @@ authors = [{name = "Skye Team"}]
 requires-python = ">=3.11"
 dependencies = []  # the core is the standard library only (decision D49; supersedes the pydantic and tenacity entries)
 
+[project.scripts]
+skye = "skye.utils.cli:main"
+
 [project.optional-dependencies]
 # Model providers: each has one built-in stdlib REST adapter (Requirement 20); vendor SDKs are
 # dev/test oracles only. The extras exist so `pip install skyeai[openai]` etc. keep working.
@@ -23,7 +26,6 @@ tokens = ["tiktoken>=0.5"]
 # Individual components
 # auth: pure-Python RSA for RS256 (Google service-account JWT, Azure certificate assertion).
 auth = ["rsa>=4.9"]
-yaml = ["pyyaml>=6.0"]  # reading a YAML file (router and library configuration); JSON needs nothing
 agents = []
 prompts = []  # empty extra: the template engine is standard library
 tools = []  # empty extra: a module of the core, no third-party libraries
@@ -42,7 +44,7 @@ llm-providers = ["tiktoken>=0.5"]
 embedding-providers = ["tiktoken>=0.5"]
 all-providers = ["tiktoken>=0.5"]
 providers = ["tiktoken>=0.5"]
-all = ["tiktoken>=0.5", "redis>=5.0", "asyncpg>=0.29", "fastmcp-slim[client]>=4.0", "rsa>=4.9", "pyyaml>=6.0"]
+all = ["tiktoken>=0.5", "redis>=5.0", "asyncpg>=0.29", "fastmcp-slim[client]>=4.0", "rsa>=4.9"]
 
 [dependency-groups]
 dev = [
@@ -52,8 +54,6 @@ dev = [
     "black>=23.0",
     "ruff>=0.1",
     "mypy>=1.0",
-    "pyyaml>=6.0",  # the extra `yaml` is not in the core: the tests read YAML files
-    "types-PyYAML>=6.0",
     "types-requests>=2.31",
     "responses>=0.23",
     "requests>=2.31",

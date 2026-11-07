@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import pytest
-from pydantic import BaseModel
+from skye.base.validated import Validated, validated
 
 import skye
 from skye.base.exceptions import ValidationError
@@ -11,7 +11,8 @@ from skye.base.messages import UserMessage
 from tests.examples.fake_network import patched
 
 
-class Person(BaseModel):
+@validated
+class Person(Validated):
     name: str
     age: int
 

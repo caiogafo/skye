@@ -32,7 +32,7 @@ unit/
 ├── config/             # Configuration loading tests
 │   ├── test_config_loader.py
 │   ├── test_env_var_substitution.py
-│   └── test_yaml_router_config.py
+│   └── test_router_config_model.py
 └── utils/              # Utility function tests
     ├── test_token_counter.py
     ├── test_cost_calculator.py
@@ -219,10 +219,10 @@ async def test_async_completion():
 def test_error_handling():
     """Test proper error handling."""
     with pytest.raises(ConfigurationError) as exc_info:
-        load_config("invalid.yaml")
+        load_config("invalid.json")
     
     assert "Invalid configuration" in str(exc_info.value)
-    assert exc_info.value.details["config_path"] == "invalid.yaml"
+    assert exc_info.value.details["config_path"] == "invalid.json"
 ```
 
 ## Troubleshooting

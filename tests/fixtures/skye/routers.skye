@@ -1,0 +1,111 @@
+# R1 to R4 of the reference examples (version 1).
+
+# R1. The smallest router (shorthand)
+router "r1" {
+  route "fast" = ["openai/gpt-4o-mini", "anthropic/claude-haiku"]   # first = primary, the rest = fallbacks in order
+}
+
+# R2. Shorthand with options on some entries
+router "r2" {
+  route "fast" = [
+    { model = "openai/gpt-4o-mini", api_key = env.OPENAI_API_KEY, rpm = 60, tpm = 90000 },
+    "anthropic/claude-haiku",                          # strings and maps can be mixed
+  ]
+}
+
+# R3. The full form: every option the YAML has today
+router "r3" {
+  # global settings
+  strategy               = "rate_limit_aware"
+  cooldown               = "60s"                       # was cooldown_seconds
+  enable_pre_call_checks = true
+
+  # 3a. several providers, rate limits, tags and metadata
+  route "gpt-4" {
+    strategy          = "rate_limit_aware"
+    fallback_on_error = true
+    fallback          = ["azure-gpt4", "claude"]       # if THIS route fails, try these routes in order (D59)
+
+    target {
+      model    = "gpt-4"
+      provider = "openai"
+      api_key  = env.OPENAI_API_KEY
+      tpm      = 100000
+      rpm      = 1000
+      tags     = ["premium", "high-quality"]
+      metadata = { deployment = "primary", region = "us-east-1" }
+    }
+  }
+
+  # 3b. Azure: base URL, API version, region, per-target timeout and retries
+  route "azure-gpt4" {
+    strategy = "latency_based"
+    fallback = ["gpt-4", "gpt-3.5-turbo"]
+
+    target {
+      model       = "gpt-4"
+      provider    = "azure"
+      api_key     = env.AZURE_OPENAI_API_KEY_EAST
+      api_base    = env.AZURE_API_BASE_EAST
+      api_version = "2024-02-15-preview"
+      region      = "eastus"
+      tpm         = 100000
+      rpm         = 1000
+      timeout     = "30s"
+      max_retries = 2
+      metadata    = { location = "Virginia", priority = "primary" }
+    }
+    target {
+      model       = "gpt-4"
+      provider    = "azure"
+      api_key     = env.AZURE_OPENAI_API_KEY_WEST
+      api_base    = env.AZURE_API_BASE_WEST
+      api_version = "2024-02-15-preview"
+      region      = "westus"
+      metadata    = { location = "Oregon", priority = "secondary" }
+    }
+  }
+
+  # 3c. Anthropic with a fallback to Bedrock
+  route "claude" {
+    strategy = "round_robin"
+    fallback = ["bedrock-claude", "gpt-4"]
+    target { model = "claude-3-5-sonnet", provider = "anthropic", api_key = env.ANTHROPIC_API_KEY }
+  }
+  route "bedrock-claude" {
+    target { model = "anthropic.claude-3-5-sonnet", provider = "bedrock", region = "us-west-2" }
+  }
+
+  # 3d. weighted routing
+  route "weighted-gpt4" {
+    strategy = "weighted"
+    target { model = "gpt-4",       provider = "openai", api_key = env.OPENAI_API_KEY, weight = 80 }
+    target { model = "gpt-4-turbo", provider = "openai", api_key = env.OPENAI_API_KEY, weight = 20 }
+  }
+
+  # 3e. other strategies
+  route "budget" {
+    strategy = "cost_based"
+    fallback = ["gpt-3.5-turbo"]
+    target { model = "gpt-4o-mini", provider = "openai", api_key = env.OPENAI_API_KEY }
+  }
+  route "gpt-3.5-turbo" {
+    strategy = "least_busy"
+    target { model = "gpt-3.5-turbo", provider = "openai", api_key = env.OPENAI_API_KEY, tpm = 200000, rpm = 2000, tags = ["fast", "cost-effective"] }
+  }
+
+  retry_policy "RateLimitError"      { max_retries = 3, retry_after = "5s", exponential_backoff = true }   # was retry_after_seconds
+  retry_policy "TimeoutError"        { max_retries = 2, retry_after = "3s", exponential_backoff = true }
+  retry_policy "ServerError"         { max_retries = 2, retry_after = "5s", exponential_backoff = true }
+  retry_policy "AuthenticationError" { max_retries = 0 }
+
+  allowed_fails_policy "RateLimitError" { allowed_fails_per_minute = 100 }
+  allowed_fails_policy "TimeoutError"   { allowed_fails_per_minute = 50 }
+  allowed_fails_policy "ServerError"    { allowed_fails_per_minute = 20 }
+}
+
+# R4. A router with a name, used by a flow
+router "main" {
+  route "smart" = ["openai/gpt-4", "openai/gpt-3.5-turbo"]
+  route "cheap" = ["openai/gpt-4o-mini"]
+}

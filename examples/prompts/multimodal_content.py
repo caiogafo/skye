@@ -121,7 +121,7 @@ Provide a comprehensive analysis covering all modalities:"""
 
 
 def structured_output_schema():
-    """Demonstrate structured output with Pydantic-like schemas."""
+    """Demonstrate structured output with schema-like classes."""
     print("=== Structured Output Schema ===")
     
     builder = MockPromptBuilder()
@@ -138,7 +138,7 @@ Text: {text}
 Entities:"""
     )
     
-    # Define output schema (mock Pydantic model)
+    # Define output schema (a mock class with a name and fields)
     class EntitySchema:
         def __init__(self):
             self.name = "EntitySchema"

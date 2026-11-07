@@ -12,10 +12,10 @@ from pathlib import Path
 
 SRC = Path(__file__).resolve().parents[2] / "src" / "skye"
 
-# name -> modules that define it. The pydantic CapabilitySchema of `tools` leaves with the pydantic removal (O4, 0-base-structure group 14).
+# name -> modules that define it. The `tools` CapabilitySchema is a validated dataclass now; it still duplicates the base Port name until the tools interface is merged.
 KNOWN_DUPLICATES: dict[str, set[str]] = {
     "CapabilitySchema": {"skye.base.interfaces.capability", "skye.tools.schema"},
-    # Found by this test, not named in the audit: the `tools` interface is the older, pydantic-typed copy of the base Port.
+    # Found by this test, not named in the audit: the `tools` interface is the older copy of the base Port.
     "CapabilityInterface": {"skye.base.interfaces.capability", "skye.tools.interface"},
 }
 

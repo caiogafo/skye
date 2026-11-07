@@ -11,7 +11,7 @@ from skye.base.config import (
     RetryConfig,
     RouterConfig,
     SkyeConfig,
-    load_router_config,
+    reject_yaml,
     substitute_env_vars,
 )
 
@@ -23,6 +23,6 @@ __all__ = [
     "RetryConfig",
     "RouterConfig",
     "SkyeConfig",
-    "load_router_config",
+    "reject_yaml",
     "substitute_env_vars",
 ]

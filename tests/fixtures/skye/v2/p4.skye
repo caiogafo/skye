@@ -1,0 +1,8 @@
+# P4. Multimodal content: version 2.
+prompt "describe_image" {
+  variables = { photo = image, question = string("What is in the picture?") }
+  message "user" {
+    content { text = "{{ question }}" }
+    content { image = photo, detail = "high" }
+  }
+}

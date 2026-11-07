@@ -1,6 +1,8 @@
 """Unit tests for environment variable substitution in configuration."""
 
 
+import json
+
 import pytest
 
 from skye.base.config import ConfigLoader, substitute_env_vars
@@ -9,11 +11,6 @@ from skye.base.exceptions import ConfigurationError
 
 class TestSubstituteEnvVars:
     """Test suite for substitute_env_vars function."""
-
-    def setup_method(self):
-        """Clear the environment variable cache before each test."""
-        from skye.base.config import _env_var_cache
-        _env_var_cache.clear()
 
     def test_substitute_simple_string(self, monkeypatch):
         """Test successful substitution in a simple string."""
@@ -195,81 +192,51 @@ class TestSubstituteEnvVars:
         result = substitute_env_vars("${VAR-NAME}")
         assert result == "${VAR-NAME}"
 
-    def test_caching_behavior(self, monkeypatch):
-        """Test that environment variable values are cached."""
-        # Import the cache to verify it's being used
-        from skye.base.config import _env_var_cache
+    def test_a_changed_variable_is_read_again(self, monkeypatch):
+        """The environment is read at every substitution: no value is kept between calls (decision D66)."""
+        monkeypatch.setenv("CHANGING_VAR", "first")
+        assert substitute_env_vars("${CHANGING_VAR}") == "first"
+        monkeypatch.setenv("CHANGING_VAR", "second")
+        assert substitute_env_vars("${CHANGING_VAR}") == "second"
+        monkeypatch.delenv("CHANGING_VAR")
+        with pytest.raises(ConfigurationError, match="CHANGING_VAR"):
+            substitute_env_vars("${CHANGING_VAR}")
 
-        # Clear cache before test
-        _env_var_cache.clear()
-
-        monkeypatch.setenv("CACHED_VAR", "cached_value")
-
-        # First substitution should cache the value
-        result1 = substitute_env_vars("${CACHED_VAR}")
-        assert result1 == "cached_value"
-        assert "CACHED_VAR" in _env_var_cache
-        assert _env_var_cache["CACHED_VAR"] == "cached_value"
-
-        # Change the environment variable
-        monkeypatch.setenv("CACHED_VAR", "new_value")
-
-        # Second substitution should use cached value
-        result2 = substitute_env_vars("${CACHED_VAR}")
-        assert result2 == "cached_value"  # Still uses cached value
-
-    def test_multiple_substitutions_use_cache(self, monkeypatch):
-        """Test that multiple substitutions of same variable use cache."""
-        from skye.base.config import _env_var_cache
-
-        _env_var_cache.clear()
-
+    def test_the_same_variable_in_several_places(self, monkeypatch):
+        """One variable may appear in several keys and nested levels."""
         monkeypatch.setenv("SHARED_VAR", "shared_value")
-
         config = {
             "key1": "${SHARED_VAR}",
             "key2": "${SHARED_VAR}",
             "nested": {"key3": "${SHARED_VAR}"},
         }
-
         result = substitute_env_vars(config)
         assert result["key1"] == "shared_value"
         assert result["key2"] == "shared_value"
         assert result["nested"]["key3"] == "shared_value"
 
-        # Variable should be cached
-        assert "SHARED_VAR" in _env_var_cache
-
 
 class TestConfigLoaderWithEnvVarSubstitution:
     """Test ConfigLoader integration with environment variable substitution."""
 
-    def setup_method(self):
-        """Clear the environment variable cache before each test."""
-        from skye.base.config import _env_var_cache
-        _env_var_cache.clear()
-
-    def test_yaml_config_with_env_vars(self, monkeypatch, tmp_path):
-        """Test loading YAML configuration with environment variables."""
+    def test_json_config_with_several_env_vars(self, monkeypatch, tmp_path):
+        """Test loading a JSON configuration file with several environment variables."""
         monkeypatch.setenv("OPENAI_API_KEY", "sk-test-key-123")
         monkeypatch.setenv("AZURE_API_BASE", "https://azure.openai.com")
 
-        config_file = tmp_path / "config.yaml"
-        config_file.write_text(
-            """
-log_level: INFO
-models:
-  gpt-4:
-    model_id: gpt-4
-    provider: openai
-    api_key: ${OPENAI_API_KEY}
-  azure-gpt:
-    model_id: azure-gpt
-    provider: azure
-    api_key: ${OPENAI_API_KEY}
-    api_base: ${AZURE_API_BASE}
-"""
-        )
+        config_file = tmp_path / "config.json"
+        config_file.write_text(json.dumps({
+            "log_level": "INFO",
+            "models": {
+                "gpt-4": {"model_id": "gpt-4", "provider": "openai", "api_key": "${OPENAI_API_KEY}"},
+                "azure-gpt": {
+                    "model_id": "azure-gpt",
+                    "provider": "azure",
+                    "api_key": "${OPENAI_API_KEY}",
+                    "api_base": "${AZURE_API_BASE}",
+                },
+            },
+        }))
 
         config = ConfigLoader.load(config_path=config_file)
 
@@ -320,19 +287,13 @@ models:
 
         assert config.models["test"].api_key == "override-value"
 
-    def test_missing_env_var_in_yaml_raises_error(self, tmp_path):
-        """Test that missing environment variable in YAML raises error."""
-        config_file = tmp_path / "config.yaml"
-        config_file.write_text(
-            """
-log_level: INFO
-models:
-  test:
-    model_id: test
-    provider: test-provider
-    api_key: ${MISSING_VAR}
-"""
-        )
+    def test_missing_env_var_in_file_raises_error(self, tmp_path):
+        """Test that missing environment variable in a file raises error."""
+        config_file = tmp_path / "config.json"
+        config_file.write_text(json.dumps({
+            "log_level": "INFO",
+            "models": {"test": {"model_id": "test", "provider": "test-provider", "api_key": "${MISSING_VAR}"}},
+        }))
 
         with pytest.raises(ConfigurationError) as exc_info:
             ConfigLoader.load(config_path=config_file)
@@ -343,23 +304,14 @@ models:
         """Test configuration with mix of env vars and static values."""
         monkeypatch.setenv("DYNAMIC_KEY", "dynamic-value")
 
-        config_file = tmp_path / "config.yaml"
-        config_file.write_text(
-            """
-log_level: INFO
-models:
-  model1:
-    model_id: model1
-    provider: provider1
-    api_key: ${DYNAMIC_KEY}
-    timeout: 30
-  model2:
-    model_id: model2
-    provider: provider2
-    api_key: static-key
-    timeout: 60
-"""
-        )
+        config_file = tmp_path / "config.json"
+        config_file.write_text(json.dumps({
+            "log_level": "INFO",
+            "models": {
+                "model1": {"model_id": "model1", "provider": "provider1", "api_key": "${DYNAMIC_KEY}", "timeout": 30},
+                "model2": {"model_id": "model2", "provider": "provider2", "api_key": "static-key", "timeout": 60},
+            },
+        }))
 
         config = ConfigLoader.load(config_path=config_file)
 
@@ -373,19 +325,14 @@ models:
         monkeypatch.setenv("REDIS_URL", "redis://localhost:6379")
         monkeypatch.setenv("OBSERVE_ENDPOINT", "http://localhost:4318")
 
-        config_file = tmp_path / "config.yaml"
-        config_file.write_text(
-            """
-log_level: INFO
-plugins:
-  memory:
-    type: redis
-    url: ${REDIS_URL}
-  observe:
-    type: otlp
-    endpoint: ${OBSERVE_ENDPOINT}
-"""
-        )
+        config_file = tmp_path / "config.json"
+        config_file.write_text(json.dumps({
+            "log_level": "INFO",
+            "plugins": {
+                "memory": {"type": "redis", "url": "${REDIS_URL}"},
+                "observe": {"type": "otlp", "endpoint": "${OBSERVE_ENDPOINT}"},
+            },
+        }))
 
         config = ConfigLoader.load(config_path=config_file)
 

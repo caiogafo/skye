@@ -1,0 +1,50 @@
+# P0, P1 and P2 of the reference examples (version 1).
+
+# P0. A real bundled prompt: chat.jinja written in .skye
+prompt "chat" {
+  variables = {
+    persona = string("a helpful AI assistant"), domain = string(""), personality = list, guidelines = list,
+    conversation_history = list, user_message = string, context = string(""), output_format = string("")
+  }
+
+  message "system" {
+    text = "You are {{ persona }}."
+    when domain      { text = "Specialized in {{ domain }}." }
+    when personality { text = "Your personality traits: {{ personality | join(', ') }}." }
+    when guidelines {
+      text = "Please follow these guidelines:"
+      each guideline in guidelines { text = "- {{ guideline }}" }
+    }
+  }
+
+  each turn in conversation_history {
+    message turn.role { text = "{{ turn.content }}" }            # a real role, not a "[ROLE]" marker in the text
+  }
+
+  message "user" {
+    text = "{{ user_message }}"
+    when context       { text = "Context: {{ context }}" }
+    when output_format { text = "Please format your response as {{ output_format }}." }
+  }
+}
+
+# P1. Variables, defaults, filters
+prompt "summarize" {
+  variables     = { text = string, max_words = number(100), style = string("neutral") }
+  allow_missing = ["style"]                      # variables the caller may leave out without an error
+
+  message "user" {
+    text = "Summarize the text in at most {{ max_words }} words."
+    when style { text = "Style: {{ style }}." }
+    text = "---\n{{ text }}"
+  }
+}
+
+# P2. Roles and a history placeholder
+prompt "support_chat" {
+  variables = { product = string, question = string }
+
+  message "system" { text = "You are the support agent of {{ product }}. Answer in the user's language." }
+  placeholder "history"                          # the conversation history is inserted here at run time
+  message "user"   { text = "{{ question }}" }
+}

@@ -69,5 +69,11 @@ component imports; an extra that imports none is empty and listed in `known_empt
 - One component = one spec folder = one package = one docs section = one budget entry, all with the same short name (`^[a-z]{3,7}$`).
 - `docs/` is a wiki with one section per component; see `20-repo.md`.
 
+## The Claude skill that ships with the package
+- The package ships a Claude Code skill in the official layout (a minimal `SKILL.md` that routes to `references/*.md`, plus `evals/` for its tests): `src/skye/utils/claude_skill/skye/`; `skye skill install` copies it to `~/.claude/skills/skye/`.
+- **Update it in the same change** whenever you change the `skye` command line, the `.skye` grammar or its limits (version 1 or 2), the public API or import paths,
+  the router strategies or fields, or a rule of this file: edit the matching reference, keep `SKILL.md` short, and add an eval for a rule a model could get wrong.
+- `tests/unit/dsl/test_claude_skill.py` fails when the skill lacks a command, option, field, keyword or public function that exists (or names one that does not); add what it cannot see.
+
 ## Licence
 MIT. Do not copy code from other projects without attribution, and never from LiteLLM `enterprise/` (see `CONTRIBUTING.md`).

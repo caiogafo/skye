@@ -1,6 +1,6 @@
 # Skye examples
 
-Every example is small, runs with no key and no network, and prints its result. Install with `pip install skyeai` (every provider is built in; extras such as `skyeai[yaml]` or `skyeai[memory]` add a library).
+Every example is small, runs with no key and no network, and prints its result. Install with `pip install skyeai` (every provider is built in; extras such as `skyeai[tokens]` or `skyeai[memory]` add a library).
 
 ## Reading order
 
@@ -8,7 +8,7 @@ Read the folders in this order; each folder has a README with its own order.
 
 1. `examples/basic/`: the first calls: client, completion, async and streaming, configuration
 2. `examples/providers/`: one client call for every provider
-3. `examples/routing/`: several models, fallbacks, health, YAML configuration
+3. `examples/routing/`: several models, fallbacks, health, `.skye` configuration
 4. `examples/advanced/`: function calling, structured output, streaming, multimodal, prompts
 5. `examples/capabilities/`: capabilities the model can call, local, remote and MCP
 6. `examples/tools/`: the capability registry and MCP clients

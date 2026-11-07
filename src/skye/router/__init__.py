@@ -94,11 +94,13 @@ from skye.router.config_models import (
 )
 from skye.base.interfaces.router import RoutingStrategy
 from skye.router.model_router import ModelRouter
+from skye.router.skye_file import load_router_config
 
 __all__ = [
     "RoutingStrategy",
     # Router
     "ModelRouter",
+    "load_router_config",
     # Configuration models
     "ModelTarget",
     "RouteConfig",

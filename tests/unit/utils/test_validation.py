@@ -3,7 +3,7 @@
 from abc import ABC, abstractmethod
 
 import pytest
-from pydantic import BaseModel, Field
+from skye.base.validated import Validated, field, validated
 
 from skye.base.completion import CompleteRequest
 from skye.base.exceptions import ValidationError
@@ -176,12 +176,14 @@ def test_schema_generation_for_completion_request():
 def test_schema_generation_for_nested_model():
     """Test schema generation for models with nested structures."""
 
-    class Address(BaseModel):
+    @validated
+    class Address(Validated):
         street: str
         city: str
         zip_code: str
 
-    class Person(BaseModel):
+    @validated
+    class Person(Validated):
         name: str
         age: int
         address: Address
@@ -191,17 +193,18 @@ def test_schema_generation_for_nested_model():
     assert schema["type"] == "object"
     assert "properties" in schema
     assert "address" in schema["properties"]
-    # Check that nested model is properly referenced
-    assert "$defs" in schema or "definitions" in schema
+    # The nested model is described inline
+    assert schema["properties"]["address"]["properties"]["city"]["type"] == "string"
 
 
 def test_schema_generation_with_field_constraints():
     """Test that schema generation includes field constraints."""
 
-    class ConstrainedModel(BaseModel):
-        name: str = Field(min_length=1, max_length=100)
-        age: int = Field(gt=0, le=150)
-        score: float = Field(ge=0.0, le=1.0)
+    @validated
+    class ConstrainedModel(Validated):
+        name: str = field(min_length=1, max_length=100)
+        age: int = field(gt=0, le=150)
+        score: float = field(ge=0.0, le=1.0)
 
     schema = generate_schema(ConstrainedModel)
 
@@ -222,17 +225,17 @@ def test_schema_generation_with_field_constraints():
 
 
 def test_schema_generation_with_invalid_input():
-    """Test that schema generation fails with non-Pydantic models."""
+    """Test that schema generation fails with a class that is neither a dataclass nor has model_json_schema."""
 
-    class NotAPydanticModel:
+    class NotASchemaClass:
         def __init__(self):
             self.value = 42
 
     with pytest.raises(ValidationError) as exc_info:
-        generate_schema(NotAPydanticModel)
+        generate_schema(NotASchemaClass)
 
     error = exc_info.value
-    assert "expected a dataclass or a pydantic basemodel" in error.message.lower()
+    assert "expected a dataclass or a class with model_json_schema" in error.message.lower()
     assert error.details["field"] == "model_type"
 
 
@@ -244,4 +247,28 @@ def test_schema_generation_with_instance_instead_of_class():
         generate_schema(msg)  # type: ignore
 
     error = exc_info.value
-    assert "expected a dataclass or a pydantic basemodel" in error.message.lower()
+    assert "expected a dataclass or a class with model_json_schema" in error.message.lower()
+
+
+def test_schema_generation_with_duck_typed_class():
+    """A user's own class with model_json_schema is accepted without importing any validation library."""
+
+    class OwnModel:
+        @classmethod
+        def model_json_schema(cls):
+            return {"type": "object", "properties": {"x": {"type": "integer"}}}
+
+    assert generate_schema(OwnModel)["properties"]["x"]["type"] == "integer"
+
+
+def test_schema_generation_failure_of_duck_typed_class():
+    """A failing model_json_schema is reported as a ValidationError."""
+
+    class Broken:
+        @classmethod
+        def model_json_schema(cls):
+            raise RuntimeError("boom")
+
+    with pytest.raises(ValidationError) as exc_info:
+        generate_schema(Broken)
+    assert exc_info.value.details["field"] == "schema_generation"

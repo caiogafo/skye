@@ -222,20 +222,47 @@ The migration is done and was verified green on 2026-11-02. The only open work i
   - [x] 13.5 Report what was found and anything left open.
     - _Requirements: 15.1_
 
-- [ ] 14. Reduce the core (open: waits for the owner's decision O4)
-  - [ ] 14.1 Replace `pydantic` with dataclasses in the core, with its own validation and serialization for `CompleteRequest` and `CompleteResponse`; tests green at every step.
-    - Note: the pydantic stack is about 7.7 MB of the 8.9 MB core on Linux and about 37 ms of the 91 ms of `import skye`; the measure is in `docs/budgets.md`. No code is changed before O4 is decided.
-    - _Requirements: 7.1, 7.9; O4_
-  - [ ] 14.2 Replace `tenacity` with a retry of our own in the standard library (backoff and jitter, sync and async).
+- [x] 14. Reduce the core to zero third-party dependencies (decision D49, which closes O4)
+  - Note: `pyproject.toml` already has `dependencies = []` and `requires-python = ">=3.11"`, and `budgets.toml` has `allowed_dependencies = []`
+    (D49). The `base` models are already dataclasses (task 7.2 of `0-base-base`). What is left is the code above `base` that still imports
+    `pydantic` (5 modules) and `tenacity` (1 module). The pydantic stack is about 7.7 MB of the 8.9 MB core on Linux and about 37 ms of the 91 ms of
+    `import skye`; the measure is in `docs/budgets.md`. Until 14.1 and 14.2 are done a clean install cannot import `skye` and the budget tests fail by design.
+  - [x] 14.1 Replace `pydantic` with `@validated` dataclasses (`skye.base.validated`: `Validated`, `field()`, `to_dict`, `from_dict`, `json_schema`) in the five modules that still import it, with the same behaviour and the same field names:
+    `src/skye/tools/capability_models.py` (`CapabilityResult`), `src/skye/tools/schema.py` (`CapabilitySchema`, frozen, the name and the description are stripped and must not be blank),
+    `src/skye/memory/__init__.py` (`MemoryEntry`), `src/skye/router/config_models.py` (`ModelTarget` with its extra fields and its `${VAR}` substitution, `RouteConfig`, `FallbackConfig`,
+    `RetryPolicyConfig`, `AllowedFailsPolicyConfig`, `ModelHealthMetrics`, `UsageStats`, `CooldownInfo`) and `src/skye/utils/validation.py` (the schema of a declared output class, which no longer accepts only a pydantic model).
+    Tests green at every step.
+    - Evidence: `src/skye/tools/capability_models.py`, `tools/schema.py` (frozen, name and description stripped, blank rejected), `memory/__init__.py`, `router/config_models.py` (`ModelTarget` keeps extra keyword fields and `${VAR}` substitution; the four configs without `forbid` ignore unknown keys as before) and `utils/validation.py` (a dataclass, or by duck typing a class with `model_json_schema`) are `@validated` dataclasses; `tests/unit/tools`, `tests/unit/utils`, `tests/unit/router`, `tests/unit/test_zero_dependencies.py`; `import skye, skye.router, skye.tools, skye.memory, skye.utils.validation, skye.models` loads no `pydantic`.
+    - _Requirements: 7.1, 7.9; D24; D49_
+  - [x] 14.2 Replace `tenacity` in `src/skye/models/transport/retry.py` with a retry of our own in the standard library (backoff and jitter, sync and async, the same public function and the same behaviour).
     - Note: saves 0.15 MB and brings the core to zero third-party dependencies (`00-rules.md`).
-    - _Requirements: 7.1_
-  - [ ] 14.3 Lower `core.max_installed_mb` and the cold-start limit in `budgets.toml` to the new measure, and empty `allowed_dependencies` and `known_compiled`. Budgets only go down.
-    - _Requirements: 7.2, 7.9_
+    - Evidence: `src/skye/models/transport/retry.py` (`with_retry`, standard library, sync and async, optional `jitter`); `tests/unit/models/test_retry_logic.py`, `tests/unit/models/test_retry_stdlib.py`; no `tenacity` module is loaded.
+    - _Requirements: 7.1; D49_
+  - [x] 14.3 Update the tests, the examples and the docs that use the pydantic API of these models (`model_dump`, `model_dump_json`, `model_validate_json`, `pydantic.ValidationError`, `model_fields`) or that name pydantic as the standard: `tests/unit/tools/test_capability_models.py`, `test_capability_schema.py`, `tests/unit/utils/test_validation.py`, `tests/unit/router/*`, `tests/unit/models/test_retry_logic.py`, `examples/memory/custom_memory.py`, `examples/advanced/custom_providers.py`, `docs/`. A user's own pydantic model keeps working where the code reads it by duck typing (`model_json_schema`, `model_validate_json`).
+    - Evidence: `tests/unit/tools/test_capability_models.py`, `test_capability_schema.py`, `tests/unit/utils/test_validation.py` (duck-typed class), the structured-output tests of `tests/unit/test_completion*.py` and `tests/unit/models/test_{openai,azure}_provider.py`, `test_structured_output_rest.py` use `@validated` classes; the retry tests patch `skye.models.transport.retry.time.sleep`; `examples/memory/custom_memory.py`, `docs/router/routing-guide.md`, `docs/getting-started.md`, `docs/budgets.md`, `README.md`.
+    - _Requirements: 7.1; D49_
+  - [x] 14.4 Measure the core in a clean install and lower `core.max_installed_mb`, `max_distributions` and the cold-start limit in `budgets.toml` to the new measure (the values written by D49, 2 and 3 MB, are estimates); delete the `[imports.max_files]` entries of `pydantic` and `tenacity`; keep `allowed_dependencies` and `known_compiled` empty. Budgets only go down.
+    - Evidence: measured on 2026-11-07 with `uv build --wheel` and `uv pip install --no-deps` in a fresh venv (Python 3.13, macOS arm64; the wheel is pure Python): 1 distribution, 1.13 MB, no compiled file, `import skye` 58 modules, 16 ms, 5 MB; cold path 56 ms best of 10. Limits lowered in `budgets.toml`: `max_distributions` 2 to 1, `max_installed_mb` 3 to 2, `max_cold_start_ms` 300 to 200 (target 150 to 100), `max_modules_loaded` 340 to 80, `max_import_ms` 250 to 100, `max_rss_delta_mb` 32 to 16, `max_profile_mb` 30 to 3. `tests/budget/test_footprint_budget.py -m budget -k "core or serverless"` and `tests/budget` pass. Not measured: Linux x86_64 and the extras (no network); the CI runner measures them. Numbers and method in `docs/budgets.md`.
+    - _Requirements: 7.2, 7.9; D49_
 
 - [x] 15. Short public import paths (D34)
   - [x] 15.1 Add the public facades and rewrite the imports of the examples and the docs
     - Evidence: `src/skye/interfaces.py`, `data.py`, `messages.py`, `completion.py`, `exceptions.py`, `config.py` (re-exports of `base`), the lazy names in `src/skye/__init__.py`, `RoutingStrategy` in `skye.router`, lazy exports in `skye.auth`; every import in `examples/`, `docs/` and `README.md` now has at most two levels and none goes through `skye.base`; `tests/budget/test_public_imports.py` fails on a deeper or `skye.base` path, and `tests/budget/test_import_matrix.py` counts the facades as `base`.
     - _Requirements: 7.8, 7.14; D34_
+
+- [ ] 16. Final verification of the dependency removal and of the `.skye` work (to be run with Kiro)
+  - [ ] 16.1 Run the whole verification: `uv run pytest tests -q`, `uv run pytest tests/budget -q`, `make budget`, `make differential`. Install the package in a clean environment with no extra and confirm that `import skye` works and imports no third-party module.
+    - _Requirements: 7.5, 7.9; D49_
+  - [x] 16.2 Fix what fails, one failure at a time; confirm that every allowlist (`KNOWN_DUPLICATES`, `KNOWN_MISMATCHES`, `KNOWN_LONG`, `known_import_failures`, `known_leaks`) is non-empty only where a real, named debt remains.
+    - Evidence (2026-11-07): see the evidence of `7.1` in `0-base-uxui`. `uv run pytest tests -q`: 2295 passed, 3 skipped; `tests/budget`: 290 passed. `KNOWN_MISMATCHES`, `known_import_failures` and `known_leaks` are
+      empty; `KNOWN_DUPLICATES` and `KNOWN_LONG` hold one named debt each. Also fixed while verifying: 56 mypy errors (131 on HEAD, 75 now, none new; the rest are older and listed in the report), the
+      `N818` and `E501` of the new files (`ruff` and `black` clean on the 38 new Python files), and the test files that wiped the provider registry in `teardown` (the cause of the
+      "Model provider 'openai' not found" failures and of the order-dependent `test_docstrings` failure).
+    - _Requirements: 7.9_
+  - [x] 16.3 Report what was found and which tasks of `0-base-structure`, `0-base-base`, `0-base-auth` and `0-base-uxui` are still unticked.
+    - Evidence (2026-11-07): unticked are `0-base-structure` 16 and 16.1, `0-base-base` 12 and 12.1; `0-base-auth` and `0-base-uxui` have none. 16.1 stays open because `make budget` ran only for the core and
+      the serverless profile (offline, both pass); the extras need the network and were not installed, so no extra limit was lowered. 12.1 stays open for the file I/O in `base/config.py`.
+    - _Requirements: 15.1_
 
 ## Requirement coverage
 

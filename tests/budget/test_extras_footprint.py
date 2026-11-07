@@ -74,7 +74,6 @@ EXTRA_PATHS: dict[str, list[str]] = {
     ],
     "memory": ["memory", "store/redis.py"],
     "postgres": ["store/postgres.py"],
-    "yaml": ["base/config.py"],
     "observe": ["observe"],
 }
 
@@ -89,7 +88,6 @@ IMPORT_NAMES: dict[str, set[str]] = {
     "asyncpg": {"asyncpg"},
     "fastmcp": {"fastmcp"},
     "fastmcp-slim": {"fastmcp"},
-    "pyyaml": {"yaml"},
     }
 
 # Libraries that stay out of the comparison: the standard library and Skye itself.

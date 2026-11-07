@@ -10,7 +10,7 @@ from skye.base.interfaces import StorageBackend
 class InMemoryBackend(StorageBackend):
     """In-memory storage backend for single-instance environments."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize in-memory backend."""
         self._data: Dict[str, Tuple[Dict[str, Any], Optional[float]]] = {}
 

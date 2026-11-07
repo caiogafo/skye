@@ -1,0 +1,61 @@
+{
+  "routes": [
+    {
+      "alias": "gpt-3.5-turbo",
+      "targets": [
+        {
+          "model": "gpt-3.5-turbo",
+          "provider": "openai",
+          "api_key": "${OPENAI_API_KEY}",
+          "tpm": 200000,
+          "rpm": 2000,
+          "tags": [
+            "fast",
+            "cost-effective"
+          ]
+        }
+      ],
+      "strategy": "rate_limit_aware"
+    },
+    {
+      "alias": "gpt-4",
+      "targets": [
+        {
+          "model": "gpt-4",
+          "provider": "openai",
+          "api_key": "${OPENAI_API_KEY}",
+          "tpm": 100000,
+          "rpm": 1000,
+          "tags": [
+            "premium",
+            "high-quality"
+          ]
+        }
+      ],
+      "strategy": "round_robin"
+    }
+  ],
+  "fallbacks": [
+    {
+      "primary": "gpt-4",
+      "fallbacks": [
+        "gpt-3.5-turbo"
+      ]
+    }
+  ],
+  "retry_policies": [
+    {
+      "error_type": "RateLimitError",
+      "max_retries": 3
+    }
+  ],
+  "allowed_fails_policies": [
+    {
+      "error_type": "RateLimitError",
+      "allowed_fails_per_minute": 100
+    }
+  ],
+  "strategy": "rate_limit_aware",
+  "cooldown_seconds": 60.0,
+  "enable_pre_call_checks": true
+}

@@ -14,7 +14,7 @@ from typing import Any
 from unittest.mock import Mock, patch
 
 import pytest
-from pydantic import BaseModel
+from skye.base.validated import Validated, validated
 
 from skye.base.completion import CompleteRequest, CompleteResponse, StreamChunk
 from skye.base.exceptions import ProviderError
@@ -174,7 +174,8 @@ class TestOpenAIRequestTransformation:
     
     def test_transform_with_structured_output(self) -> None:
         """Test transformation with structured output schema."""
-        class Person(BaseModel):
+        @validated
+        class Person(Validated):
             name: str
             age: int
         
@@ -324,7 +325,8 @@ class TestOpenAIResponseTransformation:
     
     def test_transform_response_with_structured_output(self) -> None:
         """Test transformation of response with structured output."""
-        class Person(BaseModel):
+        @validated
+        class Person(Validated):
             name: str
             age: int
         

@@ -9,7 +9,7 @@ from its Component path (skye.models, skye.router, skye.tools, ...).
 Installation:
     pip install skyeai                    # every provider (built-in REST adapters)
     pip install skyeai[tokens]            # + exact token counts
-    pip install skyeai[memory,yaml]       # + Redis store, YAML configuration
+    pip install skyeai[memory]            # + Redis store
     pip install skyeai[all]               # every optional library
 
 Example:
@@ -39,6 +39,8 @@ if TYPE_CHECKING:
         ValidationError,
     )
     from skye.base.messages import AssistantMessage, CapabilityMessage, SystemMessage, UserMessage
+    from skye.flows import Flow
+    from skye.utils.skye_files import load
     from skye.base.interfaces.model import ModelInterface
     from skye.base.interfaces.vector_encoder import VectorEncoderInterface
 
@@ -57,6 +59,8 @@ _LAZY = {
     "ConfigurationError": "skye.base.exceptions",
     "ValidationError": "skye.base.exceptions",
     "MissingExtraError": "skye.base.exceptions",
+    "load": "skye.utils.skye_files",
+    "Flow": "skye.flows",
 }
 
 __all__ = ["__version__", "messages", "completion", "exceptions", "config", "provider", *_LAZY]
@@ -96,7 +100,8 @@ def provider(name: str, **config: Any) -> "ModelInterface | VectorEncoderInterfa
     """
     from skye.models.registry import provider as _provider
 
-    return _provider(name, **config)
+    client: ModelInterface | VectorEncoderInterface = _provider(name, **config)
+    return client
 
 
 # The public module paths of ``base`` (``skye.messages`` and the others); imported last so that they are attributes of ``skye``.

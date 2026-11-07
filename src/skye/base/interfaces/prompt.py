@@ -485,11 +485,12 @@ class PromptSchemaInterface(ABC):
 
         Args:
             template_name: Name of the template.
-            schema: JSON schema dict or Pydantic model class.
+            schema: JSON schema dict or a dataclass.
 
         Example:
-            >>> from pydantic import BaseModel
-            >>> class Entity(BaseModel):
+            >>> from dataclasses import dataclass
+            >>> @dataclass
+            ... class Entity:
             ...     name: str
             ...     type: str
             >>> builder = MyPromptBuilder()

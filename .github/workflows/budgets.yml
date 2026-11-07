@@ -48,7 +48,6 @@ jobs:
           - "test_extra_footprint and memory"
           - "test_extra_footprint and postgres"
           - "test_extra_footprint and tokens"
-          - "test_extra_footprint and yaml"
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v5

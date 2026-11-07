@@ -161,8 +161,8 @@ Adding one never edits a file outside the owner; a check rejects it otherwise.
 metadata, token usage, model identifier, provider; streaming yields chunks in one format). The capability schema (name, description,
 parameters) is a pure contract in `base`; handlers and the registry stay in `tools`. Errors: `SkyeError` with `ProviderError`
 (provider context, status), `ConfigurationError`, `ValidationError` (field and value), `CapabilityExecutionError` and `MissingExtraError`;
-wrapped errors keep the original message and stack. Configuration sources, in priority order: code, environment, file (JSON, a `.skye` file, or YAML with the `yaml` extra, D53);
-`${VAR}` is substituted in JSON and YAML and `env.NAME` is the form in `.skye`; invalid values raise `ConfigurationError`. The Ports are listed in "Ports"; each performs no I/O.
+wrapped errors keep the original message and stack. Configuration sources, in priority order: code, environment, file (JSON or a `.skye` file; no YAML, D62);
+`${VAR}` is substituted in JSON and `env.NAME` is the form in `.skye`; invalid values raise `ConfigurationError`. The Ports are listed in "Ports"; each performs no I/O.
 
 ## Public API and lazy imports
 A user-facing path has at most two levels and never goes through `<pkg>.base` or into a module inside a component (Requirement 7.14, D34).
@@ -204,7 +204,7 @@ Scope. Version 1: routers, flows (sequence, conditions, parallel, bounded loops,
 block that replaces the 18 bundled `.jinja` templates, checked by an equivalence test (D51, D60). Version 2, written but not built: waiting for
 events with persistence and resume (`wait`, `on_event`; version 1 reserves both words and rejects them with a clear message), `to_mermaid()`,
 `include`, and in prompts the examples, multimodal content, output schema and `bind`. Tools of version 1: the written grammar, a JSON Schema of
-the blocks and `skye check <file>` (D61). Existing JSON and YAML router files stay readable (D59). The language adds no third-party library
+the blocks and `skye check <file>` (D61). JSON router files stay readable; YAML is not read (D59, D62). The language adds no third-party library
 to any component (D49).
 
 ## Transport and providers

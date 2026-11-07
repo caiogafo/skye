@@ -13,7 +13,7 @@ library only).
 
 1. values passed in code (highest priority);
 2. environment variables, prefixed `SKYE_` (for example `SKYE_LOG_LEVEL`);
-3. a configuration file (YAML or JSON).
+3. a configuration file (JSON). The library reads no YAML: a `.yaml` or `.yml` file raises a `ConfigurationError` that asks for `.skye` or JSON. A router is written as a `router` block in a `.skye` file (see the [language guide](skye-language.md)).
 
 A value set in code overrides the environment, which overrides the file.
 
@@ -22,14 +22,13 @@ A value set in code overrides the environment, which overrides the file.
 Both file and in-code configuration support `${VAR_NAME}` substitution, resolved at load
 time. Use it for every secret — never commit a key.
 
-```yaml
-# skye.yaml
-log_level: INFO
-models:
-  gpt-4:
-    provider: openai
-    api_key: ${OPENAI_API_KEY}
-    temperature: 0.7
+```json
+{
+  "log_level": "INFO",
+  "models": {
+    "gpt-4": {"provider": "openai", "api_key": "${OPENAI_API_KEY}", "temperature": 0.7}
+  }
+}
 ```
 
 ```python
@@ -42,7 +41,7 @@ target = ModelTarget(
 )
 ```
 
-For router-specific YAML (routes, targets, fallbacks, retry policies) see the
+For a router (routes, targets, fallbacks, retry policies) write a `router` block in a `.skye` file: see the
 [routing guide](../router/routing-guide.md). For secret handling rules see the `security`
 steering.
 
@@ -60,20 +59,20 @@ export SKYE_ENABLE_TELEMETRY=true
 
 ### Configuration File
 
-```yaml
-# skye.yaml
-log_level: INFO
-enable_telemetry: true
-
-models:
-  gpt-4:
-    provider: openai
-    api_key: ${OPENAI_API_KEY}
-    temperature: 0.7
-    max_tokens: 2000
-    rate_limits:
-      requests_per_minute: 60
-      tokens_per_minute: 90000
+```json
+{
+  "log_level": "INFO",
+  "enable_telemetry": true,
+  "models": {
+    "gpt-4": {
+      "provider": "openai",
+      "api_key": "${OPENAI_API_KEY}",
+      "temperature": 0.7,
+      "max_tokens": 2000,
+      "rate_limits": {"requests_per_minute": 60, "tokens_per_minute": 90000}
+    }
+  }
+}
 ```
 
 ### Load Configuration
@@ -83,7 +82,7 @@ from pathlib import Path
 from skye.config import ConfigLoader
 
 config = ConfigLoader.load(
-    config_path=Path("skye.yaml"),
+    config_path=Path("skye.json"),
     overrides={"log_level": "DEBUG"}
 )
 ```

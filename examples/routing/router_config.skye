@@ -1,0 +1,292 @@
+# Skye Router Configuration Example
+# =====================================
+# A complete router in the .skye language. It shows every routing strategy, environment variables
+# (env.NAME), fallback chains, retry policies and multi-provider setups.
+# Check it with:  skye check examples/routing/router_config.skye
+#
+# The router reads these fields. The old YAML file also had `priority` and
+# `cost_per_1k_*_tokens` on targets: the router never read them, so they are not declared here.
+
+router "main" {
+  # Default strategy for routes that do not set their own.
+  strategy = "rate_limit_aware"
+
+  # How long a failed model stays in cooldown (was cooldown_seconds).
+  cooldown = "60s"
+
+  # Check rate limits before each call (recommended: prevents rate limit errors).
+  enable_pre_call_checks = true
+
+  # -------------------------------------------------------------------------
+  # EXAMPLE 1: Rate-limit-aware strategy
+  # Routes to the target with the most available capacity (TPM/RPM).
+  # Best for: high-throughput scenarios, avoiding rate limit errors.
+  # -------------------------------------------------------------------------
+  route "gpt-3.5-turbo" {
+    # Primary OpenAI target
+    target {
+      model = "gpt-3.5-turbo"
+      provider = "openai"
+      api_key = env.OPENAI_API_KEY       # read from the environment
+      tpm = 200000                       # tokens per minute limit
+      rpm = 2000                         # requests per minute limit
+      tags = ["fast", "cost-effective"]
+      metadata = { deployment = "primary", region = "us-east-1" }
+    }
+    # Secondary OpenAI target for load balancing
+    target {
+      model = "gpt-3.5-turbo"
+      provider = "openai"
+      api_key = env.OPENAI_API_KEY
+      tpm = 200000
+      rpm = 2000
+      tags = ["fast", "cost-effective"]
+      metadata = { deployment = "secondary", region = "us-west-2" }
+    }
+  }
+
+  # -------------------------------------------------------------------------
+  # EXAMPLE 2: Round-robin strategy
+  # Distributes requests evenly across all targets in rotation.
+  # Best for: simple load distribution, homogeneous deployments.
+  # `fallback` lists the routes to try, in order, if this route fails.
+  # -------------------------------------------------------------------------
+  route "gpt-4" {
+    strategy = "round_robin"
+    fallback = ["azure-gpt4", "claude"]   # if gpt-4 fails, try azure-gpt4, then claude
+    target {
+      model = "gpt-4"
+      provider = "openai"
+      api_key = env.OPENAI_API_KEY
+      tpm = 100000
+      rpm = 1000
+      tags = ["premium", "high-quality"]
+    }
+  }
+
+  # -------------------------------------------------------------------------
+  # EXAMPLE 3: Least-busy strategy
+  # Routes to the target with the fewest active requests.
+  # Best for: real-time load balancing, varying request durations.
+  # -------------------------------------------------------------------------
+  route "claude" {
+    strategy = "least_busy"
+    fallback = ["bedrock-claude", "gpt-4"]   # if claude fails, try bedrock-claude, then gpt-4
+    target {
+      model = "claude-3-sonnet-20240229"
+      provider = "anthropic"
+      api_key = env.ANTHROPIC_API_KEY
+      tpm = 80000
+      rpm = 800
+      tags = ["anthropic", "claude"]
+    }
+    target {
+      model = "claude-3-sonnet-20240229"
+      provider = "anthropic"
+      api_key = env.ANTHROPIC_API_KEY_SECONDARY
+      tpm = 80000
+      rpm = 800
+      tags = ["anthropic", "claude"]
+    }
+  }
+
+  # -------------------------------------------------------------------------
+  # EXAMPLE 4: Latency-based strategy
+  # Routes to the target with the lowest average latency.
+  # Best for: latency-sensitive applications, multi-region deployments.
+  # -------------------------------------------------------------------------
+  route "azure-gpt4" {
+    strategy = "latency_based"
+    fallback = ["gpt-4", "gpt-3.5-turbo"]   # if azure-gpt4 fails, try gpt-4, then gpt-3.5-turbo
+    # East US deployment
+    target {
+      model = "gpt-4"
+      provider = "azure"
+      api_key = env.AZURE_OPENAI_API_KEY_EAST
+      api_base = env.AZURE_API_BASE_EAST
+      api_version = "2024-02-15-preview"
+      region = "eastus"
+      tpm = 100000
+      rpm = 1000
+      metadata = { location = "Virginia", priority = "primary" }
+    }
+    # West US deployment
+    target {
+      model = "gpt-4"
+      provider = "azure"
+      api_key = env.AZURE_OPENAI_API_KEY_WEST
+      api_base = env.AZURE_API_BASE_WEST
+      api_version = "2024-02-15-preview"
+      region = "westus"
+      tpm = 100000
+      rpm = 1000
+      metadata = { location = "Oregon", priority = "secondary" }
+    }
+  }
+
+  # -------------------------------------------------------------------------
+  # EXAMPLE 5: Cost-based strategy
+  # Routes to the target with the lowest cost per token.
+  # Best for: budget-conscious deployments, cost optimization.
+  # -------------------------------------------------------------------------
+  route "budget" {
+    strategy = "cost_based"
+    fallback = ["gpt-3.5-turbo"]   # budget fallback chain
+    # Cheaper model option
+    target {
+      model = "gpt-3.5-turbo"
+      provider = "openai"
+      api_key = env.OPENAI_API_KEY
+      tpm = 200000
+      rpm = 2000
+      tags = ["budget", "fast"]
+    }
+    # Alternative budget option
+    target {
+      model = "gpt-3.5-turbo-16k"
+      provider = "openai"
+      api_key = env.OPENAI_API_KEY
+      tpm = 180000
+      rpm = 1800
+      tags = ["budget", "large-context"]
+    }
+  }
+
+  # -------------------------------------------------------------------------
+  # EXAMPLE 6: Weighted strategy
+  # Routes based on assigned weights (higher weight = more traffic).
+  # Best for: gradual rollouts, A/B testing, canary deployments.
+  # -------------------------------------------------------------------------
+  route "weighted-gpt4" {
+    strategy = "weighted"
+    # Primary deployment gets 80% of traffic
+    target {
+      model = "gpt-4"
+      provider = "openai"
+      api_key = env.OPENAI_API_KEY
+      weight = 80
+      tpm = 100000
+      rpm = 1000
+      metadata = { deployment = "stable" }
+    }
+    # Canary deployment gets 20% of traffic
+    target {
+      model = "gpt-4-turbo-preview"
+      provider = "openai"
+      api_key = env.OPENAI_API_KEY
+      weight = 20
+      tpm = 50000
+      rpm = 500
+      metadata = { deployment = "canary" }
+    }
+  }
+
+  # -------------------------------------------------------------------------
+  # EXAMPLE 7: Priority-based strategy
+  # Prefers the target with the best success rate, falls back on failure.
+  # Best for: primary/secondary deployments, disaster recovery.
+  # -------------------------------------------------------------------------
+  route "priority-claude" {
+    strategy = "priority_based"
+    # Primary target
+    target {
+      model = "claude-3-opus-20240229"
+      provider = "anthropic"
+      api_key = env.ANTHROPIC_API_KEY
+      tpm = 80000
+      rpm = 800
+      metadata = { tier = "primary" }
+    }
+    # Secondary target
+    target {
+      model = "claude-3-sonnet-20240229"
+      provider = "anthropic"
+      api_key = env.ANTHROPIC_API_KEY
+      tpm = 80000
+      rpm = 800
+      metadata = { tier = "secondary" }
+    }
+    # Tertiary target
+    target {
+      model = "claude-3-haiku-20240307"
+      provider = "anthropic"
+      api_key = env.ANTHROPIC_API_KEY
+      tpm = 100000
+      rpm = 1000
+      metadata = { tier = "tertiary" }
+    }
+  }
+
+  # -------------------------------------------------------------------------
+  # EXAMPLE 8: Multi-region AWS Bedrock
+  # Redundancy across regions. Credentials come from the AWS environment
+  # (AWS_PROFILE or AWS_ACCESS_KEY_ID), so no api_key is written.
+  # -------------------------------------------------------------------------
+  route "bedrock-claude" {
+    strategy = "latency_based"
+    target {
+      model = "anthropic.claude-3-sonnet-20240229-v1:0"
+      provider = "bedrock"
+      region = "us-east-1"
+      metadata = { location = "Virginia" }
+    }
+    target {
+      model = "anthropic.claude-3-sonnet-20240229-v1:0"
+      provider = "bedrock"
+      region = "us-west-2"
+      metadata = { location = "Oregon" }
+    }
+    target {
+      model = "anthropic.claude-3-sonnet-20240229-v1:0"
+      provider = "bedrock"
+      region = "eu-west-1"
+      metadata = { location = "Ireland" }
+    }
+  }
+
+  # -------------------------------------------------------------------------
+  # EXAMPLE 9: Simple shuffle strategy
+  # Random selection from the available targets.
+  # Best for: testing, development, unpredictable distribution.
+  # -------------------------------------------------------------------------
+  route "random" {
+    strategy = "simple_shuffle"
+    target { model = "gpt-3.5-turbo", provider = "openai", api_key = env.OPENAI_API_KEY }
+    target { model = "claude-3-haiku-20240307", provider = "anthropic", api_key = env.ANTHROPIC_API_KEY }
+  }
+
+  # -------------------------------------------------------------------------
+  # RETRY POLICIES
+  # How many times to retry each kind of error. `retry_after` and
+  # `exponential_backoff` are read by the language, but the router does not
+  # apply them yet: only `max_retries` has an effect today.
+  # -------------------------------------------------------------------------
+  retry_policy "RateLimitError"      { max_retries = 3, retry_after = "5s", exponential_backoff = true }
+  retry_policy "TimeoutError"        { max_retries = 2, retry_after = "3s", exponential_backoff = true }
+  retry_policy "ServerError"         { max_retries = 2, retry_after = "5s", exponential_backoff = true }
+  retry_policy "AuthenticationError" { max_retries = 0 }   # do not retry authentication errors
+
+  # -------------------------------------------------------------------------
+  # COOLDOWN POLICIES
+  # How many failures per minute are allowed before a model is put in cooldown.
+  # This prevents cascading failures.
+  # -------------------------------------------------------------------------
+  allowed_fails_policy "RateLimitError" { allowed_fails_per_minute = 100 }
+  allowed_fails_policy "TimeoutError"   { allowed_fails_per_minute = 50 }
+  allowed_fails_policy "ServerError"    { allowed_fails_per_minute = 20 }
+}
+
+# ENVIRONMENT VARIABLES USED
+# ==========================
+#   OPENAI_API_KEY, ANTHROPIC_API_KEY, ANTHROPIC_API_KEY_SECONDARY (optional second key),
+#   AZURE_OPENAI_API_KEY_EAST, AZURE_OPENAI_API_KEY_WEST, AZURE_API_BASE_EAST, AZURE_API_BASE_WEST,
+#   and for Bedrock AWS_PROFILE or AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY.
+# For production, use a secret manager (AWS Secrets Manager, Azure Key Vault, Vault, Kubernetes Secrets).
+#
+# USAGE
+# =====
+#   from skye.router import ModelRouter
+#   router = ModelRouter.from_file("router_config.skye")
+#   response = router.complete(messages=[UserMessage(content="Hello!")], model="gpt-4")
+#   response = router.complete(messages=[UserMessage(content="Hello!")], tags=["fast", "cost-effective"])
+# See skye_config_example.py for a runnable version.

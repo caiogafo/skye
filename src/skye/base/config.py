@@ -27,20 +27,29 @@ import re
 from pathlib import Path
 from typing import Any
 
-from skye.base.exceptions import ConfigurationError, MissingExtraError, ValidationError
-from skye.base.lazy_import import missing_extra
-from skye.base.validated import Validated, dump, field, validated
+from skye.base.exceptions import ConfigurationError, ValidationError
+from skye.base.validated import Validated, field, validated
 
 # Set up module logger
 logger = logging.getLogger(__name__)
 
-# Cache for environment variable substitutions to avoid repeated os.getenv() calls
-_env_var_cache: dict[str, str] = {}
 
 
-def _yaml() -> Any:
-    """The PyYAML module, imported when a YAML file is read: it is in the extra `yaml`, not in the core."""
-    return missing_extra("yaml", extra="yaml")
+def reject_yaml(path: str | Path) -> None:
+    """Raise ``ConfigurationError`` when ``path`` is a YAML file: the library reads no YAML (decision D62).
+
+    Args:
+        path: The configuration file about to be read.
+
+    Raises:
+        ConfigurationError: If the suffix is ``.yaml`` or ``.yml``; the message names the supported formats.
+    """
+    suffix = Path(path).suffix.lower()
+    if suffix in (".yaml", ".yml"):
+        raise ConfigurationError(
+            f"YAML is not read: {Path(path).name}. Rewrite the file as .skye or JSON.",
+            details={"path": str(path), "supported": [".skye", ".json"]},
+        )
 
 
 def substitute_env_vars(config: dict[str, Any] | list[Any] | str | Any) -> Any:
@@ -81,10 +90,6 @@ def substitute_env_vars(config: dict[str, Any] | list[Any] | str | Any) -> Any:
         def replace_var(match: re.Match[str]) -> str:
             var_name = match.group(1)
 
-            # Check cache first
-            if var_name in _env_var_cache:
-                logger.debug(f"Using cached value for environment variable: {var_name}")
-                return _env_var_cache[var_name]
 
             # Get from environment
             value = os.getenv(var_name)
@@ -94,8 +99,6 @@ def substitute_env_vars(config: dict[str, Any] | list[Any] | str | Any) -> Any:
                     details={"variable_name": var_name},
                 )
 
-            # Cache the value
-            _env_var_cache[var_name] = value
             logger.debug(f"Substituted environment variable: {var_name}")
             return value
 
@@ -336,10 +339,10 @@ class SkyeConfig(Validated):
 
 @validated
 class RouterConfig(Validated):
-    """Complete router configuration from YAML.
+    """Complete router configuration.
 
     This model represents a complete router configuration that can be loaded
-    from YAML files. It includes routes, fallbacks, retry policies, and other
+    from a file. It includes routes, fallbacks, retry policies, and other
     router settings.
 
     Attributes:
@@ -408,83 +411,6 @@ def _validation_errors(error: ValidationError) -> list[dict[str, Any]]:
     ]
 
 
-def load_router_config(yaml_path: str | Path) -> dict[str, Any]:
-    """Load router configuration from YAML file with environment variable substitution.
-
-    This function loads a router configuration from a YAML file and applies
-    environment variable substitution to all string values. The configuration
-    is validated against the RouterConfig model.
-
-    Args:
-        yaml_path: Path to the YAML configuration file.
-
-    Returns:
-        Dictionary containing the router configuration with environment variables substituted.
-
-    Raises:
-        ConfigurationError: If the file doesn't exist, can't be parsed, or fails validation.
-
-    Example:
-        >>> # Load router config from YAML
-        >>> config = load_router_config("router_config.yaml")
-        >>> print(config["routes"])
-        [{'alias': 'gpt-3.5-turbo', 'targets': [...]}]
-    """
-    yaml_path = Path(yaml_path) if isinstance(yaml_path, str) else yaml_path
-
-    if not yaml_path.exists():
-        raise ConfigurationError(
-            f"Router configuration file not found: {yaml_path}",
-            details={"path": str(yaml_path)},
-        )
-
-    yaml = _yaml()
-    try:
-        with open(yaml_path) as f:
-            data = yaml.safe_load(f)
-    except yaml.YAMLError as e:
-        raise ConfigurationError(
-            f"Failed to parse YAML configuration file: {yaml_path}",
-            details={"path": str(yaml_path), "error": str(e)},
-        ) from e
-    except Exception as e:
-        raise ConfigurationError(
-            f"Failed to read configuration file: {yaml_path}",
-            details={"path": str(yaml_path), "error": str(e)},
-        ) from e
-
-    # Handle empty files
-    if data is None:
-        raise ConfigurationError(
-            "Router configuration file is empty",
-            details={"path": str(yaml_path)},
-        )
-
-    if not isinstance(data, dict):
-        raise ConfigurationError(
-            "Router configuration file must contain a dictionary/object at root level",
-            details={"path": str(yaml_path), "type": type(data).__name__},
-        )
-
-    # Apply environment variable substitution
-    substituted_data = substitute_env_vars(data)
-
-    # Validate against RouterConfig model
-    try:
-        router_config = RouterConfig.from_dict(substituted_data)
-        # Return as dict for compatibility with router initialization
-        dumped: dict[str, Any] = dump(router_config)
-        return dumped
-    except ValidationError as e:
-        raise ConfigurationError(
-            "Router configuration validation failed",
-            details={
-                "path": str(yaml_path),
-                "validation_errors": _validation_errors(e),
-            },
-        ) from e
-
-
 #: The Skye-prefixed variables that set configuration values (SKYE_CONFIG selects the file).
 ENV_CONFIG_VARS = frozenset({"SKYE_LOG_LEVEL", "SKYE_ENABLE_TELEMETRY"})
 #: All Skye-prefixed environment variables: exactly three.
@@ -498,14 +424,14 @@ class ConfigLoader:
     following precedence (highest to lowest):
     1. Code overrides (passed as dict to load())
     2. Environment variables (SKYE_ prefix)
-    3. Configuration files (YAML or JSON)
+    3. Configuration files (JSON)
 
     The loader merges configuration from all sources, with higher precedence
     sources overriding lower precedence ones.
 
     Example:
         >>> # Load from file only
-        >>> config = ConfigLoader.load(config_path=Path("skye.yaml"))
+        >>> config = ConfigLoader.load(config_path=Path("skye.json"))
         >>>
         >>> # Load with environment variables
         >>> os.environ["SKYE_LOG_LEVEL"] = "DEBUG"
@@ -516,7 +442,7 @@ class ConfigLoader:
         >>>
         >>> # Load from all sources
         >>> config = ConfigLoader.load(
-        ...     config_path=Path("skye.yaml"),
+        ...     config_path=Path("skye.json"),
         ...     overrides={"enable_telemetry": False}
         ... )
     """
@@ -531,7 +457,7 @@ class ConfigLoader:
         applying them in order of precedence: code > environment > file.
 
         Args:
-            config_path: Optional path to YAML or JSON configuration file.
+            config_path: Optional path to a JSON configuration file.
             overrides: Optional dictionary of configuration values to override.
 
         Returns:
@@ -543,7 +469,7 @@ class ConfigLoader:
 
         Example:
             >>> config = ConfigLoader.load(
-            ...     config_path=Path("config.yaml"),
+            ...     config_path=Path("config.json"),
             ...     overrides={"log_level": "DEBUG"}
             ... )
             >>> config.log_level
@@ -555,10 +481,9 @@ class ConfigLoader:
         if config_path is None and os.environ.get("SKYE_CONFIG"):
             config_path = Path(os.environ["SKYE_CONFIG"])
         if config_path:
+            reject_yaml(config_path)  # say it plainly: the library reads no YAML (D62)
             try:
                 config_data = ConfigLoader._load_from_file(config_path)
-            except MissingExtraError:
-                raise  # already says what to install (the extra `yaml`)
             except Exception as e:
                 raise ConfigurationError(
                     f"Failed to load configuration from file: {config_path}",
@@ -587,7 +512,7 @@ class ConfigLoader:
 
     @staticmethod
     def _load_from_file(config_path: Path) -> dict[str, Any]:
-        """Load configuration from a YAML or JSON file.
+        """Load configuration from a JSON file.
 
         Args:
             config_path: Path to configuration file.
@@ -604,21 +529,17 @@ class ConfigLoader:
                 details={"path": str(config_path)},
             )
 
-        # YAML needs the extra `yaml`; JSON needs nothing. The parse error types are those of the format being read.
-        yaml = _yaml() if config_path.suffix in [".yaml", ".yml"] else None
-        yaml_error: type[Exception] = yaml.YAMLError if yaml is not None else ValueError
+        # The library reads no YAML (D62); a JSON file needs nothing.
+        reject_yaml(config_path)
         try:
             with open(config_path) as f:
-                if yaml is not None:
-                    data = yaml.safe_load(f)
-                elif config_path.suffix == ".json":
+                if config_path.suffix.lower() == ".json":
                     data = json.load(f)
                 else:
                     raise ConfigurationError(
                         f"Unsupported configuration file format: {config_path.suffix}",
                         details={"path": str(config_path), "suffix": config_path.suffix},
                     )
-
             # Handle empty files
             if data is None:
                 return {}
@@ -633,7 +554,7 @@ class ConfigLoader:
             substituted: dict[str, Any] = substitute_env_vars(data)
             return substituted
 
-        except (yaml_error, json.JSONDecodeError) as e:
+        except json.JSONDecodeError as e:
             raise ConfigurationError(
                 f"Failed to parse configuration file: {config_path}",
                 details={"path": str(config_path), "error": str(e)},

@@ -250,47 +250,113 @@ requirement or decision directly. A task that depended on an open decision names
       this moot.
     - _Requirements: 7.4 of steering; O4_
 
-- [ ] 7. Checkpoint (run by Kiro, not by the implementer)
-  - [ ] 7.1 Run the whole test suite and fix what fails; ask the user if questions arise
+- [x] 7. Checkpoint (run by Kiro, not by the implementer)
+  - [x] 7.1 Run the whole test suite and fix what fails; ask the user if questions arise
+    - Evidence (2026-11-07, offline, on the regenerated `uv.lock`): `uv run pytest tests -q` gave 2295 passed, 3 skipped, 0 failed; `uv run pytest tests/budget -q` gave 290 passed.
+      Failures found and fixed: `examples/serverless/lambda_handler.py` created a Bedrock client at import with no credentials (it also failed on the clean HEAD; it now uses
+      `provider_or_scripted` like `bedrock_example.py`); `tests/stress/test_rate_limiting.py::test_rate_limit_tracking_accuracy` counted requests per fixed one-minute window and failed when
+      the 50 requests crossed a minute boundary (proved by moving the clock; the test now fixes the window, the code is unchanged). Allowlists: empty are `KNOWN_MISMATCHES`,
+      `KNOWN_STALE`, `known_leaks`, `known_import_failures`, `known_compiled`; non-empty with a named debt are `KNOWN_DUPLICATES` (the two older `tools` copies of `CapabilitySchema` and
+      `CapabilityInterface`), `KNOWN_LONG` (`advanced/custom_providers.py`, 90 lines, because `BaseModelProvider` has 11 abstract hooks; proposal S5.5, not yet a task) and
+      `KNOWN_FOLDERS` (`prompts/`, task 3 of `prompts-support`).
     - Kiro runs `uv run pytest tests/ -q` and `uv run pytest tests/budget -q`. The implementation of the other tasks was written without
       running the suite, so expect to repair failures in the new tests and in the code they guard: do that here, one failure at a time.
     - Confirm every new allowlist (`KNOWN_DUPLICATES`, `KNOWN_MISMATCHES`, `KNOWN_LONG`) is non-empty only where a real, named debt remains.
     - Report which tasks are still unticked: after D36 to D45 only the split of long examples in 5.8 may remain.
     - _Requirements: all_
 
-- [ ] 8. The `.skye` language: public surface (spec only until the parser exists)
+- [x] 8. The `.skye` language: public surface (spec only until the parser exists)
   - Note: nothing here is built and no example has been run through a parser. The parser itself (text in, syntax tree out, standard library, in
     `base`) is a task of `0-base-base`, to be added when it is designed; the tasks below follow it. The syntax, the error table and the scope are in
     `design.md`, "The `.skye` language". The decisions are D49 to D61; the delivery guarantee for persistence (O34) and the fate of
     `prompts/engine.py` (O35) are open and not needed for version 1.
-  - [ ] 8.1 The conformance suite of the parser
+  - [x] 8.1 The conformance suite of the parser
     - Turn the reference examples (four routers, seven prompts, nine flows; drafted in `.agents/tasks/uxui-dsl-examples.md`) into fixtures under
       `tests/fixtures/skye/`, and the table of load-time errors of `design.md` into a parametrized test: every version 1 example must parse and
       validate, every version 2 example must be rejected with the "not available in this version" message, and every row of the error table must give
       the stated message with the file, line and column.
+    - Evidence: `tests/fixtures/skye/` (`routers.skye` R1-R4, `prompts.skye` P0-P2, `flows.skye` F1-F5 and F8, `f7.skye`, `f9.skye` the version 1 variant, `v2/` F6 and P3-P6), `tests/unit/dsl/test_conformance.py`. The error table is a Python table in that test (source, line, column, message); the "Wirte" typo replaces the table's `"B"`, and the run-time row (`env.X is not set`) is not a check-time error.
     - _Requirements: 19.1, 19.2; D50; D51_
-  - [ ] 8.2 The grammar, as a wiki page
+  - [x] 8.2 The grammar, as a wiki page
     - Write the grammar in EBNF from the syntax page of `design.md` as `docs/base/skye-language.md` (front matter, linked from the `base` section index),
       with the block kinds, the references and prefixes, the expression grammar and the allowed functions; a `.skye` example in it passes `skye check`.
+    - Evidence: `docs/base/skye-language.md` (linked from `docs/base/index.md`); `tests/unit/dsl/test_docs_examples.py` runs `check_text` over every `skye` block of `docs/` and `README.md`.
     - _Requirements: 19.1; D50; D55; D57_
-  - [ ] 8.3 `skye check` and the JSON Schema of the blocks
+  - [x] 8.3 `skye check` and the JSON Schema of the blocks
     - Provide `skye check <file>` (an entry point that reads the file, calls the parser and the block validators and prints every error with file, line,
       column, reason and fix, written to be pasted back to a model) and ship the JSON Schema of the `router`, `flow` and `prompt` blocks generated from the
       block dataclasses. A test runs `skye check` over every `.skye` block in `docs/`, `examples/` and `README.md` (Property 17).
+    - Evidence (parser and command line side): `src/skye/utils/cli.py` (`skye check FILE...`, `--registry`, `--schema`; console script `skye = "skye.utils.cli:main"` in `pyproject.toml`), `src/skye/base/dsl/schema.py`; `tests/unit/dsl/test_skeletons_cli_schema.py`. `tests/unit/dsl/test_docs_examples.py` runs `skye check` over the blocks of `docs/` and `README.md` and over every `.skye` file of `examples/` (`router_config.skye`, `router_config_simple.skye`).
     - _Requirements: 19.2, 19.4; D61_
-  - [ ] 8.4 The loading API
+  - [x] 8.4 The loading API
     - `skye.load(path)`, `Flow.from_file(path, name=..., registry=...)` and the router's `from_file(path, name=...)`: the same `path`, errors with file, line
       and column, and `name` optional when the file holds one block of the kind (Property 16). The class names (`Router` against `ModelRouter`, `Flow`
       at the top level or in `skye.flows`) are settled with the owner first; see `design.md`, "Loading".
+    - Done without a runtime (owner's answer on D61: the flow runtime is not built now): `skye.load(path, *, registry_names=None)` returns the `Document` or raises `ConfigurationError` with every `file:line:column reason fix`; `skye.flows.Flow` has `from_file(path, *, name=None, registry=None)`, `from_text(text, *, name=None, registry=None, filename=None)`, `.spec`, `.name`, `.registry`, `.check()`, `.to_text()` and `.run(...)`, which raises `NotImplementedError` that says the runtime is not built and points to `3-runtime-flows`. `skye.load` and `skye.Flow` are lazy names of `skye/__init__.py`. `ModelRouter.from_file(path, name=...)` already existed. `skye.Router` is not added: D39 keeps it out and `test_guessable_names.py` lists it as `known_missing`; the docs name `ModelRouter`.
+    - Evidence: `src/skye/utils/skye_files.py` (`load`, `diagnostics_error`), `src/skye/flows/flow.py`, `src/skye/flows/__init__.py`, `src/skye/__init__.py`; `tests/unit/flows/test_loading.py` (load ok and with errors, name optional with one flow and required with several, registry names, `from_text`, `run` pointer, no import of another runtime component, `import skye` loads neither `skye.flows` nor `skye.base.dsl`); skill `references/python-api.md` ("Loading a file"; "Not built yet" keeps only running a flow) and `docs/base/skye-language.md` ("Loading from Python"). Still open here: the runtime itself (`3-runtime-flows`).
     - _Requirements: 19.2, 19.5; D61_
-  - [ ] 8.5 `.gitattributes`
+  - [x] 8.5 `.gitattributes`
     - Add `.gitattributes` with `*.skye linguist-language=HCL` so GitHub highlights the files until a dedicated grammar exists.
+    - Evidence: `.gitattributes` (`*.skye linguist-language=HCL`).
     - _Requirements: 19.1; D61_
-  - [ ] 8.6 Convert the router examples and the YAML tests to `.skye`
+  - [x] 8.6 Convert the router examples and the YAML tests to `.skye`
     - When the parser exists, rewrite the router examples under `examples/routing/` and the YAML router tests as `.skye` files (the `router` block is the
       reference format; JSON and YAML files stay readable), including the shorthand `route "x" = [...]`, the fallback written inside the route and the
       renamed duration fields (`cooldown`, `retry_after`). Examples stay within the size and plain-output tests of group 5.
+    - Evidence: `examples/routing/router_config.skye` and `router_config_simple.skye` (`skye check` ok; shorthand and the fallback inside the route are covered by `tests/fixtures/skye/routers.skye`, `retry_after` is kept with a comment that the router does not apply it yet), `examples/routing/skye_config_example.py` (offline, 25 lines), `tests/unit/router/test_router_examples_equivalence.py` (the old YAML as data in `tests/fixtures/legacy_router_yaml/*.json` against the router built from the `.skye`: routes, targets, strategies, fallbacks, retry and allowed-fails policies, cooldown, pre-call checks equal; only `priority` and `cost_per_1k_*` were dropped, the router never read them), `tests/unit/router/test_router_config_model.py`, `test_router_from_config.py`, `test_sample_configs.py`; `tests/examples`, `tests/budget/test_example_*` pass.
     - _Requirements: 17.2, 17.3, 19.3; D59_
+
+  - [x] 8.7 Skeleton generators and `skye new`
+    - `skye new router|flow|prompt NAME [--template T] [-o file.skye] [--force]` and `skye new --list`, on top of `skye.base.dsl.skeleton` (text only): small starting files derived from the reference examples, each passing `skye check`, with `# CHANGE ME` marks and no version 2 syntax.
+    - Evidence: `src/skye/base/dsl/skeletons.py`, `src/skye/utils/cli.py`; `tests/unit/dsl/test_skeletons_cli_schema.py`; documented in `docs/base/skye-language.md`.
+    - _Requirements: 19.1; D61_
+
+  - [x] 8.8 The Claude skill that ships with the package (decision D64; Requirement 54.14)
+    - The skill is in the official layout of the skill-creator: a minimal `SKILL.md` (33 lines: what to do first, a table that says which reference to read) and small files in `references/` (`cli`, `language`, `router`, `flow`, `prompt`, `python-api`, `rules`), with `evals/evals.json` (7 test prompts with expectations) and `evals/trigger_evals.json` (16 trigger queries, 8 that should trigger and 8 near misses). `skye skill install [--scope user|project] [--dir DIR] [--force]` copies `SKILL.md` and `references/` (not `evals/`, as the official packager does), `skye skill print [NAME]` and `skye skill path` (`src/skye/utils/skill.py`, `src/skye/utils/cli.py`); the rule to update it with every change of the command line, the grammar, the public API or the rules is in `.kiro/steering/00-rules.md`.
+    - Evidence: `src/skye/utils/claude_skill/skye/` (`SKILL.md`, `references/`, `evals/`), `src/skye/utils/skill.py`; `tests/unit/dsl/test_claude_skill.py` (the layout and the frontmatter follow the official rules and the official `quick_validate.py` accepts the skill; `SKILL.md` stays minimal and links every reference; the evals follow the official schema; the references name only commands, block kinds, strategies, prefixes and functions that exist and their `skye` examples pass `skye check`; install is idempotent, skips `evals/` and refuses to replace a different file without `--force`; the rule is written in the steering file).
+    - The skill must change when Skye changes: tests read the live command line, the block models, the language keywords and the public functions and fail when `references/` lacks one (`test_every_command_line_option_is_in_the_cli_reference`, `test_every_router_field_is_in_the_router_reference`, `test_every_flow_field_and_branch_is_in_the_flow_reference`, `test_every_prompt_field_and_kind_is_in_the_prompt_reference`, `test_every_version_2_word_is_named_as_not_available`, `test_every_public_function_of_the_parser_package_is_in_the_python_reference`); the installer records the version and a hash of each file in `.skye-skill.json`, replaces an unedited skill when the package changes, keeps an edited file unless `--force`, removes files that a newer package dropped, and `skye skill status` reports up to date, outdated or edited (exit 1); `CONTRIBUTING.md` has the paragraph. When they first ran, these tests found three real gaps in the skill (`-t`/`--output`, `backoff`, `separator`), now fixed.
+    - Not run yet: the official eval loop (each prompt with the skill and without it, graded, shown in the review viewer) and the trigger-description optimisation (`run_loop.py`); both need the skill-creator scripts and many model calls, so they are left to run on request.
+    - Keep it current: when 8.4 (the loading API) and the flow runtime are built, remove the "not built yet" line of the skill and show `Flow.from_file` and `skye.load` with an example.
+    - _Requirements: 54.14; D64_
+
+- [x] 9. Remove YAML (decision D62)
+  - Note: the library reads no YAML. The router must read a `.skye` file first (8.4) so the YAML files can be rewritten; PyYAML leaves last, because the tests read YAML until they are converted.
+  - [x] 9.1 The router reads a `.skye` block
+    - Add `ModelRouter.from_file(path, name=...)`: read the text, call the parser in `base/dsl`, turn the `RouterSpec` into the router configuration
+      (`RouteConfig`, `ModelTarget`, `FallbackConfig`, retry and allowed-fails policies), expanding the shorthand `route "x" = [...]` and
+      `env.NAME`. Same errors as the parser (file, line, column). This is the router half of 8.4.
+    - Evidence: `ModelRouter.from_file`, `load_router_config`, `router_spec_to_config` in `src/skye/router/skye_file.py`; `tests/unit/router/test_router_file.py` (positions of errors, shorthand, `env.NAME`).
+    - _Requirements: 19.5, 20.3; D59; D62_
+  - [x] 9.2 Rewrite the three YAML files
+    - `examples/routing/router_config.yaml` and `router_config_simple.yaml` become `.skye` files; `tests/fixtures/sample_config.yaml` becomes JSON
+      (it is a library configuration, not a router); `examples/routing/yaml_config_example.py` becomes `skye_config_example.py`. The pre-conversion
+      files are the equivalence cases: the router built from each `.skye` file equals the one built from the old YAML (compare once, then delete the YAML).
+    - Evidence: the two router files are `.skye` (see 8.6) and the YAML files are deleted; `tests/fixtures/sample_config.yaml` is JSON (`sample_config.json`); `skye_config_example.py` replaces `yaml_config_example.py`; the equivalence was proved by `tests/unit/router/test_router_examples_equivalence.py` before the deletion and stays as a test.
+    - _Requirements: 17.2, 20.3; D62_
+  - [x] 9.3 Reject YAML with a clear error
+    - `ConfigLoader.load`, the router loader and the gateway reject a `.yaml` or `.yml` file with a `ConfigurationError` that names `.skye` and JSON and
+      says the file must be rewritten; a test per loader. Remove `_yaml()`, `load_router_config`, the YAML branch of `ConfigLoader` and
+      `ModelRouter.from_yaml`; the gateway reads OpenAPI in JSON only.
+    - Evidence: `reject_yaml` in `src/skye/base/config.py` (used by `ConfigLoader.load`, `ConfigLoader._load_from_file` and `load_router_config`); `tests/unit/config/test_no_yaml.py` and `test_config_loader.py::test_config_loader_rejects_yaml` (ConfigLoader), `tests/unit/router/test_router_file.py` (router: `.yaml`, `.yml`, `.YAML` name `.skye` and JSON); `_yaml()`, the YAML branch and `from_yaml` are gone (`rg` finds no YAML import or call in `src/skye`); `tests/unit/config/test_yaml_extra.py` is deleted, `test_config_loader.py` and `test_env_var_substitution.py` use JSON. The gateway has no loader yet (`skye.gateway` is a stub that raises `ImportError`), so there is nothing to reject: the gateway spec reads OpenAPI in JSON only and adds its test with its loader.
+    - _Requirements: 20.1; 54.12 of steering; D62_
+  - [x] 9.4 Remove the extra and the dependency
+    - Remove the extra `yaml` and `pyyaml` from `all` and from the dev group of `pyproject.toml`, `[extras.yaml]` and the `yaml` entries of `budgets.toml`, the
+      `yaml` mapping in `tests/budget/test_extras_footprint.py`, the YAML job of `.github/workflows/budgets.yml`, and the `skyeai[memory,yaml]` line of the
+      package docstring. A test fails when `yaml` is imported anywhere in `src/skye`.
+    - Evidence: `pyproject.toml` (no `yaml` extra, no `pyyaml` or `types-PyYAML` in `all` or `dev`), `budgets.toml` (no `[extras.yaml]`; `yaml` stays in `forbidden_at_import`), `tests/budget/test_extras_footprint.py` (mapping removed; it passes), `.github/workflows/budgets.yml` (job removed), `src/skye/__init__.py` (docstring); `tests/unit/config/test_no_yaml.py` fails when any module of `src/skye` imports `yaml` and when `import skye` loads it; `tests/budget` passes. `uv.lock` was not regenerated (no network): run `uv lock`.
+    - _Requirements: 20.2; 7.12 of steering; D62_
+  - [x] 9.5 Documentation and tests
+    - Rewrite the YAML sections of `docs/getting-started.md`, `docs/base/configuration.md`, `docs/router/overview.md`, `README.md`, `examples/README.md`,
+      `examples/routing/README.md` and `examples/basic/configuration.py` for `.skye` and JSON; convert `tests/unit/router/test_yaml_router_config.py`,
+      `test_router_yaml_integration.py` and `tests/unit/config/test_yaml_extra.py` (the last is replaced by the rejection test of 9.3); `.skye` blocks in
+      the documentation pass `skye check` (Property 17).
+    - Evidence: `docs/getting-started.md`, `docs/base/configuration.md` (JSON), `docs/router/overview.md` (a `skye` block that passes `skye check`), `docs/router/routing-guide.md`, `README.md`, `examples/README.md`, `examples/routing/README.md`, `examples/basic/configuration.py` (JSON), `tests/README.md`, `tests/fixtures/README.md` and the READMEs under `tests/`; `tests/unit/dsl/test_docs_examples.py`, `tests/budget/test_install_lines.py` pass.
+    - _Requirements: 20.1; 24.3 of steering; D62_
+  - [x] 9.6 Write objects back: `to_text`, `ModelRouter.to_config` and `ModelRouter.to_skye` (decision D65; Requirement 54.15)
+    - `skye.base.dsl.to_text(spec_or_document)` writes routers, flows and prompts as `.skye` text (`src/skye/base/dsl/emit.py`; `format_duration` in `specs.py`); `ModelRouter.to_config(include_secrets=False)` and `to_skye(name=None, include_secrets=False)` (`src/skye/router/model_router.py`, `config_to_router_spec` in `src/skye/router/skye_file.py`). A way out of the YAML files and of a router built in Python: write `router.to_skye("main")` to a file. Secrets are not exported: `ModelTarget.env_refs` remembers a field written as `${NAME}`, an API key given in clear is left out unless `include_secrets=True`, and `ModelRouter.from_file` keeps `${NAME}` in the target string fields (`load_router_config(..., keep_target_references=True)`) so that the reference survives. Only retry and cooldown policies that differ from the defaults are written.
+    - Evidence: `tests/unit/dsl/test_emit.py` (every fixture of the language, router, flow and prompt, survives the round trip and a second writing gives the same text, the text passes `skye check`, strings are escaped, `format_duration` and `parse_duration` are inverse); `tests/unit/router/test_router_export.py` (the text passes the checker and builds the same router, `to_config` rebuilds the router, no secret in the text or the dictionary by default, `env.NAME` comes back as `env.NAME`, `include_secrets` writes a key given in clear, defaults are left out, a router built in Python is written too); the skill (`references/python-api.md`) names them and the coverage test of the skill passes.
+    - Use it for 9.2: convert the three YAML files with it once (build the router from the old file, write `to_skye`, check the equivalence, delete the YAML).
+    - _Requirements: 54.15; D65_
 
 ## Notes
 

@@ -1,0 +1,11 @@
+# P5. Output schema: version 2.
+prompt "extract_invoice" {
+  variables = { document = string }
+  output {
+    vendor   = string
+    total    = number
+    currency = string("EUR")
+    lines    = list({ description = string, amount = number })
+  }
+  message "user" { text = "Extract the invoice fields from the document.\n{{ document }}" }
+}

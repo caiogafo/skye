@@ -1,0 +1,18 @@
+[
+  {"query": "can you set up a skye router so that gpt-4o-mini falls back to claude haiku? router.skye in the repo root is fine", "should_trigger": true},
+  {"query": "skye check is printing 'unknown step \"Wirte\" in \"next\"' on my flow.skye and i can't see why, can you look at it", "should_trigger": true},
+  {"query": "how do i write a prompt block in skyeai that only adds the style line when a style variable is set", "should_trigger": true},
+  {"query": "we are moving off jinja in our skyeai repo, convert templates/summarize.jinja to a .skye prompt", "should_trigger": true},
+  {"query": "generate a skeleton flow for a skye pipeline with a parallel fetch step and a retry, i will fill in the steps", "should_trigger": true},
+  {"query": "what's the difference between fallback and target in a skye route? the docs for skyeai confuse me", "should_trigger": true},
+  {"query": "install the skye skill for claude code in this project only", "should_trigger": true},
+  {"query": "my .skye file says 'wait is not available in this version', what are my options", "should_trigger": true},
+  {"query": "write a terraform module for an AWS API gateway with a lambda router behind it", "should_trigger": false},
+  {"query": "set up litellm router config in yaml with fallbacks between azure and openai deployments", "should_trigger": false},
+  {"query": "convert this jinja2 email template to a python f-string function", "should_trigger": false},
+  {"query": "explain how python dataclasses with pydantic validators differ for a fastapi request model", "should_trigger": false},
+  {"query": "build a LangGraph state machine with a parallel node and a human approval interrupt", "should_trigger": false},
+  {"query": "write a GitHub Actions workflow that runs pytest on 3.11 and 3.12", "should_trigger": false},
+  {"query": "what does the HCL block syntax for a terraform dynamic block look like", "should_trigger": false},
+  {"query": "help me write a system prompt for a customer support bot that is polite but firm", "should_trigger": false}
+]

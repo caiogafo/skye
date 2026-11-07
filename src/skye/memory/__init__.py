@@ -12,10 +12,11 @@ from datetime import datetime, timezone
 from typing import Any
 from uuid import uuid4
 
-from pydantic import BaseModel, Field
+from skye.base.validated import Validated, field, validated
 
 
-class MemoryEntry(BaseModel):
+@validated
+class MemoryEntry(Validated):
     """A single memory entry.
 
     Represents a piece of information stored in memory, with support for
@@ -40,12 +41,12 @@ class MemoryEntry(BaseModel):
         'persona'
     """
 
-    id: str = Field(default_factory=lambda: str(uuid4()))
-    content: str
-    memory_type: str  # episodic, semantic, persona
+    id: str = field(default_factory=lambda: str(uuid4()))
+    content: str = field()
+    memory_type: str = field()  # episodic, semantic, persona
     embedding: list[float] | None = None
-    metadata: dict[str, Any] = Field(default_factory=dict)
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    metadata: dict[str, Any] = field(default_factory=dict)
+    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 __all__ = ["MemoryEntry"]
