@@ -2,6 +2,8 @@
 
 Skye is a light, modular library for serverless GenAI applications. Contributions are welcome. Please read these rules before opening a pull request.
 
+Everyone taking part in the project follows the [Code of Conduct](CODE_OF_CONDUCT.md).
+
 ## Where code comes from
 
 - Write the code yourself, or take it from a source whose licence allows it.

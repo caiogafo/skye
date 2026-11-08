@@ -4,8 +4,9 @@
 
 Skye AI provides a foundational layer for building AI agents and intelligent applications with a Clean Architecture approach. The base package includes only interfaces and models, while all implementations are available as optional extras.
 
-[![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![PyPI](https://img.shields.io/pypi/v/skyeai)](https://pypi.org/project/skyeai/)
+[![Documentation](https://readthedocs.org/projects/skye/badge/?version=latest)](https://skye.readthedocs.io/)
+[![Built with Kiro](https://img.shields.io/badge/built_with-Kiro-790ECB)](https://kiro.dev)
 
 ## Features
 
@@ -66,7 +67,7 @@ Every example is run offline against a fake network by `tests/examples`, so it c
 
 ## Documentation
 
-The documentation is a wiki with one section per component; start from [`docs/index.md`](https://github.com/ggiallo28/skye/blob/main/docs/index.md).
+The documentation is online at **[skye.readthedocs.io](https://skye.readthedocs.io)**, with one section per component. The same pages are in [`docs/`](https://github.com/ggiallo28/skye/blob/main/docs/index.md) in the repository.
 
 | Topic | Page |
 |---|---|
@@ -88,6 +89,8 @@ How the project is specified: the requirements, the design and the decisions are
 
 See [CONTRIBUTING.md](https://github.com/ggiallo28/skye/blob/main/CONTRIBUTING.md). Fork, create a branch, make your changes with tests, run the code quality checks, and open a pull request.
 
+Everyone taking part in the project follows the [Code of Conduct](https://github.com/ggiallo28/skye/blob/main/CODE_OF_CONDUCT.md).
+
 ## License
 
 MIT License - see [LICENSE](https://github.com/ggiallo28/skye/blob/main/LICENSE) file for details.
@@ -95,7 +98,7 @@ MIT License - see [LICENSE](https://github.com/ggiallo28/skye/blob/main/LICENSE)
 ## Support
 
 - **Issues**: [GitHub Issues](https://github.com/ggiallo28/skye/issues)
-- **Documentation**: [Full Documentation](https://github.com/ggiallo28/skye/blob/main/docs/index.md)
+- **Documentation**: [skye.readthedocs.io](https://skye.readthedocs.io)
 
 ## Acknowledgments
 

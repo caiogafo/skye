@@ -6,10 +6,22 @@ readme = "README.md"
 license = {text = "MIT"}
 authors = [{name = "Skye Team"}]
 requires-python = ">=3.11"
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
 dependencies = []  # the core is the standard library only (decision D49; supersedes the pydantic and tenacity entries)
 
 [project.urls]
 Homepage = "https://github.com/ggiallo28/skye"
+Documentation = "https://skye.readthedocs.io"
 Repository = "https://github.com/ggiallo28/skye"
 Issues = "https://github.com/ggiallo28/skye/issues"
 
