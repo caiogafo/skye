@@ -1,0 +1,217 @@
+[
+  {
+    "note": "minimal",
+    "variables": {
+      "input": "Hi"
+    }
+  },
+  {
+    "note": "everything",
+    "variables": {
+      "input": "Plan my day",
+      "system_prompt": "You help.",
+      "personality": "cheerful",
+      "capabilities": [
+        {
+          "name": "search",
+          "description": "web search"
+        },
+        {
+          "name": "math",
+          "description": "calculator"
+        }
+      ],
+      "episodic_memory": [
+        {
+          "content": "I like tea",
+          "timestamp": "2024-01-01"
+        }
+      ],
+      "declarative_memory": [
+        {
+          "content": "Tea has caffeine",
+          "source": "wiki"
+        }
+      ],
+      "tools_output": "calendar: free",
+      "procedural_memories": [
+        {
+          "name": "plan",
+          "description": "make a plan"
+        },
+        {
+          "name": "review",
+          "description": "review it"
+        }
+      ],
+      "domain_knowledge": "Time management",
+      "constraints": [
+        "be short",
+        "be kind"
+      ],
+      "chat_history": [
+        {
+          "role": "user",
+          "content": "Hello there"
+        },
+        {
+          "role": "assistant",
+          "content": "Hi, how can I help?"
+        }
+      ],
+      "response_guidelines": [
+        "use lists",
+        "no jargon"
+      ],
+      "output_format": "markdown",
+      "thinking_required": true
+    },
+    "skye_variables": {
+      "history": [
+        {
+          "role": "user",
+          "content": "Hello there"
+        },
+        {
+          "role": "assistant",
+          "content": "Hi, how can I help?"
+        }
+      ],
+      "personality": [
+        "cheerful"
+      ],
+      "semantic_memory": [
+        {
+          "content": "Tea has caffeine",
+          "source": "wiki"
+        }
+      ],
+      "procedural_memory": [
+        {
+          "name": "plan",
+          "content": "make a plan"
+        },
+        {
+          "name": "review",
+          "content": "review it"
+        }
+      ]
+    }
+  },
+  {
+    "note": "memory without timestamp and source keys",
+    "variables": {
+      "input": "x",
+      "episodic_memory": [
+        {
+          "content": "I live in Rome"
+        }
+      ],
+      "declarative_memory": [
+        {
+          "content": "Rome is in Italy"
+        }
+      ]
+    },
+    "skye_variables": {
+      "semantic_memory": [
+        {
+          "content": "Rome is in Italy"
+        }
+      ]
+    }
+  },
+  {
+    "note": "memory with empty timestamp and source",
+    "variables": {
+      "input": "x",
+      "episodic_memory": [
+        {
+          "content": "Born 1990",
+          "timestamp": ""
+        }
+      ],
+      "declarative_memory": [
+        {
+          "content": "Rome is in Italy",
+          "source": ""
+        }
+      ]
+    },
+    "skye_variables": {
+      "semantic_memory": [
+        {
+          "content": "Rome is in Italy",
+          "source": ""
+        }
+      ]
+    }
+  },
+  {
+    "note": "empty lists, thinking off",
+    "variables": {
+      "input": "x",
+      "capabilities": [],
+      "episodic_memory": [],
+      "declarative_memory": [],
+      "procedural_memories": [],
+      "constraints": [],
+      "chat_history": [],
+      "response_guidelines": [],
+      "thinking_required": false
+    },
+    "skye_variables": {
+      "history": [],
+      "semantic_memory": [],
+      "procedural_memory": []
+    }
+  },
+  {
+    "note": "several memories, with and without timestamp/source (intended difference 5)",
+    "variables": {
+      "input": "What do you know about me?",
+      "episodic_memory": [
+        {
+          "content": "I like tea",
+          "timestamp": "2024-01-01"
+        },
+        {
+          "content": "I live in Rome"
+        },
+        {
+          "content": "I run",
+          "timestamp": "2024-02-02"
+        }
+      ],
+      "declarative_memory": [
+        {
+          "content": "Tea has caffeine",
+          "source": "wiki"
+        },
+        {
+          "content": "Rome is in Italy"
+        },
+        {
+          "content": "Running is cardio",
+          "source": "book"
+        }
+      ]
+    },
+    "glued_lines": true,
+    "skye_variables": {
+      "semantic_memory": [
+        {
+          "content": "Tea has caffeine",
+          "source": "wiki"
+        },
+        {
+          "content": "Rome is in Italy"
+        },
+        {
+          "content": "Running is cardio",
+          "source": "book"
+        }
+      ]
+    }
+  }
+]

@@ -358,6 +358,29 @@ requirement or decision directly. A task that depended on an open decision names
     - Use it for 9.2: convert the three YAML files with it once (build the router from the old file, write `to_skye`, check the equivalence, delete the YAML).
     - _Requirements: 54.15; D65_
 
+- [ ] 10. Language tools: comments, front matter, `skye fmt`, `skye prompt`, the editor (decisions D71 to D74; Requirements 54.16 to 54.20 and 55)
+  - [x] 10.1 Comments `#`, `/* */`, `/** **/` and front matter in TOML, in the lexer, parser, `to_text` and the prompt loader
+    - Evidence (2026-11-08): `src/skye/base/dsl/lexer.py`, `parser.py`, `metadata.py`, `tree.py`, `emit.py`; `tests/unit/dsl/test_comments.py`, `tests/unit/dsl/test_metadata.py`; `tests/unit/prompts/test_bundled_conventions.py` (comment convention in the bundled files).
+    - _Requirements: 54.16, 54.17; D71_
+  - [x] 10.2 `skye fmt` (text formatter, `--check`, `-`, recursive search, `--exclude`, `.skyeignore`) and formatted `skye new`
+    - Evidence (2026-11-08): `src/skye/base/dsl/fmt.py` (`format_text`), `src/skye/utils/cli.py` (`_skye_files`, `_ignore_globs`, `SKYEIGNORE`), `.skyeignore`; `tests/unit/dsl/test_fmt.py` (including `test_cli_fmt_searches_the_current_folder_recursively`, `test_cli_fmt_takes_a_folder_argument`); `uv run skye fmt --check src/skye/prompts/templates examples` exits 0.
+    - _Requirements: 54.18; D71_
+  - [x] 10.3 `skye check --format json` and standard input with `--stdin-filename`
+    - Evidence (2026-11-08): `src/skye/utils/cli.py` (`_check`); `tests/unit/utils/test_vscode.py`.
+    - _Requirements: 54.19; D72_
+  - [x] 10.4 Described and structured prompt variables in the grammar, the checker and `to_text`; `skye prompt list|info`
+    - Evidence (2026-11-08): `src/skye/base/dsl/parser.py`, `build.py`, `specs.py`, `emit.py`, `shapes.py`, `info.py`; `tests/unit/dsl/test_variable_descriptions.py`, `test_structured_variables.py`, `tests/unit/utils/test_cli_prompt.py`. The form of the default is open decision O46.
+    - _Requirements: 54.20; D73_
+  - [x] 10.5 The VS Code extension and `skye vscode`
+    - Evidence (2026-11-08): `src/skye/utils/vscode_extension/` (`extension.js`, `package.json`, grammar, README), `src/skye/utils/vscode.py`; `tests/unit/utils/test_vscode.py`, `tests/unit/test_vscode_extension_files.py`; `docs/base/editor.md`. Not verified here: the extension running inside VS Code (the tests read its files and the CLI, not the editor).
+    - _Requirements: 55.1, 55.2, 55.3, 55.4; D72_
+  - [x] 10.6 Docs and skill follow the language
+    - Evidence (2026-11-08): `docs/base/skye-language.md` (comments, front matter, `skye fmt`, `output`), `docs/base/editor.md`; skill `references/cli.md`, `language.md`, `output.md`, `prompt.md`, `router.md`, `python-api.md`; `tests/unit/dsl/test_claude_skill.py`, `tests/unit/dsl/test_docs_examples.py`.
+    - _Requirements: 54.14; D64_
+  - [ ] 10.7 A public import for the checker and the formatter, so an example can show a mistake and a fix without `skye.base.*`
+    - Note: open decision O41 (options: export from `skye.prompts`, a `skye.dsl` facade, or the command line only); `examples/prompts/validation.py` works around it with the `ValidationError` of `load_prompt`. No code before it is decided.
+    - _Requirements: 7.14; D34, O41_
+
 ## Notes
 
 - Specs outside this one name the things D36 to D45 rename or remove: `CompletionRequest`/`CompletionResponse` (`0-base-base`, `1-adapters-models`,

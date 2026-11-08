@@ -5,6 +5,7 @@ Grammar (see ``docs/base/skye-language.md`` for the full page)::
     file      = block*
     block     = KIND [LABEL] "{" (attribute | block)* "}"
     attribute = NAME "=" value
+    field     = NAME "=" value [STRING]     (inside an ``output`` block: the string describes it)
 
 The parser reports every mistake it can find: after a mistake it skips to the end of the line
 (or of the block) and goes on.
@@ -31,6 +32,7 @@ from skye.base.dsl.lexer import (
     Token,
     tokenize,
 )
+from skye.base.dsl.metadata import split_metadata
 from skye.base.dsl.tree import (
     Attribute,
     Block,
@@ -63,10 +65,17 @@ class _TooDeepError(Exception):
 
 class _Parser:
     def __init__(self, text: str, filename: str) -> None:
-        self.text = text
+        # The front matter is read first and replaced by empty lines, so line numbers stay true.
+        self.metadata, self.text, header_errors = split_metadata(text, filename)
         self.filename = filename
         self.depth = 0
-        self.tokens, self.errors = tokenize(text, filename)
+        # > 0 inside an ``output`` block or the ``variables`` map of a prompt: a value may be
+        # followed by a string, its description.
+        self.described = 0
+        # The kinds of the blocks being parsed, innermost last.
+        self.kinds: list[str] = []
+        self.tokens, self.errors = tokenize(self.text, filename)
+        self.errors[:0] = header_errors
         self.pos = 0
 
     # -- token helpers -------------------------------------------------------------------------
@@ -137,7 +146,7 @@ class _Parser:
 
     # -- document ------------------------------------------------------------------------------
     def parse(self) -> Tree:
-        tree = Tree(filename=self.filename)
+        tree = Tree(filename=self.filename, metadata=self.metadata)
         try:
             self.parse_blocks(tree)
         except _TooDeepError:
@@ -243,7 +252,13 @@ class _Parser:
             return block
         if self.is_punct("="):
             self.advance()
-            value = self.parse_value()
+            # ``variables = { task = string "What the agent must achieve" }`` in a prompt
+            described = word == "variables" and self.kinds[-1:] == ["prompt"]
+            self.described += described
+            try:
+                value = self.parse_value()
+            finally:
+                self.described -= described
             return Attribute(
                 line=head.line,
                 column=head.column,
@@ -251,6 +266,7 @@ class _Parser:
                 value=value,
                 name_line=head.line,
                 name_column=head.column,
+                description=self.parse_description(),
             )
         block = Block(line=head.line, column=head.column, kind=word)
         if nxt.kind == STRING:
@@ -289,10 +305,25 @@ class _Parser:
             )
         self.advance()
         self.enter(opener)
+        output = block.kind == "output"
+        self.described += output
+        self.kinds.append(block.kind)
         try:
             self.parse_body(block, opener)
         finally:
             self.depth -= 1
+            self.described -= output
+            self.kinds.pop()
+
+    def parse_description(self) -> Str | None:
+        """The string after a value inside an ``output`` block or the ``variables`` map of a
+        prompt (its description), if any.
+        """
+        tok = self.peek()
+        if not self.described or tok.kind != STRING:
+            return None
+        self.advance()
+        return Str(line=tok.line, column=tok.column, value=str(tok.value), raw=tok.text)
 
     def parse_body(self, block: Block, opener: Token) -> None:
         while True:
@@ -347,18 +378,26 @@ class _Parser:
             self.advance()
             self.enter(self.advance())
             default: Value | None = None
+            second: Value | None = None
             self.skip_newlines()
             try:
                 if not self.is_punct(")"):
                     default = self.parse_value()
                     self.skip_newlines()
+                    if self.is_punct(","):  # list({ ... }, []): the shape, then the default
+                        self.advance()
+                        self.skip_newlines()
+                        second = self.parse_value()
+                        self.skip_newlines()
             finally:
                 self.depth -= 1
             close = self.peek()
             if not (close.kind == PUNCT and close.text == ")"):
                 raise self.fail(close, f'expected ")", found {self.describe(close)}')
             self.advance()
-            call = TypeCall(line=tok.line, column=tok.column, name=tok.text, default=default)
+            call = TypeCall(
+                line=tok.line, column=tok.column, name=tok.text, default=default, second=second
+            )
             self.after_structure(call)
             return call
         tokens = self.scan()
@@ -369,6 +408,8 @@ class _Parser:
     def after_structure(self, value: Value) -> None:
         tok = self.peek()
         if tok.kind in (NEWLINE, EOF) or (tok.kind == PUNCT and tok.text in ",]})"):
+            return
+        if self.described and tok.kind == STRING:  # the description of an output field
             return
         raise self.fail(
             tok,
@@ -434,7 +475,15 @@ class _Parser:
             self.advance()
             value = self.parse_value()
             key = str(tok.value)
-            node.entries.append(MapEntry(line=tok.line, column=tok.column, key=key, value=value))
+            node.entries.append(
+                MapEntry(
+                    line=tok.line,
+                    column=tok.column,
+                    key=key,
+                    value=value,
+                    description=self.parse_description(),
+                )
+            )
             tail = self.peek()
             if not (tail.kind in (NEWLINE,) or (tail.kind == PUNCT and tail.text in ",}")):
                 raise self.fail(tail, f"unexpected {self.describe(tail)} in the map")
@@ -465,13 +514,14 @@ class _Parser:
                     depth -= 1
                 elif tok.text == "," and depth == 0:
                     break
+            elif tok.kind == STRING and depth == 0 and out and self.described:
+                break  # ``total = number "Total amount"``: the string is the description
             out.append(tok)
             self.pos += 1
         return out
 
     def classify(self, tokens: list[Token]) -> Value:
         first = tokens[0]
-        last = tokens[-1]
         if len(tokens) == 1:
             if first.kind == STRING:
                 return Str(
@@ -495,7 +545,16 @@ class _Parser:
                 column=first.column,
                 path=tuple(t.text for t in tokens if t.kind == IDENT),
             )
-        return Expr(line=first.line, column=first.column, text=self.text[first.start : last.end])
+        return Expr(line=first.line, column=first.column, text=self._expression_text(tokens))
+
+    def _expression_text(self, tokens: list[Token]) -> str:
+        """The exact text of an expression; a ``/* */`` comment between two tokens becomes a space."""
+        parts = [tokens[0].text]
+        for before, after in zip(tokens, tokens[1:]):
+            gap = self.text[before.end : after.start]
+            parts.append(" " if "/*" in gap else gap)
+            parts.append(after.text)
+        return "".join(parts)
 
     @staticmethod
     def is_dotted_name(tokens: list[Token]) -> bool:

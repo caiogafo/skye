@@ -24,7 +24,8 @@ builder is the only caller (no second implementation of the Port exists).
 | `prompts/engine.py` | Standard-library template engine: `{{ expr }}`, `{# comment #}`, `if`/`elif`/`else`, `for` (with `loop.index`, `index0`, `first`, `last`, `length`), whitespace control, the built-in filters (`join`, `upper`, `lower`, `title`, `capitalize`, `trim`, `length`, `default`, `string`, `list`, `first`, `last`, `int`, `float`, `replace`, `tojson`) and filters added by the caller. An undefined variable stays visible and is falsy. Nothing is evaluated with `eval`. Realizes Requirement 30.8 and 30.9. |
 | `prompts/messages.py` | `BasePromptBuilder`: registry (`name:version`), variable merge, examples, role sections, content and schema configuration, metadata and validation. Re-exports the message types for peers. |
 | `prompts/loaders.py` | `load_default_templates(builder)`: reads the files of `prompts/templates/` and registers them as version `1.0`. |
-| `prompts/templates/` | The 18 bundled templates (`.jinja` today, `.skye` after task 4). |
+| `prompts/skye_prompts.py` | The `.skye` renderer: `load_prompt`, `render_prompt` (a `PromptSpec` plus variables gives `SkyeMessage`s with real roles) and `PromptRunnable` (the `Runnable` a flow step `run = prompt.NAME` will reach once the flow runtime exists). |
+| `prompts/templates/` | The bundled prompts, all `.skye`: the 18 original templates converted (task 4.3) and the agent prompts written directly in `.skye` (see "Agent prompts"). |
 
 Flow of one rendering: look up the latest (or the given) version, extract the variable names, merge defaults, partial variables and
 provided variables (the provided ones win, callable defaults are called at each rendering, Requirement 30.4), inject the selected
@@ -42,26 +43,68 @@ string order of the version (assumption: kept as it is, not changed here).
 
 ### Examples (Requirement 31)
 `add_examples` stores the examples with an example template; `set_example_selector(name, type, max_examples)` chooses `fixed` or
-`random`; the `semantic` selector (similarity) is a gap, see task 3.2. Without a selector the first `max_examples` are used.
+`random` or `semantic` (similarity, with an embedder callable passed in, never an import of `models`); one default limit (`DEFAULT_MAX_EXAMPLES`) serves with and without a selector (tasks 3.1, 3.2). For a `.skye` prompt that declares `examples` as a list, `add_examples` passes the selected list of dictionaries and not a formatted string; a prompt that declares `examples = string` still gets formatted text (D74, Requirement 31.5).
 
 ### Roles and placeholders (Requirement 32.1 to 32.3)
 A rendered text is split into sections at the markers `[SYSTEM]`, `[USER]`, `[ASSISTANT]` (today a text convention). The `.skye`
-`prompt` block replaces the markers with real `message "<role>"` blocks (D60). An unknown role must raise a validation error (gap,
-task 3.3). `add_message_placeholder` marks where a conversation history is inserted.
+`prompt` block replaces the markers with real `message "<role>"` blocks (D60). An unknown role raises a validation error. `add_message_placeholder` marks where a conversation history is inserted (at the marker line, or before the last user message); in a `.skye` prompt `placeholder "history"` does it (tasks 3.3, 4.2).
 
 ### Multimodal content (Requirement 32.4 to 32.6)
 `add_image_content` and `add_multimodal_content` record which variables carry content and of which kind. The messages are built with
-the typed content blocks of `base` (D46), not with provider-specific dictionaries. Today the configuration is recorded but the
-messages carry no content blocks and no format validation exists (gap, task 3.4).
+the typed content blocks of `base` (D46), not with provider-specific dictionaries. Images (URL, base64, file path) go to `UserMessage.images`, a bad URL or format raises a validation error that lists the supported ones, and content types are recorded. Audio, video and files are only recorded: the typed blocks of D46 do not exist in `base` yet, so task 3.4 stays open (Requirement 32.7).
 
 ### Output schema (Requirement 33)
 `set_output_schema(name, schema)` takes a dataclass or a JSON-schema dictionary (D24: no pydantic) and `get_output_instructions`
-returns the text for the model, or an empty text without a schema. Today only a dictionary gets a real instruction (gap, task 3.5).
+returns the text for the model, or an empty text without a schema. A dataclass and a dictionary both give instructions that name every field, and an invalid schema raises a validation error (task 3.5).
+
+The `.skye` output block (D70, Requirement 33.5). A prompt declares the shape of the answer once, and nobody writes the
+structure by hand: `output "json" | "table" | "xml" { field = type, ... }` (no label is `json`), or `output "<format>" { schema = VAR }`
+to read the fields from a declared `map` variable at render time. `base` parses and checks it into `OutputSpec` (`format`, `fields`
+of `OutputFieldSpec`, `schema_from`) in `PromptSpec.output`; `to_text` writes it back. This component renders it:
+`prompts/output_format.py` turns the fields into a JSON Schema (`required` = the fields without a default, `default` kept) and the
+schema into the text of the format (json: "Answer with a single JSON object and nothing else.", the schema in a fenced block and a
+one-line example; table: the header and separator rows and one line per column with its type, scalar columns only; xml: a skeleton
+whose root is the prompt name in snake_case, lists as repeated `<item>`, the type as the text of each leaf).
+`skye.prompts.output_instructions(spec, variables)` returns it and `render_prompt` appends it as the last text of the last user
+message (a new user message when there is none). The builder reuses the same writer: `set_output_schema(name, schema,
+output_format="json")` keeps today's JSON text for `json` and uses the `table` / `xml` text otherwise (the Port has the same
+parameter), and `get_output_instructions(name, variables=None)` returns the `.skye` block's text when no schema was set. The engine
+filters `toxml` and `totable`, next to `tojson`, are for the other direction: putting data into a prompt.
+
+Field descriptions (D70). A string right after a field's type is its description: `total = number "Total amount including VAT"`,
+at every level (`list({ amount = number "Amount" }) "One entry per line"`) and in the comma form. The parser reads it only inside an
+`output` block (`Attribute.description` / `MapEntry.description`; elsewhere a value followed by a string stays an error), the builder
+puts it in `OutputFieldSpec.description` (an empty one is an error; `schema = VAR` takes none) and `to_text` writes it back, one field
+per line in a map that has descriptions. The writer carries it to the model: json, the `"description"` of the property (right after
+`"type"`, nested too); table, `- total: number — Total amount including VAT`; xml, `<total>number — ...</total>` for a leaf and an XML
+comment after the opening tag of a list or map (`<lines> <!-- One entry per line -->`); the example line has none. In a
+`schema = VAR` map a field may be `{"type": T, "description": "..."}` (a map with a `type` key and no key but `type`, `description`,
+`items`, `properties`; `items` gives a list's item type, `properties` a map's fields). A dataclass field's
+`metadata={"description": ...}` and a JSON-schema dictionary's own `description`s reach the table and xml text the same way.
+
+Format from a variable (D70). `output VAR { ... }` (a bare name) takes the format from a declared `string` variable: the checker wants
+it declared ("Did you mean"), of type string, and a default (if any) among json, table, xml; `OutputSpec.format_from` holds its name.
+`output_instructions` resolves the value (or the default) at render time and raises `ValidationError` for a value that is not one of
+the three, or for `table` with a list or map field (static fields too, since they cannot be checked at load time). The bundled prompt
+`structured_output` uses it (`format = string("json")`, `output format { ... }`) next to the fixed-format
+`structured_output_json`, `_table` and `_xml`.
+
+Conditional outputs (D70). An `output` block may also sit inside a `when` at the top of the prompt (or a `when` nested in one; never
+inside a `message` or an `each`): the builder reads it into a `PromptPartSpec(kind="output", output=OutputSpec)` among the parts of
+that `when`, with every check of the plain block; a prompt with an unconditional `output` and a conditional one is an error naming
+both lines, and `schema = VAR` stays the only entry of its block. `PromptSpec.output` keeps the unconditional block;
+`PromptSpec.output_variants()` lists every block with the conditions of its `when` blocks. `skye.prompts.active_output(spec,
+variables)` evaluates the conditions (a missing variable takes its default) and returns the active block, `None` when none holds, or
+raises `ValidationError` naming the conditions when more than one does; `output_instructions`, `render_prompt` and the builder's
+`get_output_instructions` use it. `describe_prompt` puts the conditional blocks in `PromptInfo.outputs` (each `OutputInfo` with its
+`condition`), and `prompt_help` / `skye prompt info` print one `Output (when <condition>): <format>` section per block. The four
+bundled `structured_output*` prompts declare `schema = map({})` (optional) and end with
+`when schema { output F { schema = schema } }` and `when not schema { output F { name = string "...", value = string "..." } }`,
+so a call without `schema` asks for a `name` and a `value` per item, in json by default.
 
 ### Metadata and validation (Requirement 29.4 to 29.6)
 `get_template_metadata` returns required and optional variables, examples, content types, roles and the schema; `validate_template`
-returns a result without raising. Today the variable extraction reads single braces (`{name}`) and not the `{{ name }}` of the
-engine, and the syntax check is a brace count; both must use the engine's parser (gap, task 2.2).
+returns a result without raising. The variable extraction and the syntax check use the engine's parser, so `{{ name }}`, `if` conditions and `for` sources are found and a bad template is rejected at registration with the engine's details (tasks 2.1, 2.2). Which variables are required in a text template is open decision O39.
 
 ### The `.skye` renderer (version 1 and 2 of the `prompt` block)
 What exists: the `prompt` block of version 1 is parsed and checked in `base` (`PromptSpec`: `variables`, `message "<role>"`, `text`,
@@ -74,13 +117,35 @@ Requirement 30.2, defaults and `allow_missing` as in 30.4. A flow step reaches i
 whole of Jinja is not needed to start: the first thing built is the part an agentic workflow needs, the rest is version 2.
 
 Version 2, measured on the 18 templates (what the language cannot say yet): `else` and `elif` for `when` (28 uses each, `elif` mostly
-`X == "value"`); loop variables in `each` (`loop.index` 3 uses, `loop.last` 1 use, plus `first` and `length`); a loop over a dictionary
-(`for key, value in collected_data.items()`, 2 uses, needs two loop variables and `items()`); a condition inside a line (20 lines in
+`X == "value"`); loop variables in `each` (`loop.index` 3 uses, `loop.last` 1 use, plus `first` and `length`; done by D69); a loop
+over a dictionary (`for key, value in collected_data.items()`, 2 uses; done by D69 as `{key, value}` entries); a condition inside a line (20 lines in
 11 files, for example `- {{ memory.content }}{% if memory.timestamp %} ({{ memory.timestamp }}){% endif %}`; options are a conditional
-expression in `{{ }}` or an inline `when`); an inline loop with a separator (`tool_agent.jinja`; needs a `join` with an attribute).
+expression in `{{ }}` or an inline `when`); an inline loop with a separator (`tool_agent.jinja`; done by D69 with the filter `map`). Still version 2: `else`/`elif` and a condition inside a line (written today as `when not` chains and pairs of `when` blocks).
+Measured again by the conversion (task 4.3): `else`/`elif` were written as `when not x` and `==`/`!=` chains in all 15
+converted files (18 with the last three), and a condition inside a line as two `when` blocks (four for two conditions in `summarization`); both work but
+are verbose. Two more needs: a falsy test of a missing key (`x.key` on a map without `key` is an error in an expression, falsy in
+Jinja; written `"key" in x and x.key`), and a `when` that can test the history given to a `placeholder` (the old templates print a
+"Recent conversation" heading only with history, so those prompts loop over a `chat_history` variable instead). The last three
+(`form_agent`: `for key, value in collected_data.items()`; `multimodal_agent`: `loop.index`; `tool_agent`: an inline list with a
+separator) were converted once D69 added, without new syntax, `loop.*` inside `each`, `{key, value}` entries when an `each` goes
+over a map, and the engine filter `map(attribute)`. The equivalence test (task 4.4) lists the intended differences: real
+roles, history as messages, whitespace, empty messages omitted, and lines the old templates glued together because an
+`{% endif %}` swallowed the newline (`main_agent`, `memory_agent`, `sql_generation`, `relation_extraction`,
+`tabular_extraction`). The legacy texts it compares with are kept in `tests/unit/prompts/legacy_templates/`.
 Already enough in the engine: the filters `default`, `join`, `upper`, nested `each`, attribute access (`table.columns`). Not to be
 added (D20): macros, inheritance, include, variable assignment. The fate of `prompts/engine.py` after the conversion is open decision
 O35, decided at task 4.5.
+
+### Agent prompts (written in `.skye`, 2026-11-08)
+Bundled prompts written directly in `.skye`, all with the same optional inputs: `tools` (a list of `{name, description,
+parameters, returns}`), the memory lists `episodic_memory`, `semantic_memory`, `procedural_memory`, `persona_memory`,
+`working_memory` (a section per non-empty kind, nothing when all are empty), `system_prompt` to replace the role sentence, and a
+`placeholder "history"`. smolagents-style (`smol_code_agent`, `smol_tool_calling_agent`, `smol_planning`, `smol_managed_agent`);
+reasoning (`self_reflection_agent`, `chain_of_thought_agent`, `tree_of_thoughts_agent`, `planner_agent`); supervisors
+(`supervisor_router`, `supervisor_planner`, `supervisor_reviewer`, `supervisor_hierarchical`); shared conversation of several
+agents (`group_chat_participant`, which answers a pass token unless its triggers match or it is mentioned, `group_chat_manager`,
+which picks the next speakers, and `group_chat_summarizer`); memory upkeep (`memory_update_agent`, `memory_consolidation_agent`, `working_memory_agent`, which return JSON operations a memory store applies). The older agent templates (`code_agent`, `main_agent`, `memory_agent`, `procedure_agent`, `reasoning_agent` and the three `.jinja` ones) take the same optional inputs, with their own variables kept. Their text is written for Skye (Requirement 14.3): smolagents
+(Apache-2.0) and the other libraries were read for their structure only.
 
 ## Data Models
 No class of the old design survives as a public type. The state of the builder is private dictionaries keyed by template name.

@@ -90,5 +90,8 @@ class CapabilityResult(Validated):
             content, status = format_capability_result(self.result), CapabilityStatus.OK
 
         return CapabilityMessage(
-            content=content, capability_id=self.capability_call_id, capability_name=self.name, status=status
+            content=content,
+            capability_id=self.capability_call_id,
+            capability_name=self.name,
+            status=status,
         )

@@ -1,7 +1,7 @@
 """Every example runs with no key and no network, and ends without a traceback (Requirement 24.4, task 5.4 of the uxui spec).
 
 Each example runs in a subprocess with the provider variables removed and outbound sockets refused. It fails on a non-zero exit code or
-on ``Traceback`` in the output. ``prompts/`` is owned by the ``prompts`` spec (task 5) and is skipped here.
+on ``Traceback`` in the output.
 """
 
 from __future__ import annotations
@@ -15,7 +15,7 @@ import pytest
 
 ROOT = Path(__file__).resolve().parents[2]
 EXAMPLES = ROOT / "examples"
-SKIPPED_FOLDERS = {"prompts"}
+SKIPPED_FOLDERS: set[str] = set()
 SCRIPTS = sorted(
     p
     for p in EXAMPLES.rglob("*.py")

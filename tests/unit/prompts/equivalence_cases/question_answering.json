@@ -1,0 +1,22 @@
+[
+  {
+    "note": "no system prompt: one user message, plain answer",
+    "variables": {"context": "The sky is blue because of Rayleigh scattering.", "question": "Why is the sky blue?"}
+  },
+  {
+    "note": "system prompt, description, examples string, answer length, JSON output",
+    "variables": {
+      "system_prompt": "You answer from documents only.",
+      "description": "Answer questions about physics.",
+      "examples": "Input: What is 2+2?\nOutput: 4\n\n",
+      "context": "Water boils at 100 C at sea level.",
+      "question": "At what temperature does water boil?",
+      "answer_length": "short",
+      "output_format": "json"
+    }
+  },
+  {
+    "note": "unknown output format",
+    "variables": {"context": "C", "question": "Q", "output_format": "text"}
+  }
+]

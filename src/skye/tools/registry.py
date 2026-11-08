@@ -10,16 +10,16 @@ import threading
 from difflib import SequenceMatcher
 from typing import Any
 
+from skye.base.capability_execution import arun_capability_call, format_capability_result
+from skye.base.completion import CapabilityCall
+from skye.base.interfaces.tool_provider import CapabilityContext
+from skye.base.messages import CapabilityMessage
 from skye.tools.exceptions import (
     CapabilityNotFoundError,
     CapabilityValidationError,
 )
 from skye.tools.interface import CapabilityInterface
 from skye.tools.schema import CapabilitySchema
-from skye.base.capability_execution import arun_capability_call, format_capability_result
-from skye.base.completion import CapabilityCall
-from skye.base.interfaces.tool_provider import CapabilityContext
-from skye.base.messages import CapabilityMessage
 
 logger = logging.getLogger(__name__)
 
@@ -35,7 +35,7 @@ class CapabilityRegistry:
     The registry validates capabilities on registration and provides methods
     for discovery, lifecycle management, and semantic search. Supports mixing
     different capability types (LocalFunctionCapability, RemoteAPICapability,
-    MCPCapability, etc.) in the same registry.
+    MCPToolCapability, etc.) in the same registry.
 
     Features:
     - Singleton pattern for global registry access
@@ -504,7 +504,8 @@ class CapabilityRegistry:
             if return_raw:
                 return result
 
-            # Convert result to text for CapabilityMessage (a value JSON cannot hold is rendered, never raised)
+            # Convert result to text for CapabilityMessage
+            # (a value JSON cannot hold is rendered, never raised)
             content = format_capability_result(result)
 
             # Return as CapabilityMessage
@@ -590,7 +591,8 @@ class CapabilityRegistry:
             if return_raw:
                 return result
 
-            # Convert result to text for CapabilityMessage (a value JSON cannot hold is rendered, never raised)
+            # Convert result to text for CapabilityMessage
+            # (a value JSON cannot hold is rendered, never raised)
             content = format_capability_result(result)
 
             # Return as CapabilityMessage
@@ -615,25 +617,36 @@ class CapabilityRegistry:
                 original_error=str(e),
             ) from e
 
-    # --- the ToolProvider Port: how an agent takes its toolset from this registry ------------------------------------------------
+    # --- the ToolProvider Port: how an agent takes its toolset from this registry -------------
 
     def add(self, capability: CapabilityInterface) -> None:
-        """Add a capability (the object ``@capability`` returns) to this registry; the same as ``register``."""
+        """Add a capability (the object ``@capability`` returns); the same as ``register``."""
         self.register(capability)
 
     async def list_schemas(self, operation: str | None = None) -> "list[CapabilitySchema]":
-        """The schemas of every registered capability. A local registry has no operations, so ``operation`` selects nothing."""
+        """The schemas of every registered capability.
+
+        A local registry has no operations, so ``operation`` selects nothing.
+        """
         with self._registry_lock:
             capabilities = [self._capabilities[name] for name in sorted(self._capabilities)]
         return [capability.get_schema() for capability in capabilities]
 
-    async def run(self, call: CapabilityCall, context: CapabilityContext | None = None) -> CapabilityMessage:
-        """Run one call and say how it ended; never raises. ``context`` is for providers that need a scope; a local run ignores it."""
+    async def run(
+        self, call: CapabilityCall, context: CapabilityContext | None = None
+    ) -> CapabilityMessage:
+        """Run one call and say how it ended; never raises.
+
+        ``context`` is for providers that need a scope; a local run ignores it.
+        """
         return await arun_capability_call(self.get(call.name), call.id, call.name, call.arguments)
 
     async def close(self) -> None:
         """A local registry holds nothing to release."""
 
     def list(self) -> "list[str]":
-        """The registered capability names, sorted: a thin alias of ``list_all`` (the name users of other libraries try first)."""
+        """The registered capability names, sorted: a thin alias of ``list_all``.
+
+        It is the name users of other libraries try first.
+        """
         return self.list_all()

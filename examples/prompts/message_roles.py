@@ -1,65 +1,54 @@
-"""Message role management examples for Skye Prompts Support.
+"""Message roles in a .skye prompt: ``message`` blocks, a history placeholder and roles from data.
 
-This script demonstrates message role management and template composition.
+Each ``message "role"`` block is one message with a real role; no role markers are written by hand.
+``placeholder "history"`` is filled at render time with ``history={"history": [...]}``, as message
+objects or as plain dicts. ``message turn.role`` inside ``each`` takes the role from data. The
+prompt is ``trip`` in message_roles.skye, next to this file. Runs offline, no key.
 """
 
-from skye.prompts import MockPromptBuilder
+from pathlib import Path
+
+from skye import AssistantMessage, UserMessage
+from skye.prompts import load_prompt, render_prompt
+
+PROMPTS = Path(__file__).with_name("message_roles.skye").read_text(encoding="utf-8")
 
 
-def basic_message_roles():
-    """Demonstrate basic message role assignment."""
-    print("=== Basic Message Roles ===")
-    
-    builder = MockPromptBuilder()
-    
-    builder.register_template(
-        name="chat_template",
-        template="You are a helpful AI assistant. User: {user_message}"
+def show(messages: list) -> None:
+    for message in messages:
+        print(f"  {message.role:<10} {message.content}")
+
+
+def main() -> None:
+    spec = load_prompt(PROMPTS, "trip")
+    notes = [
+        {"role": "user", "text": "I travel with a child."},
+        {"role": "assistant", "text": "Short visits, then."},
+    ]
+    variables = {"question": "Plan one day in Rome.", "notes": notes}
+
+    print("History as message objects")
+    history = [
+        UserMessage(content="I like museums."),
+        AssistantMessage(content="Noted: museums first."),
+    ]
+    show(render_prompt(spec, variables, history={"history": history}))
+
+    print("History as dicts")
+    history_dicts = [
+        {"role": "user", "content": "Any food tips?"},
+        {"role": "assistant", "content": "Try supplì."},
+    ]
+    messages = render_prompt(
+        spec, {**variables, "tone": "friendly"}, history={"history": history_dicts}
     )
-    
-    builder.set_message_roles("chat_template", {
-        "system_prompt": "system",
-        "user_input": "user"
-    })
-    
-    messages = builder.render("chat_template", {
-        "user_message": "How do I clean messy data?"
-    })
-    
-    print(f"Chat template: {messages[0].content}")
-    print()
+    show(messages)
 
+    print("No history")
+    show(render_prompt(spec, {"question": "Is May a good month?"}))
 
-def template_composition():
-    """Demonstrate template composition."""
-    print("=== Template Composition ===")
-    
-    builder = MockPromptBuilder()
-    
-    builder.register_template("system", "You are a helpful assistant.")
-    builder.register_template("task", "Task: {task}")
-    builder.register_template("format", "Format: {format}")
-    
-    builder.compose_templates("full_prompt", ["system", "task", "format"])
-    
-    messages = builder.render("full_prompt", {
-        "task": "Extract entities",
-        "format": "JSON"
-    })
-    
-    print(f"Composed template: {messages[0].content}")
-    print()
-
-
-def main():
-    """Run all message role examples."""
-    print("Skye Prompts Support - Message Role Examples")
-    print("=" * 50)
-    
-    basic_message_roles()
-    template_composition()
-    
-    print("All message role examples completed!")
+    print("As request payload")
+    print(f"  {messages[0].to_dict()}")
 
 
 if __name__ == "__main__":

@@ -68,9 +68,7 @@ EXTRA_PATHS: dict[str, list[str]] = {
         "tools/schema.py",
     ],
     "mcp": [
-        "tools/mcp_capability.py",
         "tools/mcp_fastmcp.py",
-        "tools/mcp_server_client.py",
     ],
     "memory": ["memory", "store/redis.py"],
     "postgres": ["store/postgres.py"],

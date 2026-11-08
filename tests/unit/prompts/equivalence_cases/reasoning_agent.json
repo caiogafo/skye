@@ -1,0 +1,92 @@
+[
+  {
+    "note": "defaults only, default closing sentence",
+    "variables": {
+      "input": "How many weighings to find the heavy coin among 9?"
+    }
+  },
+  {
+    "note": "chain_of_thought, context, constraints, examples, history, structured output",
+    "variables": {
+      "system_prompt": "You are a careful puzzle solver.",
+      "reasoning_type": "chain_of_thought",
+      "context": "A balance scale is available.",
+      "constraints": [
+        "Use at most 3 weighings",
+        "Explain each step"
+      ],
+      "examples": [
+        {
+          "problem": "Find the heavy coin among 3",
+          "reasoning": "Weigh 1 vs 1",
+          "solution": "1 weighing"
+        },
+        {
+          "problem": "Odd one out",
+          "reasoning": "",
+          "solution": "Compare pairs"
+        }
+      ],
+      "chat_history": [
+        {
+          "role": "user",
+          "content": "Let's do puzzles."
+        },
+        {
+          "role": "assistant",
+          "content": "Sure, go ahead."
+        }
+      ],
+      "input": "Now with 9 coins.",
+      "output_format": "structured"
+    },
+    "skye_variables": {
+      "history": [
+        {
+          "role": "user",
+          "content": "Let's do puzzles."
+        },
+        {
+          "role": "assistant",
+          "content": "Sure, go ahead."
+        }
+      ]
+    }
+  },
+  {
+    "note": "tree_of_thought, JSON output",
+    "variables": {
+      "reasoning_type": "tree_of_thought",
+      "input": "Plan a trip.",
+      "output_format": "json"
+    }
+  },
+  {
+    "note": "analytical",
+    "variables": {
+      "reasoning_type": "analytical",
+      "input": "Why did sales drop?"
+    }
+  },
+  {
+    "note": "creative, unknown output format",
+    "variables": {
+      "reasoning_type": "creative",
+      "input": "Name a startup.",
+      "output_format": "poem"
+    }
+  },
+  {
+    "note": "unknown reasoning type: only the heading line",
+    "variables": {
+      "reasoning_type": "deductive",
+      "input": "Socrates is a man.",
+      "constraints": [],
+      "examples": [],
+      "chat_history": []
+    },
+    "skye_variables": {
+      "history": []
+    }
+  }
+]

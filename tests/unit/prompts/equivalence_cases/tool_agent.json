@@ -1,0 +1,104 @@
+[
+  {
+    "note": "default system text, two tools (list joined with commas), no examples / history",
+    "variables": {
+      "tools": [
+        {
+          "name": "search",
+          "description": "Search the web"
+        },
+        {
+          "name": "calculator",
+          "description": "Evaluate a math expression"
+        }
+      ],
+      "input": "What is 2 + 2?"
+    }
+  },
+  {
+    "note": "custom system prompt, one tool, examples, conversation history",
+    "variables": {
+      "system_prompt": "You pick tools.",
+      "tools": [
+        {
+          "name": "weather",
+          "description": "Get the weather for a city"
+        }
+      ],
+      "examples": [
+        {
+          "question": "Weather in Rome?",
+          "action": "weather",
+          "action_input": "Rome"
+        },
+        {
+          "question": "Hello",
+          "action": "no_action",
+          "action_input": "none"
+        }
+      ],
+      "chat_history": [
+        {
+          "role": "user",
+          "content": "Hi there."
+        },
+        {
+          "role": "assistant",
+          "content": "Hello, how can I help?"
+        }
+      ],
+      "input": "And in Milan?"
+    },
+    "skye_variables": {
+      "history": [
+        {
+          "role": "user",
+          "content": "Hi there."
+        },
+        {
+          "role": "assistant",
+          "content": "Hello, how can I help?"
+        }
+      ]
+    }
+  },
+  {
+    "note": "three tools, one example",
+    "variables": {
+      "tools": [
+        {
+          "name": "a",
+          "description": "Tool A"
+        },
+        {
+          "name": "b",
+          "description": "Tool B"
+        },
+        {
+          "name": "c",
+          "description": "Tool C"
+        }
+      ],
+      "examples": [
+        {
+          "question": "Use b",
+          "action": "b",
+          "action_input": "x"
+        }
+      ],
+      "input": "Go"
+    }
+  },
+  {
+    "note": "no tools (legacy prints '[, \"no_action\"]'), empty lists",
+    "variables": {
+      "tools": [],
+      "examples": [],
+      "chat_history": [],
+      "input": "Anything?"
+    },
+    "skye_variables": {
+      "history": []
+    }
+  }
+]

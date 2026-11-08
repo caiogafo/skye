@@ -14,8 +14,8 @@ and the public-API rule are in the steering sections named above and are not res
 
 Ports defined by this component (all under `base/interfaces`): `model`, `decision`, `runnable`, `storage`, `registry`,
 `cost_calculator`, `error_handler`, `token_counter`, `memory`, `vector_encoder`, `router`, `safety`, `observer`,
-`event_handler`, `content_reader`, `multimodal_handler`, `prompt`, `config_loader`, `plugin`, `capability`, `authorizer`,
-`authentication` (design "Ports"). Every cross-component dependency crosses one of these, never a concrete implementation.
+`event_handler`, `content_reader`, `multimodal_handler`, `prompt`, `config_loader`, `plugin`, `capability`, `resource`, `authorizer`,
+`authentication` (design "Ports"). The `resource` Port (`ResourceProviderInterface`, `Resource`; D26) was added on 2026-11-08 and is implemented by the MCP clients of `tools`. Every cross-component dependency crosses one of these, never a concrete implementation.
 
 ## Architecture
 
@@ -57,7 +57,13 @@ base/
     model.py decision.py runnable.py storage.py registry.py cost_calculator.py error_handler.py
     token_counter.py memory.py vector_encoder.py router.py safety.py observer.py event_handler.py
     content_reader.py multimodal_handler.py prompt.py config_loader.py plugin.py capability.py
-    authorizer.py authentication.py
+    authorizer.py authentication.py resource.py
+  dsl/                    the .skye language, text in and text out (no file I/O)
+    lexer.py parser.py tree.py build.py specs.py expressions.py errors.py schema.py emit.py cache.py skeletons.py
+    metadata.py           front matter (TOML between two --- lines); not frontmatter.py, `front` is a watermark (R4)
+    fmt.py                format_text, FormatError: the text formatter behind `skye fmt`
+    shapes.py             conform: checks a structured prompt variable and fills its optional fields in a copy
+    info.py               describe_prompt, prompt_help, PromptInfo (re-exported by skye.prompts; place is open decision O46)
 ```
 
 ## Components and Interfaces
@@ -114,6 +120,29 @@ calls `missing_extra("yaml", extra="yaml")`, so a missing parser raises `Missing
 nothing (Requirement 20.1; D29). An invalid value raises `ConfigurationError` with details (Requirement 20.3). The prefixed
 environment variables are exactly three — `SKYE_LOG_LEVEL`, `SKYE_CONFIG`, `SKYE_ENABLE_TELEMETRY` (`ALL_ENV_VARS`); provider
 credentials never come from a prefixed variable (D18).
+
+### The `.skye` language: text-level features (Requirement 54.16 to 54.20; D69 to D73)
+
+All of it takes text and returns text or models; nothing reads a file (Requirement 3.2).
+- **Comments.** The lexer skips `#` to the end of the line and `/* ... */` / `/** ... **/` over lines (no nesting; an unclosed one is an
+  error with its start position). `//` is floor division, not a comment. Inside an expression (`_expression_text` in `parser.py`) a
+  comment counts as one space, so the column numbers of the rest stay right.
+- **Front matter.** `metadata.split_metadata` cuts the lines between two `---` at the top, reads them with `tomllib`, and gives the parser
+  the rest padded with blank lines so the line numbers do not move; a `key: value` line is an error that shows the TOML form. The result is
+  `Tree.metadata` / `Document.metadata`; `format_metadata` writes it back and `to_text` puts one blank line after it.
+- **`format_text`** (`fmt.py`) re-indents the text (two spaces per open bracket, one level for a line that opens two such as `list({`),
+  strips trailing spaces, keeps at most one blank line, exactly one after the front matter, and a final newline; comments and `"""`
+  strings are copied as they are. It raises `FormatError` for a text with mistakes, and refuses a result whose `to_text` differs from the
+  original's (a different model). It is idempotent. `skeletons.py` returns formatted text.
+- **Prompt variables.** The parser keeps a string after a type as a description (`Attribute.description`, `MapEntry.description`) only in
+  `variables` and in `output`; the builder puts it in `VariableSpec.description` and `OutputFieldSpec.description`. A structured type
+  (`list(T)`, `[T]`, `list({ ... })`, `map({ ... })`, `{ ... }`, nested) becomes `VariableSpec.item_type` / `fields`; its default is the second
+  argument (`TypeCall.second`, open decision O46). Inside a structure `map({})` / `list([])` is an optional field with that default and
+  `map({ a = string })` a shape (`_is_shape`). `shapes.conform` checks a value and lists every mistake with its path.
+- **`output`** blocks (D70) are parsed and checked here into `OutputSpec` (also inside a top-level `when`, as
+  `PromptPartSpec(kind="output")`, listed by `PromptSpec.output_variants()`); `prompts` writes the instructions.
+- **`each`** has one variable; the checker accepts `loop` inside it (D69).
+- **`info.describe_prompt`** builds a `PromptInfo` from a `PromptSpec` and the metadata; `prompt_help` prints it.
 
 ### Type safety (Requirement 6)
 

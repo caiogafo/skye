@@ -1,25 +1,10 @@
-"""``Resource``: an MCP resource, defined inside ``tools`` (Requirement 15).
+"""``Resource`` for the MCP clients: re-exported from the resource Port in ``base`` (decision D26).
 
-No base Port and no new Component. A listed resource carries only metadata; a resource
-read by URI carries a MIME type and either ``text`` or ``data`` (bytes), never both.
+The type and its Port (``ResourceProviderInterface``) live in ``base`` so that ``prompts`` and
+``memory`` consume MCP resources without importing ``tools``; this module keeps the
+``skye.tools.mcp_resource`` path working.
 """
 
-from __future__ import annotations
+from skye.base.interfaces.resource import Resource, ResourceProviderInterface
 
-from dataclasses import dataclass
-
-
-@dataclass(frozen=True)
-class Resource:
-    """An MCP resource: ``uri`` and ``name`` always, content only after a read."""
-
-    uri: str
-    name: str
-    mime_type: str | None = None
-    description: str | None = None
-    text: str | None = None
-    data: bytes | None = None
-
-    @property
-    def has_content(self) -> bool:
-        return self.text is not None or self.data is not None
+__all__ = ["Resource", "ResourceProviderInterface"]

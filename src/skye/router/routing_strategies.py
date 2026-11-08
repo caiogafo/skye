@@ -14,6 +14,28 @@ if TYPE_CHECKING:
     from .health_tracker import ModelHealth, RateLimitTracker
 
 
+def estimated_cost(
+    target: "ModelTarget", token_estimate: tuple[float, float] | None = None
+) -> float | None:
+    """The cost of one request to a target, from its ``cost_per_1k_*_tokens`` fields.
+
+    Without an estimate the two prices are summed (the cost of 1k prompt tokens plus 1k completion
+    tokens). With ``(prompt_tokens, completion_tokens)`` each price is weighted by its tokens:
+    ``prompt_tokens / 1000 * cost_per_1k_prompt_tokens + completion_tokens / 1000 *
+    cost_per_1k_completion_tokens``. A price that is not set counts as 0 when the other one is set;
+    a target with neither has no cost (``None``).
+    """
+    prompt = getattr(target, "cost_per_1k_prompt_tokens", None)
+    completion = getattr(target, "cost_per_1k_completion_tokens", None)
+    if prompt is None and completion is None:
+        return None
+    if token_estimate is None:
+        prompt_weight, completion_weight = 1.0, 1.0
+    else:
+        prompt_weight, completion_weight = token_estimate[0] / 1000.0, token_estimate[1] / 1000.0
+    return (prompt or 0.0) * prompt_weight + (completion or 0.0) * completion_weight
+
+
 class RoutingStrategySelector:
     """Handles model selection based on different routing strategies."""
 
@@ -69,6 +91,8 @@ class RoutingStrategySelector:
         available_models: list[str],
         alias: str | None = None,
         strategy: RoutingStrategy | None = None,
+        *,
+        token_estimate: tuple[float, float] | None = None,
     ) -> str:
         """Apply routing strategy to select a model.
 
@@ -76,6 +100,8 @@ class RoutingStrategySelector:
             available_models: List of available model IDs.
             alias: Optional alias for round-robin tracking.
             strategy: Routing strategy to use.
+            token_estimate: ``(prompt_tokens, completion_tokens)`` expected for the request; read by
+                ``cost_based`` only (see :func:`estimated_cost`).
 
         Returns:
             Selected model ID.
@@ -100,6 +126,8 @@ class RoutingStrategySelector:
             return self._weighted_strategy(available_models)
         elif strategy == RoutingStrategy.PRIORITY_BASED:
             return self._priority_based_strategy(available_models)
+        elif strategy == RoutingStrategy.COST_BASED:
+            return self._cost_based_strategy(available_models, token_estimate)
         else:
             # Default to first available
             return available_models[0]
@@ -171,3 +199,19 @@ class RoutingStrategySelector:
             available_models,
             key=lambda m: self._metric(m, "success_rate", 1.0),
         )
+
+    def _cost_based_strategy(
+        self, available_models: list[str], token_estimate: tuple[float, float] | None
+    ) -> str:
+        """Select the target with the lowest estimated cost (:func:`estimated_cost`).
+
+        Targets without a cost come after every target with one; ties keep the configured order
+        (``min`` returns the first of equal keys, and ``available_models`` is in configured order).
+        """
+
+        def key(model_id: str) -> tuple[int, float]:
+            target = self.model_targets.get(model_id)
+            cost = None if target is None else estimated_cost(target, token_estimate)
+            return (1, 0.0) if cost is None else (0, cost)
+
+        return min(available_models, key=key)

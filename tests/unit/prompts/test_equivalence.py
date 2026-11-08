@@ -1,0 +1,270 @@
+"""Equivalence of the bundled `.jinja` prompts and their `.skye` conversions (task 4.4, D60).
+
+For every ``src/skye/prompts/templates/<name>.skye`` that exists, this test renders the frozen
+legacy copy ``tests/unit/prompts/legacy_templates/<name>.jinja`` and the new ``.skye`` prompt with
+the same data and compares the resulting messages. With no ``.skye`` file the test skips cleanly.
+
+How each side is rendered:
+    * Legacy: ``skye.prompts.engine.render_template(jinja_text, variables)``, then the output is
+      split into role sections at lines that are exactly ``[SYSTEM]``, ``[USER]`` or
+      ``[ASSISTANT]`` (after stripping). Text before the first marker is a ``user`` section.
+      Sections whose normalised text is empty are dropped. Each section is one
+      ``(role, content)`` message.
+    * New: ``skye.prompts.skye_prompts.load_prompt(skye_text, name=<name>)`` followed by
+      ``render_prompt(spec, variables, history=<case history>)``. The prompt inside
+      ``<name>.skye`` must be named ``<name>`` (``prompt "<name>" { ... }``).
+
+Normalisation (applied to the content of every message on both sides): strip each line, collapse
+runs of spaces and tabs into one space, drop blank lines, join the remaining lines with ``"\\n"``.
+Then the two lists of ``(role, content)`` pairs must be equal, message by message.
+
+Case files (written by whoever converts a template, one per converted template):
+    ``tests/unit/prompts/equivalence_cases/<name>.json`` is a JSON list of cases. A ``.skye``
+    template without a case file fails the test. Each case is either
+
+    * a plain object of variables, e.g. ``{"user_message": "Hi", "domain": "law"}``; or
+    * the wrapped form (preferred when you need a note or history), recognised by having a
+      ``"variables"`` key whose value is an object; only the keys ``variables``, ``history``,
+      ``note``, ``glued_lines`` and ``skye_variables`` are allowed::
+
+          {
+            "note": "history present, no context",
+            "variables": {"user_message": "Hi"},
+            "history": {"chat_history": [{"role": "user", "content": "Hello"}]},
+            "glued_lines": false
+          }
+
+      ``note`` (optional) is shown in the failure message. ``history`` (optional) maps a name to
+      a list of ``{"role", "content"}`` objects. On the legacy side the entries are merged into
+      the variables (the old templates read history as a variable and print ``[ROLE]`` markers
+      for it); on the new side they are passed as ``render_prompt(history=...)``, which a
+      ``placeholder "<name>"`` consumes. A ``placeholder`` also falls back to a variable of the
+      same name, so putting the history list in ``variables`` works too. ``glued_lines``
+      (optional, default false) is for a case whose legacy output glues lines together (intended
+      difference 5): both sides are then compared with all whitespace removed. Set it only on
+      the cases that need it; every other case is compared line by line. ``skye_variables``
+      (optional) are merged over ``variables`` for the .skye side only, for a template whose
+      inputs changed shape (intended differences 6 and 7): e.g. the old ``chat_history`` list in
+      ``variables`` and the same turns as ``history`` in ``skye_variables`` (read by the
+      ``placeholder "history"``).
+
+    Write enough cases to cover every ``if``/``elif``/``else`` and ``for`` branch of the old
+    template (each branch taken and not taken, empty and non-empty lists). Give a value to every
+    variable the old template prints without a guard: the legacy engine prints a missing variable
+    as ``{{ name }}``.
+
+Intended differences between the old and the new rendering are listed in
+``INTENDED_DIFFERENCES`` below; everything else must match. Add an entry there when a conversion
+needs a new, deliberate difference.
+"""
+
+from __future__ import annotations
+
+import json
+import re
+from pathlib import Path
+from typing import Any
+
+import pytest
+
+from skye.prompts.engine import render_template
+from skye.prompts.skye_prompts import load_prompt, render_prompt
+
+INTENDED_DIFFERENCES: list[str] = [
+    # 1. Real roles instead of text markers.
+    "Roles are real message roles (SystemMessage, UserMessage, AssistantMessage) instead of the "
+    "[SYSTEM]/[USER]/[ASSISTANT] text markers; the harness splits the legacy output at the "
+    "markers so both sides are compared as (role, content) pairs.",
+    # 2. Conversation history becomes real messages.
+    "A conversation history printed by the old template as '[ROLE]' + content sections becomes "
+    "real messages (via `placeholder` or `each ... { message turn.role { ... } }`); the marker "
+    "split makes the legacy side comparable, so no special case is needed.",
+    # 3. Whitespace.
+    "Spaces and blank lines are not significant: lines are stripped, runs of spaces collapse, "
+    "blank lines are dropped (the old whitespace control is not reproduced exactly).",
+    # 4. Empty messages.
+    "A message whose text is empty after rendering is omitted on both sides.",
+    # 5. Lines glued by the old whitespace control.
+    "Lines that the old templates glued together because an '{% endif %}' swallowed the newline "
+    "(trim_blocks) are separate lines in .skye. Seen in main_agent and memory_agent (2+ "
+    "memories: '- I like tea (2024-01-01)- I live in Rome'), sql_generation ('Description: "
+    "DColumns:', 2+ columns '- a (int) - x- b (text)'), relation_extraction (examples on a "
+    "relation that is not the last) and tabular_extraction (2+ columns). A case that exercises "
+    'such a shape sets "glued_lines": true; the harness then compares each message with its '
+    "whitespace removed, so the text and its order must still match exactly."
+    " Also seen in form_agent (field Type / Options / Validation lines) and multimodal_agent "
+    "('URL:' and 'Transcript:' lines).",
+    # 6. Inputs that changed shape (owner request, 2026-11-08).
+    "classification takes one 'categories' list of {name, description?} instead of a list of "
+    "names plus 'category_descriptions'; its cases give the old variables to the legacy side and "
+    "the new list in 'skye_variables'.",
+    # 7. Structured inputs and unified names (owner decision 2026-11-08, no backward compatibility).
+    "Every list or map input has a structured type and the agent inputs use the unified names "
+    "(chat_history / conversation_history -> placeholder 'history', declarative_memory -> "
+    "semantic_memory, procedural_memories / procedures -> procedural_memory, personality -> a "
+    "list of strings); a case gives the old variables to the legacy side and the new ones in "
+    "'skye_variables'.",
+    # 8. No heading before the conversation history.
+    "The '## Recent conversation:' / '## Previous discussion:' / '## Previous conversation:' line "
+    "the old agent templates printed before the history is gone (the history is a placeholder, "
+    "real messages); the harness drops exactly that line from the legacy system message of the "
+    "templates listed in LEGACY_HISTORY_HEADINGS.",
+]
+
+# Intended difference 8: the heading line each old template printed before its history.
+LEGACY_HISTORY_HEADINGS: dict[str, str] = {
+    "code_agent": "## Previous discussion:",
+    "form_agent": "## Recent conversation:",
+    "main_agent": "## Recent conversation:",
+    "memory_agent": "## Recent conversation:",
+    "multimodal_agent": "## Previous conversation:",
+    "procedure_agent": "## Recent conversation:",
+    "reasoning_agent": "## Previous discussion:",
+    "tool_agent": "## Recent conversation:",
+}
+
+REPO_ROOT = Path(__file__).resolve().parents[3]
+TEMPLATES_DIR = REPO_ROOT / "src" / "skye" / "prompts" / "templates"
+HERE = Path(__file__).resolve().parent
+LEGACY_DIR = HERE / "legacy_templates"
+CASES_DIR = HERE / "equivalence_cases"
+
+_MARKER = re.compile(r"^\[(SYSTEM|USER|ASSISTANT)\]$")
+_SPACES = re.compile(r"[ \t]+")
+
+# Only conversions are compared: a new prompt written directly in .skye has no legacy template.
+SKYE_NAMES = sorted(
+    p.stem for p in TEMPLATES_DIR.glob("*.skye") if (LEGACY_DIR / f"{p.stem}.jinja").exists()
+)
+
+
+def normalise(text: str) -> str:
+    """Strip each line, collapse runs of spaces, drop blank lines."""
+    lines = (_SPACES.sub(" ", line.strip()) for line in text.splitlines())
+    return "\n".join(line for line in lines if line)
+
+
+def split_legacy(rendered: str) -> list[tuple[str, str]]:
+    """Split a legacy rendering into ``(role, normalised content)`` sections at the role markers."""
+    sections: list[tuple[str, list[str]]] = [("user", [])]
+    for line in rendered.splitlines():
+        match = _MARKER.match(line.strip())
+        if match:
+            sections.append((match.group(1).lower(), []))
+        else:
+            sections[-1][1].append(line)
+    out = [(role, normalise("\n".join(lines))) for role, lines in sections]
+    return [(role, content) for role, content in out if content]
+
+
+def drop_history_heading(name: str, sections: list[tuple[str, str]]) -> list[tuple[str, str]]:
+    """Remove the old history heading line from the legacy system messages (intended difference 8)."""
+    heading = LEGACY_HISTORY_HEADINGS.get(name)
+    if heading is None:
+        return sections
+    out = []
+    for role, content in sections:
+        if role == "system":
+            content = "\n".join(line for line in content.split("\n") if line != heading)
+        out.append((role, content))
+    return [(role, content) for role, content in out if content]
+
+
+def join_lines(content: str) -> str:
+    """Drop all whitespace of normalised content (``glued_lines`` cases).
+
+    Where an old line was glued to the next one, the space kept at the joint differs from the line
+    break of the .skye output, so the comparison ignores whitespace; the text and its order must
+    still match exactly.
+    """
+    return "".join(content.split())
+
+
+def parse_case(
+    case: Any,
+) -> tuple[dict[str, Any], dict[str, list[dict[str, Any]]], str, bool]:
+    """Return ``(variables, history, note, glued_lines)`` for one case (see the docstring)."""
+    assert isinstance(case, dict), f"each case must be a JSON object, got {type(case).__name__}"
+    if isinstance(case.get("variables"), dict):
+        unknown = set(case) - {"variables", "history", "note", "glued_lines", "skye_variables"}
+        assert not unknown, f"unknown keys in wrapped case: {sorted(unknown)}"
+        history = case.get("history") or {}
+        assert isinstance(history, dict), "'history' must map a name to a list of messages"
+        glued = case.get("glued_lines", False)
+        assert isinstance(glued, bool), "'glued_lines' must be true or false"
+        return dict(case["variables"]), dict(history), str(case.get("note", "")), glued
+    return dict(case), {}, "", False
+
+
+def _cases(name: str) -> list[Any]:
+    path = CASES_DIR / f"{name}.json"
+    if not path.exists():
+        pytest.fail(
+            f"{name}.skye exists but its case file {path.relative_to(REPO_ROOT)} is missing"
+        )
+    cases = json.loads(path.read_text(encoding="utf-8"))
+    assert isinstance(cases, list) and cases, f"{path.name} must be a non-empty JSON list of cases"
+    return cases
+
+
+def test_intended_differences_are_listed() -> None:
+    assert INTENDED_DIFFERENCES
+    assert all(isinstance(item, str) and item for item in INTENDED_DIFFERENCES)
+
+
+def test_every_bundled_template_has_a_legacy_copy() -> None:
+    for jinja in TEMPLATES_DIR.glob("*.jinja"):
+        assert (LEGACY_DIR / jinja.name).exists(), f"missing legacy copy of {jinja.name}"
+
+
+def test_every_legacy_template_is_bundled_as_skye_or_jinja() -> None:
+    # A converted template must keep its .skye; one still in .jinja (version 2 needed) keeps its .jinja.
+    for legacy in LEGACY_DIR.glob("*.jinja"):
+        assert (TEMPLATES_DIR / f"{legacy.stem}.skye").exists() or (TEMPLATES_DIR / legacy.name).exists(), (
+            f"{legacy.stem} is bundled neither as .skye nor as .jinja"
+        )
+
+
+def test_split_legacy_markers() -> None:
+    text = "intro\n[SYSTEM]\n  You  are   X.\n\n[USER]\n\n[ASSISTANT]\nHi\n[USER]\nQ"
+    assert split_legacy(text) == [
+        ("user", "intro"),
+        ("system", "You are X."),
+        ("assistant", "Hi"),
+        ("user", "Q"),
+    ]
+
+
+def test_join_lines_matches_glued_legacy_output() -> None:
+    legacy = normalise("- I like tea (2024-01-01)- I live in Rome\n## Next")
+    new = normalise("  - I like tea (2024-01-01)\n  - I live in Rome\n## Next")
+    assert legacy != new
+    assert join_lines(legacy) == join_lines(new)
+
+
+@pytest.mark.parametrize(
+    "name",
+    SKYE_NAMES or [pytest.param("<none>", marks=pytest.mark.skip(reason="no .skye templates yet"))],
+)
+def test_skye_matches_legacy(name: str) -> None:
+    legacy_path = LEGACY_DIR / f"{name}.jinja"
+    assert legacy_path.exists(), (
+        f"no legacy template {legacy_path.name} to compare {name}.skye with"
+    )
+    legacy_text = legacy_path.read_text(encoding="utf-8")
+    spec = load_prompt((TEMPLATES_DIR / f"{name}.skye").read_text(encoding="utf-8"), name=name)
+
+    for index, raw in enumerate(_cases(name)):
+        variables, history, note, glued = parse_case(raw)
+        expected = drop_history_heading(
+            name, split_legacy(render_template(legacy_text, {**variables, **history}))
+        )
+        skye_variables = {**variables, **(raw.get("skye_variables") or {})}
+        messages = render_prompt(spec, skye_variables, history=history or None)
+        actual = [(m.role, normalise(m.content)) for m in messages]
+        actual = [(role, content) for role, content in actual if content]
+        if glued:
+            expected = [(role, join_lines(content)) for role, content in expected]
+            actual = [(role, join_lines(content)) for role, content in actual]
+        label = f"{name} case {index}" + (f" ({note})" if note else "")
+        assert actual == expected, f"{label}: .skye and legacy .jinja differ"

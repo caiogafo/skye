@@ -19,12 +19,14 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from skye.base.exceptions import ValidationError
-from skye.base.messages import (  # the message types live in `base`; `tools` never imports `prompts`
+from skye.base.interfaces.resource import Resource
+
+# the message types live in `base`; `tools` never imports `prompts`
+from skye.base.messages import (
     AssistantMessage,
     SkyeMessage,
     UserMessage,
 )
-from skye.tools.mcp_resource import Resource
 from skye.tools.schema import CapabilitySchema
 
 _UNSET: Any = object()

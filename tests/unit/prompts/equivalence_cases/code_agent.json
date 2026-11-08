@@ -1,0 +1,116 @@
+[
+  {
+    "note": "minimal",
+    "variables": {
+      "input": "Write fizzbuzz"
+    }
+  },
+  {
+    "note": "everything, detailed",
+    "variables": {
+      "input": "Fix this",
+      "system_prompt": "You code.",
+      "task_type": "debugging",
+      "programming_language": "python",
+      "code_context": "def f():\n    return 1",
+      "requirements": [
+        "fast",
+        "typed"
+      ],
+      "constraints": [
+        "no deps"
+      ],
+      "error_message": "TypeError: bad",
+      "examples": [
+        {
+          "input": "add(1, 2)",
+          "output": "3",
+          "language": "python"
+        },
+        {
+          "input": "f()",
+          "output": "None"
+        }
+      ],
+      "output_format": "detailed",
+      "code_style": [
+        "PEP 8",
+        "type hints"
+      ],
+      "chat_history": [
+        {
+          "role": "user",
+          "content": "Hello there"
+        },
+        {
+          "role": "assistant",
+          "content": "Hi, how can I help?"
+        }
+      ]
+    },
+    "skye_variables": {
+      "history": [
+        {
+          "role": "user",
+          "content": "Hello there"
+        },
+        {
+          "role": "assistant",
+          "content": "Hi, how can I help?"
+        }
+      ]
+    }
+  },
+  {
+    "note": "code_generation, json, code context without language",
+    "variables": {
+      "input": "x",
+      "task_type": "code_generation",
+      "output_format": "json",
+      "code_context": "x = 1"
+    }
+  },
+  {
+    "note": "code_review",
+    "variables": {
+      "input": "x",
+      "task_type": "code_review"
+    }
+  },
+  {
+    "note": "code_explanation",
+    "variables": {
+      "input": "x",
+      "task_type": "code_explanation"
+    }
+  },
+  {
+    "note": "refactoring",
+    "variables": {
+      "input": "x",
+      "task_type": "refactoring",
+      "output_format": "text"
+    }
+  },
+  {
+    "note": "unknown task type",
+    "variables": {
+      "input": "x",
+      "task_type": "other"
+    }
+  },
+  {
+    "note": "empty lists",
+    "variables": {
+      "input": "x",
+      "requirements": [],
+      "constraints": [],
+      "examples": [],
+      "code_style": [],
+      "chat_history": []
+    },
+    "skye_variables": {
+      "history": []
+    }
+  }
+]

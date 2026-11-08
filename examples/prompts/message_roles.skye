@@ -1,0 +1,42 @@
+---
+title       = "Trip assistant"
+description = "Message roles: real roles, a history placeholder and roles taken from data"
+version     = "1.0"
+tags        = ["examples"]
+---
+
+/** Real roles, a history placeholder and roles taken from data. **/
+prompt "trip" {
+  variables = {
+    tone     = string("concise")  "How the assistant talks"
+    notes    = list({
+      role = string  "Role of the turn: user or assistant"
+      text = string  "What was said"
+    }, [])  "Turns added after the history, with their roles"
+    question = string  "The user's question"
+  }
+
+  message "system" { text = "You are a {{ tone }} travel assistant." }
+
+  placeholder "history"   # earlier turns are inserted here at render time
+
+  each turn in notes {
+    message turn.role { text = "{{ turn.text }}" }
+  }
+
+  message "user" { text = "{{ question }}" }
+}
+
+/**
+ * Example:
+ *
+ *   builder.render("trip", {
+ *       "tone": "friendly",
+ *       "history": [
+ *           {"role": "user", "content": "I like museums."},
+ *           {"role": "assistant", "content": "Noted: museums first."},
+ *       ],
+ *       "notes": [{"role": "user", "text": "I travel with a child."}],
+ *       "question": "Plan one day in Rome.",
+ *   })
+ **/

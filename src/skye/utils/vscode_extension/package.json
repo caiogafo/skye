@@ -1,0 +1,91 @@
+{
+  "name": "skye",
+  "publisher": "skyeai",
+  "displayName": "Skye (.skye language)",
+  "description": "Syntax highlighting and live diagnostics (skye check) for .skye files: routers, flows and prompts.",
+  "version": "0.0.0",
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.75.0"
+  },
+  "categories": [
+    "Programming Languages",
+    "Linters",
+    "Formatters"
+  ],
+  "keywords": [
+    "skye",
+    "dsl",
+    "llm",
+    "router",
+    "prompt"
+  ],
+  "main": "./extension.js",
+  "activationEvents": [
+    "onLanguage:skye"
+  ],
+  "contributes": {
+    "languages": [
+      {
+        "id": "skye",
+        "aliases": [
+          "Skye",
+          "skye"
+        ],
+        "extensions": [
+          ".skye"
+        ],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "skye",
+        "scopeName": "source.skye",
+        "path": "./syntaxes/skye.tmLanguage.json"
+      }
+    ],
+    "commands": [
+      {
+        "command": "skye.check",
+        "title": "Skye: Check current file"
+      }
+    ],
+    "configuration": {
+      "title": "Skye",
+      "properties": {
+        "skye.command": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [
+            "skye"
+          ],
+          "markdownDescription": "The command that runs the Skye CLI, as a list of arguments (no shell). Examples: `[\"skye\"]`, `[\"uv\", \"run\", \"skye\"]`, `[\"python\", \"-m\", \"skye.utils.cli\"]`."
+        },
+        "skye.run": {
+          "type": "string",
+          "enum": [
+            "onType",
+            "onSave"
+          ],
+          "enumDescriptions": [
+            "Check while you type (debounced).",
+            "Check when the file is opened or saved."
+          ],
+          "default": "onType",
+          "description": "When to run `skye check`."
+        },
+        "skye.registry": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [],
+          "markdownDescription": "Names known to the registry, passed as `--registry a,b` so that `registry.NAME` references are checked."
+        }
+      }
+    }
+  }
+}

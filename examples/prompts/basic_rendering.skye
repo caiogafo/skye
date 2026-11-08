@@ -1,0 +1,32 @@
+---
+title       = "Greeting"
+description = "Basic rendering: a prompt with required variables, an optional note and a system message"
+version     = "1.0"
+tags        = ["examples"]
+---
+
+/** name and product are required; note is optional (its default is empty). **/
+prompt "greeting" {
+  variables = {
+    name    = string      "Name of the new user"
+    product = string      "Product the user signed up for"
+    note    = string("")  "Extra sentence added after the greeting"
+  }
+
+  message "system" { text = "You greet new users of {{ product }} in one sentence." }
+
+  message "user" {
+    text = "Hello {{ name }}, welcome to {{ product }}."
+    when note { text = "{{ note }}" }
+  }
+}
+
+/**
+ * Example:
+ *
+ *   builder.render("greeting", {
+ *       "name": "Alice",
+ *       "product": "Skye",
+ *       "note": "Your trial lasts 30 days.",
+ *   })
+ **/

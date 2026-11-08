@@ -1,0 +1,42 @@
+---
+title       = "Product list"
+description = "Output schema: the answer's shape in the format named by the format variable"
+version     = "1.0"
+tags        = ["examples"]
+---
+
+/** The answer's shape, in the format named by the format variable. **/
+prompt "products" {
+  variables = {
+    catalogue = string          "Catalogue text to read the products from"
+    format    = string("json")  "Answer format: json, table or xml"
+  }
+
+  output format {
+    name     = string "Product name as printed in the catalogue"
+    price    = number "Unit price in euro, without VAT"
+    in_stock = bool   "True when the catalogue lists it as available"
+  }
+
+  message "user" { text = "List the products in this catalogue:\n{{ catalogue }}" }
+}
+
+/** No output block: the Python code gives this prompt a dataclass schema. **/
+prompt "invoice" {
+  variables = {
+    text = string  "Text of the invoice"
+  }
+
+  message "user" { text = "Extract the invoice fields:\n{{ text }}" }
+}
+
+/**
+ * Example:
+ *
+ *   builder.render("products", {
+ *       "catalogue": "Desk lamp 24.90, in stock; Chair 89.00, sold out.",
+ *       "format": "table",
+ *   })
+ *
+ *   builder.render("invoice", {"text": "Invoice 2026-114, total 120.50 EUR"})
+ **/

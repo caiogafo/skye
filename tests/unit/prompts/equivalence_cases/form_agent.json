@@ -1,0 +1,228 @@
+[
+  {
+    "note": "minimal: default system prompt, no form, no current field",
+    "variables": {
+      "input": "Hi"
+    }
+  },
+  {
+    "note": "custom system prompt, description, fields without attributes, current field with examples, two collected entries, errors, progress, history",
+    "variables": {
+      "input": "My name is Ada",
+      "system_prompt": "You collect sign-up data.",
+      "form_description": "Sign-up",
+      "form_fields": [
+        {
+          "name": "name",
+          "required": true,
+          "description": "Full name"
+        },
+        {
+          "name": "nickname",
+          "description": "Optional nickname"
+        }
+      ],
+      "current_field": {
+        "name": "email",
+        "description": "Your email address",
+        "examples": [
+          "a@b.c",
+          "x@y.z"
+        ]
+      },
+      "collected_data": {
+        "name": "Ada",
+        "age": 36
+      },
+      "validation_errors": [
+        "email is invalid",
+        "age must be a number"
+      ],
+      "form_progress": {
+        "completed": 2,
+        "total": 5
+      },
+      "chat_history": [
+        {
+          "role": "user",
+          "content": "I want to sign up"
+        },
+        {
+          "role": "assistant",
+          "content": "Sure, what is your name?"
+        }
+      ]
+    },
+    "skye_variables": {
+      "history": [
+        {
+          "role": "user",
+          "content": "I want to sign up"
+        },
+        {
+          "role": "assistant",
+          "content": "Sure, what is your name?"
+        }
+      ]
+    }
+  },
+  {
+    "note": "current field without examples, not complete: asks for the current field",
+    "variables": {
+      "input": "ok",
+      "current_field": {
+        "name": "email",
+        "description": "Your email address"
+      }
+    }
+  },
+  {
+    "note": "last field with a type only",
+    "variables": {
+      "input": "x",
+      "form_fields": [
+        {
+          "name": "a",
+          "description": "first"
+        },
+        {
+          "name": "b",
+          "required": false,
+          "description": "second",
+          "type": "string"
+        }
+      ]
+    }
+  },
+  {
+    "note": "last field with options only",
+    "variables": {
+      "input": "x",
+      "form_fields": [
+        {
+          "name": "a",
+          "description": "first"
+        },
+        {
+          "name": "color",
+          "required": true,
+          "description": "pick one",
+          "options": [
+            "red",
+            "green",
+            "blue"
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "note": "last field with validation only",
+    "variables": {
+      "input": "x",
+      "form_fields": [
+        {
+          "name": "zip",
+          "required": true,
+          "description": "postcode",
+          "validation": "5 digits"
+        }
+      ]
+    }
+  },
+  {
+    "note": "form complete: summary of every collected entry (current field ignored)",
+    "variables": {
+      "input": "done",
+      "form_complete": true,
+      "current_field": {
+        "name": "email",
+        "description": "Your email address"
+      },
+      "collected_data": {
+        "name": "Ada",
+        "email": "ada@example.com",
+        "age": 36
+      }
+    }
+  },
+  {
+    "note": "empty lists and maps, form_complete false",
+    "variables": {
+      "input": "x",
+      "form_fields": [],
+      "current_field": {},
+      "collected_data": {},
+      "validation_errors": [],
+      "form_progress": {},
+      "chat_history": [],
+      "form_complete": false
+    },
+    "skye_variables": {
+      "history": []
+    }
+  },
+  {
+    "note": "glued: validation on fields that are not the last one, '- **a**: d / Validation: v- **b**: ...' (intended difference 5)",
+    "variables": {
+      "input": "x",
+      "form_fields": [
+        {
+          "name": "zip",
+          "required": true,
+          "description": "postcode",
+          "validation": "5 digits"
+        },
+        {
+          "name": "phone",
+          "description": "phone number",
+          "validation": "digits only"
+        },
+        {
+          "name": "notes",
+          "description": "anything else"
+        }
+      ]
+    },
+    "glued_lines": true
+  },
+  {
+    "note": "glued: type, options and validation together on fields that are not the last one (intended difference 5)",
+    "variables": {
+      "input": "x",
+      "form_fields": [
+        {
+          "name": "country",
+          "required": true,
+          "description": "where you live",
+          "type": "select",
+          "options": [
+            "IT",
+            "FR"
+          ],
+          "validation": "one of the list"
+        },
+        {
+          "name": "age",
+          "description": "years",
+          "type": "number",
+          "validation": "18 or more"
+        },
+        {
+          "name": "color",
+          "description": "favourite",
+          "options": [
+            "red",
+            "blue"
+          ]
+        },
+        {
+          "name": "notes",
+          "description": "anything else",
+          "type": "text"
+        }
+      ]
+    },
+    "glued_lines": true
+  }
+]

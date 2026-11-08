@@ -83,6 +83,104 @@
         "The class uses the validated dataclass of the library (@validated and Validated from skye.base.validated, with field() where needed)",
         "No import of pydantic, tenacity or yaml appears in the code it writes"
       ]
+    },
+    {
+      "id": 8,
+      "prompt": "Write a Skye router with a route \"cheap\" that always sends a request to the cheapest of three OpenAI models: gpt-4o-mini ($0.15 / $0.60 per million input/output tokens), gpt-4o ($2.50 / $10) and gpt-4.1-mini ($0.40 / $1.60).",
+      "expected_output": "A router.skye with route \"cheap\" using strategy = \"cost_based\" and both cost_per_1k_* prices on every target, that passes skye check.",
+      "files": [],
+      "expectations": [
+        "The route uses strategy = \"cost_based\", not a custom script or tag trick",
+        "Every target sets both cost_per_1k_prompt_tokens and cost_per_1k_completion_tokens",
+        "The prices are converted to per 1000 tokens (for example 0.00015 and 0.0006 for gpt-4o-mini), not left per million",
+        "No priority field and no API key in clear appear in the file (env.NAME or the provider's standard variable)",
+        "The assistant ran skye check and it reported ok"
+      ]
+    },
+    {
+      "id": 9,
+      "prompt": "Convert this Jinja prompt to a Skye prompt block: \"[SYSTEM]\\nCollected so far:\\n{% for key, value in data.items() %}{{ loop.index }}. {{ key }} = {{ value }}\\n{% endfor %}Tools: {% for t in tools %}{{ t.name }}{% if not loop.last %}, {% endif %}{% endfor %}\\n[USER]\\n{{ question }}\"",
+      "expected_output": "A prompt block with message \"system\" and message \"user\" that passes skye check, looping with `each entry in data` and writing the tool names on one line with a filter.",
+      "files": [],
+      "expectations": [
+        "The map loop is `each entry in data` using `entry.key` and `entry.value`, not `each key, value in ...` or `.items()`",
+        "The numbering uses `loop.index` inside the each",
+        "The tool names stay on one line with `{{ tools | map('name') | join(', ') }}` rather than an each (which would write one line per tool)",
+        "The roles are real message blocks, with no [SYSTEM] / [USER] markers and no {% %} tags left",
+        "The assistant ran skye check and it reported ok"
+      ]
+    },
+    {
+      "id": 10,
+      "prompt": "Write a Skye prompt that takes a product catalogue as text and asks the model to return a table of the products with their name, price and whether they are in stock. Save it as products.skye.",
+      "expected_output": "A prompt block with an `output \"table\"` block (name = string, price = number, in_stock = bool) and no table structure written by hand in the message text, passing skye check.",
+      "files": [],
+      "expectations": [
+        "The prompt has an `output \"table\" { name = string, price = number, in_stock = bool }` block (or the same columns with these types)",
+        "No Markdown table header, separator row or format instructions are written by hand in a text of the prompt",
+        "The catalogue is a declared variable used in a message \"user\"",
+        "The assistant ran skye check on the file and it reported ok"
+      ]
+    },
+    {
+      "id": 11,
+      "prompt": "I want a Skye prompt that extracts invoice data as JSON: the vendor, the total, the currency (EUR when missing) and the list of lines, each with a description and an amount. Write the prompt block.",
+      "expected_output": "A prompt block with an `output \"json\"` (or unlabelled `output`) block with currency = string(\"EUR\") and lines = list({ description = string, amount = number }), passing skye check.",
+      "files": [],
+      "expectations": [
+        "The answer shape is an output block, not a JSON schema or example written by hand in the text",
+        "currency has the default as string(\"EUR\") and lines is list({ description = string, amount = number })",
+        "There is at most one output block and it sits in the prompt, not inside a message",
+        "The assistant ran skye check and it reported ok"
+      ]
+    },
+    {
+      "id": 12,
+      "prompt": "Write a Skye prompt that extracts a product from a description and returns JSON with sku, price and vat_rate. The model keeps confusing them, so tell it that sku is the code printed on the label, price is the unit price before VAT in EUR, and vat_rate is a percentage such as 22.",
+      "expected_output": "A prompt block whose `output \"json\"` block gives each field a description as a string after the type (sku = string \"...\", price = number \"...\", vat_rate = number \"...\"), passing skye check.",
+      "files": [],
+      "expectations": [
+        "Each explanation is a string right after the field type in the output block, such as `price = number \"Unit price before VAT, in EUR\"`",
+        "The explanations are not written as `#` comments, as extra `description = ...` fields, or as hand-written schema text in a message",
+        "vat_rate is a number, not a string",
+        "The assistant ran skye check and it reported ok"
+      ]
+    },
+    {
+      "id": 13,
+      "prompt": "I want to call the bundled planner_agent prompt from Python but I don't know which variables it needs or what it returns. Also, in my own prompt file, document that `task` is the goal and `phase` is plan, execute or replan.",
+      "expected_output": "Runs `skye prompt info planner_agent` (or uses `BasePromptBuilder().help` / `describe_prompt`) to list the inputs and output instead of guessing; documents the variables with a trailing string, `task = string \"The goal\"`, `phase = string(\"plan\") \"plan, execute or replan\"`, and the file passes skye check.",
+      "files": [],
+      "expectations": [
+        "The assistant used `skye prompt info planner_agent`, `prompt_help` / `describe_prompt` or `BasePromptBuilder().help` to read the inputs rather than guessing them",
+        "The variable descriptions are strings right after the type inside `variables = { ... }`, not `#` comments and not extra fields",
+        "The assistant ran skye check on the edited file and it reported ok"
+      ]
+    },
+    {
+      "id": 14,
+      "prompt": "In my Skye classification prompt, declare a variable with the list of categories: each category has a name and an optional description. The caller may also omit the whole list.",
+      "expected_output": "A `variables` entry `categories = list({ name = string, description = string(\"\") }, [])` (descriptions after the types allowed), not a bare `list` or `list([])`, passing skye check.",
+      "files": [],
+      "expectations": [
+        "The variable uses the structured field syntax `list({ name = string, description = string(\"\") ... })`, not a bare `list` or `list([])` with the fields only described in a comment",
+        "description is optional through a default (`string(\"\")`), name is required (plain `string`)",
+        "The empty default of the whole list is written after the shape, `list({ ... }, [])`, or the variable is put in allow_missing",
+        "The assistant ran skye check and it reported ok"
+      ]
+    },
+    {
+      "id": 15,
+      "prompt": "Write a Skye prompt that extracts data from a text. The caller may pass a map of output fields in a variable called fields; when they don't, the answer should still be JSON with two string fields, title and summary. Save it as extract.skye.",
+      "expected_output": "A prompt with fields = map({}) and two conditional output blocks, when fields / when not fields, that passes skye check.",
+      "files": [],
+      "expectations": [
+        "fields is declared as an optional map variable (map({}) or with a default)",
+        "There are two output blocks, each inside a top-level when block (when fields and when not fields), and no unconditional output block",
+        "The when fields block holds only schema = fields; title and summary are not written next to schema = fields",
+        "Neither output block is inside a message or an each block",
+        "The assistant ran skye check on the file and it reported ok"
+      ]
     }
   ]
 }

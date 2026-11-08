@@ -14,11 +14,14 @@ This module provides a complete routing solution with support for:
 - External storage backends for serverless environments
 """
 
+import asyncio
+import inspect
 import logging
 import os
 import time
 from collections.abc import Coroutine
-from typing import Any, Optional, TypeVar
+from dataclasses import dataclass, field
+from typing import Any, Optional, TypeVar, cast
 
 from skye.base.completion import CompleteRequest, CompleteResponse
 from skye.base.exceptions import ConfigurationError, ProviderError
@@ -65,6 +68,16 @@ def _run_sync(coro: Coroutine[Any, Any, _T]) -> _T:
         return executor.submit(asyncio.run, coro).result()
 
 
+
+
+@dataclass
+class _Outcome:
+    """What happened while one request walked the targets: the calls, the targets tried and the last error."""
+
+    attempts: int = 0
+    target_attempts: int = 0
+    tried: list[str] = field(default_factory=list)
+    last_error: BaseException | None = None
 
 
 #: The retry policy and the cooldown policy a router starts with (a file or ``to_config`` lists only what differs).
@@ -252,6 +265,10 @@ class ModelRouter(ModelRouterInterface):
         self.allowed_fails_policy: dict[str, int] = dict(DEFAULT_ALLOWED_FAILS_POLICY)
 
         self._round_robin_index: dict[str, int] = {}  # Per-alias round-robin index
+        self._last_serving: dict[str, Any] | None = None
+        # The storage backend is connected lazily, at the first call that uses it (see _ensure_storage).
+        self._storage_connected = False
+        self._storage_connecting: tuple[asyncio.AbstractEventLoop, asyncio.Task[None]] | None = None
 
         # Initialize routing strategy selector
         self._strategy_selector = RoutingStrategySelector(
@@ -283,19 +300,26 @@ class ModelRouter(ModelRouterInterface):
         if allowed_fails_policies:
             self.set_allowed_fails_policy(allowed_fails_policies)
 
-        # Initialize storage backend
-        self._initialize_storage()
+    async def _ensure_storage(self) -> None:
+        """Connect the storage backend once, at the first call that needs it.
 
-    def _initialize_storage(self) -> None:
-        """Initialize storage backend synchronously."""
-        import asyncio
+        Nothing is started in ``__init__``, so a router can be built inside or outside a running loop. Concurrent first
+        calls on one loop share the same connection attempt; a failed attempt is retried by the next call.
+        """
+        if self._storage_connected:
+            return
+        loop = asyncio.get_running_loop()
+        if self._storage_connecting is None or self._storage_connecting[0] is not loop:
+            self._storage_connecting = (loop, loop.create_task(self.storage_backend.connect()))
+        task = self._storage_connecting[1]
         try:
-            loop = asyncio.get_running_loop()
-            # We're in an async context, create a task
-            asyncio.create_task(self.storage_backend.connect())
-        except RuntimeError:
-            # No running loop, use asyncio.run
-            asyncio.run(self.storage_backend.connect())
+            await asyncio.shield(task)
+        except BaseException:
+            if task.done():
+                self._storage_connecting = None
+            raise
+        self._storage_connected = True
+        self._storage_connecting = None
 
     @classmethod
     def from_file(cls, path: str | Any, name: str | None = None, **kwargs: Any) -> "ModelRouter":
@@ -584,7 +608,7 @@ class ModelRouter(ModelRouterInterface):
                 tpm_limit=target.tpm, rpm_limit=target.rpm, model_id=model_id, storage=self.storage_backend
             )
 
-            logger.info(f"Registered target: {model_id} (alias: {route.alias})")
+            logger.info("Router target registered", extra={"model_id": model_id, "alias": route.alias})
 
     def register_model(
         self,
@@ -608,7 +632,7 @@ class ModelRouter(ModelRouterInterface):
         # Create health and rate limit trackers with shared storage backend
         self.health[model_id] = ModelHealth(model_id=model_id, tags=tags or [], storage=self.storage_backend)
         self.rate_limits[model_id] = RateLimitTracker(tpm_limit=tpm, rpm_limit=rpm, model_id=model_id, storage=self.storage_backend)
-        logger.info(f"Registered model: {model_id}")
+        logger.info("Router model registered", extra={"model_id": model_id})
 
     async def select_model(self, request: CompleteRequest) -> str:
         """Select a model based on routing strategy.
@@ -616,6 +640,7 @@ class ModelRouter(ModelRouterInterface):
         If the request specifies an alias, selects from targets for that alias.
         Otherwise, selects from all available models.
         """
+        await self._ensure_storage()
         # Check if request model is an alias
         if request.model and request.model in self.aliases:
             return await self._select_from_alias(request.model, request)
@@ -631,7 +656,9 @@ class ModelRouter(ModelRouterInterface):
             )
 
         await self._strategy_selector.prepare(available_models)
-        return self._strategy_selector.apply_strategy(available_models, None, self.strategy)
+        return self._strategy_selector.apply_strategy(
+            available_models, None, self.strategy, token_estimate=self._token_estimate(request)
+        )
 
     async def _select_from_alias(self, alias: str, request: CompleteRequest) -> str:
         """Select a target from an alias based on the route's strategy."""
@@ -658,7 +685,23 @@ class ModelRouter(ModelRouterInterface):
         # Use route-specific strategy if different from default
         strategy = route.strategy if route.strategy else self.strategy
         await self._strategy_selector.prepare(available_models)
-        return self._strategy_selector.apply_strategy(available_models, alias, strategy)
+        return self._strategy_selector.apply_strategy(
+            available_models, alias, strategy, token_estimate=self._token_estimate(request)
+        )
+
+    @staticmethod
+    def _token_estimate(request: CompleteRequest) -> tuple[float, float] | None:
+        """A rough (prompt, completion) token estimate for ``cost_based``, or ``None`` with nothing to go on.
+
+        The prompt side is about four characters per token over the message texts; the completion side is
+        ``max_tokens`` when the request sets it, else the prompt estimate.
+        """
+        chars = sum(len(getattr(message, "content", "") or "") for message in (request.messages or []))
+        if not chars and not request.max_tokens:
+            return None
+        prompt_tokens = chars / 4
+        completion_tokens = float(request.max_tokens) if request.max_tokens else prompt_tokens
+        return (prompt_tokens, completion_tokens)
 
     def complete(
         self,
@@ -768,38 +811,79 @@ class ModelRouter(ModelRouterInterface):
         return _run_sync(self._aroute_request_internal(request))
 
     async def _aroute_request_internal(self, request: CompleteRequest) -> CompleteResponse:
-        """Route a request asynchronously (internal method)."""
+        """Route a request asynchronously (internal method).
+
+        The selected target is tried first (with the retries its error type allows, see :meth:`_retries_for`), then each
+        entry of the fallback chain in order. On success the serving record is put in ``response.metadata["router"]`` and
+        kept as :attr:`last_serving`. If every target fails, ``ProviderError`` names what was tried and chains the last error.
+        """
+        await self._ensure_storage()
         # A registered model id is used as is; an alias (or no model) is resolved by the routing strategy.
         model_id = request.model if request.model in self.models else await self.select_model(request)
         fallback_chain = self.fallbacks.get(request.model, []) or self.fallbacks.get(model_id, [])
 
+        outcome = _Outcome()
+
         # Try primary model
-        response = await self._try_model(model_id, request)
-        if response:
-            return response
+        response = await self._try_model(model_id, request, outcome)
+        if response is not None:
+            return self._record_serving(request, model_id, response, outcome, fallbacks_tried=[])
 
         # Try fallbacks (each entry is a registered model id or an alias)
+        fallbacks_tried: list[str] = []
         for fallback in fallback_chain:
-            logger.warning(f"Primary model {model_id} failed, trying fallback: {fallback}")
+            logger.warning(
+                "Router target failed, trying the next fallback",
+                extra={"model_id": model_id, "fallback": fallback, "requested": request.model},
+            )
+            fallbacks_tried.append(fallback)
             try:
                 fallback_id = fallback if fallback in self.models else await self._select_from_alias(fallback, request)
-            except (ProviderError, KeyError):
+            except (ProviderError, KeyError) as error:
+                outcome.last_error = error
                 continue
-            response = await self._try_model(fallback_id, request)
-            if response:
-                return response
+            response = await self._try_model(fallback_id, request, outcome)
+            if response is not None:
+                return self._record_serving(request, fallback_id, response, outcome, fallbacks_tried=fallbacks_tried)
 
         raise ProviderError(
             f"All models failed for request (tried: {model_id}, {fallback_chain})",
             provider="router",
-        )
+            requested=request.model,
+            tried=list(outcome.tried),
+            attempts=outcome.attempts,
+            last_error_type=type(outcome.last_error).__name__ if outcome.last_error is not None else None,
+        ) from outcome.last_error
+
+    def _retries_for(self, error: BaseException) -> int:
+        """The number of immediate retries the retry policy allows for this error.
+
+        The error type matches a policy by class name along the MRO, the most specific class first (an error derived from
+        ``RateLimitError`` uses the ``RateLimitError`` policy unless its own class has one). No match means no retry.
+        """
+        for cls in type(error).__mro__:
+            if cls.__name__ in self.retry_policy:
+                return max(0, self.retry_policy[cls.__name__])
+        return 0
+
+    async def _call_model(self, model: ModelInterface, request: CompleteRequest) -> CompleteResponse:
+        """Call the model without blocking the loop: its ``acomplete`` if it has one, else ``complete`` in a worker thread."""
+        acomplete = getattr(model, "acomplete", None)
+        if acomplete is not None and inspect.iscoroutinefunction(acomplete):
+            return cast(CompleteResponse, await acomplete(request))
+        return cast(CompleteResponse, await asyncio.to_thread(model.complete, request))
 
     async def _try_model(
-        self, model_id: str, request: CompleteRequest
+        self, model_id: str, request: CompleteRequest, outcome: "_Outcome | None" = None
     ) -> CompleteResponse | None:
-        """Try to execute request on a specific model."""
+        """Try a request on one target, retrying it as the retry policy allows; ``None`` when the target did not answer.
+
+        The retries are immediate (``retry_after`` and ``exponential_backoff`` are not applied). Retrying stops early when
+        the target is put in cooldown. Every attempt and the last error are added to ``outcome``.
+        """
+        outcome = outcome if outcome is not None else _Outcome()
         if model_id not in self.models:
-            logger.error(f"Model {model_id} not registered")
+            logger.error("Router target is not registered", extra={"model_id": model_id})
             return None
 
         health = self.health[model_id]
@@ -807,61 +891,129 @@ class ModelRouter(ModelRouterInterface):
 
         # Check cooldown
         if await health.is_in_cooldown():
-            logger.warning(f"Model {model_id} is in cooldown")
+            logger.warning("Router target is in cooldown", extra={"model_id": model_id})
             return None
 
         # Check rate limits (pre-call check)
         if self.pre_call_checks_enabled:
             if not await rate_limit.can_accept_request(estimated_tokens=1000):
-                logger.warning(f"Model {model_id} rate limit exceeded")
+                logger.warning("Router target is over its rate limit", extra={"model_id": model_id})
                 return None
 
-        # Increment active requests
-        await rate_limit.increment_active_requests()
+        outcome.tried.append(model_id)
+        outcome.target_attempts = 0
+        model = self.models[model_id]
+        retries_left: int | None = None  # set from the policy at the first failure
+        while True:
+            outcome.attempts += 1
+            outcome.target_attempts += 1
+            await rate_limit.increment_active_requests()
+            try:
+                start_time = time.time()
+                response = await self._call_model(model, request)
+                latency_ms = (time.time() - start_time) * 1000
 
-        try:
-            start_time = time.time()
-            model = self.models[model_id]
-            response = model.complete(request)
-            latency_ms = (time.time() - start_time) * 1000
+                await health.record_success(latency_ms)
+                tokens_used = response.usage.total_tokens if response.usage else 0
+                await rate_limit.record_request(tokens_used)
+                return response
 
-            # Record success
-            await health.record_success(latency_ms)
-            tokens_used = response.usage.total_tokens if response.usage else 0
-            await rate_limit.record_request(tokens_used)
+            except Exception as error:
+                outcome.last_error = error
+                error_type = type(error).__name__
+                await health.record_failure(error_type)
 
-            return response
+                in_cooldown = await self._should_cooldown(model_id, error_type)
+                if in_cooldown:
+                    await health.set_cooldown(self.cooldown_seconds)
+                    logger.warning(
+                        "Router target put in cooldown",
+                        extra={"model_id": model_id, "error_type": error_type, "cooldown_seconds": self.cooldown_seconds},
+                    )
 
-        except Exception as e:
-            # Record failure
-            error_type = type(e).__name__
-            await health.record_failure(error_type)
-
-            # Check if should cooldown
-            if await self._should_cooldown(model_id, error_type):
-                await health.set_cooldown(self.cooldown_seconds)
-                logger.warning(
-                    f"Model {model_id} put in cooldown for {self.cooldown_seconds}s "
-                    f"due to {error_type}"
+                if retries_left is None:
+                    retries_left = self._retries_for(error)
+                logger.error(
+                    "Router target failed",
+                    extra={
+                        "model_id": model_id,
+                        "error_type": error_type,
+                        "attempt": outcome.target_attempts,
+                        "retries_left": retries_left,
+                    },
                 )
+                if in_cooldown or retries_left <= 0:
+                    return None
+                retries_left -= 1
 
-            logger.error(f"Model {model_id} failed: {e}")
+            finally:
+                await rate_limit.decrement_active_requests()
+
+    def _record_serving(
+        self,
+        request: CompleteRequest,
+        model_id: str,
+        response: CompleteResponse,
+        outcome: "_Outcome",
+        fallbacks_tried: list[str],
+    ) -> CompleteResponse:
+        """Put the serving record in ``response.metadata["router"]`` and keep it as :attr:`last_serving`.
+
+        The record names the configuration that served the request and never holds a key or another secret.
+        """
+        target = self.model_targets.get(model_id)
+        alias: str | None = None
+        target_index: int | None = None
+        if target is not None:
+            alias = model_id.split(":", 1)[0]
+            route = self.aliases.get(alias)
+            if route is not None:
+                target_index = next((i for i, item in enumerate(route.targets) if item is target), None)
+        record: dict[str, Any] = {
+            "requested": request.model or None,
+            "alias": alias,
+            "model_id": model_id,
+            "provider": target.provider if target is not None else response.provider,
+            "model": target.model if target is not None else response.model,
+            "target_index": target_index,
+            "attempts": outcome.target_attempts,
+            "total_attempts": outcome.attempts,
+            "tried": outcome.tried[:-1],  # the serving target is the last one tried
+            "fallbacks_tried": list(fallbacks_tried),
+            "fallback": bool(fallbacks_tried),
+        }
+        metadata = dict(response.metadata or {})
+        metadata["router"] = record
+        response.metadata = metadata
+        self._last_serving = record
+        logger.debug("Router request served", extra={"router": record})
+        return response
+
+    @property
+    def last_serving(self) -> dict[str, Any] | None:
+        """The serving record of the last request this router answered (a copy), or ``None`` before the first one.
+
+        The same record is in ``response.metadata["router"]``: ``requested`` (the model or alias asked for), ``alias`` (the
+        route of the serving target, ``None`` for a model registered directly), ``model_id``, ``provider``, ``model``,
+        ``target_index`` (the position of the target in its route), ``attempts`` (calls to the serving target),
+        ``total_attempts`` (calls across the chain), ``tried`` (targets that failed first), ``fallbacks_tried`` and
+        ``fallback``. It holds no key or other secret. It is process state, for observability only.
+        """
+        if self._last_serving is None:
             return None
-
-        finally:
-            await rate_limit.decrement_active_requests()
+        record = dict(self._last_serving)
+        record["tried"] = list(record["tried"])
+        record["fallbacks_tried"] = list(record["fallbacks_tried"])
+        return record
 
     async def _should_cooldown(self, model_id: str, error_type: str) -> bool:
-        """Determine if model should be put in cooldown."""
+        """Whether the failures of this error type in the last minute reached the allowed-fails policy for it."""
         if error_type not in self.allowed_fails_policy:
             return False
 
-        health = self.health[model_id]
-        health_metrics = await health.get_health_metrics()
         allowed_fails = self.allowed_fails_policy[error_type]
-        recent_fails = health_metrics.get('failure_reasons', {}).get(error_type, 0)
-
-        return bool(recent_fails >= allowed_fails)
+        recent_fails = await self.health[model_id].recent_failure_count(error_type)
+        return recent_fails >= allowed_fails
 
     async def _is_model_available(self, model_id: str, request: CompleteRequest) -> bool:
         """Check if a model is available for routing."""
@@ -931,7 +1083,7 @@ class ModelRouter(ModelRouterInterface):
             except RuntimeError:
                 # No running loop, use asyncio.run
                 asyncio.run(self.health[model_id].set_cooldown(self.cooldown_seconds))
-            logger.warning(f"Model {model_id} manually marked as failed")
+            logger.warning("Router model marked as failed", extra={"model_id": model_id})
 
     async def aget_model_health(self, model_id: str) -> ModelHealthMetrics:
         """Get health status of a model asynchronously.
@@ -945,6 +1097,7 @@ class ModelRouter(ModelRouterInterface):
         if model_id not in self.health:
             return ModelHealthMetrics(model_id=model_id)
 
+        await self._ensure_storage()
         health = self.health[model_id]
         rate_limit = self.rate_limits[model_id]
         
@@ -990,7 +1143,7 @@ class ModelRouter(ModelRouterInterface):
     def set_routing_strategy(self, strategy: RoutingStrategy) -> None:
         """Set the routing strategy."""
         self.strategy = strategy
-        logger.info(f"Routing strategy set to: {strategy.value}")
+        logger.info("Router strategy set", extra={"strategy": strategy.value})
 
     def set_fallbacks(self, fallbacks: list[FallbackConfig]) -> None:
         """Set fallback model chains.
@@ -1008,7 +1161,7 @@ class ModelRouter(ModelRouterInterface):
         """
         for config in fallbacks:
             self.fallbacks[config.primary] = config.fallbacks
-            logger.info(f"Set fallbacks for {config.primary}: {config.fallbacks}")
+            logger.info("Router fallbacks set", extra={"primary": config.primary, "fallbacks": list(config.fallbacks)})
 
     def set_retry_policy(self, retry_policies: list[RetryPolicyConfig]) -> None:
         """Set retry policy per error type.
@@ -1024,7 +1177,7 @@ class ModelRouter(ModelRouterInterface):
         """
         for policy in retry_policies:
             self.retry_policy[policy.error_type] = policy.max_retries
-        logger.info(f"Updated retry policy: {self.retry_policy}")
+        logger.info("Router retry policy updated", extra={"retry_policy": dict(self.retry_policy)})
 
     def set_allowed_fails_policy(self, allowed_fails_policies: list[AllowedFailsPolicyConfig]) -> None:
         """Set allowed fails before cooldown per error type.
@@ -1042,17 +1195,17 @@ class ModelRouter(ModelRouterInterface):
         """
         for policy in allowed_fails_policies:
             self.allowed_fails_policy[policy.error_type] = policy.allowed_fails_per_minute
-        logger.info(f"Updated allowed fails policy: {self.allowed_fails_policy}")
+        logger.info("Router allowed-fails policy updated", extra={"allowed_fails_policy": dict(self.allowed_fails_policy)})
 
     def set_cooldown_time(self, cooldown_seconds: float) -> None:
         """Set cooldown duration for failed models."""
         self.cooldown_seconds = cooldown_seconds
-        logger.info(f"Cooldown time set to: {cooldown_seconds}s")
+        logger.info("Router cooldown set", extra={"cooldown_seconds": cooldown_seconds})
 
     def enable_pre_call_checks(self, enabled: bool = True) -> None:
         """Enable/disable pre-call rate limit checks."""
         self.pre_call_checks_enabled = enabled
-        logger.info(f"Pre-call checks {'enabled' if enabled else 'disabled'}")
+        logger.info("Router pre-call checks set", extra={"enabled": enabled})
 
     def set_rate_limits(
         self, model_id: str, tpm: int | None = None, rpm: int | None = None
@@ -1064,13 +1217,14 @@ class ModelRouter(ModelRouterInterface):
         tracker = self.rate_limits[model_id]
         tracker.tpm_limit = tpm
         tracker.rpm_limit = rpm
-        logger.info(f"Set rate limits for {model_id}: TPM={tpm}, RPM={rpm}")
+        logger.info("Router rate limits set", extra={"model_id": model_id, "tpm": tpm, "rpm": rpm})
 
     async def aget_usage_stats(self, model_id: str) -> UsageStats:
         """Get current usage statistics for a model (async; state lives in the storage backend)."""
         if model_id not in self.rate_limits:
             return UsageStats(model_id=model_id)
 
+        await self._ensure_storage()
         usage = await self.rate_limits[model_id].get_current_usage()
         health = self.health.get(model_id)
         metrics = await health.get_health_metrics() if health else {}
@@ -1103,6 +1257,7 @@ class ModelRouter(ModelRouterInterface):
 
     async def aget_cooldown_models(self) -> list[CooldownInfo]:
         """Get the models currently in cooldown (async)."""
+        await self._ensure_storage()
         cooled_down = []
         for model_id, health in self.health.items():
             metrics = await health.get_health_metrics()
@@ -1136,7 +1291,7 @@ class ModelRouter(ModelRouterInterface):
         """Set tags for a model deployment."""
         if model_id in self.health:
             self.health[model_id].tags = tags
-            logger.info(f"Set tags for {model_id}: {tags}")
+            logger.info("Router model tags set", extra={"model_id": model_id, "tags": list(tags)})
 
     def _route_with_tags_internal(
         self, request: CompleteRequest, required_tags: list[str]

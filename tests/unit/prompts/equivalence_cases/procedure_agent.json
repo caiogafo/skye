@@ -1,0 +1,111 @@
+[
+  {
+    "note": "default system text, two procedures, no examples / memories / history",
+    "variables": {
+      "procedures": [
+        {
+          "name": "open_ticket",
+          "description": "Open a support ticket"
+        },
+        {
+          "name": "reset_password",
+          "description": "Reset the user's password"
+        }
+      ],
+      "input": "I forgot my password"
+    },
+    "skye_variables": {
+      "procedural_memory": [
+        {
+          "name": "open_ticket",
+          "content": "Open a support ticket"
+        },
+        {
+          "name": "reset_password",
+          "content": "Reset the user's password"
+        }
+      ]
+    }
+  },
+  {
+    "note": "custom system prompt, examples, procedural memories, conversation history (as a variable, read by each ... message turn.role)",
+    "variables": {
+      "system_prompt": "You route requests to procedures.",
+      "procedures": [
+        {
+          "name": "refund",
+          "description": "Refund an order"
+        }
+      ],
+      "examples": [
+        {
+          "question": "Give me my money back",
+          "action": "refund",
+          "action_input": "order 42"
+        },
+        {
+          "question": "Hello",
+          "action": "no_action",
+          "action_input": "none"
+        }
+      ],
+      "procedural_memories": [
+        {
+          "content": "Refunds need an order number"
+        },
+        {
+          "content": "Always confirm first"
+        }
+      ],
+      "chat_history": [
+        {
+          "role": "user",
+          "content": "Hi, I have a problem with an order."
+        },
+        {
+          "role": "assistant",
+          "content": "Sure, which order?"
+        }
+      ],
+      "input": "Order 42, please refund it"
+    },
+    "skye_variables": {
+      "history": [
+        {
+          "role": "user",
+          "content": "Hi, I have a problem with an order."
+        },
+        {
+          "role": "assistant",
+          "content": "Sure, which order?"
+        }
+      ],
+      "procedural_memory": [
+        {
+          "name": "refund",
+          "content": "Refund an order"
+        },
+        {
+          "content": "Refunds need an order number"
+        },
+        {
+          "content": "Always confirm first"
+        }
+      ]
+    }
+  },
+  {
+    "note": "no procedures, empty lists",
+    "variables": {
+      "procedures": [],
+      "examples": [],
+      "procedural_memories": [],
+      "chat_history": [],
+      "input": "Anything?"
+    },
+    "skye_variables": {
+      "history": [],
+      "procedural_memory": []
+    }
+  }
+]

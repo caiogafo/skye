@@ -38,12 +38,57 @@ TYPE        = "string" | "number" | "bool" | "list" | "map" ;
 duration    = STRING matching digits ("s" | "m" | "h" | "d") ;   (* "30s", "5m", "24h" *)
 reference   = name ;
 name        = IDENT { "." IDENT } ;
-comment     = "#" { any character but newline } ;
+comment     = "#" { any character but newline }
+            | "/*" { any character } "*/" ;             (* may span lines; does not nest *)
 ```
 
 Items of a body are separated by a new line or by a comma. Inside `[ ]`, `{ }` of a value and `( )` a new line is just a space. A string
 escapes `\n`, `\t`, `\r`, `\"` and `\\`; the text of a `"""` string loses its first new line and its common indentation.
 Lines and columns count from 1 in every message.
+
+### Comments
+
+The language drops every comment; the convention says which kind to write:
+
+- `/** ... **/` documents: what a section is for, and the usage example at the end of a prompt file. It may span lines; a long
+  explanation is one `/** **/` block, not a run of `#` lines (more than two `#` lines in a row should be a block).
+- `#` is a short note on one line, alone or after an item (`route "fast" = [...]   # cheap first answer`).
+- A plain `/* ... */` is only for disabling code for a while; it does not belong in a shared file (bundled prompts, examples).
+
+A bundled or example prompt file ends with a usage-example doc comment, after the prompt's closing brace. The dictionary inside it is
+made of Python literals only (strings, numbers, booleans, `None`, lists, dicts), so a test reads it with `ast.literal_eval` and renders
+it:
+
+```skye
+/**
+ * Example:
+ *
+ *   builder.render("greeting", {
+ *       "name": "Alice",
+ *       "product": "Skye",
+ *   })
+ **/
+```
+
+### Front matter
+
+A file may start with metadata between two `---` lines. It is TOML (`key = value`, the same form as an attribute), not YAML (D62): a
+`key: value` line is an error with the fix. The keys are free; the bundled files use `title`, `description`, `version` and `tags`.
+`build(text).metadata` holds it as a dict, `to_text(document)` writes it back, and the line numbers of the rest of the file do not change.
+The prompt loader takes the template version from `version`.
+
+```skye
+---
+title       = "Support router"
+description = "Routes support questions to a fast and a strong model"
+version     = "1.2"
+tags        = ["support"]
+---
+/** The routes; the first target of each list is the primary. **/
+router "support" {
+  route "fast" = ["openai/gpt-4o-mini"]   # cheap first answer
+}
+```
 
 ## Block kinds
 
@@ -91,7 +136,9 @@ router "main" {
 In the shorthand `route "x" = ["provider/model", ...]` the first entry is the primary target and the others are its fallbacks, in order; an
 entry may be a map `{ model = "provider/model", api_key = env.X, rpm = 60 }`. Strategies: `simple_shuffle`, `round_robin`, `least_busy`,
 `rate_limit_aware`, `latency_based`, `cost_based`, `weighted`, `priority_based`. Targets of one route are alternatives picked by the strategy;
-`fallback` names other routes.
+`fallback` names other routes. `cost_based` reads the target fields `cost_per_1k_prompt_tokens` and `cost_per_1k_completion_tokens` (numbers,
+0 or more): it picks the available target with the lowest sum of the two (a price left out counts as 0); a target with neither comes last and
+ties keep the written order.
 
 ### flow
 
@@ -148,6 +195,130 @@ prompt "summarize" {
 Roles are `system`, `user` and `assistant` (or a loop value such as `message turn.role { ... }`). Inside a prompt the variables are written bare, as in a
 template; `text` may appear several times in a message and the parts are joined in order. `{{ name }}` and `{{ name | filter }}` interpolate;
 the names must be declared in `variables` (or be a loop variable). `{% %}` tags are not used: write a `when` or an `each`.
+Inside an `each`, `loop.index` (from 1), `loop.index0`, `loop.first`, `loop.last` and `loop.length` are defined. An `each` over a map loops
+over its entries, each with `key` and `value`: `each entry in data { text = "{{ entry.key }}: {{ entry.value }}" }`. To put a list on one
+line, use the filters: `{{ tools | map('name') | join(', ') }}`. To put data into the text as JSON, XML or a Markdown table, use the
+filters `tojson`, `toxml("root")` and `totable` (or `totable(["name", "price"])` for chosen columns).
+A variable may carry a description, a string right after its type (`task = string "What the agent must achieve"`, `phase =
+string("plan") "plan, execute or replan"`, one per line or in the comma form): `skye prompt info` and `describe_prompt` show it, and it is
+not sent to the model. Only a prompt's `variables` and an `output` block take this trailing string.
+
+A variable may also have a **shape**, written with the field syntax of the `output` block below:
+
+```skye
+prompt "classify" {
+  variables = {
+    categories = list({ name = string "Category name", description = string("") "What it means" }) "Categories to choose from"
+    examples   = list({ text = string, category = string, reasoning = string("") }, [])           "Worked examples"
+    owner      = map({ team = string, email = string("") })                                        "Who owns it"
+    tags       = list(string)                                                                       "Free labels"
+  }
+
+  message "user" {
+    text = "Pick one of: {{ categories | map('name') | join(', ') }}. Owner: {{ owner.team }}."
+    each example in examples { text = "{{ example.text }} -> {{ example.category }}" }
+    when tags { text = "Labels: {{ tags | join(', ') }}" }
+  }
+}
+```
+
+The forms are `list(type)` or `[type]`, `list({ fields })` or `[{ fields }]`, `map({ fields })` or `{ fields }`, nested to any depth;
+a field is `name = type`, with a default (`string("")`) when it is optional and a trailing description. A structured variable is
+required; its default goes after the shape (`list({ ... }, [])`, `map({ ... }, { ... })`) and must match it. The older forms keep
+their meaning: `list([])`, `map({})` and `map({ k = 1 })` are a plain list or map with a default, with no shape. At render time
+`render_prompt` checks the value given against the shape and raises one `ValidationError` that lists every mistake by path
+(`categories[1].name: missing`, `examples[0].text: expected string, got int`); `number` takes an int or a float, `bool` only a bool; a
+missing optional field gets its default in a copy (the caller's data is never changed); keys the shape does not declare are kept.
+
+#### The output block: the shape of the answer
+
+An `output` block says what the model must answer and in which format; the renderer writes the instructions, so the structure is
+never written by hand in the text (D70).
+
+```skye
+prompt "extract_invoice" {
+  variables = { document = string }
+  output "json" {
+    vendor   = string          "Seller name as printed on the invoice"
+    total    = number          "Total amount including VAT"
+    currency = string("EUR")   "ISO 4217 currency code"
+    lines    = list({
+      description = string    "Text of the line"
+      amount      = number    "Amount of the line"
+    })                         "One entry per invoice line"
+    meta     = map({ source = string })
+  }
+  message "user" { text = "Extract the invoice fields from the document.\n{{ document }}" }
+}
+
+prompt "products" {
+  variables = { text = string }
+  output "table" { name = string "Product name", price = number, in_stock = bool }
+  message "user" { text = "List the products in: {{ text }}" }
+}
+
+prompt "extract" {
+  variables = { document = string, fields = map, style = string("xml") }
+  output style { schema = fields }
+  message "user" { text = "{{ document }}" }
+}
+```
+
+- The label is the format: `"json"`, `"table"` or `"xml"`; `output { ... }` with no label is `"json"`. Any other string is an error that
+  lists the three. A prompt has at most one unconditional `output` block, at the top of the prompt (not inside a message), or any
+  number of conditional ones (next item), never both.
+- Conditional outputs: an `output` block may sit inside a `when` block at the top of the prompt (or a `when` nested in one; never inside a
+  `message` or an `each`, an error), so a variable chooses the shape of the answer:
+
+  ```
+  when schema     { output format { schema = schema } }
+  when not schema { output format { name = string "What the extracted item is", value = string "Its value, as written in the input" } }
+  ```
+
+  At render time the active output is the one whose conditions (its `when` and the ones around it) hold, a missing variable taking its
+  default; none active means no instructions (free text), and more than one active raises `ValidationError` naming their conditions, so
+  write conditions that exclude each other. A prompt with an unconditional `output` and a conditional one is an error naming both lines.
+  Every check of the block applies to each conditional one. `skye.prompts.active_output(spec, variables)` returns the active `OutputSpec`
+  (or `None`); in the model each one is a `PromptPartSpec(kind="output", output=OutputSpec)` among the parts of its `when`
+  (`PromptSpec.output_variants()` lists them with their conditions), while `PromptSpec.output` keeps the unconditional block. `skye prompt
+  info` shows each one under its condition (`Output (when not schema): json`).
+- The label may also be a declared `string` variable (`output style { ... }`, no quotes): the format is its value at render time (or its
+  default). An undeclared name is an error with "Did you mean ...?", a variable of another type is an error, and so is a default that is
+  not `json`, `table` or `xml`; at render time a value that is not one of the three raises `ValidationError` listing them, and with
+  `"table"` a list or map field raises `ValidationError` naming it (checked then, since the format is not known before).
+- A field is `name = string | number | bool | list | map`, a scalar with a default (`currency = string("EUR")`: a field with a default is
+  not required), a list of a type (`list(string)` or `[string]`), a list of objects (`list({ a = string })`), or an object
+  (`map({ a = string })` or `{ a = string }`). A bare `list` or `map` takes any items or keys. An unknown type is an error with
+  "Did you mean ...?".
+- A string right after the type is the field's description, for the model: `total = number "Total amount including VAT"`. It works at
+  every level (inside `list({ ... })` and `{ ... }`, after the closing `)` or `}` for the whole list or map) and in the comma form
+  (`{ a = string "x", b = number }`). Only an `output` block and the `variables` of a prompt read it: elsewhere a value followed by a
+  string is still an error. An empty
+  description is an error, and `schema = VAR` takes none (describe the fields in the variable).
+- `table`: one row per item, and every column is a `string`, `number` or `bool`; a list or map field is an error that names it.
+- `schema = VAR` (the word `schema` is reserved here, and it is the only entry of its block: another field next to it is an error; for
+  default fields when the variable is empty, use a conditional output as above) takes the fields at render time from the declared `map`
+  variable `VAR`, whose value maps each field name to `"string" | "number" | "bool" | "list" | "map"`, `[type]` or `[{...}]` (a list),
+  a nested map (an object), or a described field `{"type": "number", "description": "..."}`, for example
+  `{"name": "string", "tags": ["string"], "vendor": {"city": "string"}, "total": {"type": "number", "description": "With VAT"}}`.
+  A map with a `"type"` key and no other key than `type`, `description`, `items` and `properties` is a described field: `items` gives
+  the item type of a `"list"` (`{"type": "list", "items": {"a": "string"}, "description": "..."}`) and `properties` the fields of a
+  `"map"`; an object with a field named `type` is written `{"type": "map", "properties": {"type": "string"}}`. List items take no
+  description of their own (describe the list).
+- `render_prompt` appends the instructions as the last text of the last user message (a new user message if there is none);
+  `skye.prompts.output_instructions(spec, variables)` returns them alone. `json` gives "Answer with a single JSON object and nothing
+  else.", the JSON Schema (`required` = the fields without a default; a description becomes the `"description"` of the property, nested
+  ones too) and a one-line example; `table` gives the header row, the separator row and the type of each column
+  (`- total: number — Total amount including VAT`); `xml` gives a skeleton whose root element is the prompt name in snake_case, a list
+  as repeated `<item>` elements and the type of each leaf as text (`<total>number — Total amount including VAT</total>`; a list or map
+  with a description gets an XML comment after its opening tag: `<lines> <!-- One entry per invoice line -->`).
+- A hand-written format text in a message keeps working; so does `BasePromptBuilder.set_output_schema(name, schema, output_format="json")`
+  with a dataclass (a field's `metadata={"description": ...}` is its description) or a JSON-schema dictionary (its `description`s are
+  kept), where `output_format` may also be `"table"` or `"xml"`.
+- The bundled prompts `structured_output_json`, `structured_output_table` and `structured_output_xml` fix the format;
+  `structured_output` takes it from its `format` variable (`"json"` by default, `"table"` or `"xml"`) with the same `schema`. In all
+  four `schema` is optional (`map({})`): `when schema` takes the fields from it, `when not schema` asks for two string fields, `name`
+  and `value`.
 
 ## References and prefixes
 
@@ -226,7 +397,7 @@ parses. In Python, `skye.base.dsl.check_text(text, filename, registry_names)` re
 |---|---|---|
 | Blocks | `router`, `flow`, `prompt` | `include "other.skye"` |
 | Flows | sequence, `choice`, `parallel`, bounded loops, `retry`, `timeout`, `on_error`, `foreach`, `set`, `emit` | `wait`, `on_event` (waiting for events with persistence and resume), `to_mermaid()` |
-| Prompts | `variables`, `message`, `placeholder`, `text`, `when`, `each`, `allow_missing` | `examples`, multimodal `content`, `output` schema, `from`/`bind`, `parts`, type `image` |
+| Prompts | `variables`, `message`, `placeholder`, `text`, `when`, `each`, `allow_missing`, `output` (D70) | `examples`, multimodal `content`, `from`/`bind`, `parts`, type `image` |
 
 A version 2 word in a version 1 file is rejected with "is not available in this version".
 
@@ -242,8 +413,8 @@ skye new prompt my_prompt --template chat               # basic, chat
 skye new --list
 ```
 
-`skye new` refuses to overwrite a file unless you pass `--force`. The text it prints passes `skye check`; the lines to edit are marked
-`# CHANGE ME`. `.gitattributes` maps `*.skye` to HCL so that GitHub highlights the files.
+`skye new` refuses to overwrite a file unless you pass `--force`. The text it prints passes `skye check`; it starts with front matter
+(`title` is the block name, `version = "0.1.0"`) and the lines to edit, the `description` among them, are marked `CHANGE ME`. `.gitattributes` maps `*.skye` to HCL so that GitHub highlights the files.
 
 ### The Claude skill
 
@@ -270,8 +441,12 @@ test fails when one names something that does not exist or shows an example that
 ## Writing `.skye` from objects
 
 The opposite of `build` is `to_text`: it writes a router, flow or prompt model (or a whole document) back as `.skye` text that passes
-`skye check` and builds an equal model again; defaults are left out and comments are not kept (so there is no `skye fmt`, which would delete
-them). A router built in Python or by an older program can be moved to a file:
+`skye check` and builds an equal model again; defaults are left out and comments are not kept. To tidy a file you wrote, use `skye fmt`
+instead: it works on the text, so comments, `"""` strings and the front matter stay (two spaces per open bracket, no trailing spaces, at most
+one blank line in a row, exactly one after the front matter), and it refuses to write a result that would build differently. `skye fmt
+--check` lists the files that are not formatted (exit 1), for CI. With no path it formats every `.skye` file under the current folder (a folder argument is searched the same way; hidden
+folders, `node_modules`, `venv`, `build` and `dist` are skipped); `--exclude GLOB` and a `.skyeignore` file (one glob per line, relative to the
+folder searched) leave paths out. A router built in Python or by an older program can be moved to a file:
 
 ```python
 router = ModelRouter({"fast": ["openai/gpt-4o-mini", "anthropic/claude-haiku"]})

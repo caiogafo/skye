@@ -4,12 +4,13 @@ This module defines the abstract interface for prompt template management
 and rendering. It enables reusable, parameterized prompts with version control.
 
 Inspired by:
-- **Promptify's Prompter**: Jinja2 templates, variable validation, default values, few-shot examples
+- **Promptify's Prompter**: templates, variable validation, default values, few-shot examples
 - **LangChain's BasePromptTemplate**: Partial variables, input/output parsers,
   invoke pattern, multimodal support
 
 Comprehensive Features:
-- **Jinja2 Template Engine**: Full Jinja2 support with filters, macros, and inheritance
+- **Template Engine**: a standard-library engine (``{{ }}``, ``if``, ``for``, filters); no macros,
+  inheritance or include (D20)
 - **Few-Shot Learning**: Dynamic example selection and formatting
 - **Multimodal Support**: Text, images, audio, video content in prompts
 - **Template Management**: Versioning, loading from files/strings, composition
@@ -33,7 +34,7 @@ Concurrency: registries are mutated by ``register`` calls: register at start-up,
 """
 
 from abc import ABC, abstractmethod
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from typing import Any
 
 from skye.base.messages import SkyeMessage
@@ -183,9 +184,10 @@ class PromptRenderingInterface(ABC):
 
         Args:
             template_name: Name of the template.
-            selector_type: Type of selector ("semantic", "random", "fixed", "length_based").
+            selector_type: Type of selector ("fixed", "random", "semantic").
             max_examples: Maximum number of examples to select.
-            **selector_kwargs: Additional arguments for the selector (e.g., vectorstore config).
+            **selector_kwargs: Additional arguments for the selector (e.g., the ``embedder``
+                callable ``(str) -> list[float]`` of the semantic selector).
 
         Example:
             >>> builder = MyPromptBuilder()
@@ -193,7 +195,7 @@ class PromptRenderingInterface(ABC):
             ...     "ner",
             ...     selector_type="semantic",
             ...     max_examples=3,
-            ...     vectorstore="chroma"
+            ...     embedder=my_embedder
             ... )
         """
         pass
@@ -245,10 +247,10 @@ class PromptRenderingInterface(ABC):
 
     @abstractmethod
     def register_jinja_filter(self, filter_name: str, filter_func: Callable[[Any], Any]) -> None:
-        """Register a custom Jinja2 filter.
+        """Register a custom filter for the stdlib template engine.
 
-        Allows extending Jinja2 templates with custom filters for
-        text processing, formatting, etc.
+        Allows extending templates (``{{ value | name }}``) with custom filters for
+        text processing, formatting, etc. Macros are not supported (D20).
 
         Args:
             filter_name: Name of the filter to use in templates.
@@ -258,23 +260,6 @@ class PromptRenderingInterface(ABC):
             >>> builder = MyPromptBuilder()
             >>> builder.register_jinja_filter("uppercase", lambda x: x.upper())
             >>> # In template: "{{ name | uppercase }}"
-        """
-        pass
-
-    @abstractmethod
-    def register_jinja_macro(self, macro_name: str, macro_template: str) -> None:
-        """Register a Jinja2 macro for reusable template components.
-
-        Args:
-            macro_name: Name of the macro.
-            macro_template: Jinja2 macro definition.
-
-        Example:
-            >>> builder = MyPromptBuilder()
-            >>> builder.register_jinja_macro(
-            ...     "format_entity",
-            ...     "{% macro format_entity(name, type) %}{{ name }} ({{ type }}){% endmacro %}"
-            ... )
         """
         pass
 
@@ -478,7 +463,9 @@ class PromptSchemaInterface(ABC):
     """Schema role of a prompt builder: output schema, metadata and validation of a template."""
 
     @abstractmethod
-    def set_output_schema(self, template_name: str, schema: dict[str, Any] | type) -> None:
+    def set_output_schema(
+        self, template_name: str, schema: dict[str, Any] | type, output_format: str = "json"
+    ) -> None:
         """Set expected output schema for structured outputs.
 
         Enables validation and parsing of LLM responses into structured formats.
@@ -486,6 +473,8 @@ class PromptSchemaInterface(ABC):
         Args:
             template_name: Name of the template.
             schema: JSON schema dict or a dataclass.
+            output_format: The format the model answers in: ``"json"`` (the default), ``"table"``
+                (a Markdown table; every field must be a string, number or bool) or ``"xml"``.
 
         Example:
             >>> from dataclasses import dataclass
@@ -499,14 +488,18 @@ class PromptSchemaInterface(ABC):
         pass
 
     @abstractmethod
-    def get_output_instructions(self, template_name: str) -> str:
+    def get_output_instructions(
+        self, template_name: str, variables: Mapping[str, Any] | None = None
+    ) -> str:
         """Get formatted output instructions based on schema.
 
         Generates instructions for the LLM on how to format its output
-        based on the configured output schema.
+        based on the configured output schema, or on the ``output`` block of a ``.skye`` prompt.
 
         Args:
             template_name: Name of the template.
+            variables: The variables of a render; read only by a ``.skye`` ``output`` block whose
+                fields come from a variable (``schema = VAR``).
 
         Returns:
             Formatted output instructions string.
@@ -568,11 +561,13 @@ class PromptSchemaInterface(ABC):
         pass
 
 
-class PromptBuilderInterface(PromptRenderingInterface, PromptRegistryInterface, PromptSchemaInterface):
+class PromptBuilderInterface(
+    PromptRenderingInterface, PromptRegistryInterface, PromptSchemaInterface
+):
     """Abstract interface for prompt template management.
 
     This interface defines the contract for managing and rendering prompt templates.
-    Implementations should support Jinja2-style templates with variable injection,
+    Implementations should support ``{{ }}`` templates (a stdlib engine) with variable injection,
     validation, and default values. Inspired by Promptify's Prompter design.
 
     Key Features:
@@ -584,7 +579,7 @@ class PromptBuilderInterface(PromptRenderingInterface, PromptRegistryInterface, 
     - Template versioning
 
     Example:
-        >>> class Jinja2PromptBuilder(PromptBuilderInterface):
+        >>> class DictPromptBuilder(PromptBuilderInterface):
         ...     def __init__(self):
         ...         self.templates = {}
         ...         self.allowed_missing = ["examples", "description", "output_format"]

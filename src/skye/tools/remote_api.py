@@ -255,7 +255,7 @@ class RemoteAPICapability(CapabilityInterface):
         )
 
     async def _make_request_async(self, params: dict[str, Any]) -> HttpResponse:
-        """Make an HTTP request without blocking the event loop (runs the sync transport in a thread)."""
+        """Make an HTTP request without blocking the event loop (sync transport in a thread)."""
         return await asyncio.to_thread(self._make_request, params)
 
     @staticmethod

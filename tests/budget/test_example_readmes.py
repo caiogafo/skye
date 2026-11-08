@@ -1,7 +1,7 @@
 """A README matches its folder (Requirement 24.8 of steering, task 5.6 of the uxui spec).
 
 Each example folder has a README that names exactly the ``*.py`` files of the folder (and no file that is missing), and
-``examples/README.md`` carries a numbered reading order of the folders. ``prompts/`` is owned by the ``prompts`` spec (task 5).
+``examples/README.md`` carries a numbered reading order of the folders.
 """
 
 from __future__ import annotations
@@ -13,7 +13,7 @@ import pytest
 
 ROOT = Path(__file__).resolve().parents[2]
 EXAMPLES = ROOT / "examples"
-KNOWN_FOLDERS = {"prompts"}
+KNOWN_FOLDERS: set[str] = set()
 NAME_RE = re.compile(r"[\w/-]+\.py")
 
 

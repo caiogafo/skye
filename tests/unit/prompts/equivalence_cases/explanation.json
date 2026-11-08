@@ -1,0 +1,66 @@
+[
+  {
+    "note": "minimal",
+    "variables": {
+      "topic": "Recursion"
+    }
+  },
+  {
+    "note": "everything, structured",
+    "variables": {
+      "topic": "Recursion",
+      "system_prompt": "You explain.",
+      "description": "Teaching",
+      "audience_level": "beginner",
+      "explanation_type": "step_by_step",
+      "context": "CS 101",
+      "examples": [
+        {
+          "topic": "Gravity",
+          "explanation": "Mass attracts mass."
+        }
+      ],
+      "specific_aspects": [
+        "base case",
+        "stack"
+      ],
+      "output_format": "structured"
+    }
+  },
+  {
+    "note": "json",
+    "variables": {
+      "topic": "x",
+      "audience_level": "intermediate",
+      "explanation_type": "conceptual",
+      "output_format": "json"
+    }
+  },
+  {
+    "note": "expert, practical",
+    "variables": {
+      "topic": "x",
+      "audience_level": "expert",
+      "explanation_type": "practical",
+      "output_format": "text"
+    }
+  },
+  {
+    "note": "child, comparative",
+    "variables": {
+      "topic": "x",
+      "audience_level": "child",
+      "explanation_type": "comparative"
+    }
+  },
+  {
+    "note": "unknown levels",
+    "variables": {
+      "topic": "x",
+      "audience_level": "other",
+      "explanation_type": "other",
+      "examples": [],
+      "specific_aspects": []
+    }
+  }
+]

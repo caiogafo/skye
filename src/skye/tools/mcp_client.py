@@ -1,10 +1,13 @@
-"""Tri-faceted MCP client in ``tools``: tools, prompts and resources behind one Port (Requirement 15).
+"""Tri-faceted MCP client in ``tools``: tools, prompts and resources behind one Port (Req. 15).
 
 * :class:`MCPClientInterface` is the one Port. :class:`BuiltinMCPClient` (stdlib JSON-RPC over
   stateless HTTP, built on ``skye.base.http``) and ``FastMCPClient``
   (``skye.tools.mcp_fastmcp``, lazily imported) both implement it and return the same
   Skye types: ``CapabilityInterface``
-  objects for tools, ``prompts`` message objects for prompts, :class:`Resource` for resources.
+  objects for tools, ``base`` messages for prompts (never ``prompts`` objects, D26),
+  :class:`Resource` for resources.
+* The resources facet is the resource Port of ``base`` (``ResourceProviderInterface``, D26):
+  every MCP client implements it.
 * Protocol shapes are converted in exactly one place, ``skye.tools.mcp_boundary``.
 * Choice: :func:`create_mcp_client` takes an explicit ``impl`` argument (``"builtin"`` by default,
   ``"fastmcp"`` opt-in). No environment variable, no config entry, no fallback (Requirement 21).
@@ -23,19 +26,23 @@ from typing import Any
 
 from skye.base import http
 from skye.base.exceptions import ConfigurationError, ProviderError, ValidationError
+from skye.base.interfaces.resource import Resource, ResourceProviderInterface
 from skye.base.messages import SkyeMessage
 from skye.tools import mcp_boundary as boundary
 from skye.tools.exceptions import CapabilityExecutionError
 from skye.tools.interface import CapabilityInterface
 from skye.tools.mcp_boundary import MCPPrompt
-from skye.tools.mcp_resource import Resource
 from skye.tools.schema import CapabilitySchema
 
 PROTOCOL_VERSION = "2025-06-18"
 
 
-class MCPClientInterface(ABC):
-    """The MCP client Port: three facets, identical Skye return types in every implementation."""
+class MCPClientInterface(ResourceProviderInterface, ABC):
+    """The MCP client Port: three facets, identical Skye return types in every implementation.
+
+    The resources facet is the ``base`` resource Port (``ResourceProviderInterface``, D26), so an
+    MCP client can be passed wherever a resource provider is expected.
+    """
 
     # tools
     @abstractmethod

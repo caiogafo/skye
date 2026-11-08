@@ -44,6 +44,17 @@ def test_no_skeleton_uses_version_2_syntax(kind: str, template: str) -> None:
     assert "wait" not in text and "on_event" not in text
 
 
+@pytest.mark.parametrize("kind,template", ALL)
+def test_every_skeleton_starts_with_front_matter(kind: str, template: str) -> None:
+    text = skeleton(kind, "my.name-1", template)
+    assert text.startswith('---\ntitle       = "my.name-1"\n')
+    meta = build(text).metadata
+    assert meta["title"] == "my.name-1"
+    assert meta["description"].startswith("CHANGE ME: ")
+    assert meta["version"] == "0.1.0" and meta["tags"] == []
+    assert "__NAME__" not in text and "__DESCRIPTION__" not in text
+
+
 def test_named_helpers_and_defaults() -> None:
     assert 'router "main"' in new_router()
     assert 'flow "my_flow"' in new_flow()

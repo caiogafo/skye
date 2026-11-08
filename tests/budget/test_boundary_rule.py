@@ -46,11 +46,6 @@ SDK_OWNERS: dict[str, tuple[str, ...]] = {
     "fastmcp": ("tools/mcp_fastmcp.py",),
     "mcp": ("tools/mcp_fastmcp.py",),
 }
-# Known pre-existing in-function availability probes outside mcp_fastmcp.py (inside `tools`,
-# the owning Component; they import fastmcp only to raise a clear ImportError and never expose
-# a fastmcp object). Candidates for removal; do not add to this set.
-LEGACY_TOOLS_PROBES = {"fastmcp": {"tools/mcp_capability.py", "tools/mcp_server_client.py"}}
-
 # Import helpers that take a module name as the first string argument.
 IMPORT_CALLS = {"import_module", "missing_extra"}
 EXTERNAL = set(SDK_OWNERS)
@@ -91,7 +86,7 @@ def test_external_libraries_imported_only_by_owning_component():
         for mod, line, _ in _external_imports(tree):
             if mod not in EXTERNAL:
                 continue
-            allowed = set(SDK_OWNERS[mod]) | LEGACY_TOOLS_PROBES.get(mod, set())
+            allowed = set(SDK_OWNERS[mod])
             if rel not in allowed:
                 bad.append(f"'{mod}' imported outside its owning Component files: src/skye/{rel}:{line}")
     assert not bad, "\n".join(bad)

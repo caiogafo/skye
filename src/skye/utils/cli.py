@@ -1,20 +1,29 @@
-"""The ``skye`` command line: ``skye check`` and ``skye new`` for ``.skye`` files.
+"""The ``skye`` command line: ``skye check``, ``skye fmt``, ``skye new`` and ``skye prompt`` for
+``.skye`` files.
 
 This is the code that reads and writes files; the parser in ``skye.base.dsl`` takes text only.
 
 Usage::
 
     skye check app.skye [more.skye ...]    # prints file:line:col message; exit 1 on errors
+    skye check --format json --stdin-filename app.skye -   # stdin; one JSON object (for editors)
     skye check --schema                    # prints the JSON Schema of the router, flow, prompt
     blocks
+    skye fmt app.skye [more.skye ...]      # rewrite in the standard layout (comments kept)
+    skye fmt --check templates/*.skye      # exit 1 if a file is not formatted (for CI)
+    skye fmt -                             # stdin to stdout (for editors)
     skye new flow my_flow --template loop -o my_flow.skye
     skye new --list                        # the kinds and their templates
+    skye prompt list [--json]              # the bundled prompts: name, title, version, description
+    skye prompt info NAME|FILE [--name PROMPT] [--json]   # a prompt's inputs, messages and output
     skye skill install [--scope user|project] [--dir DIR] [--force]   # the Claude Code skill that
     teaches Skye
     skye skill print [NAME] | skye skill path   # SKILL.md, or references/NAME.md; where it is
     installed
     skye skill status                      # up to date, outdated (the package changed) or edited;
     exit 1 if not up to date
+    skye vscode install [--editor CMD] [--dir DIR] [--force]   # the VS Code extension for .skye
+    skye vscode package [-o FILE] | uninstall | path | status
 
 Exit codes: 0 no error, 1 the checked files have errors, 2 usage or file error.
 """
@@ -23,11 +32,16 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 from collections.abc import Sequence
+from fnmatch import fnmatch
 from pathlib import Path
 
-from skye.base.dsl import TEMPLATES, block_schema, check_text, skeleton
+from skye.base.dsl import TEMPLATES, block_schema, build, check_text, skeleton
+from skye.base.dsl.fmt import FormatError, format_text
+from skye.base.dsl.info import PromptInfo, describe_prompt, header_fields, prompt_help
+from skye.base.dsl.metadata import split_metadata
 from skye.base.exceptions import ConfigurationError
 from skye.utils.skill import (
     SCOPES,
@@ -37,6 +51,14 @@ from skye.utils.skill import (
     skill_status,
     skill_text,
 )
+from skye.utils.vscode import (
+    COMMAND_HINT,
+    build_vsix,
+    extension_path,
+    extension_status,
+    install_extension,
+    uninstall_extension,
+)
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -44,12 +66,58 @@ def _build_parser() -> argparse.ArgumentParser:
     commands = parser.add_subparsers(dest="command", required=True)
 
     check = commands.add_parser("check", help="check .skye files and print every error")
-    check.add_argument("files", nargs="*", metavar="FILE", help="the .skye files to check")
+    check.add_argument(
+        "files", nargs="*", metavar="FILE", help="the .skye files to check (- reads stdin)"
+    )
+    check.add_argument(
+        "--format",
+        choices=("text", "json"),
+        default="text",
+        help='text (file:line:col message) or json (one {"diagnostics": [...]} object)',
+    )
+    check.add_argument(
+        "--stdin-filename",
+        metavar="NAME",
+        default="<stdin>",
+        help="the file name used in the diagnostics of - (stdin)",
+    )
     check.add_argument("--schema", action="store_true", help="print the JSON Schema of the blocks")
     check.add_argument(
         "--registry",
         metavar="NAMES",
         help="comma-separated names the registry will hold; registry.NAME is checked against them",
+    )
+
+    fmt = commands.add_parser(
+        "fmt", help="rewrite .skye files in the standard layout (comments and strings are kept)"
+    )
+    fmt.add_argument(
+        "files",
+        nargs="*",
+        metavar="PATH",
+        help=(
+            "files or folders to format; a folder is searched for .skye files recursively; "
+            "none = the current folder; - reads stdin and writes stdout"
+        ),
+    )
+    fmt.add_argument(
+        "--exclude",
+        action="append",
+        default=[],
+        metavar="GLOB",
+        help="skip paths matching GLOB (relative to the folder searched, e.g. 'tests/fixtures/*'); "
+        "repeatable",
+    )
+    fmt.add_argument(
+        "--check",
+        action="store_true",
+        help="change nothing; list the files that are not formatted and exit 1 if there are any",
+    )
+    fmt.add_argument(
+        "--stdin-filename",
+        metavar="NAME",
+        default="<stdin>",
+        help="the file name used in the messages of - (stdin)",
     )
 
     new = commands.add_parser("new", help="print (or write) a starting .skye file")
@@ -93,7 +161,63 @@ def _build_parser() -> argparse.ArgumentParser:
                 action="store_true",
                 help="replace a skill that differs from this version",
             )
+    _add_prompt(commands)
+    _add_vscode(commands)
     return parser
+
+
+def _add_prompt(commands: argparse._SubParsersAction[argparse.ArgumentParser]) -> None:
+    prompt = commands.add_parser(
+        "prompt", help="list the bundled prompts, or show what a prompt takes and gives back"
+    )
+    actions = prompt.add_subparsers(dest="action", required=True)
+    listing = actions.add_parser("list", help="the bundled prompts: name, title, version")
+    listing.add_argument("--json", action="store_true", help="print one JSON array")
+    info = actions.add_parser("info", help="the inputs, history, messages and output of one prompt")
+    info.add_argument(
+        "target", metavar="NAME|FILE", help="a bundled prompt name, or a .skye file (- reads stdin)"
+    )
+    info.add_argument(
+        "--name", metavar="PROMPT", help="the prompt to show when the file has several"
+    )
+    info.add_argument("--json", action="store_true", help="print the PromptInfo as JSON")
+
+
+def _add_vscode(commands: argparse._SubParsersAction[argparse.ArgumentParser]) -> None:
+    vscode = commands.add_parser(
+        "vscode", help="package or install the VS Code extension for .skye"
+    )
+    actions = vscode.add_subparsers(dest="action", required=True)
+    package = actions.add_parser("package", help="build the .vsix of the extension")
+    package.add_argument("-o", "--output", metavar="FILE", help="the .vsix to write")
+    for action, text in (
+        ("install", "install the extension (with the editor command, or by copying its folder)"),
+        ("uninstall", "remove the extension"),
+        ("path", "print the folder where the extension is copied"),
+        ("status", "say whether the installed extension is up to date (exit 1 if it is not)"),
+    ):
+        sub = actions.add_parser(action, help=text)
+        if action != "path":
+            sub.add_argument(
+                "--editor", metavar="CMD", help="the editor command (code, codium, cursor, ...)"
+            )
+        sub.add_argument(
+            "--dir",
+            metavar="DIR",
+            help="copy to (or look in) this extensions folder instead of using the editor",
+        )
+        if action == "install":
+            sub.add_argument(
+                "--force", action="store_true", help="replace a folder whose files were edited"
+            )
+
+
+def _read_input(name: str, stdin_name: str) -> tuple[str, str]:
+    if name == "-":
+        buffer = getattr(sys.stdin, "buffer", None)
+        text = buffer.read().decode("utf-8") if buffer is not None else sys.stdin.read()
+        return text, stdin_name
+    return Path(name).read_text(encoding="utf-8"), name
 
 
 def _check(args: argparse.Namespace) -> int:
@@ -106,20 +230,125 @@ def _check(args: argparse.Namespace) -> int:
         return 2
     names = [n.strip() for n in args.registry.split(",") if n.strip()] if args.registry else None
     status = 0
+    found: list[dict[str, object]] = []
     for name in args.files:
         try:
-            text = Path(name).read_text(encoding="utf-8")
+            text, name = _read_input(name, args.stdin_filename)
         except (OSError, UnicodeDecodeError) as exc:
             print(f"{name}: cannot read the file: {exc}", file=sys.stderr)
             status = max(status, 2)
             continue
         diagnostics = check_text(text, name, names)
+        if args.format == "json":
+            found.extend(
+                {
+                    "file": d.file,
+                    "line": d.line,
+                    "column": d.column,
+                    "reason": d.reason,
+                    "fix": d.fix,
+                    "message": d.message,
+                }
+                for d in diagnostics
+            )
+            if diagnostics and status != 2:
+                status = 1
+            continue
         for item in diagnostics:
             print(item.format())
         if diagnostics:
             status = max(status, 1) if status != 2 else 2
         else:
             print(f"{name}: ok")
+    if args.format == "json" and status != 2:
+        print(json.dumps({"diagnostics": found}))
+    return status
+
+
+#: The file that lists the paths ``skye fmt`` leaves out of a folder search, one glob per line.
+SKYEIGNORE = ".skyeignore"
+
+
+def _ignore_globs(path: Path) -> list[str]:
+    try:
+        lines = path.read_text(encoding="utf-8").splitlines()
+    except OSError:
+        return []
+    return [line.strip() for line in lines if line.strip() and not line.lstrip().startswith("#")]
+
+
+#: Folders never searched for .skye files (besides hidden ones).
+_SKIPPED_DIRS = frozenset({"node_modules", "__pycache__", "venv", "build", "dist", "site-packages"})
+
+
+def _skye_files(paths: Sequence[str], exclude: Sequence[str]) -> list[str]:
+    """The files named in ``paths``, with each folder replaced by its .skye files (recursively).
+
+    Hidden folders (``.git``, ``.venv``, ...) and ``_SKIPPED_DIRS`` are not searched; ``exclude``
+    globs, and those of a ``.skyeignore`` file in the folder searched (one per line, ``#``
+    comments), are matched against the path relative to that folder, and against the file name.
+    """
+    found: list[str] = []
+    for name in paths or ["."]:
+        root = Path(name)
+        if name == "-" or not root.is_dir():
+            found.append(name)
+            continue
+        globs = [*exclude, *_ignore_globs(root / SKYEIGNORE)]
+        for current, dirs, files in os.walk(root):
+            dirs[:] = sorted(d for d in dirs if not d.startswith(".") and d not in _SKIPPED_DIRS)
+            for file in sorted(files):
+                if not file.endswith(".skye"):
+                    continue
+                path = Path(current) / file
+                relative = path.relative_to(root).as_posix()
+                if any(fnmatch(relative, g) or fnmatch(file, g) for g in globs):
+                    continue
+                found.append(str(path))
+    return found
+
+
+def _fmt(args: argparse.Namespace) -> int:
+    status = 0
+    files = _skye_files(args.files, args.exclude)
+    if not files:
+        print("skye fmt: no .skye files found", file=sys.stderr)
+        return 0
+    for name in files:
+        try:
+            text, label = _read_input(name, args.stdin_filename)
+        except (OSError, UnicodeDecodeError) as exc:
+            print(f"{name}: cannot read the file: {exc}", file=sys.stderr)
+            status = 2
+            continue
+        try:
+            formatted = format_text(text, label)
+        except FormatError as exc:
+            for item in exc.diagnostics:
+                print(item.format(), file=sys.stderr)
+            print(f"{label}: not formatted: {exc}", file=sys.stderr)
+            status = max(status, 1) if status != 2 else 2
+            continue
+        if name == "-":
+            if not args.check:
+                sys.stdout.write(formatted)
+            elif formatted != text:
+                print(f"{label}: would be reformatted")
+                status = max(status, 1) if status != 2 else 2
+            continue
+        if formatted == text:
+            continue
+        if args.check:
+            print(f"{name}: would be reformatted")
+            status = max(status, 1) if status != 2 else 2
+            continue
+        try:
+            Path(name).write_text(formatted, encoding="utf-8")
+        except OSError as exc:
+            print(f"{name}: cannot write the file: {exc}", file=sys.stderr)
+            status = 2
+            continue
+        print(f"formatted {name}")
     return status
 
 
@@ -176,6 +405,109 @@ def _skill(args: argparse.Namespace) -> int:
     return 0
 
 
+def _bundled() -> dict[str, Path]:
+    """The bundled ``.skye`` prompts (``skye/prompts/templates``), by name."""
+    folder = Path(__file__).resolve().parent.parent / "prompts" / "templates"
+    return {path.stem: path for path in sorted(folder.glob("*.skye"))}
+
+
+def _prompt_list(as_json: bool) -> int:
+    rows: list[dict[str, object]] = []
+    for name, path in _bundled().items():
+        try:
+            metadata, _, _ = split_metadata(path.read_text(encoding="utf-8"), str(path))
+        except (OSError, UnicodeDecodeError):
+            metadata = {}
+        meta = header_fields(metadata)
+        rows.append(
+            {
+                "name": name,
+                "title": meta.get("title"),
+                "version": meta.get("version"),
+                "description": meta.get("description"),
+            }
+        )
+    if as_json:
+        print(json.dumps(rows, indent=2, ensure_ascii=False))
+        return 0
+    width = max((len(str(r["name"])) for r in rows), default=0)
+    for row in rows:
+        head = f"{row['title'] or ''}" + (f" ({row['version']})" if row["version"] else "")
+        print(f"{str(row['name']).ljust(width)}  {head}".rstrip())
+        if row["description"]:
+            print(f"{' ' * width}  {row['description']}")
+    return 0
+
+
+def _prompt_info(args: argparse.Namespace) -> int:
+    target: str = args.target
+    bundled = _bundled()
+    if target != "-" and target in bundled and not Path(target).exists():
+        name, path = target, str(bundled[target])
+        text = bundled[target].read_text(encoding="utf-8")
+    elif target == "-" or Path(target).is_file():
+        try:
+            text, path = _read_input(target, "<stdin>")
+        except (OSError, UnicodeDecodeError) as exc:
+            print(f"{target}: cannot read the file: {exc}", file=sys.stderr)
+            return 2
+        name = args.name
+    else:
+        known = ", ".join(bundled)
+        print(
+            f'skye prompt info: "{target}" is neither a bundled prompt nor a file. '
+            f"Bundled: {known}",
+            file=sys.stderr,
+        )
+        return 2
+    document = build(text, filename=path)
+    if document.diagnostics:
+        for item in document.diagnostics:
+            print(item.format())
+        return 1
+    try:
+        spec = document.prompt(name)
+    except KeyError as exc:
+        print(f"skye prompt info: {path}: {exc.args[0] if exc.args else exc}", file=sys.stderr)
+        return 2
+    info: PromptInfo = describe_prompt(spec, document.metadata)
+    if args.json:
+        print(json.dumps(info.to_dict(), indent=2, ensure_ascii=False, default=str))
+    else:
+        sys.stdout.write(prompt_help(info))
+    return 0
+
+
+def _prompt(args: argparse.Namespace) -> int:
+    if args.action == "list":
+        return _prompt_list(args.json)
+    return _prompt_info(args)
+
+
+def _vscode(args: argparse.Namespace) -> int:
+    try:
+        if args.action == "package":
+            print(build_vsix(args.output))
+            return 0
+        if args.action == "path":
+            print(extension_path(args.dir))
+            return 0
+        if args.action == "status":
+            state, message = extension_status(args.editor, args.dir)
+            print(message)
+            return 0 if state == "up to date" else 1
+        if args.action == "uninstall":
+            print(uninstall_extension(args.editor, args.dir))
+            return 0
+        _, message = install_extension(args.editor, args.dir, force=args.force)
+    except ConfigurationError as exc:
+        print(f"skye vscode: {exc.message}", file=sys.stderr)
+        return 2
+    print(message)
+    print(COMMAND_HINT)
+    return 0
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     """Run the ``skye`` command.
 
@@ -190,6 +522,12 @@ def main(argv: Sequence[str] | None = None) -> int:
         return _check(args)
     if args.command == "skill":
         return _skill(args)
+    if args.command == "vscode":
+        return _vscode(args)
+    if args.command == "prompt":
+        return _prompt(args)
+    if args.command == "fmt":
+        return _fmt(args)
     return _new(args)
 
 

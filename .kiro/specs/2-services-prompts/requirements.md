@@ -155,3 +155,53 @@ The requirements themselves live in `.kiro/steering/10-requirements.md`; each re
 1. THE spec SHALL realize Requirement 34.4 of #[[file:.kiro/steering/10-requirements.md]].
 2. THE spec SHALL realize Requirement 34.5 of #[[file:.kiro/steering/10-requirements.md]].
 3. THE spec SHALL realize Requirement 34.6 of #[[file:.kiro/steering/10-requirements.md]].
+
+### Requirement 13: Described and typed prompt inputs
+
+**User Story:** As a developer, I want a prompt to say what it takes and give precise errors for wrong data, so that a mistake in an input fails early with its path instead of producing an empty section.
+
+#### Acceptance Criteria
+
+1. THE spec SHALL realize Requirement 30.10 of #[[file:.kiro/steering/10-requirements.md]].
+2. THE spec SHALL realize Requirement 30.11 of #[[file:.kiro/steering/10-requirements.md]].
+3. THE spec SHALL realize Requirement 54.20 of #[[file:.kiro/steering/10-requirements.md]].
+4. THE spec SHALL honor decision D69 of #[[file:.kiro/steering/12-decisions.md]].
+5. THE spec SHALL honor decision D73 of #[[file:.kiro/steering/12-decisions.md]].
+
+### Requirement 14: Structured output declared in the prompt
+
+**User Story:** As a developer, I want to declare the shape of the answer once and have the format instructions generated, so that I never write a JSON, table or XML structure by hand.
+
+#### Acceptance Criteria
+
+1. THE spec SHALL realize Requirement 33.5 of #[[file:.kiro/steering/10-requirements.md]].
+2. THE spec SHALL realize Requirement 33.6 of #[[file:.kiro/steering/10-requirements.md]].
+3. THE spec SHALL realize Requirement 33.7 of #[[file:.kiro/steering/10-requirements.md]].
+4. THE spec SHALL realize Requirement 33.8 of #[[file:.kiro/steering/10-requirements.md]].
+5. THE spec SHALL honor decision D70 of #[[file:.kiro/steering/12-decisions.md]].
+
+### Requirement 15: Bundled agent prompts and their conventions
+
+**User Story:** As a developer building agents, I want ready prompts with one input shape for tools and memories, so that I can swap one prompt for another without rewriting the data I pass.
+
+#### Acceptance Criteria
+
+1. THE spec SHALL realize Requirement 30.12 of #[[file:.kiro/steering/10-requirements.md]].
+2. THE spec SHALL realize Requirement 30.13 of #[[file:.kiro/steering/10-requirements.md]].
+3. THE spec SHALL realize Requirement 30.14 of #[[file:.kiro/steering/10-requirements.md]].
+4. THE spec SHALL realize Requirement 31.5 of #[[file:.kiro/steering/10-requirements.md]].
+5. THE spec SHALL honor decision D74 of #[[file:.kiro/steering/12-decisions.md]].
+6. THE spec SHALL honor decision D71 of #[[file:.kiro/steering/12-decisions.md]].
+
+### Requirement 16: Prompt help and examples
+
+**User Story:** As a developer, I want to ask a prompt what it takes and gives back, and to learn the language from examples that cannot fall behind, so that I use a prompt without reading its source.
+
+#### Acceptance Criteria
+
+1. THE spec SHALL realize Requirement 34.7 of #[[file:.kiro/steering/10-requirements.md]].
+2. THE spec SHALL realize Requirement 34.8 of #[[file:.kiro/steering/10-requirements.md]].
+3. THE spec SHALL realize Requirement 24.9 of #[[file:.kiro/steering/10-requirements.md]].
+4. THE spec SHALL realize Requirement 24.10 of #[[file:.kiro/steering/10-requirements.md]].
+5. THE spec SHALL honor decision D73 of #[[file:.kiro/steering/12-decisions.md]].
+6. THE spec SHALL honor decision D74 of #[[file:.kiro/steering/12-decisions.md]].

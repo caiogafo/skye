@@ -14,6 +14,9 @@ from skye.base.interfaces import StorageBackend
 from skye.store.memory import InMemoryBackend
 from skye.base.health import HealthMetrics  # noqa: F401  (adapter-reported metrics, consumed by routing)
 
+#: The window of the allowed-fails policy: only the failures of the last minute count.
+RECENT_FAILURES_WINDOW_SECONDS = 60.0
+
 
 @dataclass
 class RateLimitTracker:
@@ -115,6 +118,10 @@ class ModelHealth:
         """Get storage key for cooldown data."""
         return f"cooldown:{self.model_id}"
 
+    def _get_recent_failures_key(self) -> str:
+        """Get storage key for the times of the recent failures, per error type."""
+        return f"recent_failures:{self.model_id}"
+
     async def record_success(self, latency_ms: float) -> None:
         """Record a successful request."""
         health_key = self._get_health_key()
@@ -153,6 +160,28 @@ class ModelHealth:
         
         # Store with 24 hour TTL
         await self.storage.set(health_key, health_data, ttl=86400)
+
+        # The times of the failures of the last window, per error type
+        # (the allowed-fails policy counts per minute).
+        recent_key = self._get_recent_failures_key()
+        recent = await self.storage.get(recent_key) or {}
+        cutoff = current_time - RECENT_FAILURES_WINDOW_SECONDS
+        times = [moment for moment in recent.get(reason, []) if moment > cutoff]
+        times.append(current_time)
+        recent = {name: [m for m in moments if m > cutoff] for name, moments in recent.items()}
+        recent[reason] = times
+        await self.storage.set(recent_key, recent, ttl=int(RECENT_FAILURES_WINDOW_SECONDS) * 2)
+
+    async def recent_failure_count(
+        self, reason: str, window_seconds: float = RECENT_FAILURES_WINDOW_SECONDS
+    ) -> int:
+        """The number of failures of this error type in the last ``window_seconds``.
+
+        Only the failures of the recorded window (``RECENT_FAILURES_WINDOW_SECONDS``) are kept.
+        """
+        recent = await self.storage.get(self._get_recent_failures_key()) or {}
+        cutoff = time.time() - window_seconds
+        return sum(1 for moment in recent.get(reason, []) if moment > cutoff)
 
     async def set_cooldown(self, duration_seconds: float) -> None:
         """Set cooldown period."""

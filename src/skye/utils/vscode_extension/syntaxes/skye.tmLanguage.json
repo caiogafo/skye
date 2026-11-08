@@ -1,0 +1,386 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "Skye",
+  "scopeName": "source.skye",
+  "fileTypes": [
+    "skye"
+  ],
+  "patterns": [
+    {
+      "include": "#front-matter"
+    },
+    {
+      "include": "#comment"
+    },
+    {
+      "include": "#comment-block"
+    },
+    {
+      "include": "#string-triple"
+    },
+    {
+      "include": "#duration"
+    },
+    {
+      "include": "#string"
+    },
+    {
+      "include": "#number"
+    },
+    {
+      "include": "#constant"
+    },
+    {
+      "include": "#reference"
+    },
+    {
+      "include": "#statement-set"
+    },
+    {
+      "include": "#block-keyword"
+    },
+    {
+      "include": "#statement-keyword"
+    },
+    {
+      "include": "#logical-keyword"
+    },
+    {
+      "include": "#type"
+    },
+    {
+      "include": "#function"
+    },
+    {
+      "include": "#property"
+    },
+    {
+      "include": "#operator"
+    },
+    {
+      "include": "#punctuation"
+    },
+    {
+      "include": "#identifier"
+    }
+  ],
+  "repository": {
+    "comment": {
+      "name": "comment.line.number-sign.skye",
+      "match": "(#).*$",
+      "captures": {
+        "1": {
+          "name": "punctuation.definition.comment.skye"
+        }
+      }
+    },
+    "string-triple": {
+      "name": "string.quoted.triple.skye",
+      "begin": "\"\"\"",
+      "end": "(?<!\\\\)\"\"\"",
+      "beginCaptures": {
+        "0": {
+          "name": "punctuation.definition.string.begin.skye"
+        }
+      },
+      "endCaptures": {
+        "0": {
+          "name": "punctuation.definition.string.end.skye"
+        }
+      },
+      "patterns": [
+        {
+          "include": "#escape"
+        },
+        {
+          "include": "#interpolation"
+        }
+      ]
+    },
+    "duration": {
+      "name": "string.quoted.double.skye",
+      "match": "(\")(\\d+(?:\\.\\d+)?[smhd])(\")",
+      "captures": {
+        "1": {
+          "name": "punctuation.definition.string.begin.skye"
+        },
+        "2": {
+          "name": "constant.numeric.duration.skye"
+        },
+        "3": {
+          "name": "punctuation.definition.string.end.skye"
+        }
+      }
+    },
+    "string": {
+      "name": "string.quoted.double.skye",
+      "begin": "\"",
+      "end": "(\")|(\\n)",
+      "beginCaptures": {
+        "0": {
+          "name": "punctuation.definition.string.begin.skye"
+        }
+      },
+      "endCaptures": {
+        "1": {
+          "name": "punctuation.definition.string.end.skye"
+        },
+        "2": {
+          "name": "invalid.illegal.unterminated-string.skye"
+        }
+      },
+      "patterns": [
+        {
+          "include": "#escape"
+        },
+        {
+          "include": "#interpolation"
+        }
+      ]
+    },
+    "escape": {
+      "patterns": [
+        {
+          "name": "constant.character.escape.skye",
+          "match": "\\\\[ntr\"\\\\]"
+        }
+      ]
+    },
+    "interpolation": {
+      "name": "meta.interpolation.skye",
+      "contentName": "meta.embedded.expression.skye",
+      "begin": "\\{\\{",
+      "end": "\\}\\}",
+      "beginCaptures": {
+        "0": {
+          "name": "punctuation.section.interpolation.begin.skye"
+        }
+      },
+      "endCaptures": {
+        "0": {
+          "name": "punctuation.section.interpolation.end.skye"
+        }
+      },
+      "patterns": [
+        {
+          "match": "(\\|)\\s*([A-Za-z_][A-Za-z0-9_]*)",
+          "captures": {
+            "1": {
+              "name": "keyword.operator.filter.skye"
+            },
+            "2": {
+              "name": "support.function.filter.skye"
+            }
+          }
+        },
+        {
+          "name": "string.quoted.single.skye",
+          "match": "'(?:[^'\\\\]|\\\\.)*'"
+        },
+        {
+          "include": "#number"
+        },
+        {
+          "include": "#constant"
+        },
+        {
+          "include": "#logical-keyword"
+        },
+        {
+          "match": "\\b(loop)(\\.)",
+          "captures": {
+            "1": {
+              "name": "variable.language.skye"
+            },
+            "2": {
+              "name": "punctuation.accessor.skye"
+            }
+          }
+        },
+        {
+          "name": "variable.other.skye",
+          "match": "[A-Za-z_][A-Za-z0-9_]*"
+        },
+        {
+          "include": "#operator"
+        },
+        {
+          "include": "#punctuation"
+        }
+      ]
+    },
+    "number": {
+      "name": "constant.numeric.skye",
+      "match": "\\b\\d+(?:\\.\\d+)?(?:[eE][+-]?\\d+)?\\b"
+    },
+    "constant": {
+      "name": "constant.language.skye",
+      "match": "\\b(?:true|false|none|True|False|None)\\b"
+    },
+    "reference": {
+      "match": "\\b(registry|flow|router|prompt|env|context|step|item|loop)(\\.)",
+      "captures": {
+        "1": {
+          "name": "variable.language.skye"
+        },
+        "2": {
+          "name": "punctuation.accessor.skye"
+        }
+      }
+    },
+    "statement-set": {
+      "match": "\\b(set)\\s+([A-Za-z_][A-Za-z0-9_]*)\\s*(?==(?!=))",
+      "captures": {
+        "1": {
+          "name": "keyword.other.statement.skye"
+        },
+        "2": {
+          "name": "variable.other.property.skye"
+        }
+      }
+    },
+    "block-keyword": {
+      "name": "keyword.control.block.skye",
+      "match": "\\b(?:router|flow|prompt|route|target|retry_policy|allowed_fails_policy|step|parallel|choice|context|message|placeholder|output|each|when|else)\\b(?!\\s*=(?!=))"
+    },
+    "statement-keyword": {
+      "name": "keyword.other.statement.skye",
+      "match": "\\b(?:set|emit|in|end)\\b"
+    },
+    "logical-keyword": {
+      "name": "keyword.operator.logical.skye",
+      "match": "\\b(?:and|or|not|is|if)\\b"
+    },
+    "type": {
+      "name": "support.type.skye",
+      "match": "\\b(?:string|number|bool|list|map)\\b"
+    },
+    "function": {
+      "name": "support.function.builtin.skye",
+      "match": "\\b(?:len|min|max|abs|round|str|int|float)\\b(?=\\s*\\()"
+    },
+    "property": {
+      "match": "\\b([A-Za-z_][A-Za-z0-9_]*)\\s*(?==(?!=))",
+      "captures": {
+        "1": {
+          "name": "variable.other.property.skye entity.name.tag.skye"
+        }
+      }
+    },
+    "operator": {
+      "patterns": [
+        {
+          "name": "keyword.operator.comparison.skye",
+          "match": "==|!=|<=|>=|<|>"
+        },
+        {
+          "name": "keyword.operator.arithmetic.skye",
+          "match": "//|\\*\\*|[+\\-*/%]"
+        },
+        {
+          "name": "keyword.operator.assignment.skye",
+          "match": "="
+        },
+        {
+          "name": "keyword.operator.skye",
+          "match": "[|&^~!]"
+        }
+      ]
+    },
+    "punctuation": {
+      "patterns": [
+        {
+          "name": "punctuation.section.braces.skye",
+          "match": "[{}]"
+        },
+        {
+          "name": "punctuation.section.brackets.skye",
+          "match": "[\\[\\]]"
+        },
+        {
+          "name": "punctuation.section.parens.skye",
+          "match": "[()]"
+        },
+        {
+          "name": "punctuation.separator.comma.skye",
+          "match": ","
+        },
+        {
+          "name": "punctuation.separator.colon.skye",
+          "match": ":"
+        },
+        {
+          "name": "punctuation.accessor.skye",
+          "match": "\\."
+        }
+      ]
+    },
+    "identifier": {
+      "name": "variable.other.skye",
+      "match": "[A-Za-z_][A-Za-z0-9_]*"
+    },
+    "comment-block": {
+      "name": "comment.block.skye",
+      "begin": "/\\*",
+      "end": "\\*/",
+      "beginCaptures": {
+        "0": {
+          "name": "punctuation.definition.comment.begin.skye"
+        }
+      },
+      "endCaptures": {
+        "0": {
+          "name": "punctuation.definition.comment.end.skye"
+        }
+      }
+    },
+    "front-matter": {
+      "name": "meta.front-matter.skye",
+      "contentName": "meta.embedded.block.toml",
+      "begin": "\\A(---)\\s*$",
+      "end": "^(---)\\s*$",
+      "beginCaptures": {
+        "1": {
+          "name": "punctuation.definition.front-matter.begin.skye"
+        }
+      },
+      "endCaptures": {
+        "1": {
+          "name": "punctuation.definition.front-matter.end.skye"
+        }
+      },
+      "patterns": [
+        {
+          "include": "#comment"
+        },
+        {
+          "name": "entity.name.section.toml.skye",
+          "match": "^\\s*\\[[^\\]]+\\]"
+        },
+        {
+          "match": "^\\s*([A-Za-z0-9_-]+)\\s*(=)",
+          "captures": {
+            "1": {
+              "name": "variable.other.property.skye"
+            },
+            "2": {
+              "name": "keyword.operator.assignment.skye"
+            }
+          }
+        },
+        {
+          "include": "#string"
+        },
+        {
+          "include": "#number"
+        },
+        {
+          "include": "#constant"
+        },
+        {
+          "include": "#punctuation"
+        }
+      ]
+    }
+  }
+}

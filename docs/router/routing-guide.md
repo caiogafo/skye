@@ -328,12 +328,28 @@ RoutingStrategy.SIMPLE_SHUFFLE     # Random selection
 RoutingStrategy.LEAST_BUSY         # Fewest active requests
 RoutingStrategy.RATE_LIMIT_AWARE   # Most available capacity
 RoutingStrategy.LATENCY_BASED      # Lowest average latency
-RoutingStrategy.COST_BASED         # Lowest cost
+RoutingStrategy.COST_BASED         # Lowest cost_per_1k_prompt_tokens + cost_per_1k_completion_tokens
 RoutingStrategy.WEIGHTED           # Weighted random (by target weight)
 RoutingStrategy.PRIORITY_BASED     # Highest success rate
 
 # Change strategy dynamically
 router.set_routing_strategy(RoutingStrategy.LATENCY_BASED)
+```
+
+`COST_BASED` reads two target fields, `cost_per_1k_prompt_tokens` and `cost_per_1k_completion_tokens` (numbers, 0 or more, in any
+currency as long as every target uses the same one). It picks the available target with the lowest sum of the two; a price left out
+counts as 0, a target with neither comes after every priced target, and ties keep the configured order. A caller of
+`RoutingStrategySelector.apply_strategy` can pass `token_estimate=(prompt_tokens, completion_tokens)` to weight each price by its
+tokens / 1000 instead of summing them.
+
+```skye
+router {
+  route "budget" {
+    strategy = "cost_based"
+    target { model = "gpt-4o-mini", provider = "openai", cost_per_1k_prompt_tokens = 0.00015, cost_per_1k_completion_tokens = 0.0006 }
+    target { model = "gpt-4o", provider = "openai", cost_per_1k_prompt_tokens = 0.0025, cost_per_1k_completion_tokens = 0.01 }
+  }
+}
 ```
 
 ## Advanced Features

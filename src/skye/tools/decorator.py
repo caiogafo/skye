@@ -4,9 +4,8 @@ This module provides the @capability decorator that allows developers to
 easily create capabilities from Python functions.
 """
 
-from typing import Any, Callable, TypeVar, overload
-
-from skye.tools.schema import CapabilitySchema
+from collections.abc import Callable
+from typing import Any, TypeVar, overload
 
 F = TypeVar("F", bound=Callable[..., Any])
 

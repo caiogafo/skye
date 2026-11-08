@@ -1,7 +1,7 @@
 """Examples are small (Requirement 24.5 of steering, task 5.8 of the uxui spec).
 
 One idea per example, about 80 lines. ``KNOWN_LONG`` maps each file still over the limit to the most lines it may have; the entry only
-goes down, and a file that fits is removed from the list. Files that start with an underscore (the shared helper ``examples/_offline.py``) are not examples. ``prompts/`` is owned by the ``prompts`` spec (task 5).
+goes down, and a file that fits is removed from the list. Files that start with an underscore (the shared helper ``examples/_offline.py``) are not examples.
 """
 
 from __future__ import annotations
@@ -11,7 +11,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 EXAMPLES = ROOT / "examples"
 LIMIT = 80
-EXEMPT_FOLDERS = {"prompts"}
+EXEMPT_FOLDERS: set[str] = set()
 
 # custom_providers.py stays long because BaseModelProvider has 11 abstract methods that every provider must write (streaming and
 # capability hooks included). Making them optional with safe defaults is proposal S5.5 of the simplicity report; it is not a task

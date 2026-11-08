@@ -15,7 +15,13 @@ bundled ``templates/`` files and the prompts tests. Supported syntax:
   string / number / ``True``/``False``/``None`` literals, list literals, ``not``/``and``/``or``,
   ``== != < > <= >= in not in``, conditional ``a if cond else b`` and filters ``x | f(args)``.
 * Built-in filters: join, upper, lower, title, capitalize, trim, length, default (alias d),
-  string, list, first, last, int, float, replace, tojson. Callers may add their own.
+  string, list, first, last, int, float, replace, tojson, toxml, totable, map(attribute). Callers
+  may add their own. ``tojson``, ``toxml`` and ``totable`` put DATA into a prompt as JSON, as XML
+  (``{{ order | toxml("order") }}``: a map gives one element per key, a list repeated ``<item>``
+  elements, the text is escaped) or as a Markdown table (``{{ rows | totable }}``: a list of maps,
+  one row per map, the columns in order of first appearance, or the ones given:
+  ``totable(["name", "price"])``). To ask the model to ANSWER in a format, use the ``output``
+  block of a ``.skye`` prompt instead.
 
 Undefined variables are left visible (``{{ name }}``) and are falsy, as with Jinja2's
 ``DebugUndefined``. No code is evaluated with ``eval``; only the grammar above is interpreted.
@@ -25,10 +31,17 @@ from __future__ import annotations
 
 import json
 import re
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Iterator, Mapping
 from typing import Any
 
-__all__ = ["TemplateSyntaxError", "Undefined", "render_template", "DEFAULT_FILTERS"]
+__all__ = [
+    "DEFAULT_FILTERS",
+    "CompiledTemplate",
+    "TemplateSyntaxError",
+    "Undefined",
+    "compile_template",
+    "render_template",
+]
 
 
 class TemplateSyntaxError(ValueError):
@@ -51,7 +64,7 @@ class Undefined:
     def __bool__(self) -> bool:
         return False
 
-    def __iter__(self):  # noqa: ANN204
+    def __iter__(self) -> Iterator[Any]:
         return iter(())
 
     def __len__(self) -> int:
@@ -90,6 +103,77 @@ def _last(value: Any) -> Any:
     return items[-1] if items else Undefined("last")
 
 
+_XML_BAD = re.compile(r"[^0-9A-Za-z_.-]")
+
+
+def _xml_escape(text: str) -> str:
+    return text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
+
+def _xml_tag(name: Any) -> str:
+    tag = _XML_BAD.sub("_", str(name)) or "item"
+    return tag if tag[0].isalpha() or tag[0] == "_" else f"_{tag}"
+
+
+def _xml_scalar(value: Any) -> str:
+    if value is None or isinstance(value, Undefined):
+        return ""
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    return _xml_escape(str(value))
+
+
+def _xml_lines(tag: str, value: Any, depth: int, out: list[str]) -> None:
+    pad = "  " * depth
+    if isinstance(value, Mapping):
+        out.append(f"{pad}<{tag}>")
+        for key, item in value.items():
+            _xml_lines(_xml_tag(key), item, depth + 1, out)
+        out.append(f"{pad}</{tag}>")
+    elif isinstance(value, list | tuple):
+        out.append(f"{pad}<{tag}>")
+        for item in value:
+            _xml_lines("item", item, depth + 1, out)
+        out.append(f"{pad}</{tag}>")
+    else:
+        out.append(f"{pad}<{tag}>{_xml_scalar(value)}</{tag}>")
+
+
+def _toxml(value: Any, root: str = "data") -> str:
+    """``value`` as indented XML under ``<root>``."""
+    out: list[str] = []
+    _xml_lines(_xml_tag(root), value, 0, out)
+    return "\n".join(out)
+
+
+def _cell(value: Any) -> str:
+    if value is None or isinstance(value, Undefined):
+        return ""
+    if isinstance(value, bool):
+        text = "true" if value else "false"
+    elif isinstance(value, Mapping | list | tuple):
+        text = json.dumps(value, ensure_ascii=False)
+    else:
+        text = str(value)
+    return text.replace("|", "\\|").replace("\r\n", " ").replace("\n", " ")
+
+
+def _totable(value: Any, columns: Any = None) -> str:
+    """A list of maps (or one map) as a Markdown table, one row per map."""
+    rows = [value] if isinstance(value, Mapping) else list(value or ())
+    rows = [r if isinstance(r, Mapping) else {"value": r} for r in rows]
+    names: list[str] = [str(c) for c in columns] if columns else []
+    if not names:
+        for row in rows:
+            names.extend(str(k) for k in row if str(k) not in names)
+    if not names:
+        return ""
+    lines = ["| " + " | ".join(_cell(n) for n in names) + " |", "|" + "---|" * len(names)]
+    for row in rows:
+        lines.append("| " + " | ".join(_cell(row.get(n)) for n in names) + " |")
+    return "\n".join(lines)
+
+
 DEFAULT_FILTERS: dict[str, Callable[..., Any]] = {
     "join": _join,
     "upper": lambda v: str(v).upper(),
@@ -109,6 +193,9 @@ DEFAULT_FILTERS: dict[str, Callable[..., Any]] = {
     "float": lambda v, default=0.0: _safe(float, v, default),
     "replace": lambda v, old, new: str(v).replace(str(old), str(new)),
     "tojson": lambda v: json.dumps(v, ensure_ascii=False),
+    "toxml": _toxml,
+    "totable": _totable,
+    "map": lambda v, attribute: [_getattr(item, str(attribute)) for item in v],
 }
 
 
@@ -134,7 +221,14 @@ _TOKEN_RE = re.compile(
 )
 
 _KEYWORDS = {"not", "and", "or", "in", "if", "else"}
-_CONSTANTS = {"True": True, "False": False, "true": True, "false": False, "None": None, "none": None}
+_CONSTANTS = {
+    "True": True,
+    "False": False,
+    "true": True,
+    "false": False,
+    "None": None,
+    "none": None,
+}
 
 
 def _tokenize(src: str) -> list[tuple[str, str]]:
@@ -156,6 +250,10 @@ class _Parser:
         self.src = src.strip()
         self.toks = _tokenize(self.src)
         self.i = 0
+        # Root names read by the expression, in first-seen order (with repeats), and the ones that
+        # are the operand of a ``default`` filter (so a missing value is expected).
+        self.names: list[str] = []
+        self.defaulted: set[str] = set()
 
     def peek(self) -> tuple[str, str] | None:
         return self.toks[self.i] if self.i < len(self.toks) else None
@@ -181,7 +279,8 @@ class _Parser:
     def parse(self) -> Callable[[dict[str, Any]], Any]:
         node = self.ternary()
         if self.peek() is not None:
-            raise TemplateSyntaxError(f"Unexpected token {self.peek()[1]!r} in expression: {self.src!r}")  # type: ignore[index]
+            token = self.toks[self.i][1]
+            raise TemplateSyntaxError(f"Unexpected token {token!r} in expression: {self.src!r}")
         return node
 
     # --- grammar ---
@@ -226,7 +325,11 @@ class _Parser:
             elif tok == ("name", "in"):
                 op = "in"
                 self.i += 1
-            elif tok == ("name", "not") and self.i + 1 < len(self.toks) and self.toks[self.i + 1] == ("name", "in"):
+            elif (
+                tok == ("name", "not")
+                and self.i + 1 < len(self.toks)
+                and self.toks[self.i + 1] == ("name", "in")
+            ):
                 op = "not in"
                 self.i += 2
             if op is None:
@@ -235,13 +338,20 @@ class _Parser:
             left = (lambda p, r, o: lambda ctx: _compare(o, p(ctx), r(ctx)))(prev, right, op)
 
     def filtered(self) -> Callable[[dict[str, Any]], Any]:
+        first_tok = self.peek()
+        first_name = len(self.names)
         value = self.postfix()
         while self.accept("op", "|"):
             kind, fname = self.next()
             if kind != "name":
                 raise TemplateSyntaxError(f"Invalid filter name in expression: {self.src!r}")
+            if fname in ("default", "d") and first_tok is not None and first_tok[0] == "name":
+                if len(self.names) > first_name and self.names[first_name] == first_tok[1]:
+                    self.defaulted.add(first_tok[1])
             args = self.call_args() if self.accept("op", "(") else []
-            value = (lambda v, n, a: lambda ctx: _apply_filter(ctx, n, v(ctx), [x(ctx) for x in a]))(value, fname, args)
+            value = (
+                lambda v, n, a: lambda ctx: _apply_filter(ctx, n, v(ctx), [x(ctx) for x in a])
+            )(value, fname, args)
         return value
 
     def call_args(self) -> list[Callable[[dict[str, Any]], Any]]:
@@ -275,7 +385,9 @@ class _Parser:
     def atom(self) -> Callable[[dict[str, Any]], Any]:
         kind, text = self.next()
         if kind == "str":
-            value = bytes(text[1:-1], "utf-8").decode("unicode_escape") if "\\" in text else text[1:-1]
+            value = (
+                bytes(text[1:-1], "utf-8").decode("unicode_escape") if "\\" in text else text[1:-1]
+            )
             return lambda ctx: value
         if kind == "num":
             number: Any = float(text) if "." in text else int(text)
@@ -285,7 +397,10 @@ class _Parser:
                 const = _CONSTANTS[text]
                 return lambda ctx: const
             if text in _KEYWORDS:
-                raise TemplateSyntaxError(f"Unexpected keyword {text!r} in expression: {self.src!r}")
+                raise TemplateSyntaxError(
+                    f"Unexpected keyword {text!r} in expression: {self.src!r}"
+                )
+            self.names.append(text)
             return lambda ctx: ctx[text] if text in ctx else Undefined(text)
         if (kind, text) == ("op", "("):
             inner = self.ternary()
@@ -369,10 +484,6 @@ def _apply_filter(ctx: dict[str, Any], name: str, value: Any, args: list[Any]) -
     return fn(value, *args)
 
 
-def _compile_expr(src: str) -> Callable[[dict[str, Any]], Any]:
-    return _Parser(src).parse()
-
-
 # ---------------------------------------------------------------------------------------
 # Template lexing / parsing
 # ---------------------------------------------------------------------------------------
@@ -395,7 +506,11 @@ def _lex(source: str) -> list[tuple[str, str]]:
         if strip_next_ws:
             text = text.lstrip()
         elif trim_newline:
-            text = text[1:] if text.startswith("\n") else (text[2:] if text.startswith("\r\n") else text)
+            text = (
+                text[1:]
+                if text.startswith("\n")
+                else (text[2:] if text.startswith("\r\n") else text)
+            )
         strip_next_ws = trim_newline = False
         if text:
             items.append(("text", text))
@@ -456,6 +571,24 @@ class _TemplateParser:
     def __init__(self, source: str) -> None:
         self.items = _lex(source)
         self.i = 0
+        # Free root names in first-seen order, and the ones read unconditionally (outside any
+        # ``if`` and loop body, not through ``default``): those must be given at rendering.
+        self.variables: dict[str, None] = {}
+        self.required: dict[str, None] = {}
+        self.scopes: list[set[str]] = []
+        self.depth = 0
+
+    def expr(self, src: str) -> Callable[[dict[str, Any]], Any]:
+        """Compile one expression and record the free names it reads."""
+        parser = _Parser(src)
+        node = parser.parse()
+        for name in parser.names:
+            if any(name in scope for scope in self.scopes) or (self.scopes and name == "loop"):
+                continue
+            self.variables.setdefault(name, None)
+            if self.depth == 0 and name not in parser.defaulted:
+                self.required.setdefault(name, None)
+        return node
 
     def parse(self) -> list[Any]:
         body, end = self.block(())
@@ -471,7 +604,7 @@ class _TemplateParser:
             if kind == "text":
                 nodes.append(("text", payload))
             elif kind == "var":
-                nodes.append(("out", _compile_expr(payload)))
+                nodes.append(("out", self.expr(payload)))
             else:
                 word = payload.split(None, 1)[0] if payload else ""
                 if word in terminators:
@@ -487,16 +620,23 @@ class _TemplateParser:
         return nodes, None
 
     def parse_if(self, head: str) -> Any:
+        self.depth += 1
+        try:
+            return self._parse_if(head)
+        finally:
+            self.depth -= 1
+
+    def _parse_if(self, head: str) -> Any:
         branches: list[tuple[Callable[[dict[str, Any]], Any], list[Any]]] = []
         else_body: list[Any] = []
-        cond = _compile_expr(head[2:])
+        cond = self.expr(head[2:])
         while True:
             body, end = self.block(("elif", "else", "endif"))
             branches.append((cond, body))
             if end is None or end.split()[0] == "endif":
                 break
             if end.split()[0] == "elif":
-                cond = _compile_expr(end[4:])
+                cond = self.expr(end[4:])
                 continue
             else_body, end2 = self.block(("endif",))
             if end2 is None:
@@ -511,11 +651,19 @@ class _TemplateParser:
         names = [n.strip() for n in m.group(1).split(",") if n.strip()]
         if not names or not all(re.fullmatch(r"[A-Za-z_]\w*", n) for n in names):
             raise TemplateSyntaxError(f"Invalid loop variable in: {{% {head} %}}")
-        iterable = _compile_expr(m.group(2))
-        body, end = self.block(("else", "endfor"))
+        iterable = self.expr(m.group(2))
+        self.depth += 1
+        self.scopes.append(set(names))
+        try:
+            body, end = self.block(("else", "endfor"))
+        finally:
+            self.scopes.pop()
         else_body: list[Any] = []
-        if end is not None and end.split()[0] == "else":
-            else_body, end = self.block(("endfor",))
+        try:
+            if end is not None and end.split()[0] == "else":
+                else_body, end = self.block(("endfor",))
+        finally:
+            self.depth -= 1
         if end is None:
             raise TemplateSyntaxError("Missing {% endfor %}")
         return ("for", names, iterable, body, else_body)
@@ -560,15 +708,70 @@ def _render_nodes(nodes: list[Any], ctx: dict[str, Any], out: list[str]) -> None
                 _render_nodes(body, inner, out)
 
 
+class CompiledTemplate:
+    """A parsed template: render it many times without parsing the text again.
+
+    Attributes:
+        variables: The free variable names the template reads, in first-seen order (loop
+            variables inside their loop, ``loop``, constants and filter names are not included).
+        required_variables: The names read unconditionally (outside any ``if`` and loop body and
+            not through the ``default`` filter); a renderer may require them.
+    """
+
+    __slots__ = ("_nodes", "required_variables", "variables")
+
+    def __init__(
+        self, nodes: list[Any], variables: tuple[str, ...], required: tuple[str, ...]
+    ) -> None:
+        self._nodes = nodes
+        self.variables = variables
+        self.required_variables = required
+
+    def render(
+        self,
+        variables: Mapping[str, Any],
+        filters: Mapping[str, Callable[..., Any]] | None = None,
+    ) -> str:
+        """Render with ``variables``; ``filters`` extend the built-in filters.
+
+        Args:
+            variables: The values of the template variables (a missing one stays visible).
+            filters: Extra filters by name; they win over the built-in ones.
+
+        Returns:
+            The rendered text.
+        """
+        ctx: dict[str, Any] = dict(variables)
+        ctx["__filters__"] = {**DEFAULT_FILTERS, **filters} if filters else DEFAULT_FILTERS
+        out: list[str] = []
+        _render_nodes(self._nodes, ctx, out)
+        return "".join(out)
+
+    def __repr__(self) -> str:
+        return f"CompiledTemplate(variables={self.variables!r})"
+
+
+def compile_template(source: str) -> CompiledTemplate:
+    """Parse ``source`` once into a :class:`CompiledTemplate`.
+
+    Args:
+        source: The template text.
+
+    Returns:
+        The compiled template with its free variable names.
+
+    Raises:
+        TemplateSyntaxError: If the template or an expression in it cannot be parsed.
+    """
+    parser = _TemplateParser(source)
+    nodes = parser.parse()
+    return CompiledTemplate(nodes, tuple(parser.variables), tuple(parser.required))
+
+
 def render_template(
     template: str,
     variables: Mapping[str, Any],
     filters: Mapping[str, Callable[..., Any]] | None = None,
 ) -> str:
     """Render ``template`` with ``variables``; ``filters`` extend the built-in filters."""
-    nodes = _TemplateParser(template).parse()
-    ctx: dict[str, Any] = dict(variables)
-    ctx["__filters__"] = {**DEFAULT_FILTERS, **(filters or {})}
-    out: list[str] = []
-    _render_nodes(nodes, ctx, out)
-    return "".join(out)
+    return compile_template(template).render(variables, filters)

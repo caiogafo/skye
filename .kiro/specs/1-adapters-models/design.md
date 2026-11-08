@@ -136,6 +136,13 @@ dataclass, not a pydantic model (Requirement 27.2, D24); a non-conforming result
 Note: the current `base/completion.py` still types `response_schema`/`structured_output` as pydantic models; moving them to
 dataclasses is open work tracked in tasks.md (D24, O4).
 
+Open (decision O44, 2026-11-08, nothing built): `prompts` returns messages and appends the output instructions as text, while providers
+take the system prompt, images and an output schema as separate API fields (Anthropic `system`, Gemini `systemInstruction` /
+`responseSchema`, OpenAI `response_format: json_schema`, Bedrock Converse `system` and output configuration). If the owner takes the
+proposal (prompt parts consumed by the adapter), the adapter chooses the native field or the text from the capabilities of the model,
+which stay in `models` (D17, the import matrix), and `CompleteRequest.response_schema` may have to accept a JSON-Schema `dict`; table
+and XML have no native form. This design changes only after the owner decides O44.
+
 ### Token counting and cost
 
 `transport/token_counter.py` provides an approximate counter using only the standard library (~4 chars per token with a
