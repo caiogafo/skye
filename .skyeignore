@@ -1,0 +1,3 @@
+# Paths `skye fmt` leaves out when it searches this folder (one glob per line).
+# Test data: some files are deliberately invalid or unformatted.
+tests/fixtures/*

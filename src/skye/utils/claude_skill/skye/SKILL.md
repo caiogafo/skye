@@ -11,7 +11,7 @@ Its core is the Python standard library only, and routers, flows and prompts are
 ## Do this first
 
 1. Start from a template instead of a blank file: `skye new router|flow|prompt NAME` (add `-o FILE` to write it).
-2. Edit it. Lines marked `# CHANGE ME` are the ones to change.
+2. Edit it. Lines marked `CHANGE ME` are the ones to change, the `description` of the front matter among them.
 3. Run `skye check FILE` and fix every message until it prints `ok`. Each message gives the line, the column, the reason and the fix, so
    the checker, not memory, is the source of truth for syntax.
 
@@ -24,6 +24,7 @@ Its core is the Python standard library only, and routers, flows and prompts are
 | a router: models, fallbacks, strategies, retries | [references/router.md](references/router.md) |
 | a flow: steps, branches, parallel, loops, errors | [references/flow.md](references/flow.md) |
 | a prompt: variables, roles, conditions, loops | [references/prompt.md](references/prompt.md) |
+| a prompt's answer as JSON, table or XML (`output`, conditional outputs) | [references/output.md](references/output.md) |
 | calling a provider or loading a router from Python | [references/python-api.md](references/python-api.md) |
 | writing or reviewing code inside the library | [references/rules.md](references/rules.md) |
 

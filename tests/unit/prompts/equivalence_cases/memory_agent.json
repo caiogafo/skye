@@ -1,0 +1,171 @@
+[
+  {
+    "note": "minimal",
+    "variables": {
+      "input": "Hi"
+    }
+  },
+  {
+    "note": "everything, memory with timestamp and source",
+    "variables": {
+      "input": "What do I like?",
+      "system_prompt": "You remember.",
+      "personality": "warm",
+      "episodic_memory": [
+        {
+          "content": "I like tea",
+          "timestamp": "2024-01-01"
+        }
+      ],
+      "declarative_memory": [
+        {
+          "content": "Tea has caffeine",
+          "source": "wiki"
+        }
+      ],
+      "tools_output": "search: ok",
+      "output_format": "markdown",
+      "chat_history": [
+        {
+          "role": "user",
+          "content": "Hello there"
+        },
+        {
+          "role": "assistant",
+          "content": "Hi, how can I help?"
+        }
+      ]
+    },
+    "skye_variables": {
+      "history": [
+        {
+          "role": "user",
+          "content": "Hello there"
+        },
+        {
+          "role": "assistant",
+          "content": "Hi, how can I help?"
+        }
+      ],
+      "personality": [
+        "warm"
+      ],
+      "semantic_memory": [
+        {
+          "content": "Tea has caffeine",
+          "source": "wiki"
+        }
+      ]
+    }
+  },
+  {
+    "note": "memory without timestamp and source keys",
+    "variables": {
+      "input": "x",
+      "episodic_memory": [
+        {
+          "content": "I live in Rome"
+        }
+      ],
+      "declarative_memory": [
+        {
+          "content": "Rome is in Italy"
+        }
+      ]
+    },
+    "skye_variables": {
+      "semantic_memory": [
+        {
+          "content": "Rome is in Italy"
+        }
+      ]
+    }
+  },
+  {
+    "note": "memory with empty timestamp and source",
+    "variables": {
+      "input": "x",
+      "episodic_memory": [
+        {
+          "content": "Born 1990",
+          "timestamp": ""
+        }
+      ],
+      "declarative_memory": [
+        {
+          "content": "Rome is in Italy",
+          "source": ""
+        }
+      ]
+    },
+    "skye_variables": {
+      "semantic_memory": [
+        {
+          "content": "Rome is in Italy",
+          "source": ""
+        }
+      ]
+    }
+  },
+  {
+    "note": "empty lists",
+    "variables": {
+      "input": "x",
+      "episodic_memory": [],
+      "declarative_memory": [],
+      "chat_history": []
+    },
+    "skye_variables": {
+      "history": [],
+      "semantic_memory": []
+    }
+  },
+  {
+    "note": "several memories, with and without timestamp/source (intended difference 5)",
+    "variables": {
+      "input": "What do you know about me?",
+      "episodic_memory": [
+        {
+          "content": "I like tea",
+          "timestamp": "2024-01-01"
+        },
+        {
+          "content": "I live in Rome"
+        },
+        {
+          "content": "I run",
+          "timestamp": "2024-02-02"
+        }
+      ],
+      "declarative_memory": [
+        {
+          "content": "Tea has caffeine",
+          "source": "wiki"
+        },
+        {
+          "content": "Rome is in Italy"
+        },
+        {
+          "content": "Running is cardio",
+          "source": "book"
+        }
+      ]
+    },
+    "glued_lines": true,
+    "skye_variables": {
+      "semantic_memory": [
+        {
+          "content": "Tea has caffeine",
+          "source": "wiki"
+        },
+        {
+          "content": "Rome is in Italy"
+        },
+        {
+          "content": "Running is cardio",
+          "source": "book"
+        }
+      ]
+    }
+  }
+]

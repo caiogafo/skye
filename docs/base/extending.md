@@ -40,6 +40,8 @@ checks each built-in implementation and a short reference implementation of each
 | `PromptRenderingInterface` | prompt rendering role | part of `PromptBuilderInterface` | `examples/advanced/prompt_engineering.py` | implemented |
 | `PromptSchemaInterface` | prompt schema role (output schema, validation) | part of `PromptBuilderInterface` | `examples/advanced/prompt_engineering.py` | implemented |
 | `ProviderRegistryInterface` | provider registry | `skye.models` | `examples/advanced/custom_providers.py` | implemented |
+| `Resource` | data type, not a Port | - | - | data |
+| `ResourceProviderInterface` | resource source (list, read by URI) | pass it to its consumer; every MCP client is one (`skye.tools.create_mcp_client`) | `examples/capabilities/mcp_client.py` | implemented by the MCP clients |
 | `RouterConfigurationInterface` | router configuration role (strategy, fallbacks, policies) | part of `ModelRouterInterface` | `examples/routing/basic_routing.py` | implemented |
 | `RoutingStrategy` | data type, not a Port | - | - | data |
 | `Runnable` | agent, team or flow unit | passed wherever a `Runnable` is accepted | `examples/agents/custom_agent_type.py`, `examples/teams/team_of_runnables.py` | implemented |

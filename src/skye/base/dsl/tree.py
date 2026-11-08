@@ -7,6 +7,7 @@ The tree is neutral: it says what was written, not what it means. The block mode
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from typing import Any
 
 
 @dataclass(kw_only=True)
@@ -69,10 +70,14 @@ class Expr(Node):
 class TypeCall(Node):
     """A typed declaration such as ``string("x")`` or ``number(0)`` (``default`` is ``None`` if
     absent).
+
+    ``list({ a = string }, [])`` and ``map({ a = string }, {})`` have a second argument,
+    ``second``: ``default`` holds the shape and ``second`` the default value.
     """
 
     name: str
     default: Value | None = None
+    second: Value | None = None
 
 
 @dataclass(kw_only=True)
@@ -84,10 +89,15 @@ class ListNode(Node):
 
 @dataclass(kw_only=True)
 class MapEntry(Node):
-    """One ``key = value`` entry of a map (the position is the one of the key)."""
+    """One ``key = value`` entry of a map (the position is the one of the key).
+
+    Inside an ``output`` block an entry may end with a string, its description
+    (``amount = number "Amount of the line"``); elsewhere ``description`` is always ``None``.
+    """
 
     key: str
     value: Value
+    description: Str | None = None
 
 
 @dataclass(kw_only=True)
@@ -110,6 +120,8 @@ class Attribute(Node):
         keyword: ``""`` for a plain attribute, ``set`` or ``emit``.
         name_line: The line of the name.
         name_column: The column of the name.
+        description: The string after the value, only inside an ``output`` block
+            (``total = number "Total amount"``); ``None`` elsewhere.
     """
 
     name: str
@@ -117,6 +129,7 @@ class Attribute(Node):
     keyword: str = ""
     name_line: int = 0
     name_column: int = 0
+    description: Str | None = None
 
 
 @dataclass(kw_only=True)
@@ -166,7 +179,9 @@ class Tree:
     Attributes:
         filename: The file name used in diagnostics.
         blocks: The top-level blocks, in order.
+        metadata: The front matter (``---`` ... ``---`` at the top, TOML); empty without one.
     """
 
     filename: str
     blocks: list[Block] = field(default_factory=list)
+    metadata: dict[str, Any] = field(default_factory=dict)

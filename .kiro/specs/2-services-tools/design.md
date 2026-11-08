@@ -42,7 +42,7 @@ tools/
   mcp_client.py             MCPClientInterface, BuiltinMCPClient, MCPToolCapability, create_mcp_client
   mcp_fastmcp.py            FastMCPClient (the only module importing fastmcp, lazily)
   mcp_boundary.py           the single protocol -> Skye conversion point (stdlib only)
-  mcp_resource.py           Resource (to move behind a base resource Port, D26)
+  mcp_resource.py           re-exports Resource and ResourceProviderInterface from the base resource Port (D26), keeping the old path
 ```
 
 ## Components and Interfaces
@@ -102,7 +102,7 @@ behaviour (Requirement 18.3).
 `mcp_client.py` defines `MCPClientInterface`, the one Port with three facets whose return types are identical across
 implementations: `list_tools`/`call_tool` return tools as `CapabilityInterface` objects (reusing the `tools` interfaces),
 `list_prompts`/`get_prompt` return prompts as `base` messages (without importing `prompts`), and
-`list_resources`/`read_resource` return resources as `Resource` objects (Requirement 10.1). `BuiltinMCPClient` is a
+`list_resources`/`read_resource` return resources as `Resource` objects of the `base` resource Port (Requirement 10.1, 10.5). `BuiltinMCPClient` is a
 standard-library JSON-RPC 2.0 client over stateless HTTP POST on `base/http.py`: consume-only, with no stdio transport, no
 subprocess and no server of its own; it handles both a plain-JSON and an SSE-framed reply and paginates list calls by cursor
 (Requirement 10.2). `MCPToolCapability` is the capability that executes a server tool through the client.
@@ -134,18 +134,20 @@ partially populated Skye object is returned (Requirement 10.6). This module impo
 The three facets convert to Skye types only: tools as `Capability` objects, prompts as `base` messages (the prompt facet
 returns `base` messages and does NOT implement `PromptBuilderInterface`, D26), and resources as `Resource`. Under D26 MCP
 resources are a Port in `base` (list and read by URI, MIME type, text or bytes) implemented by the MCP client in `tools`, so
-`prompts` and `memory` can consume MCP resources through `base` without importing `tools` (Requirement 10.5). Today
-`Resource` is still a local dataclass in `tools/mcp_resource.py` ("No base Port") and the code lags D26; defining the `base`
-resource Port and implementing it here is an open task (tasks.md; see "Superseded (history)").
+`prompts` and `memory` can consume MCP resources through `base` without importing `tools` (Requirement 10.5). The Port
+is `skye.base.interfaces.resource` (`ResourceProviderInterface`, a `Protocol` with `list_resources` and `read_resource`, and `Resource`, a
+frozen `@validated` dataclass whose `text` and `data` are mutually exclusive; both exported from `skye.interfaces`).
+`MCPClientInterface` inherits the Port, so `BuiltinMCPClient` and `FastMCPClient` implement it, and `tools/mcp_resource.py` only
+re-exports the two names so `skye.tools.mcp_resource` keeps working.
 
 ## Data Models
 
 `tools` consumes and produces the `base` contracts: `CapabilityCall` and the `SkyeMessage` role variants (including
 `CapabilityMessage`) come from `base`; a completion carries capabilities in the OpenAI data shape converted inside the
 provider adapter (Requirement 9.10). The `tools`-local structures are `CapabilitySchema`, `CapabilityResult`, the MCP
-descriptors `MCPPrompt`/`MCPPromptArgument`/`MCPToolResult`, and `Resource`. New structures are dataclasses, not pydantic
-(D24); `CapabilitySchema`, `CapabilityResult` and the `CapabilityCall` wrapper still carry pydantic and are migrated under
-O4. The MCP descriptors and `Resource` are already frozen dataclasses.
+descriptors `MCPPrompt`/`MCPPromptArgument`/`MCPToolResult`; `Resource` comes from `base`. New structures are dataclasses, not pydantic
+(D24): `CapabilitySchema`, `CapabilityResult` and `CapabilityCall` are `Validated` dataclasses, and no module of `tools` imports
+pydantic (`tests/unit/tools/test_mcp_conformance.py`). The MCP descriptors and `Resource` are frozen dataclasses.
 
 ## Error Handling
 
@@ -158,7 +160,7 @@ required field that is absent or malformed with `ValidationError` naming the MCP
 
 ## Testing Strategy
 
-Unit tests in `tests/unit/tools` cover the interface, schema, registry, local-function and remote-API capabilities,
+Unit tests in `tests/unit/tools` cover the interface, schema, registry, local-function and remote-API capabilities (and, in `test_mcp_conformance.py`, the dataclass rule, the resource Port and the prompt-facet rule),
 the decorator, the call handler, the exceptions, the built-in MCP client and the boundary against mocked transport, with no
 network. The boundary rule is guarded statically and at runtime by `tests/budget/test_boundary_rule.py` (no third-party
 import in `mcp_boundary.py`; no external type in a public annotation or return value). The differential tests in
@@ -211,11 +213,12 @@ imported lazily, and `import skye` reaches neither `fastmcp` nor any optional MC
 
 The former `capability-support` spec is replaced, not deleted; its text is in the git history. The changes:
 - The pydantic `CapabilitySchema`, `CapabilityResult` and `CapabilityCall` models are replaced by dataclasses (D24;
-  Requirement 16.1); the code still carries the pydantic types and is migrated under O4.
+  Requirement 16.1); done, guarded by `tests/unit/tools/test_mcp_conformance.py`.
 - The `fastmcp`-required, stdio/subprocess MCP design — `MCPCapability` and `MCPServerClient` that import `fastmcp` to run,
   with placeholder stdio framing — is replaced by the consume-only tri-faceted client: a stdlib JSON-RPC-over-HTTP
   `BuiltinMCPClient` by default and `FastMCPClient` behind the same Port, selected by an explicit `impl` with no fallback
-  (D15, D16; Requirement 10.2, 10.3, 10.4). The legacy `mcp_capability.py` and `mcp_server_client.py` remain as removable
-  probes and are cited in tasks.md.
-- MCP resources move from a `tools`-internal `Resource` to a resource Port in `base` implemented here, and the MCP prompt
-  facet returns `base` messages rather than implementing `PromptBuilderInterface` (D26; Requirement 10.5).
+  (D15, D16; Requirement 10.2, 10.3, 10.4). The legacy `mcp_capability.py` and `mcp_server_client.py` probes are deleted
+  (2026-11-08), with their tests and the `LEGACY_TOOLS_PROBES` allowance of `tests/budget/test_boundary_rule.py`: `fastmcp` is imported
+  only in `mcp_fastmcp.py`.
+- MCP resources moved from a `tools`-internal `Resource` to a resource Port in `base` implemented here (done 2026-11-08), and the MCP
+  prompt facet returns `base` messages rather than implementing `PromptBuilderInterface` (D26; Requirement 10.5).

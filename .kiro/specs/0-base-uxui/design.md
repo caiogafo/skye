@@ -181,9 +181,9 @@ Thin aliases that store no second value: `CompleteResponse.text` → `content`, 
 `skye.completion(...)` as a callable module is rejected: a facade may only re-export (Requirement 7.15). A test records each name as `exists`
 or `known_missing`, the list only shrinking (task 4.9, steering property 20).
 
-## The `.skye` language (not built yet)
-**Status: the parser is not written, and none of the examples below has been run through a parser.** The syntax was drafted with the owner in
-two interviews (decisions D49 to D61) and the reference examples were written by hand. This spec owns the public surface of the language (the
+## The `.skye` language
+**Status (2026-11-08): the parser, the checker, the writer and the formatter are built and tested; the flow runtime is not.** The syntax was drafted with the owner in
+two interviews (decisions D49 to D61), then extended by D62 to D74 (comments, front matter, `skye fmt`, structured prompt inputs, the `output` block, the editor extension). The examples below were first written by hand and are now run by `tests/unit/dsl/`. This spec owns the public surface of the language (the
 syntax a user types, the load calls, the error messages); the parser and the grammar belong to `base`, the flow engine to `3-runtime-flows`,
 the router mapping to the router spec and the bundled prompts to `prompts:4`. System view: `11-design.md`, section "The `.skye`
 language"; requirements: Requirement 54 of steering.
@@ -236,8 +236,8 @@ Each row is a short file and the message `skye check` prints; together they are 
 ### Scope and the reference set
 Version 1 covers routers, flows (sequence, condition, parallel, bounded loop, retry, timeout, error branch, `foreach`, typed context with `set` and
 `emit`, an agent, a team, a model through the router or a sub-flow as a step) and the reduced `prompt` block. Version 2 is written and not built:
-waiting for events with persistence and resume, `to_mermaid()`, `include`, and in prompts the examples, multimodal content, output schema and the
-partial; the delivery guarantee of persistence is open decision O34 and the fate of `prompts/engine.py` O35. The full reference set (four routers, seven
+waiting for events with persistence and resume, `to_mermaid()`, `include`, and in prompts the examples, multimodal content and the
+partial (the output schema moved to version 1, D70); the delivery guarantee of persistence is open decision O34 and the fate of `prompts/engine.py` O35. The full reference set (four routers, seven
 prompts, nine flows) was drafted in `.agents/tasks/uxui-dsl-examples.md`, a working file that is not versioned; task 8.1 turns it into fixtures under
 `tests/fixtures/skye/` so the conformance suite lives in the repository.
 
@@ -256,6 +256,24 @@ result = flow.run({"topic": "mermaid state machines"})
 `skye.Router.from_file`. The router class that exists is `ModelRouter`, and D39 records `skye.Router` as `known_missing` (not added). The block above
 uses the component paths, which need no new top-level name; whether `Router` and `Flow` become top-level names is a question for the owner, not
 decided here.
+
+### Language tools (decisions D71 to D74)
+These are the parts of the surface a person touches while writing a `.skye` file; the code is in `base/dsl` (text in, text out) and
+`utils` (files, processes), and every one is a client of the same functions, so the editor and CI agree.
+- **Comments** (D71): `#` to the end of the line, `/* */` and `/** **/` over lines, no nesting; `//` is not a comment (floor division).
+  Convention for shared files: `/** **/` documents, `#` is a short note, plain `/* */` only disables code and never appears in a bundled file.
+- **Front matter** (D71): TOML between two `---` lines at the top (`Document.metadata`); a YAML-looking line is an error with the fix.
+- **`skye fmt [PATH...] [--check] [--exclude GLOB]`** (D71): formats the text and keeps comments, triple-quoted strings and front
+  matter; refuses a file with errors and a result that builds a different model; `--check` for CI; `-` reads standard input. With no
+  path it formats every `.skye` file under the current folder, recursively (a folder argument the same), skipping hidden folders,
+  `node_modules`, `venv`, `build`, `dist` and `site-packages`; `--exclude` and a `.skyeignore` file (one glob per line, `#` comments,
+  relative to the folder searched) leave paths out, and the repository's own `.skyeignore` lists `tests/fixtures/*`.
+- **`skye check --format json`** and `-` with `--stdin-filename` (D72): `{"diagnostics": [{file, line, column, reason, fix, message}]}`.
+- **`skye prompt list|info`** (D73): what a prompt takes and gives back (`describe_prompt`, `prompt_help`); the code is in `base/dsl/info.py`
+  because `utils` may not import `prompts` (open decision O46).
+- **The VS Code extension and `skye vscode install|uninstall|status|path|package`** (D72, Requirement 55): TextMate grammar, live diagnostics,
+  "Format Document" through `skye fmt -`; plain JavaScript, no npm dependency, no build; settings `skye.command`, `skye.run`, `skye.registry`.
+- **Open:** a public import for `check_text` and `format_text` (O41; examples may not import `skye.base.*`, D34); named types (O45).
 
 ## Decisions taken and the tasks they unblock
 The owner took O24 to O33 as D36 to D45 (`.kiro/steering/12-decisions.md`). None blocks a task any more.
@@ -276,6 +294,7 @@ The owner took O24 to O33 as D36 to D45 (`.kiro/steering/12-decisions.md`). None
 | D48 | `CapabilityCallHandler`, `Runnable.ainvoke`, `get_instance()` stay as known debt | none |
 | D50 | one declarative language, `.skye`, for routers, flows and prompts; parser in `base` taking text | 8.1 to 8.4 |
 | D59 | the `router` block is the reference format; fields 1:1 with today's YAML; `fallback` inside the route; the shorthand is additive | 8.4, 8.6 |
+| D71 to D74 | comments, front matter, `skye fmt`; the VS Code extension; described and typed prompt inputs, `skye prompt`; the bundled prompts and examples | 10 |
 | D61 | the written grammar, the JSON Schema, `skye check`, `.gitattributes`, and the loading API `Flow.from_file`, `Router.from_file`, `skye.load` | 8.2 to 8.5 |
 | D62 | the library reads no YAML: no parser, no `yaml` extra, no PyYAML; a `.yaml` file is rejected with a message naming `.skye` and JSON | 9.1 to 9.5 |
 Related and not blocking: D49 (taken: the core has no third-party dependency) closes O4, so the pydantic copy of `CapabilitySchema` leaves with the code

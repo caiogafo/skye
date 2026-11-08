@@ -1,1 +1,1 @@
-"""Prompt template files (*.jinja) loaded by `skye.prompts.loaders`."""
+"""The bundled prompts (``*.skye`` prompt blocks, D60) loaded by `skye.prompts.loaders`."""

@@ -28,6 +28,9 @@ class ModelTarget(Validated):
         weight: Weight for weighted routing (optional)
         tpm: Tokens per minute limit (optional)
         rpm: Requests per minute limit (optional)
+        cost_per_1k_prompt_tokens: Price of 1000 prompt tokens, read by ``cost_based`` (optional)
+        cost_per_1k_completion_tokens: Price of 1000 completion tokens, read by ``cost_based``
+            (optional)
         tags: Tags for tag-based routing (optional)
         metadata: Additional metadata (optional)
 
@@ -56,6 +59,12 @@ class ModelTarget(Validated):
     weight: float = field(default=1.0, description="Weight for weighted routing")
     tpm: int | None = field(default=None, description="Tokens per minute limit")
     rpm: int | None = field(default=None, description="Requests per minute limit")
+    cost_per_1k_prompt_tokens: float | None = field(
+        default=None, ge=0, description="Price of 1000 prompt tokens (cost_based)"
+    )
+    cost_per_1k_completion_tokens: float | None = field(
+        default=None, ge=0, description="Price of 1000 completion tokens (cost_based)"
+    )
     tags: list[str] = field(default_factory=list, description="Tags for routing")
     metadata: dict[str, Any] = field(default_factory=dict, description="Additional metadata")
 

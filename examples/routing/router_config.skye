@@ -1,11 +1,9 @@
-# Skye Router Configuration Example
-# =====================================
-# A complete router in the .skye language. It shows every routing strategy, environment variables
-# (env.NAME), fallback chains, retry policies and multi-provider setups.
-# Check it with:  skye check examples/routing/router_config.skye
-#
-# The router reads these fields. The old YAML file also had `priority` and
-# `cost_per_1k_*_tokens` on targets: the router never read them, so they are not declared here.
+---
+title       = "Routing strategies"
+description = "A complete router in the .skye language: every routing strategy, environment variables (env.NAME), fallback chains, retry policies and multi-provider setups. Check it with `skye check examples/routing/router_config.skye`."
+version     = "1.0"
+tags        = ["router", "example", "strategies", "fallback"]
+---
 
 router "main" {
   # Default strategy for routes that do not set their own.
@@ -17,11 +15,9 @@ router "main" {
   # Check rate limits before each call (recommended: prevents rate limit errors).
   enable_pre_call_checks = true
 
-  # -------------------------------------------------------------------------
-  # EXAMPLE 1: Rate-limit-aware strategy
-  # Routes to the target with the most available capacity (TPM/RPM).
-  # Best for: high-throughput scenarios, avoiding rate limit errors.
-  # -------------------------------------------------------------------------
+  /** EXAMPLE 1: Rate-limit-aware strategy
+      Routes to the target with the most available capacity (TPM/RPM).
+      Best for: high-throughput scenarios, avoiding rate limit errors. **/
   route "gpt-3.5-turbo" {
     # Primary OpenAI target
     target {
@@ -45,12 +41,10 @@ router "main" {
     }
   }
 
-  # -------------------------------------------------------------------------
-  # EXAMPLE 2: Round-robin strategy
-  # Distributes requests evenly across all targets in rotation.
-  # Best for: simple load distribution, homogeneous deployments.
-  # `fallback` lists the routes to try, in order, if this route fails.
-  # -------------------------------------------------------------------------
+  /** EXAMPLE 2: Round-robin strategy
+      Distributes requests evenly across all targets in rotation.
+      Best for: simple load distribution, homogeneous deployments.
+      `fallback` lists the routes to try, in order, if this route fails. **/
   route "gpt-4" {
     strategy = "round_robin"
     fallback = ["azure-gpt4", "claude"]   # if gpt-4 fails, try azure-gpt4, then claude
@@ -60,15 +54,15 @@ router "main" {
       api_key = env.OPENAI_API_KEY
       tpm = 100000
       rpm = 1000
+      cost_per_1k_prompt_tokens = 0.03       # price of 1000 tokens, read by cost_based
+      cost_per_1k_completion_tokens = 0.06
       tags = ["premium", "high-quality"]
     }
   }
 
-  # -------------------------------------------------------------------------
-  # EXAMPLE 3: Least-busy strategy
-  # Routes to the target with the fewest active requests.
-  # Best for: real-time load balancing, varying request durations.
-  # -------------------------------------------------------------------------
+  /** EXAMPLE 3: Least-busy strategy
+      Routes to the target with the fewest active requests.
+      Best for: real-time load balancing, varying request durations. **/
   route "claude" {
     strategy = "least_busy"
     fallback = ["bedrock-claude", "gpt-4"]   # if claude fails, try bedrock-claude, then gpt-4
@@ -90,11 +84,9 @@ router "main" {
     }
   }
 
-  # -------------------------------------------------------------------------
-  # EXAMPLE 4: Latency-based strategy
-  # Routes to the target with the lowest average latency.
-  # Best for: latency-sensitive applications, multi-region deployments.
-  # -------------------------------------------------------------------------
+  /** EXAMPLE 4: Latency-based strategy
+      Routes to the target with the lowest average latency.
+      Best for: latency-sensitive applications, multi-region deployments. **/
   route "azure-gpt4" {
     strategy = "latency_based"
     fallback = ["gpt-4", "gpt-3.5-turbo"]   # if azure-gpt4 fails, try gpt-4, then gpt-3.5-turbo
@@ -124,11 +116,10 @@ router "main" {
     }
   }
 
-  # -------------------------------------------------------------------------
-  # EXAMPLE 5: Cost-based strategy
-  # Routes to the target with the lowest cost per token.
-  # Best for: budget-conscious deployments, cost optimization.
-  # -------------------------------------------------------------------------
+  /** EXAMPLE 5: Cost-based strategy
+      Routes to the available target with the lowest cost_per_1k_prompt_tokens +
+      cost_per_1k_completion_tokens; targets without a cost come last, ties keep this order.
+      Best for: budget-conscious deployments, cost optimization. **/
   route "budget" {
     strategy = "cost_based"
     fallback = ["gpt-3.5-turbo"]   # budget fallback chain
@@ -139,6 +130,8 @@ router "main" {
       api_key = env.OPENAI_API_KEY
       tpm = 200000
       rpm = 2000
+      cost_per_1k_prompt_tokens = 0.0005
+      cost_per_1k_completion_tokens = 0.0015
       tags = ["budget", "fast"]
     }
     # Alternative budget option
@@ -148,15 +141,15 @@ router "main" {
       api_key = env.OPENAI_API_KEY
       tpm = 180000
       rpm = 1800
+      cost_per_1k_prompt_tokens = 0.001
+      cost_per_1k_completion_tokens = 0.002
       tags = ["budget", "large-context"]
     }
   }
 
-  # -------------------------------------------------------------------------
-  # EXAMPLE 6: Weighted strategy
-  # Routes based on assigned weights (higher weight = more traffic).
-  # Best for: gradual rollouts, A/B testing, canary deployments.
-  # -------------------------------------------------------------------------
+  /** EXAMPLE 6: Weighted strategy
+      Routes based on assigned weights (higher weight = more traffic).
+      Best for: gradual rollouts, A/B testing, canary deployments. **/
   route "weighted-gpt4" {
     strategy = "weighted"
     # Primary deployment gets 80% of traffic
@@ -181,11 +174,9 @@ router "main" {
     }
   }
 
-  # -------------------------------------------------------------------------
-  # EXAMPLE 7: Priority-based strategy
-  # Prefers the target with the best success rate, falls back on failure.
-  # Best for: primary/secondary deployments, disaster recovery.
-  # -------------------------------------------------------------------------
+  /** EXAMPLE 7: Priority-based strategy
+      Prefers the target with the best success rate, falls back on failure.
+      Best for: primary/secondary deployments, disaster recovery. **/
   route "priority-claude" {
     strategy = "priority_based"
     # Primary target
@@ -217,11 +208,9 @@ router "main" {
     }
   }
 
-  # -------------------------------------------------------------------------
-  # EXAMPLE 8: Multi-region AWS Bedrock
-  # Redundancy across regions. Credentials come from the AWS environment
-  # (AWS_PROFILE or AWS_ACCESS_KEY_ID), so no api_key is written.
-  # -------------------------------------------------------------------------
+  /** EXAMPLE 8: Multi-region AWS Bedrock
+      Redundancy across regions. Credentials come from the AWS environment
+      (AWS_PROFILE or AWS_ACCESS_KEY_ID), so no api_key is written. **/
   route "bedrock-claude" {
     strategy = "latency_based"
     target {
@@ -244,49 +233,42 @@ router "main" {
     }
   }
 
-  # -------------------------------------------------------------------------
-  # EXAMPLE 9: Simple shuffle strategy
-  # Random selection from the available targets.
-  # Best for: testing, development, unpredictable distribution.
-  # -------------------------------------------------------------------------
+  /** EXAMPLE 9: Simple shuffle strategy
+      Random selection from the available targets.
+      Best for: testing, development, unpredictable distribution. **/
   route "random" {
     strategy = "simple_shuffle"
     target { model = "gpt-3.5-turbo", provider = "openai", api_key = env.OPENAI_API_KEY }
     target { model = "claude-3-haiku-20240307", provider = "anthropic", api_key = env.ANTHROPIC_API_KEY }
   }
 
-  # -------------------------------------------------------------------------
-  # RETRY POLICIES
-  # How many times to retry each kind of error. `retry_after` and
-  # `exponential_backoff` are read by the language, but the router does not
-  # apply them yet: only `max_retries` has an effect today.
-  # -------------------------------------------------------------------------
+  /** RETRY POLICIES
+      How many times to retry each kind of error. `retry_after` and
+      `exponential_backoff` are read by the language, but the router does not
+      apply them yet: only `max_retries` has an effect today. **/
   retry_policy "RateLimitError"      { max_retries = 3, retry_after = "5s", exponential_backoff = true }
   retry_policy "TimeoutError"        { max_retries = 2, retry_after = "3s", exponential_backoff = true }
   retry_policy "ServerError"         { max_retries = 2, retry_after = "5s", exponential_backoff = true }
   retry_policy "AuthenticationError" { max_retries = 0 }   # do not retry authentication errors
 
-  # -------------------------------------------------------------------------
-  # COOLDOWN POLICIES
-  # How many failures per minute are allowed before a model is put in cooldown.
-  # This prevents cascading failures.
-  # -------------------------------------------------------------------------
+  /** COOLDOWN POLICIES
+      How many failures per minute are allowed before a model is put in cooldown.
+      This prevents cascading failures. **/
   allowed_fails_policy "RateLimitError" { allowed_fails_per_minute = 100 }
   allowed_fails_policy "TimeoutError"   { allowed_fails_per_minute = 50 }
   allowed_fails_policy "ServerError"    { allowed_fails_per_minute = 20 }
 }
 
-# ENVIRONMENT VARIABLES USED
-# ==========================
-#   OPENAI_API_KEY, ANTHROPIC_API_KEY, ANTHROPIC_API_KEY_SECONDARY (optional second key),
-#   AZURE_OPENAI_API_KEY_EAST, AZURE_OPENAI_API_KEY_WEST, AZURE_API_BASE_EAST, AZURE_API_BASE_WEST,
-#   and for Bedrock AWS_PROFILE or AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY.
-# For production, use a secret manager (AWS Secrets Manager, Azure Key Vault, Vault, Kubernetes Secrets).
-#
-# USAGE
-# =====
-#   from skye.router import ModelRouter
-#   router = ModelRouter.from_file("router_config.skye")
-#   response = router.complete(messages=[UserMessage(content="Hello!")], model="gpt-4")
-#   response = router.complete(messages=[UserMessage(content="Hello!")], tags=["fast", "cost-effective"])
-# See skye_config_example.py for a runnable version.
+/** ENVIRONMENT VARIABLES USED
+    OPENAI_API_KEY, ANTHROPIC_API_KEY, ANTHROPIC_API_KEY_SECONDARY (optional second key),
+    AZURE_OPENAI_API_KEY_EAST, AZURE_OPENAI_API_KEY_WEST, AZURE_API_BASE_EAST, AZURE_API_BASE_WEST,
+    and for Bedrock AWS_PROFILE or AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY.
+    For production, use a secret manager (AWS Secrets Manager, Azure Key Vault, Vault, Kubernetes Secrets).
+
+    USAGE
+      from skye.router import ModelRouter
+      from skye import UserMessage
+      router = ModelRouter.from_file("router_config.skye", name="main")
+      response = router.complete(messages=[UserMessage(content="Hello!")], model="gpt-4")
+      response = router.complete(messages=[UserMessage(content="Hello!")], tags=["fast", "cost-effective"])
+    See skye_config_example.py for a runnable version. **/

@@ -1,0 +1,51 @@
+---
+title       = "Code review"
+description = "Control flow: when / when not, each with loop.*, a map's entries and filters"
+version     = "1.0"
+tags        = ["examples"]
+---
+
+/** When / when not, each with loop.*, a map's entries and filters. **/
+prompt "review" {
+  variables = {
+    language = string        "Language of the change"
+    strict   = bool(false)   "True to block the merge on any bug"
+    rules    = list(string)  "Review rules, in order"
+    owners   = map           "Area of the code to the name of its owner"
+    tools    = list({
+      name        = string      "Tool name"
+      description = string      "What the tool does"
+      parameters  = map({})     "Arguments: name to type or description"
+      returns     = string("")  "What the tool returns"
+    }, [])  "Tools the agent may call"
+  }
+
+  message "system" {
+    text = "You review {{ language | upper }} changes."
+    when strict     { text = "Block the merge on any bug." }
+    when not strict { text = "Comment only; never block the merge." }
+    each rule in rules {
+      text = "{{ loop.index }}. {{ rule }}"
+      when loop.last { text = "({{ loop.length }} rules)" }
+    }
+    each entry in owners { text = "Owner of {{ entry.key }}: {{ entry.value }}" }   # a map gives {key, value}
+    when tools { text = "Tools: {{ tools | map('name') | join(', ') }}" }
+  }
+
+  message "user" { text = "Review the attached diff." }
+}
+
+/**
+ * Example:
+ *
+ *   builder.render("review", {
+ *       "language": "python",
+ *       "strict": True,
+ *       "rules": ["Errors keep their cause", "Names say what they hold"],
+ *       "owners": {"api": "Alice", "docs": "Bob"},
+ *       "tools": [
+ *           {"name": "run_tests", "description": "Run the test suite", "returns": "The failures"},
+ *           {"name": "lint", "description": "Check the style", "parameters": {"path": "string"}},
+ *       ],
+ *   })
+ **/

@@ -51,6 +51,8 @@ _TARGET_FIELDS = (
     "weight",
     "tpm",
     "rpm",
+    "cost_per_1k_prompt_tokens",
+    "cost_per_1k_completion_tokens",
 )
 
 
@@ -129,6 +131,8 @@ _TARGET_SPEC_FIELDS = (
     "weight",
     "tpm",
     "rpm",
+    "cost_per_1k_prompt_tokens",
+    "cost_per_1k_completion_tokens",
     "tags",
     "metadata",
 )

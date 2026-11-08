@@ -53,6 +53,10 @@ from skye.base.interfaces.prompt import (
 from skye.base.interfaces.registry import (
     ProviderRegistryInterface,
 )
+from skye.base.interfaces.resource import (
+    Resource,
+    ResourceProviderInterface,
+)
 from skye.base.interfaces.router import (
     ModelHealthInterface,
     ModelRouterInterface,
@@ -108,6 +112,8 @@ __all__ = [
     "PromptRenderingInterface",
     "PromptSchemaInterface",
     "ProviderRegistryInterface",
+    "Resource",
+    "ResourceProviderInterface",
     "RouterConfigurationInterface",
     "RoutingStrategy",
     "Runnable",

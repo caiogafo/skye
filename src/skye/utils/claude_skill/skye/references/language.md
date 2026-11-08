@@ -1,7 +1,7 @@
 # The `.skye` language
 
 One language for three kinds of block: `router`, `flow` and `prompt`. A file may hold several blocks, in any order, and is self-sufficient
-(no `include`). Comments start with `#`. Each item of a block is on its own line or separated by a comma.
+(no `include`). It may start with front matter: `---`, TOML `key = value` lines (`title`, `description`, `version`, `tags`; never YAML `key: value`), `---`. Comments: `/** ... **/` documents (a section, a usage example), `#` to the end of the line is a short note; a plain `/* ... */` only disables code for a while, never in a shared file (not `//`, which is floor division). Each item of a block is on its own line or separated by a comma.
 
 ```text
 KIND "label" { ... }        a block: router "main", flow "triage", step "Classify", route "fast"
@@ -26,6 +26,8 @@ Strings (`"..."`, or `"""..."""` over several lines), numbers, `true` and `false
 | `item` | the current element inside a step that has `foreach` |
 
 Inside a `prompt` block the variables are written bare (`domain`, `turn.role`).
+A prompt variable may have a shape, with the same field syntax as the `output` block: `list({ name = string, note = string("") }, [])`
+(see [prompt.md](prompt.md)). Only a prompt's `variables` and an `output` block take a trailing `"description"` after a type.
 
 ## Expressions
 
@@ -34,8 +36,8 @@ Python-like and safe: comparison, `and`, `or`, `not`, `+ - * /`, `in`, and the f
 
 ## Not available yet (version 2)
 
-`wait` and `on_event` (waiting for an event with persistence), `include`, and in prompts: examples, multimodal content, output schema and
-`bind`. The checker rejects them with "not available in this version". Do not write them; say that they are not available and offer
+`wait` and `on_event` (waiting for an event with persistence), `include`, and in prompts: examples, multimodal content and `bind`
+(the prompt `output` block is available: see [output.md](output.md)). The checker rejects them with "not available in this version". Do not write them; say that they are not available and offer
 the nearest thing that is (see [flow.md](flow.md)).
 
 ## Nesting

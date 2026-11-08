@@ -90,13 +90,13 @@ Three checks run on every import: no upward import; no import outside the compon
 ## Components
 | Component | Layer | Role | Ports consumed |
 |---|---|---|---|
-| `base` | 0 | core models, errors, configuration, all Ports, `missing_extra` helper, `http.py`, the `.skye` parser (text in, syntax tree out) | none (standard library only) |
+| `base` | 0 | core models, errors, configuration, all Ports, `missing_extra` helper, `http.py`, the `.skye` language in `base/dsl` (text in, syntax tree out; comments, front matter, the formatter and the prompt help are text functions) | none (standard library only) |
 | `auth` | 0 | strategies, credential sources, token cache, SigV4 | implements `authentication` |
 | `models` | 1 | adapters for language, embedding and decision models; shared transport, retry, error mapping, token counting; implements `runnable` | `model`, `decision`, `vector_encoder`, `registry`, `cost_calculator`, `error_handler`, `token_counter`, `runnable`; credentials through `auth` |
 | `store` | 1 | in-memory, file, DynamoDB, Redis backends | `storage`; credentials through `auth` |
-| `router` | 2 | ModelRouter, strategies, health tracking, fallbacks | `router`, `model`, `decision`, `registry`, `storage` |
-| `tools` | 2 | capability registry, local functions, remote API, MCP client | `capability`, `registry`, `prompt` and the `base` messages for the MCP prompt facet; credentials through `auth` |
-| `prompts` | 2 | loaders, role-based messages, templates | `prompt`, `content_reader` |
+| `router` | 2 | ModelRouter, strategies (cost based included, D68), health tracking, fallbacks | `router`, `model`, `decision`, `registry`, `storage` |
+| `tools` | 2 | capability registry, local functions, remote API, MCP client (implements the `resource` Port of `base`) | `capability`, `registry`, `resource`, `prompt` and the `base` messages for the MCP prompt facet; credentials through `auth` |
+| `prompts` | 2 | loaders, role-based messages, the `.skye` renderer, bundled prompts (all `.skye`), output instructions, prompt help | `prompt`, `content_reader` |
 | `memory` | 2 | conversation and state memory | `memory`, `storage`; credentials through `auth` |
 | `guard` | 2 | safety filters, pre-flight checks | `safety`, `decision` |
 | `observe` | 2 | events, logs, metrics, traces | `observer`, `event_handler` |
@@ -109,7 +109,7 @@ Three checks run on every import: no upward import; no import outside the compon
 ## Ports (all in `base/interfaces`)
 `model`, `decision`, `runnable`, `storage`, `registry`, `cost_calculator`, `error_handler`, `token_counter`, `memory`,
 `vector_encoder`, `router`, `safety`, `observer`, `event_handler`, `content_reader`, `multimodal_handler`, `prompt`,
-`config_loader`, `plugin`, `capability`, `authorizer`, `authentication`. Every cross-component dependency crosses a Port,
+`config_loader`, `plugin`, `capability`, `resource`, `authorizer`, `authentication`. Every cross-component dependency crosses a Port,
 never a concrete implementation.
 
 A Port is a class named `*Interface` (exceptions: `Runnable`, `DecisionModel`, `StorageBackend`) and describes the call its users
@@ -203,9 +203,31 @@ grammar in `base` serves the flow guards and the prompt interpolation.
 Scope. Version 1: routers, flows (sequence, conditions, parallel, bounded loops, retry, timeout, errors, `foreach`) and the reduced `prompt`
 block that replaces the 18 bundled `.jinja` templates, checked by an equivalence test (D51, D60). Version 2, written but not built: waiting for
 events with persistence and resume (`wait`, `on_event`; version 1 reserves both words and rejects them with a clear message), `to_mermaid()`,
-`include`, and in prompts the examples, multimodal content, output schema and `bind`. Tools of version 1: the written grammar, a JSON Schema of
+`include`, and in prompts the examples, multimodal content and `bind` (the prompt `output` block moved to version 1 by D70). Tools of version 1: the written grammar, a JSON Schema of
 the blocks and `skye check <file>` (D61). JSON router files stay readable; YAML is not read (D59, D62). The language adds no third-party library
 to any component (D49).
+
+Text-level features (all in `base/dsl`, text in and text out, no file I/O). **Comments** (D71): `#` to the end of the line, `/* */` and `/** **/`
+over lines without nesting; `//` is floor division, not a comment; inside an expression a comment is a space. **Front matter** (D71):
+metadata between two `---` lines at the top of the file, written in TOML and read with `tomllib` (never YAML, D62), kept in
+`Document.metadata` and written back by `to_text`; the module is `metadata.py`, because `front` is a watermark (R4). **`skye fmt`** (D71):
+`format_text` works on the text, not on the model, so comments, `"""` strings and front matter survive; it refuses a file with errors and a
+result that would build a different model, is idempotent, and is the same function behind `--check` and `-` (editors). **`skye check
+--format json`** with `-` and `--stdin-filename` (D72) gives an editor the diagnostics the command line gives CI.
+
+Prompt features of the language. Variables are described and typed with the syntax of `output` fields (D73): a trailing string is the
+description, and `list(string)`, `list({ ... }, [])`, `map({ ... })` and nesting give a structured type that `render_prompt` checks with
+one `ValidationError` listing every path (`shapes.py`, `conform`); the default of a structured variable is the second argument (open
+decision O46). `each` has one variable and `loop.*` (D69). The `output` block (`json`, `table`, `xml`, `schema = VAR`, a format from a
+`string` variable, conditional variants inside `when`) turns one declaration into the instructions for the model (D70, in `prompts`).
+`describe_prompt` / `prompt_help` (`base/dsl/info.py`, re-exported by `skye.prompts`, because `utils` may not import `prompts`; open
+decision O46) tell what a prompt takes and gives back, and `skye prompt list|info` print it (D73). The bundled prompts are all `.skye`,
+with front matter, structured inputs, one shape for `tools` and the five memories, and a usage comment a test renders (D74).
+
+Editors (D72). A VS Code extension ships inside the package (`utils/vscode_extension/`, plain JavaScript, no npm dependency, no build):
+a TextMate grammar, diagnostics from `skye check --format json` and "Format Document" through `skye fmt -`; it is only a client of the
+command line. `skye vscode install|uninstall|status|path|package` (`utils/vscode.py`) builds a `.vsix` with `zipfile` for an editor CLI,
+or copies the folder into `~/.vscode/extensions` (Requirement 55).
 
 ## Transport and providers
 One shared transport in `models/transport`: `http.py` (JSON over `urllib`, bearer and API-key headers, timeouts; the helper itself is

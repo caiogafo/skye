@@ -7,8 +7,9 @@ functions as capabilities that can be invoked by LLMs.
 import asyncio
 import inspect
 import logging
+from collections.abc import Callable
 from functools import partial
-from typing import Any, Callable
+from typing import Any
 
 from skye.tools.exceptions import CapabilityValidationError
 from skye.tools.interface import CapabilityInterface

@@ -101,6 +101,12 @@ class TargetSpec(Validated):
     weight: float = field(default=1.0, ge=0, description="Weight for weighted routing")
     tpm: int | None = field(default=None, ge=0, description="Tokens per minute limit")
     rpm: int | None = field(default=None, ge=0, description="Requests per minute limit")
+    cost_per_1k_prompt_tokens: float | None = field(
+        default=None, ge=0, description="Price of 1000 prompt tokens (read by cost_based)"
+    )
+    cost_per_1k_completion_tokens: float | None = field(
+        default=None, ge=0, description="Price of 1000 completion tokens (read by cost_based)"
+    )
     tags: list[str] = field(default_factory=list, description="Tags for routing")
     metadata: dict[str, Any] = field(default_factory=dict, description="Additional metadata")
 
@@ -292,19 +298,104 @@ class FlowSpec(Validated):
 
 @validated
 class VariableSpec(Validated):
-    """One variable of a prompt."""
+    """One variable of a prompt.
+
+    A string after the type is the ``description`` (``task = string "What the agent must
+    achieve"``); ``describe_prompt`` and ``skye prompt info`` show it.
+
+    A structured variable takes the field syntax of the ``output`` block:
+    ``tags = list(string)``, ``categories = list({ name = string, note = string("") })``,
+    ``owner = map({ team = string })`` (or ``[string]``, ``[{ ... }]``, ``{ ... }``). It is
+    required; ``list({ ... }, [])`` gives a default (the second argument). ``render_prompt``
+    checks the value given against the shape and fills the defaults of the optional fields.
+    """
 
     name: str = field(description="Variable name")
     type: FieldType = field(default="string", description="string, number, bool, list or map")
     default: Any = field(default=None, description="Default value")
     required: bool = field(default=True, description="True when there is no default")
+    description: str | None = field(
+        default=None, description='What the variable holds: task = string "The goal"'
+    )
+    item_type: FieldType | None = field(
+        default=None, description="list(string) or list({ ... }): the type of the items"
+    )
+    fields: list[Any] = field(
+        default_factory=list,
+        description="OutputFieldSpec: the fields of map({ ... }), or of the items of list({ ... })",
+    )
+
+    @property
+    def structured(self) -> bool:
+        """True for ``list(<type>)``, ``list({ ... })`` and ``map({ ... })``: values are checked."""
+        return self.item_type is not None or bool(self.fields)
+
+
+#: The formats of an ``output`` block (``output "json" { ... }``; no label means ``"json"``).
+OutputFormat = Literal["json", "table", "xml"]
+OUTPUT_FORMATS: tuple[str, ...] = ("json", "table", "xml")
+
+
+@validated
+class OutputFieldSpec(Validated):
+    """One field of an ``output`` block, possibly nested.
+
+    ``total = number`` gives ``type="number"``; ``currency = string("EUR")`` adds a ``default``;
+    ``lines = list({ description = string })`` gives ``type="list"``, ``item_type="map"`` and the
+    item fields in ``fields``; ``tags = list(string)`` gives ``item_type="string"``;
+    ``meta = map({ source = string })`` gives ``type="map"`` and its ``fields``. A bare ``list``
+    or ``map`` has no ``item_type`` or ``fields`` (any items, any keys). A string after the type
+    is the ``description`` (``total = number "Total amount including VAT"``); it goes into the
+    schema given to the model.
+    """
+
+    name: str = field(description="Field name")
+    type: FieldType = field(description="string, number, bool, list or map")
+    default: Any = field(default=None, description="Default value (string, number or bool)")
+    required: bool = field(default=True, description="True when there is no default")
+    item_type: FieldType | None = field(
+        default=None, description="The type of the items of a list (None: any)"
+    )
+    fields: list[Any] = field(
+        default_factory=list,
+        description="OutputFieldSpec: the fields of a map, or of the items of a list of maps",
+    )
+    description: str | None = field(
+        default=None, description="What the field holds, for the model (the string after the type)"
+    )
+
+
+@validated
+class OutputSpec(Validated):
+    """The ``output`` block of a prompt: the shape of the answer and the format to write it in.
+
+    The renderer turns it into instructions for the model (see
+    ``skye.prompts.output_instructions``); nobody writes the structure by hand.
+    """
+
+    format: OutputFormat = field(
+        default="json", description="json, table or xml (not read when format_from is set)"
+    )
+    format_from: str | None = field(
+        default=None,
+        description="output VAR { ... }: the string variable that gives the format at render time",
+    )
+    fields: list[OutputFieldSpec] = field(
+        default_factory=list, description="The fields of the answer, in order"
+    )
+    schema_from: str | None = field(
+        default=None,
+        description="schema = VAR: the map variable that gives the fields at render time",
+    )
 
 
 @validated
 class PromptPartSpec(Validated):
-    """One part of a prompt: a message, a text, a ``when`` or ``each`` block or a placeholder."""
+    """One part of a prompt: a message, a text, a ``when`` or ``each`` block, a placeholder, or
+    an ``output`` block inside a top-level ``when`` (a conditional output).
+    """
 
-    kind: Literal["message", "text", "when", "each", "placeholder"] = field(
+    kind: Literal["message", "text", "when", "each", "placeholder", "output"] = field(
         description="Kind of part"
     )
     role: str | None = field(default=None, description="system, user or assistant (message)")
@@ -315,11 +406,16 @@ class PromptPartSpec(Validated):
     items: Any = field(default=None, description="The list to loop over (each)")
     name: str | None = field(default=None, description="The placeholder name (placeholder)")
     children: list[Any] = field(default_factory=list, description="Parts inside the block")
+    output: OutputSpec | None = field(
+        default=None, description="The output block (output, inside a top-level when)"
+    )
 
 
 @validated
 class PromptSpec(Validated):
-    """A ``prompt`` block of version 1 (variables, messages, text, when, each, placeholder)."""
+    """A ``prompt`` block of version 1 (variables, messages, text, when, each, placeholder,
+    output).
+    """
 
     name: str = field(description="Prompt name")
     variables: list[VariableSpec] = field(default_factory=list, description="Declared variables")
@@ -327,3 +423,29 @@ class PromptSpec(Validated):
         default_factory=list, description="Variables the caller may leave out"
     )
     parts: list[PromptPartSpec] = field(default_factory=list, description="Messages, in order")
+    output: OutputSpec | None = field(
+        default=None,
+        description="The unconditional output block: format and fields of the answer (None when "
+        "there is none, or when the outputs are inside when blocks)",
+    )
+
+    def output_variants(self) -> list[tuple[list[Any], OutputSpec]]:
+        """Every output block with the conditions that make it active, in the order written.
+
+        The unconditional block has no condition (``[]``); a conditional one, written inside a
+        top-level ``when`` (or a ``when`` nested in one), has the conditions of its ``when``
+        blocks from the outside in. A prompt has one or the other, never both.
+        """
+        if self.output is not None:
+            return [([], self.output)]
+        out: list[tuple[list[Any], OutputSpec]] = []
+
+        def walk(parts: list[Any], conditions: list[Any]) -> None:
+            for part in parts:
+                if part.kind == "output" and part.output is not None:
+                    out.append((conditions, part.output))
+                elif part.kind == "when":
+                    walk(part.children, [*conditions, part.condition])
+
+        walk(self.parts, [])
+        return out

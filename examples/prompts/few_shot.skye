@@ -1,0 +1,38 @@
+---
+title       = "Sentiment with examples"
+description = "Few-shot: each example becomes a user turn and an assistant turn"
+version     = "1.0"
+tags        = ["examples"]
+---
+
+/** Each example becomes a user turn and an assistant turn. **/
+prompt "sentiment" {
+  variables = {
+    examples = list({
+      review    = string  "A review"
+      sentiment = string  "Its sentiment: positive, negative or neutral"
+    }, [])  "Worked examples, sent as user/assistant turns"
+    review   = string  "The review to tag"
+  }
+
+  message "system" { text = "Tag the sentiment of the review as positive, negative or neutral. Answer with one word." }
+
+  each example in examples {
+    message "user"      { text = "{{ example.review }}" }
+    message "assistant" { text = "{{ example.sentiment }}" }
+  }
+
+  message "user" { text = "{{ review }}" }
+}
+
+/**
+ * Example:
+ *
+ *   builder.render("sentiment", {
+ *       "examples": [
+ *           {"review": "Arrived early and works perfectly.", "sentiment": "positive"},
+ *           {"review": "The box was crushed and the cable missing.", "sentiment": "negative"},
+ *       ],
+ *       "review": "Stopped working after a week.",
+ *   })
+ **/

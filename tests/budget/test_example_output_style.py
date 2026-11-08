@@ -1,7 +1,7 @@
 """Plain output (Requirement 24.7 of steering, task 5.9 of the uxui spec).
 
-No banner row (``"=" * 60``) and no emoji in the examples. ``prompts/`` is owned by the ``prompts`` spec (task 5) and is
-listed in ``KNOWN_FOLDERS``; the list only shrinks.
+No banner row (``"=" * 60``) and no emoji in the examples. A folder still dirty is listed in ``KNOWN_FOLDERS``; the list only
+shrinks.
 """
 
 from __future__ import annotations
@@ -11,7 +11,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 EXAMPLES = ROOT / "examples"
-KNOWN_FOLDERS = {"prompts"}
+KNOWN_FOLDERS: set[str] = set()
 BANNER_RE = re.compile(r"""["'][=\-─━*#_]["']\s*\*\s*\d+|["'][=\-─━*#_]{10,}["']""")
 EMOJI_RE = re.compile("[\U0001F300-\U0001FAFF☀-⛿✀-➿⭐️]")
 

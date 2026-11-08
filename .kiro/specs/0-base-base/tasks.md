@@ -134,6 +134,32 @@ satisfies (`Requirement N.k` of `10-requirements.md`) or the decision it honors.
       only (`typing_extensions` appears under `TYPE_CHECKING` only and is not installed in a clean environment). Moving the read to the caller needs a decision of the owner.
     - _Requirements: 15.1_
 
+- [ ] 13. The language grows: comments, front matter, the formatter, prompt inputs and outputs (decisions D69 to D73; Requirements 54.16 to 54.20)
+  - [x] 13.1 Comments `/* */` and `/** **/` in the lexer; a comment in an expression is a space; `//` stays floor division
+    - Evidence (2026-11-08): `src/skye/base/dsl/lexer.py`, `parser.py` (`_expression_text`); `tests/unit/dsl/test_comments.py`.
+    - _Requirements: 54.16; D71_
+  - [x] 13.2 Front matter in TOML: `split_metadata`, `format_metadata`, `Document.metadata`, line numbers unchanged, YAML lines rejected with the fix
+    - Evidence (2026-11-08): `src/skye/base/dsl/metadata.py`, `parser.py`, `tree.py`, `build.py`, `emit.py`; `tests/unit/dsl/test_metadata.py`.
+    - _Requirements: 54.17; D71_
+  - [x] 13.3 `format_text` and `FormatError`: idempotent, keeps comments and strings, refuses mistakes and a different model
+    - Evidence (2026-11-08): `src/skye/base/dsl/fmt.py`, `skeletons.py`; `tests/unit/dsl/test_fmt.py` (also checks that every bundled `.skye` file is formatted).
+    - _Requirements: 54.18; D71_
+  - [x] 13.4 Descriptions and structured types of prompt variables; `conform` with the path of each mistake
+    - Evidence (2026-11-08): `src/skye/base/dsl/parser.py` (`TypeCall.second`), `build.py`, `specs.py` (`VariableSpec.description`, `item_type`, `fields`), `emit.py`, `shapes.py`; `tests/unit/dsl/test_variable_descriptions.py`, `tests/unit/dsl/test_structured_variables.py`. The default form is open decision O46.
+    - _Requirements: 54.20, 30.10; D73_
+  - [x] 13.5 The `output` block in the parser, the checker and `to_text` (descriptions, format from a variable, conditional variants); `loop` inside `each`
+    - Evidence (2026-11-08): `src/skye/base/dsl/build.py`, `specs.py` (`OutputSpec`, `OutputFieldSpec`, `output_variants`), `emit.py`; `tests/unit/dsl/test_output_block.py`, `tests/unit/dsl/test_conditional_output.py`; `tests/unit/prompts/test_prompt_loops.py`.
+    - _Requirements: 33.5 to 33.8, 30.11; D69, D70_
+  - [x] 13.6 `describe_prompt`, `prompt_help` and `PromptInfo` in `base/dsl/info.py`
+    - Evidence (2026-11-08): `src/skye/base/dsl/info.py`; `tests/unit/prompts/test_prompt_help.py`. Its place is open decision O46.
+    - _Requirements: 34.7; D73_
+  - [x] 13.7 The resource Port: `ResourceProviderInterface` and `Resource` in `base/interfaces/resource.py`, exported by `skye.interfaces`
+    - Evidence (2026-11-08): `src/skye/base/interfaces/resource.py`, `src/skye/base/interfaces/__init__.py`, `src/skye/interfaces.py`; `tests/unit/tools/test_mcp_conformance.py` (the Port, the frozen dataclass, a plain class satisfies it).
+    - _Requirements: 10.5; D26_
+  - [ ] 13.8 Re-run task 12.1 on the new modules (`metadata.py`, `fmt.py`, `shapes.py`, `info.py`, `interfaces/resource.py`): standard library only, no file I/O
+    - Note (2026-11-08): `uv run pytest tests -q` and `uv run pytest tests/budget -q` pass, and `uv run mypy src/skye/base/dsl` reports no error, but the open point of 12.2 (`ConfigLoader._load_from_file` reads a file in `base`) is still there, so 12.1 and this task stay open.
+    - _Requirements: 3.2, 54.2, 54.11_
+
 ## Notes
 
 - Tasks marked with `*` are optional (tests) and can be skipped for a faster path.

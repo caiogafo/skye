@@ -1,0 +1,84 @@
+[
+  {
+    "note": "only the required variable",
+    "variables": {
+      "user_message": "What is a list?"
+    }
+  },
+  {
+    "note": "everything set",
+    "variables": {
+      "user_message": "Explain contracts",
+      "persona": "a lawyer",
+      "domain": "law",
+      "personality": [
+        "precise",
+        "formal"
+      ],
+      "guidelines": [
+        "Cite sources",
+        "Be brief"
+      ],
+      "context": "Italian law",
+      "output_format": "bullet points",
+      "conversation_history": [
+        {
+          "role": "user",
+          "content": "Hello there"
+        },
+        {
+          "role": "assistant",
+          "content": "Hi, how can I help?"
+        }
+      ]
+    },
+    "skye_variables": {
+      "history": [
+        {
+          "role": "user",
+          "content": "Hello there"
+        },
+        {
+          "role": "assistant",
+          "content": "Hi, how can I help?"
+        }
+      ]
+    }
+  },
+  {
+    "note": "empty lists and strings",
+    "variables": {
+      "user_message": "Hi",
+      "domain": "",
+      "personality": [],
+      "guidelines": [],
+      "conversation_history": [],
+      "context": "",
+      "output_format": ""
+    },
+    "skye_variables": {
+      "history": []
+    }
+  },
+  {
+    "note": "domain without persona, history only",
+    "variables": {
+      "user_message": "Next?",
+      "domain": "math",
+      "conversation_history": [
+        {
+          "role": "user",
+          "content": "Hello there"
+        }
+      ]
+    },
+    "skye_variables": {
+      "history": [
+        {
+          "role": "user",
+          "content": "Hello there"
+        }
+      ]
+    }
+  }
+]

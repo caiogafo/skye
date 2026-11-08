@@ -20,7 +20,7 @@ class CapabilityInterface(ABC):
     Capabilities can be:
     - Local Python functions (LocalFunctionCapability)
     - Remote HTTP APIs (RemoteAPICapability)
-    - MCP (Model Context Protocol) server tools (MCPCapability)
+    - MCP (Model Context Protocol) server tools (MCPToolCapability)
     - Custom implementations
 
     Example:

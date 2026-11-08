@@ -41,7 +41,7 @@ from skye.interfaces import (
 from skye.utils.validation import port_methods, port_signature_mismatches, validate_port_signatures
 
 # Exported names that are data types or enums, not Ports.
-NOT_PORTS = {"CapabilityContext", "CapabilitySchema", "Decision", "DecisionResult", "EventType", "MemoryEntryLike", "RoutingStrategy", "SafetyResult"}
+NOT_PORTS = {"CapabilityContext", "CapabilitySchema", "Decision", "DecisionResult", "EventType", "MemoryEntryLike", "Resource", "RoutingStrategy", "SafetyResult"}
 
 # (implementation, Port) pairs that differ today. Only shrinks; empty after D36 (model call shape) and D41 (Port reconciliation).
 KNOWN_MISMATCHES: set[tuple[str, str]] = set()

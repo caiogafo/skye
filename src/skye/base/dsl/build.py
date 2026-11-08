@@ -9,7 +9,7 @@ from __future__ import annotations
 import ast
 import re
 from collections.abc import Collection, Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Any
 
 from skye.base.dsl.errors import (
@@ -22,8 +22,10 @@ from skye.base.dsl.errors import (
 )
 from skye.base.dsl.expressions import Expression, check_expression, locate, references
 from skye.base.dsl.parser import TYPE_NAMES, parse_collect
+from skye.base.dsl.shapes import conform
 from skye.base.dsl.specs import (
     DURATION,
+    OUTPUT_FORMATS,
     STRATEGIES,
     AllowedFailsPolicySpec,
     BranchSpec,
@@ -31,6 +33,8 @@ from skye.base.dsl.specs import (
     ContextFieldSpec,
     ContextSpec,
     FlowSpec,
+    OutputFieldSpec,
+    OutputSpec,
     ParallelSpec,
     PromptPartSpec,
     PromptSpec,
@@ -49,6 +53,7 @@ from skye.base.dsl.tree import (
     Bool,
     Expr,
     ListNode,
+    MapEntry,
     MapNode,
     Name,
     Node,
@@ -69,9 +74,10 @@ PREFIXES = ("registry", "flow", "router", "prompt", "step", "context", "env", "i
 _WAIT_MESSAGE = '"{}" needs persistence and is not available in this version'
 _V2_MESSAGE = '"{}" is not available in this version'
 _V2_FLOW = frozenset({"wait", "on_event"})
-_V2_PROMPT = frozenset(
-    {"examples", "output", "content", "from", "bind", "parts", "separator", "include"}
-)
+_V2_PROMPT = frozenset({"examples", "content", "from", "bind", "parts", "separator", "include"})
+#: The word of an ``output`` block that names a map variable giving the fields at render time.
+_SCHEMA_WORD = "schema"
+_SCALARS = ("string", "number", "bool")
 _ROLES = ("system", "user", "assistant")
 _STEP_FIELDS = (
     "run",
@@ -97,6 +103,8 @@ _TARGET_FIELDS = (
     "weight",
     "tpm",
     "rpm",
+    "cost_per_1k_prompt_tokens",
+    "cost_per_1k_completion_tokens",
     "tags",
     "metadata",
 )
@@ -120,6 +128,8 @@ class Document:
         flows: The ``flow`` blocks that are sound.
         prompts: The ``prompt`` blocks that are sound.
         diagnostics: Every mistake found, sorted by position (empty if the file is valid).
+        metadata: The front matter of the file (``---`` ... ``---`` at the top, TOML); empty
+            without.
     """
 
     filename: str
@@ -127,6 +137,7 @@ class Document:
     flows: list[FlowSpec] = field(default_factory=list)
     prompts: list[PromptSpec] = field(default_factory=list)
     diagnostics: list[Diagnostic] = field(default_factory=list)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
     @property
     def ok(self) -> bool:
@@ -207,6 +218,9 @@ class _Builder:
         self.prompt_names = self.labels("prompt")
         self.flow_calls: dict[str, list[str]] = {}
         self.flow_blocks: dict[str, Block] = {}
+        # the prompt being built: its variables and its output blocks inside when blocks
+        self.prompt_variables: list[VariableSpec] = []
+        self.conditional_outputs: list[Block] = []
 
     def labels(self, kind: str) -> list[str]:
         return [b.label_text for b in self.tree.blocks if b.kind == kind and b.label_text]
@@ -226,7 +240,7 @@ class _Builder:
 
     # -- document ------------------------------------------------------------------------------
     def build(self) -> Document:
-        doc = Document(filename=self.file)
+        doc = Document(filename=self.file, metadata=dict(self.tree.metadata))
         seen: set[tuple[str, str]] = set()
         for block in self.tree.blocks:
             name = block.label_text
@@ -832,6 +846,13 @@ class _Builder:
         default: Any = None
         if isinstance(value, TypeCall):
             kind = value.name
+            if value.second is not None:
+                raise self.fail(
+                    value.second,
+                    f"{label}: {kind}(...) takes one argument here.",
+                    "Only list({ ... }, []) and map({ ... }, {}) in a prompt take a default "
+                    "after the shape.",
+                )
             if value.default is not None:
                 default = self.literal(value.default)
                 found = self.infer(value.default)
@@ -1267,11 +1288,11 @@ class _Builder:
             raise self.fail(block, 'a prompt needs a name: prompt "name" { ... }')
         name = block.label.value
         what = f'prompt "{name}"'
-        attrs, _, _, _ = self.split(
+        attrs, _, _, subs = self.split(
             block,
             what,
             ("variables", "allow_missing"),
-            ("message", "each", "when", "placeholder"),
+            ("message", "each", "when", "placeholder", "output"),
             v2=_V2_PROMPT,
             v2_message=_V2_MESSAGE,
         )
@@ -1296,12 +1317,257 @@ class _Builder:
                         allow.append(item.value)
             else:
                 self.at(value, '"allow_missing" must be a list of variable names: ["style"]')
-        parts = self.parts(block, scope, top=True)
+        # conditional outputs (inside a top-level when) are read with the parts
+        self.prompt_variables = variables
+        self.conditional_outputs = []
+        parts = self.parts(block, scope, top=True, out_ok=True)
+        output: OutputSpec | None = None
+        plain = [s for s in subs if s.kind == "output"]
+        for index, sub in enumerate(plain):
+            if index:
+                self.at(sub, f"{what} has more than one output block; keep one")
+                continue
+            try:
+                output = self.output(sub, variables)
+            except _SkipError:
+                pass
+        if plain and self.conditional_outputs:
+            first = self.conditional_outputs[0]
+            self.at(
+                first,
+                f"{what} has an output block on line {plain[0].line} and one inside a when "
+                f"block on line {first.line}; a prompt has either one unconditional output or "
+                "conditional ones, not both.",
+                "Put every output block inside a when, or keep only the unconditional one.",
+            )
         return self.make(  # type: ignore[no-any-return]
             PromptSpec,
             block,
-            {"name": name, "variables": variables, "allow_missing": allow, "parts": parts},
+            {
+                "name": name,
+                "variables": variables,
+                "allow_missing": allow,
+                "parts": parts,
+                "output": output,
+            },
         )
+
+    # -- output --------------------------------------------------------------------------------
+    def output(self, block: Block, variables: list[VariableSpec]) -> OutputSpec:
+        """``output ["json" | "table" | "xml" | VAR] { field = type ["description"], ... }`` or
+        ``{ schema = VAR }``.
+        """
+        fmt: Any = "json"
+        format_from: str | None = None
+        if isinstance(block.label, Name) and len(block.label.path) == 1:
+            format_from = self.format_from(block.label, variables)
+        elif block.label is not None:
+            if not isinstance(block.label, Str) or block.label.value not in OUTPUT_FORMATS:
+                word = block.label_text or ""
+                raise self.fail(
+                    block.label,
+                    f'output format "{word}" is not known.',
+                    (did_you_mean(word, OUTPUT_FORMATS) + " Use json, table or xml.").strip(),
+                )
+            fmt = block.label.value
+        items: list[Attribute] = []
+        for item in block.body:
+            if isinstance(item, Block):
+                self.at(
+                    item,
+                    f'"{item.kind}" is not allowed in an output block.',
+                    "Write one field per line: name = string, number, bool, list or map",
+                )
+            elif item.keyword:
+                self.at(item, f'"{item.keyword}" is not allowed in an output block.')
+            else:
+                items.append(item)
+        if any(item.name == _SCHEMA_WORD for item in items):
+            schema_from = self.schema_from(items, variables)
+            return OutputSpec(format=fmt, format_from=format_from, schema_from=schema_from)
+        fields = self.output_fields(items, "output")
+        if fmt == "table" and format_from is None:
+            for f in fields:
+                if f.type not in _SCALARS:
+                    self.at(
+                        next(i for i in items if i.name == f.name).value,
+                        f'output "table": column "{f.name}" is a {f.type}; a table has only '
+                        "string, number and bool columns.",
+                        'Use output "json" or "xml" for nested data, or make it a string.',
+                    )
+        if not fields and not items:
+            self.at(block, "the output block has no field.", "Add one: name = string")
+        return OutputSpec(format=fmt, format_from=format_from, fields=fields)
+
+    def format_from(self, label: Name, variables: list[VariableSpec]) -> str:
+        """``output VAR { ... }``: a declared string variable gives the format at render time."""
+        word = label.path[0]
+        names = [v.name for v in variables]
+        declared = next((v for v in variables if v.name == word), None)
+        if declared is None:
+            hint = did_you_mean(word, names)
+            if word in OUTPUT_FORMATS:
+                hint = f'Write the format as a string: output "{word}" {{ ... }}'
+            raise self.fail(
+                label,
+                f'variable "{word}" is not declared; it cannot give the output format.',
+                (f"Declared: {', '.join(names) or '(none)'}. {hint}").strip(),
+            )
+        if declared.type != "string":
+            raise self.fail(
+                label,
+                f'the output format comes from "{word}", which is {declared.type}; it must be '
+                "a string.",
+                f'Declare it as {word} = string("json")',
+            )
+        if declared.default is not None and declared.default not in OUTPUT_FORMATS:
+            raise self.fail(
+                label,
+                f'the default of "{word}" is "{declared.default}", which is not an output format.',
+                (
+                    did_you_mean(str(declared.default), OUTPUT_FORMATS) + " Use json, table or xml."
+                ).strip(),
+            )
+        return word
+
+    def schema_from(self, items: list[Attribute], variables: list[VariableSpec]) -> str | None:
+        if len(items) > 1:
+            other = next(i for i in items if i.name != _SCHEMA_WORD)
+            self.err(
+                other.name_line,
+                other.name_column,
+                f'"{_SCHEMA_WORD}" gives all the fields of the output block; it cannot be '
+                f'written with other fields ("{other.name}").',
+                f'Remove "{other.name}": the fields come from the variable.',
+            )
+        item = next(i for i in items if i.name == _SCHEMA_WORD)
+        if item.description is not None:
+            self.at(
+                item.description,
+                f'"{_SCHEMA_WORD}" takes no description; the fields come from the variable.',
+                'Describe them in its value: {"total": {"type": "number", "description": "..."}}',
+            )
+        value = item.value
+        names = [v.name for v in variables]
+        if not (isinstance(value, Name) and len(value.path) == 1):
+            raise self.fail(
+                value,
+                f'"{_SCHEMA_WORD}" takes the name of a map variable: {_SCHEMA_WORD} = fields',
+            )
+        word = value.path[0]
+        declared = next((v for v in variables if v.name == word), None)
+        if declared is None:
+            raise self.fail(
+                value,
+                f'variable "{word}" is not declared.',
+                (f"Declared: {', '.join(names) or '(none)'}. {did_you_mean(word, names)}").strip(),
+            )
+        if declared.type != "map":
+            raise self.fail(
+                value,
+                f'"{_SCHEMA_WORD}" needs a map variable; "{word}" is {declared.type}.',
+                f"Declare it as {word} = map",
+            )
+        return word
+
+    def output_fields(
+        self, items: Sequence[Attribute | MapEntry], where: str
+    ) -> list[OutputFieldSpec]:
+        out: list[OutputFieldSpec] = []
+        seen: set[str] = set()
+        for item in items:
+            name = item.name if isinstance(item, Attribute) else item.key
+            if name in seen:
+                self.at(item, f'"{name}" is set twice in {where}')
+                continue
+            seen.add(name)
+            try:
+                spec = self.output_field(name, item.value)
+            except _SkipError:
+                continue
+            note = item.description
+            if note is not None and not note.value.strip():
+                self.at(
+                    note,
+                    f'the description of "{name}" is empty.',
+                    'Write what the field holds, or remove the "".',
+                )
+            elif note is not None:
+                spec = replace(spec, description=note.value)
+            out.append(spec)
+        return out
+
+    def output_field(self, name: str, value: Value) -> OutputFieldSpec:
+        label = f'"{name}"'
+        if isinstance(value, MapNode):  # { a = string } is map({ a = string })
+            return OutputFieldSpec(name=name, type="map", fields=self.nested(value, name))
+        if isinstance(value, ListNode):  # [string] is list(string)
+            if len(value.items) != 1:
+                raise self.fail(
+                    value, f"{label}: a list type has one item type: [string] or [{{ a = string }}]"
+                )
+            return self.list_field(name, value.items[0])
+        if isinstance(value, Name) and len(value.path) == 1:
+            word = value.path[0]
+            if word in TYPE_NAMES:
+                return OutputFieldSpec(name=name, type=word)  # type: ignore[arg-type]
+            raise self.fail(
+                value,
+                f'unknown type "{word}" for {label}.',
+                did_you_mean(word, sorted(TYPE_NAMES)) or "Use string, number, bool, list or map.",
+            )
+        if isinstance(value, TypeCall):
+            # list(...)/map(...) with a shape inside (`map({ a = string })`) describes the items;
+            # with a plain value (`map({})`, `list([])`) it is an optional field with that default.
+            if (
+                value.name in ("list", "map")
+                and value.default is not None
+                and _is_shape(value.default)
+            ):
+                if value.name == "list":
+                    spec = self.list_field(name, value.default)
+                elif not isinstance(value.default, MapNode):
+                    raise self.fail(
+                        value.default, f"{label}: map(...) takes the fields: map({{ a = string }})"
+                    )
+                else:
+                    spec = OutputFieldSpec(
+                        name=name, type="map", fields=self.nested(value.default, name)
+                    )
+                if value.second is None:
+                    return spec
+                return replace(spec, required=False, default=self.shaped_default(spec, value))
+            kind, default = self.typed(value, label, "default")
+            return OutputFieldSpec(
+                name=name,
+                type=kind,  # type: ignore[arg-type]
+                default=default,
+                required=value.default is None,
+            )
+        raise self.fail(
+            value,
+            f"{label} needs a type.",
+            "Use string, number, bool, list or map, for example number(0).",
+        )
+
+    def list_field(self, name: str, item: Value) -> OutputFieldSpec:
+        if isinstance(item, MapNode):
+            return OutputFieldSpec(
+                name=name, type="list", item_type="map", fields=self.nested(item, name)
+            )
+        inner = self.output_field(name, item)
+        if inner.type == "list" or inner.default is not None:
+            raise self.fail(
+                item, f'"{name}": the items of a list are string, number, bool or a map {{ ... }}'
+            )
+        return OutputFieldSpec(
+            name=name, type="list", item_type=inner.type, fields=list(inner.fields)
+        )
+
+    def nested(self, node: MapNode, name: str) -> list[OutputFieldSpec]:
+        if not node.entries:
+            raise self.fail(node, f'"{name}": the map has no field. Add one: {{ a = string }}')
+        return self.output_fields(node.entries, f'"{name}"')
 
     def variables(self, attr: Attribute) -> list[VariableSpec]:
         if not isinstance(attr.value, MapNode):
@@ -1310,21 +1576,93 @@ class _Builder:
         out: list[VariableSpec] = []
         for entry in attr.value.entries:
             try:
-                kind, default = self.typed(entry.value, f'"{entry.key}"', "default")
-                has_default = isinstance(entry.value, TypeCall) and entry.value.default is not None
-                out.append(
-                    VariableSpec(
-                        name=entry.key,
-                        type=kind,  # type: ignore[arg-type]
-                        default=default,
-                        required=not has_default,
-                    )
-                )
+                spec = self.variable(entry.key, entry.value)
             except _SkipError:
-                pass
+                continue
+            note = entry.description
+            if note is not None and not note.value.strip():
+                self.at(
+                    note,
+                    f'the description of "{entry.key}" is empty.',
+                    'Write what the variable holds, or remove the "".',
+                )
+            elif note is not None:
+                spec = replace(spec, description=note.value)
+            out.append(spec)
         return out
 
-    def parts(self, block: Block, scope: list[str], *, top: bool) -> list[PromptPartSpec]:
+    def variable(self, name: str, value: Value) -> VariableSpec:
+        """One variable: ``string``, ``number(0)``, ``list([])`` (a default), or a shape with the
+        field syntax of ``output``: ``list(string)``, ``list({ ... })``, ``map({ ... })``,
+        ``[type]``, ``{ ... }``, with an optional default after it: ``list({ ... }, [])``.
+        """
+        shaped = isinstance(value, ListNode | MapNode) or (
+            isinstance(value, TypeCall)
+            and value.name in ("list", "map")
+            and value.default is not None
+            and _is_shape(value.default)
+        )
+        if shaped:
+            field_spec = self.output_field(name, value)
+            return VariableSpec(
+                name=name,
+                type=field_spec.type,
+                default=field_spec.default,
+                required=field_spec.required,
+                item_type=field_spec.item_type,
+                fields=list(field_spec.fields),
+            )
+        kind, default = self.typed(value, f'"{name}"', "default")
+        if isinstance(value, TypeCall):
+            self.no_inner_description(value.default)
+        has_default = isinstance(value, TypeCall) and value.default is not None
+        return VariableSpec(
+            name=name,
+            type=kind,  # type: ignore[arg-type]
+            default=default,
+            required=not has_default,
+        )
+
+    def shaped_default(self, spec: OutputFieldSpec, value: TypeCall) -> Any:
+        """The default after a shape (``list({ ... }, [])``), checked against the shape."""
+        assert value.second is not None
+        self.no_inner_description(value.second)
+        default = self.literal(value.second)
+        errors: list[str] = []
+        conform(spec.type, spec.item_type, spec.fields, default, spec.name, errors)
+        if errors:
+            raise self.fail(
+                value.second,
+                f'the default of "{spec.name}" does not match its shape: {"; ".join(errors)}',
+                f"Use an empty {'list: []' if spec.type == 'list' else 'map: {}'}, or values "
+                "with every required field.",
+            )
+        return default
+
+    def no_inner_description(self, node: Value | None) -> None:
+        """Only a variable (or a field of a shape) takes a description, not a default value."""
+        if isinstance(node, TypeCall):
+            self.no_inner_description(node.default)
+        elif isinstance(node, ListNode):
+            for item in node.items:
+                self.no_inner_description(item)
+        elif isinstance(node, MapNode):
+            for entry in node.entries:
+                if entry.description is not None:
+                    self.at(
+                        entry.description,
+                        f'"{entry.key}" is a key of a default value and takes no description.',
+                        'Describe the variable instead: name = map({ ... }) "What it holds"',
+                    )
+                self.no_inner_description(entry.value)
+
+    def parts(
+        self, block: Block, scope: list[str], *, top: bool, out_ok: bool = False
+    ) -> list[PromptPartSpec]:
+        """The parts of a prompt, message, ``when`` or ``each`` block. ``out_ok`` is true in the
+        prompt and in a ``when`` reached from it through ``when`` blocks only: there an ``output``
+        block is a conditional output.
+        """
         out: list[PromptPartSpec] = []
         allowed_blocks = ("message", "each", "when", "placeholder") if top else ("each", "when")
         for item in block.body:
@@ -1345,19 +1683,37 @@ class _Builder:
                     continue
                 if block.kind == "prompt":
                     if item.kind in allowed_blocks:
-                        out.append(self.part_block(item, scope, top=top))
-                    continue  # others were reported by split
+                        out.append(self.part_block(item, scope, top=top, out_ok=out_ok))
+                    continue  # others were reported by split; output was read by prompt()
                 if item.kind in _V2_PROMPT:
                     self.at(item, _V2_MESSAGE.format(item.kind))
+                elif item.kind == "output" and out_ok:
+                    self.conditional_outputs.append(item)
+                    output = self.output(item, self.prompt_variables)
+                    out.append(PromptPartSpec(kind="output", output=output))
+                elif item.kind == "output" and not top:
+                    self.at(
+                        item,
+                        "an output block belongs to the prompt, not to a message.",
+                        "Move it out of the message, into the prompt block or a top-level when.",
+                    )
+                elif item.kind == "output":
+                    self.at(
+                        item,
+                        "an output block cannot be inside an each block.",
+                        "Move it into the prompt block, or into a when at the top of the prompt.",
+                    )
                 elif item.kind not in allowed_blocks:
                     self.unknown(item, item.kind, f"{block.kind} block", [*allowed_blocks, "text"])
                 else:
-                    out.append(self.part_block(item, scope, top=top))
+                    out.append(self.part_block(item, scope, top=top, out_ok=out_ok))
             except _SkipError:
                 pass
         return out
 
-    def part_block(self, item: Block, scope: list[str], *, top: bool) -> PromptPartSpec:
+    def part_block(
+        self, item: Block, scope: list[str], *, top: bool, out_ok: bool = False
+    ) -> PromptPartSpec:
         if item.kind == "placeholder":
             if not isinstance(item.label, Str):
                 raise self.fail(item, 'a placeholder needs a name: placeholder "history"')
@@ -1388,13 +1744,14 @@ class _Builder:
             return PromptPartSpec(
                 kind="when",
                 condition=self.literal(item.head),
-                children=self.parts(item, scope, top=top),
+                children=self.parts(item, scope, top=top, out_ok=out_ok and top),
             )
         return PromptPartSpec(
             kind="each",
             variable=item.var,
             items=self.literal(item.head),
-            children=self.parts(item, [*scope, item.var], top=top),
+            # inside an each, `loop` (index, index0, first, last, length) is defined too
+            children=self.parts(item, [*scope, item.var, "loop"], top=top),
         )
 
     def text_part(self, item: Attribute, scope: list[str]) -> PromptPartSpec:
@@ -1453,6 +1810,22 @@ class _Builder:
                         f"Declared: {', '.join(scope) or '(none)'}. " f"{did_you_mean(word, scope)}"
                     ).strip(),
                 )
+
+
+def _is_shape(node: Value) -> bool:
+    """True when ``node`` is a type (``string``, ``[string]``, ``{ a = string }``,
+    ``string("x")``) and not a value (``[]``, ``{}``, ``["a"]``, ``{ a = 1 }``). A default value
+    holds no bare word, so ``{ a = strin }`` is a shape with an unknown type.
+    """
+    if isinstance(node, Name):  # a bare word is a type (a misspelt one is reported as such)
+        return len(node.path) == 1
+    if isinstance(node, TypeCall):
+        return node.name in TYPE_NAMES
+    if isinstance(node, ListNode):
+        return len(node.items) == 1 and _is_shape(node.items[0])
+    if isinstance(node, MapNode):
+        return bool(node.entries) and all(_is_shape(e.value) for e in node.entries)
+    return False
 
 
 def _uses_v2(block: Block) -> bool:

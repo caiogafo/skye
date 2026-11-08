@@ -102,12 +102,11 @@ src/skye/
 │   ├── registry.py
 │   ├── local_function.py
 │   ├── remote_api.py           # HTTP via stdlib urllib transport; httpx/requests eliminated (Req 7)
-│   ├── mcp_capability.py
 │   ├── mcp_client.py           # create_mcp_client(target, impl="builtin"): the one factory (Req 21)
-│   ├── mcp_server_client.py    # built-in tri-faceted MCP client (tools/prompts/resources), consume-only over HTTP
+│   │                           # (removed 2026-11-08: the legacy MCPCapability and MCPServerClient probes; the built-in client is mcp_client.py)
 │   ├── mcp_fastmcp.py          # fastmcp-backed client (mcp extra) behind the same Port
 │   ├── mcp_boundary.py         # the single conversion point from official MCP types to Skye types (Req 15)
-│   ├── mcp_resource.py         # Resource type internal to tools (URI, MIME, text/bytes); no base Port, no new Component (Req 15)
+│   ├── mcp_resource.py         # re-exports Resource and ResourceProviderInterface from the resource Port in base (D26)
 │   ├── capability_call_handler.py
 │   ├── decorator.py
 │   └── exceptions.py
@@ -240,9 +239,9 @@ Every current file maps to a target location, or is marked split/merge/delete wi
 | `capabilities/exceptions.py` | `skye/tools/exceptions.py` | Tools-local exceptions (base.exceptions holds the shared hierarchy). |
 | `capabilities/interface.py` | → `skye/base/interfaces/capability.py` | Capability port in base. |
 | `capabilities/local_function.py` | `skye/tools/local_function.py` | Local function capability. |
-| `capabilities/mcp_capability.py` | `skye/tools/mcp_capability.py` | MCP capability. |
-| `capabilities/mcp_server_client.py` | `skye/tools/mcp_server_client.py` | Tri-faceted MCP client in `tools` (tools/prompts/resources); built-in stdlib client and `fastmcp` behind one Port (Req 15). |
-| *(new)* | `skye/tools/mcp_resource.py` | `Resource` type internal to `tools` for MCP resources (URI, MIME type, text or bytes); no base Port, no new Component (Req 15). |
+| `capabilities/mcp_capability.py` | *(removed 2026-11-08)* | The legacy MCP capability probe; superseded by `MCPToolCapability` in `mcp_client.py`. |
+| `capabilities/mcp_server_client.py` | `skye/tools/mcp_client.py` | Tri-faceted MCP client in `tools` (tools/prompts/resources); built-in stdlib client and `fastmcp` behind one Port (Req 15). The legacy `mcp_server_client.py` module was removed on 2026-11-08. |
+| *(new)* | `skye/tools/mcp_resource.py` | Re-exports `Resource` and `ResourceProviderInterface`, which live in `skye/base/interfaces/resource.py` (D26, Req 10.5); no new Component. |
 | `capabilities/remote_api.py` | `skye/tools/remote_api.py` | HTTP calls use the shared stdlib `urllib` transport; the `httpx`/`requests` imports are eliminated at the source, not merely deferred (Req 7; Dependency policy). |
 | `routes/__init__.py` | `skye/router/__init__.py` | Rename routes → router (name was misleading, Req 1). |
 | `routes/config_models.py` | `skye/router/config_models.py` | Router config. |

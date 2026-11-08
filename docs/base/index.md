@@ -17,6 +17,7 @@ Pages:
 - [Core interfaces](interfaces.md)
 - [Extending Skye](extending.md): which Port to implement, where to register it, which example to copy
 - [The .skye language](skye-language.md): grammar, blocks, references, expressions, errors, `skye check` and `skye new`
+- [Editor support](editor.md): the VS Code extension for `.skye` files (`skye vscode install`) and `skye check --format json`
 
 ## Models are validated dataclasses
 

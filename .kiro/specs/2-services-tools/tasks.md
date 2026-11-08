@@ -12,15 +12,15 @@ cited from other documents are `tools:N.k`.
 
 ## Tasks
 
-- [ ] 1. Capability interface and schema
+- [x] 1. Capability interface and schema
   - [x] 1.1 `CapabilityInterface` (get_schema, execute, aexecute)
     - Evidence: `src/skye/tools/interface.py`; `tests/unit/tools/test_capability_interface.py`.
     - _Requirements: 16.1, 16.2_
   - [x] 1.2 `CapabilitySchema` (name, description, parameters, returns)
     - Evidence: `src/skye/tools/schema.py`; `tests/unit/tools/test_capability_schema.py`.
     - _Requirements: 16.1_
-  - [ ] 1.3 Move `CapabilitySchema` / `CapabilityResult` / `CapabilityCall` off pydantic to dataclasses (D24)
-    - Note: `src/skye/tools/schema.py` (`CapabilitySchema`) and `src/skye/tools/capability_models.py` (`CapabilityResult`) are still `pydantic.BaseModel` subclasses, and `CapabilityCall` is re-exported from `src/skye/base/completion.py` (pydantic). Under D24/O4 new data structures are dataclasses and must raise `ValidationError` with field context on invalid data. Coordinate with the `base` spec (O4) before changing the shared completion models.
+  - [x] 1.3 Move `CapabilitySchema` / `CapabilityResult` / `CapabilityCall` off pydantic to dataclasses (D24)
+    - Evidence (2026-11-08): `CapabilitySchema`, `CapabilityResult` and `CapabilityCall` are `Validated` dataclasses and no module of `src/skye/tools` imports pydantic; `tests/unit/tools/test_mcp_conformance.py::test_no_module_of_tools_imports_pydantic`, `test_capability_types_are_validated_dataclasses`, `test_invalid_data_raises_validation_error_with_field_context`.
     - _Requirements: 16.1; D24_
 
 - [ ] 2. Registry and capability kinds
@@ -51,7 +51,7 @@ cited from other documents are `tools:N.k`.
     - Evidence: structured `logger.info/error(..., extra={...})` in `src/skye/tools/registry.py` and `capability_call_handler.py`.
     - _Requirements: 18.3_
 
-- [ ] 4. Tri-faceted MCP client and the boundary
+- [x] 4. Tri-faceted MCP client and the boundary
   - [x] 4.1 `MCPClientInterface` and `BuiltinMCPClient` (stdlib JSON-RPC over HTTP, consume-only)
     - Evidence: `src/skye/tools/mcp_client.py` (`MCPClientInterface`, `BuiltinMCPClient`, `MCPToolCapability`); `tests/unit/tools/test_mcp_client.py`, `test_mcp_stdlib_prototype.py`.
     - _Requirements: 10.1, 10.2_
@@ -68,18 +68,18 @@ cited from other documents are `tools:N.k`.
 - [ ] 5. Checkpoint
   - Ensure all tests pass, ask the user if questions arise.
 
-- [ ] 6. Migration conformance (open)
-  - [ ] 6.1 Move `Resource` behind a new resource Port in `base` (D26)
-    - Note: `src/skye/tools/mcp_resource.py` states "No base Port" and `Resource` is a `tools`-local dataclass; the code lags D26. Define the resource Port in `base` (list and read by URI, MIME type, text or bytes) and have the MCP client in `tools` implement it, so `prompts` and `memory` consume MCP resources through `base`. Coordinate with the `base` spec.
+- [x] 6. Migration conformance
+  - [x] 6.1 Move `Resource` behind a new resource Port in `base` (D26)
+    - Evidence (2026-11-08): `src/skye/base/interfaces/resource.py` (`ResourceProviderInterface`, `Resource`), exported by `skye.base.interfaces` and `skye.interfaces`; `MCPClientInterface` inherits the Port (`src/skye/tools/mcp_client.py`) and `src/skye/tools/mcp_resource.py` re-exports it; `tests/unit/tools/test_mcp_conformance.py::test_resource_is_the_base_type_everywhere`, `test_every_mcp_client_implements_the_resource_port`, `test_a_plain_class_satisfies_the_resource_port`.
     - _Requirements: 10.5; D26_
-  - [ ] 6.2 MCP prompt facet returns `base` messages, not `PromptBuilderInterface` (D26)
-    - Note: conformance check — `get_prompt` / `to_prompt_messages` already return `base` `UserMessage`/`AssistantMessage` (`src/skye/tools/mcp_client.py`, `src/skye/tools/mcp_boundary.py`) and `tools` must not import `prompts` or implement `PromptBuilderInterface`. Add an explicit test asserting the prompt facet returns `base` messages and that `tools` imports no `prompts` symbol, so the rule is guarded.
+  - [x] 6.2 MCP prompt facet returns `base` messages, not `PromptBuilderInterface` (D26)
+    - Evidence (2026-11-08): `tests/unit/tools/test_mcp_conformance.py::test_get_prompt_returns_base_messages`, `test_tools_imports_no_prompts_module`, `test_no_tools_class_implements_a_prompt_port`.
     - _Requirements: 10.5, 10.1; D26_
-  - [ ] 6.3 Remove the legacy MCP probes (`LEGACY_TOOLS_PROBES`)
-    - Note: `src/skye/tools/mcp_capability.py` (`MCPCapability`) and `src/skye/tools/mcp_server_client.py` (`MCPServerClient`) import `fastmcp` to raise a probe error and carry placeholder stdio/subprocess framing; they are the only `fastmcp` importers outside `mcp_fastmcp.py`, tracked in `LEGACY_TOOLS_PROBES` in `tests/budget/test_boundary_rule.py`. Delete these two modules (superseded by the tri-faceted client), drop their exports from `src/skye/tools/__init__.py`, and remove the `LEGACY_TOOLS_PROBES` entry so `tools` imports `fastmcp` only in `mcp_fastmcp.py`.
+  - [x] 6.3 Remove the legacy MCP probes (`LEGACY_TOOLS_PROBES`)
+    - Evidence (2026-11-08): `src/skye/tools/mcp_capability.py` and `mcp_server_client.py` are deleted, their exports are gone from `src/skye/tools/__init__.py` (`tests/unit/tools/test_capability_exports.py` asserts `MCPCapability` and `MCPServerClient` are absent) and `LEGACY_TOOLS_PROBES` is removed from `tests/budget/test_boundary_rule.py`; `tests/unit/tools/test_mcp_conformance.py::test_only_mcp_fastmcp_imports_fastmcp`.
     - _Requirements: 10.7_
-  - [ ] 6.4 Fix the order-dependent MCP unit tests
-    - Note: `tests/unit/tools/test_mcp_capability.py` and `test_mcp_server_client.py` set `sys.modules["fastmcp"] = MagicMock()` at module import, which leaks a fake `fastmcp` into other tests, and `test_execute_raises_not_supported_error` depends on the event loop left by test ordering. Remove the module-level `sys.modules` assignment (patch locally instead) and make the sync-`execute` test install its own loop, so selection stays per-call and `import skye` never sees a fake `fastmcp`. These tests go away with task 6.3 if those modules are deleted.
+  - [x] 6.4 Fix the order-dependent MCP unit tests
+    - Evidence (2026-11-08): the two test modules that set `sys.modules["fastmcp"]` (`test_mcp_capability.py`, `test_mcp_server_client.py`) are deleted with the modules they tested; `grep` finds no module-level `sys.modules["fastmcp"]` assignment in `tests/`.
     - _Requirements: 10.4_
   - [x] 6.5 Stop gating CI on the size of the `mcp` extra (D67, closes O23)
     - Evidence: `budgets.toml` (no `[extras.mcp]`; `not_gated = ["mcp"]` in `[extras_policy]`), `.github/workflows/budgets.yml` (no `mcp` footprint job), `tests/budget/test_policy.py` (`not_gated` accepted, never with a budget), `tests/budget/test_workflow_matrix.py` (unchanged, passes), `docs/budgets.md`; `tests/budget/test_boundary_rule.py` still allows `fastmcp` only in `tools/mcp_fastmcp.py`. Done before 6.3, which is still open.
@@ -93,9 +93,8 @@ cited from other documents are `tools:N.k`.
 - Status reflects the code in `src/skye/tools` and `tests/` at migration time, not the former `capability-support` checkboxes.
 - `tools` carries no third-party library; `fastmcp` is the separate `mcp` extra, imported lazily only in `mcp_fastmcp.py`
   (design "Extras and budgets"; Requirement 10.7, 7.3).
-- Open items at migration: 1.3 (pydantic -> dataclasses under D24/O4), 6.1 (`Resource` behind a `base` Port, D26), 6.2
-  (prompt-facet conformance), 6.3 (remove the legacy `MCPCapability` / `MCPServerClient` probes), 6.4 (order-dependent MCP
-  unit tests).
+- The open items at migration (1.3, 6.1 to 6.4) were closed on 2026-11-08 and ticked with their evidence. Milestones 2, 3, 5 and 7 stay
+  unticked only because they hold the checkpoints, which are run by Kiro (the suite passes: see the final report of that day).
 
 ## Task Dependency Graph
 

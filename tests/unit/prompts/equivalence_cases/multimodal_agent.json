@@ -1,0 +1,154 @@
+[
+  {
+    "note": "minimal: default system prompt, default output format",
+    "variables": {
+      "input": "Hi"
+    }
+  },
+  {
+    "note": "custom system prompt, image_analysis, content types, one image without url, documents, audio without transcript, context, examples, detailed",
+    "variables": {
+      "input": "What is in the picture?",
+      "system_prompt": "You see things.",
+      "task_type": "image_analysis",
+      "content_types": [
+        "image",
+        "text"
+      ],
+      "images": [
+        {
+          "description": "A cat"
+        }
+      ],
+      "documents": [
+        {
+          "title": "Report",
+          "content": "Sales went up"
+        },
+        {
+          "content": "Untitled body"
+        }
+      ],
+      "audio": [
+        {
+          "description": "A song"
+        },
+        {}
+      ],
+      "context": "Office photos",
+      "examples": [
+        {
+          "input": "dog.png",
+          "output": "A dog"
+        },
+        {
+          "input": "sky.png",
+          "output": "Blue sky"
+        }
+      ],
+      "output_format": "detailed"
+    }
+  },
+  {
+    "note": "image_qa, json output, images with no description",
+    "variables": {
+      "input": "How many?",
+      "task_type": "image_qa",
+      "images": [
+        {},
+        {
+          "description": "Second"
+        }
+      ],
+      "output_format": "json"
+    }
+  },
+  {
+    "note": "document_analysis, other output format",
+    "variables": {
+      "input": "Read it",
+      "task_type": "document_analysis",
+      "output_format": "text"
+    }
+  },
+  {
+    "note": "multimodal_reasoning",
+    "variables": {
+      "input": "Relate them",
+      "task_type": "multimodal_reasoning"
+    }
+  },
+  {
+    "note": "unknown task type: header only",
+    "variables": {
+      "input": "Go",
+      "task_type": "video_qa"
+    }
+  },
+  {
+    "note": "history",
+    "variables": {
+      "input": "And now?",
+      "chat_history": [
+        {
+          "role": "user",
+          "content": "Look at this"
+        },
+        {
+          "role": "assistant",
+          "content": "I see a tree"
+        }
+      ]
+    },
+    "skye_variables": {
+      "history": [
+        {
+          "role": "user",
+          "content": "Look at this"
+        },
+        {
+          "role": "assistant",
+          "content": "I see a tree"
+        }
+      ]
+    }
+  },
+  {
+    "note": "glued: images with url (2+), url glued to the next image line",
+    "variables": {
+      "input": "Compare",
+      "images": [
+        {
+          "description": "First",
+          "url": "http://a/1.png"
+        },
+        {
+          "url": "http://a/2.png"
+        },
+        {
+          "description": "Third"
+        }
+      ]
+    },
+    "glued_lines": true
+  },
+  {
+    "note": "glued: audio with transcript (2+), transcript glued to the next audio line",
+    "variables": {
+      "input": "Summarise",
+      "audio": [
+        {
+          "description": "Call",
+          "transcript": "Hello there"
+        },
+        {
+          "transcript": "Bye"
+        },
+        {
+          "description": "Silence"
+        }
+      ]
+    },
+    "glued_lines": true
+  }
+]

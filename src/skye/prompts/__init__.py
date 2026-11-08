@@ -1,42 +1,61 @@
-"""Skye Prompts Support Module.
+"""Prompt templates rendered into role-based messages.
 
-This module provides comprehensive prompt template management with a standard-library template engine,
-including few-shot learning, multimodal content support, and structured output generation.
+Part of the base install (``pip install skyeai``): the template engine is the standard
+library's, with ``{{ var }}``, ``if``/``elif``/``else``, ``for`` and filters, and no Jinja2.
 
-The implementation follows Skye's clean architecture principles and is available
-as an optional extra (skyeai[prompts]).
-
-Key Features:
-- Stdlib template engine ({{ var }}, if/elif/else, for, filters; no Jinja2)
-- Template versioning and composition
-- Few-shot learning with dynamic example selection
-- Multimodal content support (text, images, audio, video)
-- Message role management (system, user, assistant, capability)
-- Output schema validation and structured generation
-- Performance optimization through caching
+Key features:
+- Template registration, versioning and composition
+- Default values, optional variables and partial builders
+- Few-shot examples with an example selector
+- Roles from ``[SYSTEM]``, ``[USER]`` and ``[ASSISTANT]`` markers
+- Output instructions from a declared schema, as JSON, a Markdown table or XML
+- Bundled templates (``classification``, ``chat``, ``summarization``, ...)
+- ``.skye`` prompt blocks rendered with real roles (``load_prompt``, ``render_prompt``)
+- Help for a prompt: its inputs and output (``describe_prompt``, ``prompt_help``,
+  ``BasePromptBuilder.help``, ``skye prompt info``)
 
 Example:
     >>> from skye.prompts import BasePromptBuilder
-    >>> 
     >>> builder = BasePromptBuilder()
-    >>> builder.register_template("greeting", "Hello {name}!")
+    >>> builder.register_template("greeting", "Hello {{ name }}!")
     >>> messages = builder.render("greeting", {"name": "Alice"})
-    >>> print(messages[0].content)
+    >>> messages[0].content
     'Hello Alice!'
 
 Codename: cirrus.
 """
 
+from skye.base.dsl.info import (
+    InputInfo,
+    OutputFieldInfo,
+    OutputInfo,
+    PromptInfo,
+    describe_prompt,
+    prompt_help,
+)
 from skye.base.interfaces.prompt import PromptBuilderInterface
 
-# Import base implementation
 from .messages import BasePromptBuilder
-
-# Alias for backward compatibility and examples
-MockPromptBuilder = BasePromptBuilder
+from .skye_prompts import (
+    PromptRunnable,
+    active_output,
+    load_prompt,
+    output_instructions,
+    render_prompt,
+)
 
 __all__ = [
     "PromptBuilderInterface",
     "BasePromptBuilder",
-    "MockPromptBuilder",  # Alias for examples
+    "InputInfo",
+    "OutputFieldInfo",
+    "OutputInfo",
+    "PromptInfo",
+    "PromptRunnable",
+    "describe_prompt",
+    "prompt_help",
+    "active_output",
+    "load_prompt",
+    "output_instructions",
+    "render_prompt",
 ]

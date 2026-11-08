@@ -20,8 +20,11 @@ from typing import Any
 
 from skye.base.dsl.build import Document
 from skye.base.dsl.expressions import Expression
+from skye.base.dsl.metadata import format_metadata
 from skye.base.dsl.specs import (
     FlowSpec,
+    OutputFieldSpec,
+    OutputSpec,
     ParallelSpec,
     PromptPartSpec,
     PromptSpec,
@@ -31,6 +34,7 @@ from skye.base.dsl.specs import (
     SetSpec,
     StepSpec,
     TargetSpec,
+    VariableSpec,
 )
 
 _IDENTIFIER = re.compile(r"^[A-Za-z_]\w*$")
@@ -122,6 +126,10 @@ def _target_lines(target: TargetSpec) -> list[str]:
         item = getattr(target, name)
         if item is not None:
             lines.append(f"{name} = {item}")
+    for name in ("cost_per_1k_prompt_tokens", "cost_per_1k_completion_tokens"):
+        item = getattr(target, name)
+        if item is not None:
+            lines.append(f"{name} = {item!r}")
     if target.tags:
         lines.append(f"tags = {value(list(target.tags))}")
     if target.metadata:
@@ -319,6 +327,9 @@ def _parts(parts: list[PromptPartSpec], depth: int) -> list[str]:
             out.append(f"{pad}text = {quote(part.text or '')}")
         elif part.kind == "placeholder":
             out.append(f"{pad}placeholder {quote(part.name or '')}")
+        elif part.kind == "output":  # a conditional output, inside a top-level when
+            if part.output is not None:
+                out.extend(_output(part.output, depth))
         else:
             if part.kind == "message":
                 role = (
@@ -342,20 +353,87 @@ def _parts(parts: list[PromptPartSpec], depth: int) -> list[str]:
     return out
 
 
+def _output_type(item: OutputFieldSpec, depth: int) -> str:
+    """The type of a field whose line is at ``depth``; a nested map may span several lines.
+    A shape with a default writes it after the shape: ``list({ a = string }, [])``.
+    """
+    if item.type == "map" and item.fields:
+        shape = _output_map(item.fields, depth)
+    elif item.type == "list" and item.item_type == "map":
+        shape = _output_map(item.fields, depth)
+    elif item.type == "list" and item.item_type is not None:
+        shape = item.item_type
+    else:
+        return _typed(item.type, item.default, required=item.required)
+    tail = "" if item.default is None else f", {value(item.default)}"
+    return f"{item.type}({shape}{tail})"
+
+
+def _output_entry(item: OutputFieldSpec, depth: int) -> str:
+    """``name = type ["description"]`` (the description is the string after the type)."""
+    text = f"{_key(item.name)} = {_output_type(item, depth)}"
+    return text if item.description is None else f"{text} {quote(item.description)}"
+
+
+def _output_map(fields: list[OutputFieldSpec], depth: int) -> str:
+    """``{ a = string, b = number }`` on one line; one line per field when a field has a
+    description (or a nested map does).
+    """
+    entries = [_output_entry(f, depth + 1) for f in fields]
+    if all(f.description is None for f in fields) and not any("\n" in e for e in entries):
+        return "{ " + ", ".join(entries) + " }"
+    pad = _INDENT * (depth + 1)
+    return "{\n" + "\n".join(pad + e for e in entries) + "\n" + _INDENT * depth + "}"
+
+
+def _output(spec: OutputSpec, depth: int = 1) -> list[str]:
+    head = f"output {spec.format_from or quote(spec.format)}"
+    if spec.schema_from is not None:
+        return _block(head, [f"schema = {spec.schema_from}"], depth)
+    entries = [_output_entry(f, depth + 1) for f in spec.fields]
+    if all(f.description is None for f in spec.fields):
+        return _block(head, entries, depth)
+    pad = _INDENT * depth
+    return [f"{pad}{head} {{", *(f"{pad}{_INDENT}{e}" for e in entries), f"{pad}}}"]
+
+
+def _variable_type(spec: VariableSpec) -> str:
+    """``string``, ``number(3)``, or a shape (``list({ a = string })``) with its default after it
+    (``list({ a = string }, [])``).
+    """
+    if not spec.structured:
+        return _typed(spec.type, spec.default, required=spec.required)
+    shape = OutputFieldSpec(
+        name=spec.name,
+        type=spec.type,
+        item_type=spec.item_type,
+        fields=list(spec.fields),
+        default=spec.default,
+        required=spec.required,
+    )
+    return _output_type(shape, 2)
+
+
 def _prompt(spec: PromptSpec) -> str:
     out = [f"prompt {quote(spec.name)} {{"]
     if spec.variables:
         items = [
-            f"{v.name} = {_typed(v.type, v.default, required=v.required)}" for v in spec.variables
+            f"{_key(v.name)} = {_variable_type(v)}"
+            + ("" if v.description is None else f" {quote(v.description)}")
+            for v in spec.variables
         ]
         one = f"{_INDENT}variables = {{ {', '.join(items)} }}"
         out.extend(
             [one]
             if len(one) <= _WIDTH
+            and all(v.description is None for v in spec.variables)
+            and not any("\n" in i for i in items)
             else [f"{_INDENT}variables = {{", *(f"{_INDENT * 2}{i}" for i in items), f"{_INDENT}}}"]
         )
     if spec.allow_missing:
         out.append(f"{_INDENT}allow_missing = {value(list(spec.allow_missing))}")
+    if spec.output is not None:
+        out.extend(_output(spec.output))
     if spec.parts:
         if len(out) > 1:
             out.append("")
@@ -386,8 +464,12 @@ def to_text(*specs: RouterSpec | FlowSpec | PromptSpec | Document) -> str:
     texts: list[str] = []
     for spec in specs:
         if isinstance(spec, Document):
+            header = format_metadata(spec.metadata)  # the front matter comes first, then the blocks
             if spec.routers or spec.flows or spec.prompts:
-                texts.append(to_text(*spec.routers, *spec.flows, *spec.prompts))
+                body = to_text(*spec.routers, *spec.flows, *spec.prompts)
+                texts.append(header + "\n" + body if header else body)  # one blank line after it
+            elif header:
+                texts.append(header)
         elif isinstance(spec, RouterSpec):
             texts.append(_router(spec))
         elif isinstance(spec, FlowSpec):

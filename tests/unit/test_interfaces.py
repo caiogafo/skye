@@ -305,11 +305,8 @@ class TestPromptBuilderInterface:
         ) -> None:
             pass
 
-        # Jinja2 advanced
+        # Template engine
         def register_jinja_filter(self, filter_name: str, filter_func: Callable) -> None:
-            pass
-
-        def register_jinja_macro(self, macro_name: str, macro_template: str) -> None:
             pass
 
         def compose_templates(
@@ -365,9 +362,8 @@ class TestPromptBuilderInterface:
             # Multimodal support
             "add_image_content",
             "add_multimodal_content",
-            # Jinja2 advanced
+            # Template engine
             "register_jinja_filter",
-            "register_jinja_macro",
             "compose_templates",
             # Message roles
             "set_message_roles",

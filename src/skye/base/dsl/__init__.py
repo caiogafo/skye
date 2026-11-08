@@ -14,6 +14,10 @@ Entry points:
 * :func:`block_schema` ``(kind=None) -> dict``: the JSON Schema of the blocks.
 * :func:`evaluate` ``(expression, scope)``: a safe evaluator (never ``eval``).
 * :func:`skeleton` ``(kind, name=None, template=None) -> str``: a starting ``.skye`` text.
+* :func:`format_text` ``(text, filename=None) -> str``: the standard layout, comments kept
+  (``skye fmt``).
+* :func:`split_metadata` / :func:`format_metadata`: the ``---`` metadata at the top of a file
+  (TOML); :func:`build` puts it in ``Document.metadata``.
 
 Codename: stratus.
 """
@@ -29,17 +33,22 @@ from skye.base.dsl.expressions import (
     check_expression,
     evaluate,
 )
+from skye.base.dsl.fmt import FormatError, format_text
 from skye.base.dsl.lexer import Token, tokenize
+from skye.base.dsl.metadata import format_metadata, split_metadata
 from skye.base.dsl.parser import parse, parse_collect
 from skye.base.dsl.schema import block_schema
 from skye.base.dsl.skeletons import TEMPLATES, new_flow, new_prompt, new_router, skeleton
 from skye.base.dsl.specs import (
+    OUTPUT_FORMATS,
     AllowedFailsPolicySpec,
     BranchSpec,
     ChoiceSpec,
     ContextFieldSpec,
     ContextSpec,
     FlowSpec,
+    OutputFieldSpec,
+    OutputSpec,
     ParallelSpec,
     PromptPartSpec,
     PromptSpec,
@@ -68,7 +77,11 @@ __all__ = [
     "Diagnostic",
     "Document",
     "Expression",
+    "FormatError",
     "FlowSpec",
+    "OUTPUT_FORMATS",
+    "OutputFieldSpec",
+    "OutputSpec",
     "ParallelSpec",
     "PromptPartSpec",
     "PromptSpec",
@@ -94,6 +107,8 @@ __all__ = [
     "did_you_mean",
     "evaluate",
     "format_duration",
+    "format_text",
+    "format_metadata",
     "new_flow",
     "new_prompt",
     "new_router",
@@ -101,6 +116,7 @@ __all__ = [
     "parse_collect",
     "parse_duration",
     "skeleton",
+    "split_metadata",
     "suggest",
     "to_text",
     "tokenize",

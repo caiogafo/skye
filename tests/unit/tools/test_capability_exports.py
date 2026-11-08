@@ -103,18 +103,14 @@ def test_capability_call_handler_import():
     assert hasattr(CapabilityCallHandler, "format_capability_results")
 
 
-def test_mcp_capability_import():
-    """Test that MCPCapability can be imported."""
-    from skye.tools import MCPCapability
-    
-    assert MCPCapability is not None
+def test_mcp_client_import():
+    """The tri-faceted MCP client and its factory can be imported; the legacy probes are gone (task 6.3)."""
+    import skye.tools
+    from skye.tools import BuiltinMCPClient, MCPToolCapability, create_mcp_client
 
-
-def test_mcp_server_client_import():
-    """Test that MCPServerClient can be imported."""
-    from skye.tools import MCPServerClient
-    
-    assert MCPServerClient is not None
+    assert BuiltinMCPClient is not None and MCPToolCapability is not None and callable(create_mcp_client)
+    assert not hasattr(skye.tools, "MCPCapability")
+    assert not hasattr(skye.tools, "MCPServerClient")
 
 
 def test_capability_decorator_import():
@@ -152,8 +148,9 @@ def test_all_contains_expected_symbols():
         "CapabilityValidationError",
         "CapabilityCallParsingError",
         "CapabilityCallHandler",
-        "MCPCapability",
-        "MCPServerClient",
+        "BuiltinMCPClient",
+        "MCPToolCapability",
+        "create_mcp_client",
         "capability",
     ]
     

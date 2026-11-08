@@ -1,9 +1,12 @@
-# Simple Skye router configuration
-# ================================
-# A small router for demonstration. It only needs OPENAI_API_KEY to be set.
+---
+title       = "Simple router"
+description = "A small router for demonstration: a fast GPT-3.5 Turbo route and a GPT-4 route that falls back to it. It only needs OPENAI_API_KEY to be set."
+version     = "1.0"
+tags        = ["router", "example"]
+---
 
 router "simple" {
-  # Default strategy, cooldown (default "60s") and pre-call checks (default true)
+  # Default strategy; cooldown ("60s") and pre-call checks (true) keep their defaults
   strategy = "rate_limit_aware"
 
   # Basic GPT-3.5 Turbo route with rate limiting

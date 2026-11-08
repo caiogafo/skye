@@ -7,9 +7,9 @@ of them (``ModelRouter.from_config_dict``) must equal the router built from the 
 in ``examples/routing`` on
 every field the router reads: routes, targets, strategies, fallback chains, retry and allowed-fails
 policies, cooldown and
-pre-call checks. Not compared, because the router never reads them (owner decision, noted for
-version 2): ``priority`` and
-``cost_per_1k_*_tokens`` of a target.
+pre-call checks, and the ``cost_per_1k_*_tokens`` of a target (read by ``cost_based``, real fields
+since 2026-11-08). Not compared, because the router never reads it (owner decision, noted for
+version 2): ``priority`` of a target.
 """
 
 from __future__ import annotations
@@ -27,7 +27,7 @@ ROOT = Path(__file__).resolve().parents[3]
 LEGACY = ROOT / "tests" / "fixtures" / "legacy_router_yaml"
 EXAMPLES = ROOT / "examples" / "routing"
 CASES = [("router_config", "main"), ("router_config_simple", "simple")]
-DROPPED_TARGET_FIELDS = ("priority", "cost_per_1k_prompt_tokens", "cost_per_1k_completion_tokens")
+DROPPED_TARGET_FIELDS = ("priority",)
 
 
 def _set_env(monkeypatch, text: str) -> None:
@@ -36,8 +36,8 @@ def _set_env(monkeypatch, text: str) -> None:
 
 
 def _fields(target) -> dict:
-    """The fields of a target, without the dropped ``priority`` and ``cost_per_1k_*`` of the old
-    YAML (the router never read them).
+    """The fields of a target, without the dropped ``priority`` of the old YAML (the router never
+    read it).
     """
     fields = target.model_dump() if hasattr(target, "model_dump") else dict(vars(target))
     extras = fields.pop("extras", {})
@@ -116,6 +116,8 @@ def test_only_the_unread_target_fields_were_dropped(stem, label):
         "region",
         "tpm",
         "rpm",
+        "cost_per_1k_prompt_tokens",
+        "cost_per_1k_completion_tokens",
         "weight",
         "tags",
         "metadata",

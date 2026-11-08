@@ -63,7 +63,9 @@ class CapabilitySchema(Validated):
             super().__post_init__()
         except dataclasses.FrozenInstanceError as error:
             raise ValidationError(
-                "parameters and returns must be dicts with string keys", field="parameters", value=None
+                "parameters and returns must be dicts with string keys",
+                field="parameters",
+                value=None,
             ) from error
         for field_name in ("name", "description"):
             value = getattr(self, field_name)

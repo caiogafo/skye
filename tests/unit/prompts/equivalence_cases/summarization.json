@@ -1,0 +1,30 @@
+[
+  {
+    "note": "no length, no style, no format",
+    "variables": {"text": "A long article about climate."}
+  },
+  {
+    "note": "length and style, system prompt, description, examples, bullet points",
+    "variables": {
+      "system_prompt": "You summarize news.",
+      "description": "Summaries for busy readers.",
+      "max_length": 50,
+      "style": "formal",
+      "examples": "Input: long text\nOutput: short text\n\n",
+      "text": "The council met on Monday.",
+      "output_format": "bullet_points"
+    }
+  },
+  {
+    "note": "length only, paragraph",
+    "variables": {"max_length": 20, "text": "T", "output_format": "paragraph"}
+  },
+  {
+    "note": "style only, structured",
+    "variables": {"style": "casual", "text": "T", "output_format": "structured"}
+  },
+  {
+    "note": "unknown format, zero length is falsy",
+    "variables": {"max_length": 0, "text": "T", "output_format": "table"}
+  }
+]

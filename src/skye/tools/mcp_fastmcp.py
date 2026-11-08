@@ -11,14 +11,14 @@ import functools
 from collections.abc import Awaitable, Callable, Coroutine
 from typing import Any, ParamSpec, TypeVar
 
-from skye.base.exceptions import SkyeError, ProviderError
+from skye.base.exceptions import ProviderError, SkyeError
+from skye.base.interfaces.resource import Resource
 from skye.base.lazy_import import missing_extra
 from skye.base.messages import SkyeMessage
 from skye.tools import mcp_boundary as boundary
 from skye.tools.interface import CapabilityInterface
 from skye.tools.mcp_boundary import MCPPrompt
 from skye.tools.mcp_client import MCPClientInterface, _tool_value, _ToolsFacet
-from skye.tools.mcp_resource import Resource
 
 _T = TypeVar("_T")
 _P = ParamSpec("_P")

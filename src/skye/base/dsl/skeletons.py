@@ -1,13 +1,16 @@
 """Skeletons: small ``.skye`` texts to start from (``skye new router|flow|prompt``).
 
 Each function returns text only (no file is read or written). Every skeleton passes
-:func:`skye.base.dsl.check_text` as it is; the lines to edit are marked ``# CHANGE ME``.
+:func:`skye.base.dsl.check_text` as it is; the lines to edit are marked ``CHANGE ME``.
+Every skeleton starts with front matter (``title``, ``description``, ``version``, ``tags``).
 Version 2 syntax (``wait``, ``on_event``) is never used.
 """
 
 from __future__ import annotations
 
 import re
+
+from skye.base.dsl.fmt import FormatError, format_text
 
 #: The templates of each block kind; the first one is the default.
 TEMPLATES: dict[str, tuple[str, ...]] = {
@@ -19,10 +22,32 @@ TEMPLATES: dict[str, tuple[str, ...]] = {
 _DEFAULT_NAMES = {"router": "main", "flow": "my_flow", "prompt": "my_prompt"}
 _NAME = re.compile(r"^[A-Za-z0-9_][A-Za-z0-9_.\- ]*$")
 
+_FRONT_MATTER = """\
+---
+title       = "__NAME__"
+description = "CHANGE ME: __DESCRIPTION__"
+version     = "0.1.0"
+tags        = []
+---
+"""
+
+#: What the ``description`` of each skeleton says before you change it.
+_DESCRIPTIONS: dict[tuple[str, str], str] = {
+    ("router", "shorthand"): "the models this router calls and the fallbacks of each.",
+    ("router", "full"): "the routes, strategies and retry policies of this router.",
+    ("flow", "sequence"): "what this flow does, step by step.",
+    ("flow", "branch"): "what this flow does and how it chooses a branch.",
+    ("flow", "parallel"): "what this flow does and what runs in parallel.",
+    ("flow", "loop"): "what this flow does and when its loop stops.",
+    ("flow", "full"): "what this flow does: its steps, branches, parallel work and loop.",
+    ("prompt", "basic"): "what this prompt asks the model.",
+    ("prompt", "chat"): "the conversation this prompt starts.",
+}
+
 _ROUTER_SHORTHAND = """\
 router "__NAME__" {
-  # CHANGE ME: the alias, then "provider/model" first (primary) and its fallbacks in order.
-  # The key comes from the provider's variable (OPENAI_API_KEY, ANTHROPIC_API_KEY).
+  /** CHANGE ME: the alias, then "provider/model" first (primary) and its fallbacks in order.
+      The key comes from the provider's variable (OPENAI_API_KEY, ANTHROPIC_API_KEY). **/
   route "fast" = ["openai/gpt-4o-mini", "anthropic/claude-haiku"]
 }
 """
@@ -259,7 +284,8 @@ def skeleton(kind: str, name: str | None = None, template: str | None = None) ->
         template: One of ``TEMPLATES[kind]``; the first one when ``None``.
 
     Returns:
-        The text; it passes ``check_text`` as it is, and ``# CHANGE ME`` marks what to edit.
+        The text, front matter first; it passes ``check_text`` as it is, and ``CHANGE ME``
+        marks what to edit.
 
     Raises:
         ValueError: If the kind, the template or the name is not valid.
@@ -274,7 +300,12 @@ def skeleton(kind: str, name: str | None = None, template: str | None = None) ->
     label = name or _DEFAULT_NAMES[kind]
     if not _NAME.match(label):
         raise ValueError(f'"{label}" is not a valid name; use letters, digits, "_", "-" or "."')
-    return _BODIES[(kind, chosen)].replace("__NAME__", label)
+    text = _FRONT_MATTER.replace("__DESCRIPTION__", _DESCRIPTIONS[(kind, chosen)])
+    text = (text + _BODIES[(kind, chosen)]).replace("__NAME__", label)
+    try:  # the skeleton comes out as `skye fmt` would write it
+        return format_text(text)
+    except FormatError:  # a label that does not build (quotes, ...): the text as it is
+        return text
 
 
 def new_router(name: str = "main", template: str = "shorthand") -> str:

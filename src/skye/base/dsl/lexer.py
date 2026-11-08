@@ -1,7 +1,9 @@
 """The lexer of the ``.skye`` language: text in, tokens with line and column out.
 
 Tokens carry their start and end offsets so that an expression can be kept as the exact text
-of the file. ``#`` comments are dropped. A newline is a token (it ends an attribute).
+of the file. Comments are dropped: ``#`` to the end of the line, and ``/* ... */``, which may span
+lines (it does not nest). A newline is a token (it ends an attribute); a block comment that spans
+lines produces no newline token.
 """
 
 from __future__ import annotations
@@ -135,6 +137,16 @@ def tokenize(text: str, filename: str) -> tuple[list[Token], list[Diagnostic]]:
         elif ch == "#":
             while i < n and text[i] != "\n":
                 i += 1
+        elif text.startswith("/*", i):
+            close = text.find("*/", i + 2)
+            if close == -1:
+                fail(i, line, line_start, 'unterminated "/*" comment', 'Add the closing "*/"')
+                break
+            newlines = text.count("\n", i, close + 2)
+            if newlines:
+                line += newlines
+                line_start = text.rfind("\n", i, close + 2) + 1
+            i = close + 2
         elif text.startswith('"""', i):
             close = text.find('"""', i + 3)
             while close != -1 and text[close - 1] == "\\":
