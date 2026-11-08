@@ -290,7 +290,7 @@ The codebase is production-ready with a clean, maintainable architecture that ma
 
 - [Provider Transformation Architecture](./provider-transformation-architecture.md)
 - [Architecture Validation Report](./provider-architecture-validation.md)
-- [Validation test](../../tests/budget/test_provider_agnostic_core.py)
-- [BaseModelProvider](../../src/skye/models/base.py)
-- [Requirements Document](../../.kiro/specs/0-base-structure/requirements.md)
-- [Design Document](../../.kiro/specs/0-base-structure/design.md)
+- [Validation test](https://github.com/ggiallo28/skye/blob/main/tests/budget/test_provider_agnostic_core.py)
+- [BaseModelProvider](https://github.com/ggiallo28/skye/blob/main/src/skye/models/base.py)
+- [Requirements Document](https://github.com/ggiallo28/skye/blob/main/.kiro/specs/0-base-structure/requirements.md)
+- [Design Document](https://github.com/ggiallo28/skye/blob/main/.kiro/specs/0-base-structure/design.md)

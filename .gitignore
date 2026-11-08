@@ -66,3 +66,4 @@ docs/_notes/
 # agent task artifacts and working reports (not committed)
 .agents/
 .agent/
+site/

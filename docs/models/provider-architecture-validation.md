@@ -222,7 +222,7 @@ The architecture is production-ready and maintainable. The single instance of do
 ## References
 
 - [Provider Transformation Architecture](./provider-transformation-architecture.md) - Complete architecture documentation
-- [BaseModelProvider](../../src/skye/models/base.py) - Base provider class
-- [OpenAIProvider](../../src/skye/models/llm/openai_compatible.py) - Example implementation
-- [BedrockProvider](../../src/skye/models/llm/bedrock.py) - Example implementation
-- [Validation test](../../tests/budget/test_provider_agnostic_core.py) - Automated validation
+- [BaseModelProvider](https://github.com/ggiallo28/skye/blob/main/src/skye/models/base.py) - Base provider class
+- [OpenAIProvider](https://github.com/ggiallo28/skye/blob/main/src/skye/models/llm/openai_compatible.py) - Example implementation
+- [BedrockProvider](https://github.com/ggiallo28/skye/blob/main/src/skye/models/llm/bedrock.py) - Example implementation
+- [Validation test](https://github.com/ggiallo28/skye/blob/main/tests/budget/test_provider_agnostic_core.py) - Automated validation

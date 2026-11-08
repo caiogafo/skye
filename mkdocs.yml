@@ -1,0 +1,81 @@
+site_name: Skye
+site_description: Modular GenAI library for building AI agents and intelligent applications
+site_url: https://skye.readthedocs.io/
+repo_url: https://github.com/ggiallo28/skye
+repo_name: ggiallo28/skye
+edit_uri: edit/main/docs/
+docs_dir: docs
+exclude_docs: |
+  _notes/
+
+theme:
+  name: material
+  features:
+    - navigation.sections
+    - navigation.top
+    - search.suggest
+    - content.code.copy
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      toggle:
+        icon: material/brightness-7
+        name: Dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      toggle:
+        icon: material/brightness-4
+        name: Light mode
+
+markdown_extensions:
+  - admonition
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.highlight
+  - pymdownx.superfences
+
+nav:
+  - Home: index.md
+  - Getting started: getting-started.md
+  - Architecture: architecture.md
+  - Base:
+      - Overview: base/index.md
+      - The .skye language: base/skye-language.md
+      - Editor support: base/editor.md
+      - Configuration: base/configuration.md
+      - Core interfaces: base/interfaces.md
+      - Extending Skye: base/extending.md
+  - Models:
+      - Overview: models/index.md
+      - Provider guide: models/provider-guide.md
+      - Structured outputs: models/structured-outputs.md
+      - Provider transformation architecture: models/provider-transformation-architecture.md
+      - Provider architecture validation: models/provider-architecture-validation.md
+      - Provider consolidation summary: models/provider-consolidation-summary.md
+  - Router:
+      - Overview: router/index.md
+      - Routing guide: router/routing-guide.md
+      - Advanced features: router/overview.md
+  - Prompts: prompts/index.md
+  - Tools:
+      - Overview: tools/index.md
+      - Function calling: tools/function-calling.md
+  - Auth: auth/index.md
+  - Agents: agents/index.md
+  - Memory: memory/index.md
+  - Store: store/index.md
+  - Teams: teams/index.md
+  - Flows: flows/index.md
+  - Guard: guard/index.md
+  - Policy: policy/index.md
+  - Gateway: gateway/index.md
+  - Observe:
+      - Overview: observe/index.md
+      - Observability: observe/observability.md
+  - Reference:
+      - Size and load budgets: budgets.md
+      - Deployment: deployment.md
+      - Development: development.md
+      - Glossary: glossary.md
+      - Roadmap: roadmap.md
