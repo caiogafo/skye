@@ -4,9 +4,12 @@
 
 Skye AI provides a foundational layer for building AI agents and intelligent applications with a Clean Architecture approach. The base package includes only interfaces and models, while all implementations are available as optional extras.
 
-[![PyPI](https://img.shields.io/pypi/v/skyeai)](https://pypi.org/project/skyeai/)
-[![Documentation](https://readthedocs.org/projects/skye/badge/?version=latest)](https://skye.readthedocs.io/)
-[![Built with Kiro](https://img.shields.io/badge/built_with-Kiro-790ECB)](https://kiro.dev)
+[![PyPI](https://img.shields.io/pypi/v/skyeai?label=PyPI)](https://pypi.org/project/skyeai/)
+[![Python 3.11+](https://img.shields.io/badge/Python-3.11%2B-3776AB)](https://www.python.org/downloads/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow)](https://opensource.org/licenses/MIT)
+[![Documentation](https://img.shields.io/readthedocs/skye?label=Docs)](https://skye.readthedocs.io/)
+[![Install size: 1.1 MB](https://img.shields.io/badge/Install%20size-1.1%20MB-2EA44F)](https://skye.readthedocs.io/en/latest/budgets/)
+[![Built with Kiro](https://img.shields.io/badge/Built%20with-Kiro-790ECB)](https://kiro.dev)
 
 ## Features
 
@@ -27,7 +30,7 @@ pip install skyeai            # the base: messages, completion, errors, config, 
 pip install skyeai[memory]    # add only what you need: tokens, auth, memory, postgres, mcp, ...
 ```
 
-Every extra is optional and loaded lazily. All extras and install options: [getting started](https://github.com/ggiallo28/skye/blob/main/docs/getting-started.md).
+Every extra is optional and loaded lazily. All extras and install options: [getting started](https://skye.readthedocs.io/en/latest/getting-started/).
 
 ## Quick start
 
@@ -47,7 +50,7 @@ print(response.content)
 ```
 
 The same line works for every provider (`"openai"`, `"anthropic"`, `"bedrock"`, `"azure"`, `"google"`, `"cohere"`); for embeddings add `provider_type="embedding"`.
-To balance several models with fallbacks, use the router: [router overview](https://github.com/ggiallo28/skye/blob/main/docs/router/overview.md).
+To balance several models with fallbacks, use the router: [router overview](https://skye.readthedocs.io/en/latest/router/overview/).
 
 ## Examples
 
@@ -67,21 +70,21 @@ Every example is run offline against a fake network by `tests/examples`, so it c
 
 ## Documentation
 
-The documentation is online at **[skye.readthedocs.io](https://skye.readthedocs.io)**, with one section per component. The same pages are in [`docs/`](https://github.com/ggiallo28/skye/blob/main/docs/index.md) in the repository.
+The documentation is online at **[skye.readthedocs.io](https://skye.readthedocs.io)**, with one section per component. The same pages are in [`docs/`](https://skye.readthedocs.io/en/latest/) in the repository.
 
 | Topic | Page |
 |---|---|
-| Getting started, install, quick start | [getting started](https://github.com/ggiallo28/skye/blob/main/docs/getting-started.md) |
-| Architecture and layers | [architecture](https://github.com/ggiallo28/skye/blob/main/docs/architecture.md) |
-| Core interfaces and configuration | [interfaces](https://github.com/ggiallo28/skye/blob/main/docs/base/interfaces.md), [configuration](https://github.com/ggiallo28/skye/blob/main/docs/base/configuration.md) |
-| Providers, embeddings, multimodal, streaming | [provider guide](https://github.com/ggiallo28/skye/blob/main/docs/models/provider-guide.md) |
-| Function calling and capabilities | [function calling](https://github.com/ggiallo28/skye/blob/main/docs/tools/function-calling.md) |
-| Routing, `.skye` files, health, fallbacks | [router overview](https://github.com/ggiallo28/skye/blob/main/docs/router/overview.md), [routing guide](https://github.com/ggiallo28/skye/blob/main/docs/router/routing-guide.md) |
-| Lazy loading and serverless deployment | [deployment](https://github.com/ggiallo28/skye/blob/main/docs/deployment.md) |
-| Size and load budgets | [budgets](https://github.com/ggiallo28/skye/blob/main/docs/budgets.md) |
-| Codename glossary | [glossary](https://github.com/ggiallo28/skye/blob/main/docs/glossary.md) |
-| Development: setup, tests, code quality | [development](https://github.com/ggiallo28/skye/blob/main/docs/development.md) |
-| Roadmap | [roadmap](https://github.com/ggiallo28/skye/blob/main/docs/roadmap.md) |
+| Getting started, install, quick start | [getting started](https://skye.readthedocs.io/en/latest/getting-started/) |
+| Architecture and layers | [architecture](https://skye.readthedocs.io/en/latest/architecture/) |
+| Core interfaces and configuration | [interfaces](https://skye.readthedocs.io/en/latest/base/interfaces/), [configuration](https://skye.readthedocs.io/en/latest/base/configuration/) |
+| Providers, embeddings, multimodal, streaming | [provider guide](https://skye.readthedocs.io/en/latest/models/provider-guide/) |
+| Function calling and capabilities | [function calling](https://skye.readthedocs.io/en/latest/tools/function-calling/) |
+| Routing, `.skye` files, health, fallbacks | [router overview](https://skye.readthedocs.io/en/latest/router/overview/), [routing guide](https://skye.readthedocs.io/en/latest/router/routing-guide/) |
+| Lazy loading and serverless deployment | [deployment](https://skye.readthedocs.io/en/latest/deployment/) |
+| Size and load budgets | [budgets](https://skye.readthedocs.io/en/latest/budgets/) |
+| Codename glossary | [glossary](https://skye.readthedocs.io/en/latest/glossary/) |
+| Development: setup, tests, code quality | [development](https://skye.readthedocs.io/en/latest/development/) |
+| Roadmap | [roadmap](https://skye.readthedocs.io/en/latest/roadmap/) |
 
 How the project is specified: the requirements, the design and the decisions are in `.kiro/steering/` (`10-requirements.md`, `11-design.md`, `12-decisions.md`) and the per-component specs in `.kiro/specs/`.
 
