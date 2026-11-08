@@ -141,4 +141,4 @@ render as they are.
 In a shared conversation each agent renders `group_chat_participant` with the transcript and its `triggers`; it answers the pass
 token (`[PASS]`) unless the latest messages concern it or mention `@name`. `group_chat_manager` can instead pick the next speakers.
 
-Examples: [examples/prompts](../../examples/prompts/README.md).
+Examples: [examples/prompts](https://github.com/ggiallo28/skye/blob/main/examples/prompts/README.md).

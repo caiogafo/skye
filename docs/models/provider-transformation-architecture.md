@@ -327,8 +327,8 @@ class MessageTransformer:
 
 ## References
 
-- [BaseModelProvider](../../src/skye/models/base.py) - Base provider class with transformation methods
-- [OpenAIProvider](../../src/skye/models/llm/openai_compatible.py) - Example provider implementation
-- [BedrockProvider](../../src/skye/models/llm/bedrock.py) - Example provider implementation
+- [BaseModelProvider](https://github.com/ggiallo28/skye/blob/main/src/skye/models/base.py) - Base provider class with transformation methods
+- [OpenAIProvider](https://github.com/ggiallo28/skye/blob/main/src/skye/models/llm/openai_compatible.py) - Example provider implementation
+- [BedrockProvider](https://github.com/ggiallo28/skye/blob/main/src/skye/models/llm/bedrock.py) - Example provider implementation
 - `MessageTransformer` (`models/transformers.py`) - thin delegation layer; the file no longer exists, the logic lives in each adapter
 - `CapabilityTransformer` (`tools/capability_transformer.py`) - thin delegation layer; the file no longer exists, the logic lives in each adapter
