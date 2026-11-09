@@ -150,6 +150,8 @@ LAZY_NAMES = {
     "StreamChunk", "TokenUsage", "SkyeError", "ProviderError", "ConfigurationError", "ValidationError", "MissingExtraError",
     # The `.skye` loading API (decision D61): `skye.load(path)` and `skye.Flow` (task 8.4 of the uxui spec).
     "load", "Flow",
+    # The configuration file is read in `skye.utils` (decision D91): `skye.load_config(path)`.
+    "load_config",
 }
 
 

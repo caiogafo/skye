@@ -13,7 +13,7 @@ from pathlib import Path
 import pytest
 
 SRC = Path(__file__).resolve().parents[2] / "src" / "skye"
-FACADES = ["interfaces", "data", "messages", "completion", "exceptions", "config"]
+FACADES = ["interfaces", "data", "dsl", "messages", "completion", "exceptions", "config"]
 
 
 def _tree(name: str) -> ast.Module:

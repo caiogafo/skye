@@ -7,6 +7,7 @@ import pytest
 
 from skye.base.config import ConfigLoader, substitute_env_vars
 from skye.base.exceptions import ConfigurationError
+from skye.utils.config_files import load_config
 
 
 class TestSubstituteEnvVars:
@@ -238,7 +239,7 @@ class TestConfigLoaderWithEnvVarSubstitution:
             },
         }))
 
-        config = ConfigLoader.load(config_path=config_file)
+        config = load_config(config_file)
 
         assert config.models["gpt-4"].api_key == "sk-test-key-123"
         assert config.models["azure-gpt"].api_key == "sk-test-key-123"
@@ -264,7 +265,7 @@ class TestConfigLoaderWithEnvVarSubstitution:
 """
         )
 
-        config = ConfigLoader.load(config_path=config_file)
+        config = load_config(config_file)
 
         assert config.models["test-model"].api_key == "secret-key"
 
@@ -296,7 +297,7 @@ class TestConfigLoaderWithEnvVarSubstitution:
         }))
 
         with pytest.raises(ConfigurationError) as exc_info:
-            ConfigLoader.load(config_path=config_file)
+            load_config(config_file)
 
         assert "MISSING_VAR" in str(exc_info.value)
 
@@ -313,7 +314,7 @@ class TestConfigLoaderWithEnvVarSubstitution:
             },
         }))
 
-        config = ConfigLoader.load(config_path=config_file)
+        config = load_config(config_file)
 
         assert config.models["model1"].api_key == "dynamic-value"
         assert config.models["model1"].timeout == 30
@@ -334,7 +335,7 @@ class TestConfigLoaderWithEnvVarSubstitution:
             },
         }))
 
-        config = ConfigLoader.load(config_path=config_file)
+        config = load_config(config_file)
 
         assert config.plugins["memory"]["url"] == "redis://localhost:6379"
         assert config.plugins["observe"]["endpoint"] == "http://localhost:4318"

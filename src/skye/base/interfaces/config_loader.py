@@ -3,13 +3,12 @@
 This module defines the abstract interface for loading configuration from
 multiple sources with precedence handling.
 
-Raises: ConfigurationError when a file is absent, malformed or the merged values do not validate.
-Missing: an absent environment variable falls back to the next source and to the default; an absent file raises.
+Raises: ConfigurationError when the text is malformed or the merged values do not validate.
+Missing: an absent environment variable falls back to the next source and to the default; no text means no file.
 Concurrency: loading is read-only and safe to repeat; ``skye.config.ConfigLoader`` satisfies this Port structurally, with a static ``load``.
 """
 
 from abc import ABC, abstractmethod
-from pathlib import Path
 from typing import Any
 
 from skye.base.config import SkyeConfig
@@ -24,22 +23,20 @@ class ConfigLoaderInterface(ABC):
 
     Example:
         >>> class MyConfigLoader(ConfigLoaderInterface):
-        ...     def load(self, config_path=None, overrides=None):
+        ...     def load(self, text=None, overrides=None):
         ...         # Implementation
         ...         return SkyeConfig()
     """
 
     @abstractmethod
-    def load(
-        self, config_path: Path | None = None, overrides: dict[str, Any] | None = None
-    ) -> SkyeConfig:
-        """Load configuration from multiple sources with precedence.
+    def load(self, text: str | None = None, overrides: dict[str, Any] | None = None) -> SkyeConfig:
+        """Build the configuration from the text of a file, the environment and code overrides.
 
-        Loads configuration from file, environment variables, and code overrides,
-        applying them in order of precedence: code > environment > file.
+        Precedence: code > environment > file. The loader takes the text of the file and opens
+        nothing (Requirement 3.2, decision D91); ``skye.load_config(path)`` reads a file.
 
         Args:
-            config_path: Optional path to a JSON configuration file (YAML is not read).
+            text: The text of a JSON configuration file, or ``None`` for no file.
             overrides: Optional dictionary of configuration values to override.
 
         Returns:
@@ -49,9 +46,6 @@ class ConfigLoaderInterface(ABC):
             ConfigurationError: If configuration cannot be loaded or validated.
 
         Example:
-            >>> config = loader.load(
-            ...     config_path=Path("config.json"),
-            ...     overrides={"log_level": "DEBUG"}
-            ... )
+            >>> config = loader.load('{"log_level": "INFO"}', overrides={"log_level": "DEBUG"})
         """
         pass

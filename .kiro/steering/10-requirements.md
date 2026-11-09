@@ -45,7 +45,7 @@ Written without the project name (it is being chosen); `<pkg>` is the import pac
 #### Acceptance Criteria
 
 1. THE `base` component SHALL hold the core models, the errors, the configuration loader and every Port, and SHALL import only the standard library.
-2. THE `base` component SHALL do no file, network or process I/O, except `base/http.py`, the one standard-library HTTP transport shared by `auth` and the adapters.
+2. THE `base` component SHALL do no file, network or process I/O, except `base/http.py`, the one standard-library HTTP transport shared by `auth` and the adapters; the configuration loader and the `.skye` parser SHALL take text, and the files SHALL be read in `skye.utils` (`load_config`, public as `skye.load_config`, and `load_document`); A test SHALL fail when another module of `base` opens a file (decision D91).
 3. THE `base` component SHALL NOT need pydantic to import.
 4. EACH Port SHALL perform no I/O and SHALL import no other component.
 5. IF a `base` module imports a package outside the standard library, THEN THE budget tests SHALL fail.

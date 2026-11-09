@@ -1,5 +1,5 @@
-"""The ``skye`` command line: ``skye check``, ``skye fmt``, ``skye new`` and ``skye prompt`` for
-``.skye`` files.
+"""The ``skye`` command line: ``skye check``, ``skye fmt``, ``skye new``, ``skye render`` and
+``skye prompt`` for ``.skye`` files.
 
 This is the code that reads and writes files; the parser in ``skye.base.dsl`` takes text only.
 
@@ -13,6 +13,8 @@ Usage::
     skye fmt --check templates/*.skye      # exit 1 if a file is not formatted (for CI)
     skye fmt -                             # stdin to stdout (for editors)
     skye new flow my_flow --template loop -o my_flow.skye
+    skye render flow.skye [--name NAME] [--stdout] [--fence] [-o OUT] [--direction TD|LR]
+                                           # a flow or a router as a Mermaid diagram (FILE.mmd)
     skye new --list                        # the kinds and their templates
     skye prompt list [--json]              # the bundled prompts: name, title, version, description
     skye prompt info NAME|FILE [--name PROMPT] [--json]   # a prompt's inputs, messages and output
@@ -38,10 +40,11 @@ from collections.abc import Sequence
 from fnmatch import fnmatch
 from pathlib import Path
 
-from skye.base.dsl import TEMPLATES, block_schema, build, check_text, skeleton
+from skye.base.dsl import TEMPLATES, block_schema, build, check_text, skeleton, to_mermaid
 from skye.base.dsl.fmt import FormatError, format_text
 from skye.base.dsl.info import PromptInfo, describe_prompt, header_fields, prompt_help
 from skye.base.dsl.metadata import split_metadata
+from skye.base.dsl.specs import FlowSpec, RouterSpec
 from skye.base.exceptions import ConfigurationError
 from skye.utils.skill import (
     SCOPES,
@@ -118,6 +121,31 @@ def _build_parser() -> argparse.ArgumentParser:
         metavar="NAME",
         default="<stdin>",
         help="the file name used in the messages of - (stdin)",
+    )
+
+    render = commands.add_parser(
+        "render", help="draw a flow or a router of a .skye file as a Mermaid diagram"
+    )
+    render.add_argument("file", help="the .skye file")
+    render.add_argument(
+        "--name", help="the flow or router to draw (needed when the file has several)"
+    )
+    render.add_argument(
+        "--stdout", action="store_true", help="print the diagram instead of writing FILE.mmd"
+    )
+    render.add_argument(
+        "--fence",
+        action="store_true",
+        help="wrap each diagram in a ```mermaid fence, ready to paste into Markdown",
+    )
+    render.add_argument(
+        "-o",
+        "--output",
+        metavar="OUT",
+        help="write to OUT instead of FILE.mmd (FILE.mmd.md with --fence)",
+    )
+    render.add_argument(
+        "--direction", choices=["TD", "LR"], help="TD (top down) or LR (left to right)"
     )
 
     new = commands.add_parser("new", help="print (or write) a starting .skye file")
@@ -352,6 +380,49 @@ def _fmt(args: argparse.Namespace) -> int:
     return status
 
 
+def _render(args: argparse.Namespace) -> int:
+    try:
+        text, name = _read_input(args.file, args.file)
+    except (OSError, UnicodeDecodeError) as exc:
+        print(f"{args.file}: cannot read the file: {exc}", file=sys.stderr)
+        return 2
+    document = build(text, filename=name)
+    if document.diagnostics:
+        for item in document.diagnostics:
+            print(item.format())
+        return 1
+    blocks: list[FlowSpec | RouterSpec] = [*document.flows, *document.routers]
+    if args.name:
+        blocks = [b for b in blocks if b.name == args.name]
+        if not blocks:
+            print(f"skye render: {name} has no flow or router named {args.name!r}", file=sys.stderr)
+            return 2
+    if not blocks:
+        print(f"skye render: {name} has no flow or router to draw", file=sys.stderr)
+        return 2
+    if len(blocks) > 1 and not args.fence:
+        names = ", ".join(repr(b.name) for b in blocks)
+        print(
+            f"skye render: {name} has {len(blocks)} flows and routers ({names}); "
+            "pass --name, or --fence to write them all as Markdown",
+            file=sys.stderr,
+        )
+        return 2
+    diagrams = [to_mermaid(block, direction=args.direction) for block in blocks]
+    if args.fence:
+        out = "\n".join(f"```mermaid\n{diagram}```\n" for diagram in diagrams)
+    else:
+        out = diagrams[0]
+    if args.stdout:
+        sys.stdout.write(out)
+        return 0
+    default = Path(args.file).with_suffix(".mmd.md" if args.fence else ".mmd")
+    target = Path(args.output) if args.output else default
+    target.write_text(out, encoding="utf-8")
+    print(f"wrote {target}")
+    return 0
+
+
 def _new(args: argparse.Namespace) -> int:
     if args.list:
         for kind, templates in TEMPLATES.items():
@@ -528,6 +599,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         return _prompt(args)
     if args.command == "fmt":
         return _fmt(args)
+    if args.command == "render":
+        return _render(args)
     return _new(args)
 
 

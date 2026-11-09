@@ -69,6 +69,7 @@ NON_COMPONENT_TO_COMPONENT = {
     "exceptions": "base",
     "config": "base",
     "data": "base",
+    "dsl": "base",
     "interfaces": "base",
 }
 

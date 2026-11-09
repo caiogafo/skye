@@ -78,12 +78,19 @@ export SKYE_ENABLE_TELEMETRY=true
 ### Load Configuration
 
 ```python
-from pathlib import Path
+import skye
+
+# Reads skye.json (or the file SKYE_CONFIG names when no path is given), then the environment, then the overrides
+config = skye.load_config("skye.json", overrides={"log_level": "DEBUG"})
+```
+
+`skye.load_config` is the function that opens the file. `skye.config.ConfigLoader` takes the text of the file and opens nothing,
+because `base` does no file I/O: use it when the configuration comes from somewhere else (a secret store, a test, a string).
+
+```python
 from skye.config import ConfigLoader
 
-config = ConfigLoader.load(
-    config_path=Path("skye.json"),
-    overrides={"log_level": "DEBUG"}
-)
+config = ConfigLoader.from_text('{"log_level": "INFO"}', source="inline")
+config = ConfigLoader.load(overrides={"log_level": "ERROR"})  # environment and code only
 ```
 

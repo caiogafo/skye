@@ -10,6 +10,7 @@ skye fmt --check [PATH...]    change nothing; exit 1 if a file would be reformat
 skye fmt [--stdin-filename NAME] -    format stdin to stdout (editors)
 skye new KIND [NAME] [--template T | -t T] [-o FILE | --output FILE] [--force]    a starting .skye file you can edit
 skye new --list               the kinds (router, flow, prompt) and their templates
+skye render FILE [--name NAME] [--stdout] [--fence] [-o OUT | --output OUT] [--direction TD|LR]    a flow or a router as a Mermaid diagram
 skye prompt list [--json]     the bundled prompts: name, title, version and description (from the front matter)
 skye prompt info NAME|FILE [--name PROMPT] [--json]    what a prompt takes and gives back: inputs, history, messages, output
 skye skill install [--scope user|project] [--dir DIR] [--force]    install this skill for Claude Code
@@ -63,3 +64,13 @@ exit 0 none, 1 some, 2 read error with nothing on stdout). `-` reads the text fr
 `skye vscode install` gives VS Code highlighting and live diagnostics for `.skye` files; the extension runs `skye check`, so `skye` must be
 on PATH or set the `skye.command` setting (for example `["uv", "run", "skye"]`). "Format Document" runs `skye fmt -`. Without an editor command, or with `--dir`, it copies the
 extension to `~/.vscode/extensions/skyeai.skye-<version>/` (reload VS Code); an edited copy is kept unless you pass `--force`.
+
+## Diagrams (`skye render`)
+
+`skye render FILE` writes `FILE.mmd`, a Mermaid `flowchart` of the one flow or router in the file. `--stdout` prints it instead;
+`--fence` wraps each diagram in a ```` ```mermaid ```` fence (all the flows and routers of the file, or the one `--name` picks) so it can be
+pasted into Markdown, and without `--stdout` writes `FILE.mmd.md`; `-o OUT` chooses the file; `--direction TD|LR` (flows default to `TD`,
+routers to `LR`). A file with several blocks needs `--name` or `--fence`; a prompt has nothing to draw (exit 2). When you document a flow
+or a router in Markdown, run `skye render FILE --name NAME --stdout --fence` and paste the output, so the diagram matches the file. From
+Python: `from skye.dsl import to_mermaid` and `to_mermaid(document.flow("name"))`.
+

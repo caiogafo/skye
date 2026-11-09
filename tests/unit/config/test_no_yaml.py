@@ -11,8 +11,8 @@ from pathlib import Path
 
 import pytest
 
-from skye.base.config import ConfigLoader
 from skye.base.exceptions import ConfigurationError
+from skye.utils.config_files import load_config
 
 SRC = Path(__file__).resolve().parents[3] / "src" / "skye"
 
@@ -41,7 +41,7 @@ def test_a_yaml_file_is_rejected_with_the_supported_formats(tmp_path, name):
     path = tmp_path / name
     path.write_text("log_level: INFO\n", encoding="utf-8")
     with pytest.raises(ConfigurationError) as caught:
-        ConfigLoader.load(config_path=path)
+        load_config(path)
     message = str(caught.value)
     assert ".skye" in message and "JSON" in message
 
@@ -49,4 +49,4 @@ def test_a_yaml_file_is_rejected_with_the_supported_formats(tmp_path, name):
 def test_a_json_file_still_loads(tmp_path):
     path = tmp_path / "skye.json"
     path.write_text('{"log_level": "DEBUG"}', encoding="utf-8")
-    assert ConfigLoader.load(config_path=path).log_level == "DEBUG"
+    assert load_config(path).log_level == "DEBUG"

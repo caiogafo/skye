@@ -358,7 +358,7 @@ requirement or decision directly. A task that depended on an open decision names
     - Use it for 9.2: convert the three YAML files with it once (build the router from the old file, write `to_skye`, check the equivalence, delete the YAML).
     - _Requirements: 54.15; D65_
 
-- [ ] 10. Language tools: comments, front matter, `skye fmt`, `skye prompt`, the editor (decisions D71 to D74; Requirements 54.16 to 54.20 and 55)
+- [x] 10. Language tools: comments, front matter, `skye fmt`, `skye prompt`, the editor (decisions D71 to D74; Requirements 54.16 to 54.20 and 55)
   - [x] 10.1 Comments `#`, `/* */`, `/** **/` and front matter in TOML, in the lexer, parser, `to_text` and the prompt loader
     - Evidence (2026-11-08): `src/skye/base/dsl/lexer.py`, `parser.py`, `metadata.py`, `tree.py`, `emit.py`; `tests/unit/dsl/test_comments.py`, `tests/unit/dsl/test_metadata.py`; `tests/unit/prompts/test_bundled_conventions.py` (comment convention in the bundled files).
     - _Requirements: 54.16, 54.17; D71_
@@ -377,10 +377,12 @@ requirement or decision directly. A task that depended on an open decision names
   - [x] 10.6 Docs and skill follow the language
     - Evidence (2026-11-08): `docs/base/skye-language.md` (comments, front matter, `skye fmt`, `output`), `docs/base/editor.md`; skill `references/cli.md`, `language.md`, `output.md`, `prompt.md`, `router.md`, `python-api.md`; `tests/unit/dsl/test_claude_skill.py`, `tests/unit/dsl/test_docs_examples.py`.
     - _Requirements: 54.14; D64_
-  - [ ] 10.7 A public import for the checker and the formatter, so an example can show a mistake and a fix without `skye.base.*`
+  - [x] 10.7 A public import for the checker and the formatter, so an example can show a mistake and a fix without `skye.base.*`
     - Note (2026-11-09): settled by D78, a `skye.dsl` facade (`check_text`, `format_text`, `Diagnostic`, `FormatError`); then `examples/prompts/validation.py` imports it instead of its workaround. Before: `examples/prompts/validation.py` works around it with the `ValidationError` of `load_prompt`. No code before it is decided.
+    - Evidence (2026-11-09): `src/skye/dsl.py` (re-exports `check_text`, `format_text`, `Diagnostic`, `FormatError`, `to_mermaid`; added to the facades of `tests/budget/test_facade_purity.py` and to the map of `tests/budget/test_import_matrix.py`); `examples/prompts/validation.py` uses `check_text` and `format_text` instead of its workaround.
     - _Requirements: 7.14, 7.15; D34, D78_
-  - [ ] 10.8 `to_mermaid(spec) -> str` in `base/dsl` for flows and routers (deterministic; every step, edge, `choice` branch with its `when` text, `parallel` branches and `join`, dotted `on_error` and `on_timeout`, routes and fallback chains) and `skye render FILE [--name] [--stdout] [--fence] [-o] [--direction]`; tests on the structure of the text, no Mermaid library; public in `skye.dsl`; the skill names the command
+  - [x] 10.8 `to_mermaid(spec) -> str` in `base/dsl` for flows and routers (deterministic; every step, edge, `choice` branch with its `when` text, `parallel` branches and `join`, dotted `on_error` and `on_timeout`, routes and fallback chains) and `skye render FILE [--name] [--stdout] [--fence] [-o] [--direction]`; tests on the structure of the text, no Mermaid library; public in `skye.dsl`; the skill names the command
+    - Evidence (2026-11-09): `src/skye/base/dsl/mermaid.py` (`to_mermaid`, exported by `skye.base.dsl` and `skye.dsl`); `skye render` in `src/skye/utils/cli.py`; `tests/unit/dsl/test_mermaid.py` (nodes, edges, choice labels, parallel subgraph and join, escaping, determinism, routers and fallbacks, every fixture renders, a prompt is refused) and `tests/unit/utils/test_cli_render.py`; skill `references/cli.md` and `python-api.md`; `docs/base/skye-language.md`.
     - _Requirements: 54.21, 54.14; D88, D64_
 
 ## Notes

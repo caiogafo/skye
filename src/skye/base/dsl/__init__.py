@@ -16,6 +16,8 @@ Entry points:
 * :func:`skeleton` ``(kind, name=None, template=None) -> str``: a starting ``.skye`` text.
 * :func:`format_text` ``(text, filename=None) -> str``: the standard layout, comments kept
   (``skye fmt``).
+* :func:`to_mermaid` ``(spec, direction=None) -> str``: a flow or a router as a Mermaid diagram
+  (``skye render``, decision D88).
 * :func:`split_metadata` / :func:`format_metadata`: the ``---`` metadata at the top of a file
   (TOML); :func:`build` puts it in ``Document.metadata``.
 
@@ -35,6 +37,7 @@ from skye.base.dsl.expressions import (
 )
 from skye.base.dsl.fmt import FormatError, format_text
 from skye.base.dsl.lexer import Token, tokenize
+from skye.base.dsl.mermaid import to_mermaid
 from skye.base.dsl.metadata import format_metadata, split_metadata
 from skye.base.dsl.parser import parse, parse_collect
 from skye.base.dsl.schema import block_schema
@@ -118,6 +121,7 @@ __all__ = [
     "skeleton",
     "split_metadata",
     "suggest",
+    "to_mermaid",
     "to_text",
     "tokenize",
 ]

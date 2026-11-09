@@ -125,16 +125,31 @@ satisfies (`Requirement N.k` of `10-requirements.md`) or the decision it honors.
     - Evidence: `docs/budgets.md`, section "Parse time of a `.skye` file": best of 5 fresh interpreters on a clean install; the real router file (292 lines) builds cold in 4.6 ms and flows in 2.3 to 5.6 ms, from the memory cache in 8 to 40 microseconds; importing the parser costs about 27 ms. Conclusion: a parse result on disk would save about 5 ms of roughly 70 ms per cold container and adds a file to keep consistent, so it is not worth it; the owner can close O37 as "no" (not edited here: `12-decisions.md` is the owner's).
     - _Requirements: 54.13; O37_
 
-- [ ] 12. Final verification (to be run with Kiro)
-  - [ ] 12.1 Run `uv run pytest tests -q` and `uv run pytest tests/budget -q`; confirm that `src/skye/base` imports only the standard library and does no file I/O except `http.py` (the parser takes text); fix what fails, one failure at a time.
+- [x] 14. The configuration file is read outside `base` (decision D91; unblocks 12.1 and 13.8)
+  - [x] 14.1 `ConfigLoader.from_text(text, source=)` and `ConfigLoader.from_dict(data)` in `base/config.py` (JSON parse, `${VAR}` substitution, validation); remove the `open()` and `Path.exists()` of `_load_from_file` and `ConfigLoader.load(config_path=...)`; reading `SKYE_CONFIG` stays
+    - Evidence (2026-11-09): `src/skye/base/config.py` (`ConfigLoader.load(text=None, overrides=None)`, `from_text`, `from_dict`, `parse_text`, `config_path_from_env`; no `open()` or `Path.exists()`; a path given as text, or `SKYE_CONFIG` with no text, raises a `ConfigurationError` that names `skye.load_config`); the Port `ConfigLoaderInterface.load(text, overrides)`; `tests/unit/config/test_config_loader.py::test_config_loader_from_text_and_from_dict`, `test_config_loader_takes_text_not_a_path`, `test_config_loader_opens_no_file_when_skye_config_is_set`, `tests/unit/test_port_signatures.py`.
+    - _Requirements: 3.2, 20.4; D91_
+  - [x] 14.2 `load_config(path)` in `skye.utils` beside `skye_files.py`: opens the file, rejects YAML, calls `from_text`; public as `skye.load_config`, resolved lazily like `skye.load`
+    - Evidence (2026-11-09): `src/skye/utils/config_files.py` (`load_config(path=None, *, overrides=None)`: the `SKYE_CONFIG` file when no path, YAML refused, `.json` only); `skye.load_config` lazy in `src/skye/__init__.py`; `tests/unit/test_exports.py`, `tests/unit/config/` (every file test goes through `load_config`).
+    - _Requirements: 3.2, 7.14, 54.12; D62, D91_
+  - [x] 14.3 A budget test that fails when a module of `src/skye/base` other than `http.py` opens a file (`open`, `Path.read_text`, `Path.read_bytes`, `Path.exists` on a path)
+    - Evidence (2026-11-09): `tests/budget/test_base_no_file_io.py` (AST scan of `src/skye/base` except `http.py`; a self-test proves it sees a read).
+    - _Requirements: 3.2; D91_
+  - [x] 14.4 Move `examples/basic/configuration.py`, `docs/base/configuration.md`, `docs/base/extending.md`, `tests/unit/config/` and the skill to the new calls
+    - Evidence (2026-11-09): `examples/basic/configuration.py` uses `skye.load_config`; `docs/base/configuration.md` (load_config and the text loader); skill `references/python-api.md`; `docs/base/extending.md` needed no change (it names the Port only).
+    - _Requirements: 24.3, 15.5, 54.14; D91_
+
+- [x] 12. Final verification (to be run with Kiro)
+  - [x] 12.1 Run `uv run pytest tests -q` and `uv run pytest tests/budget -q`; confirm that `src/skye/base` imports only the standard library and does no file I/O except `http.py` (the parser takes text); fix what fails, one failure at a time.
+    - Evidence (2026-11-09): `uv run pytest tests -q`: 3486 passed, 3 skipped, 0 failed; `uv run pytest tests/budget -q`: 293 passed, 0 failed. An AST scan of the 53 modules of `src/skye/base` against `sys.stdlib_module_names` finds one import outside the standard library, `typing_extensions` in `src/skye/base/validated.py`, under `TYPE_CHECKING` only. File I/O: `tests/budget/test_base_no_file_io.py` 2 passed, and `grep` for `open(`, `read_text`, `write_text`, `read_bytes`, `write_bytes` and `.exists()` in `src/skye/base` outside `http.py` finds nothing. The open point of 12.2 is closed: `src/skye/base/config.py` opens no file (`ConfigLoader.from_text`, `from_dict`), the file is read by `src/skye/utils/config_files.py` (`skye.load_config`, milestone 14, D91). Nothing had to be fixed.
     - _Requirements: 54.2, 54.11; Requirement 3_
   - [x] 12.2 Report which tasks of this spec are still unticked and anything left open.
     - Evidence (2026-11-07): the only unticked tasks of this spec are 12 and 12.1. Open: `src/skye/base/config.py` (`ConfigLoader._load_from_file`) calls `Path.exists()` and `open()` to read a
       JSON file, which Requirement 3.2 does not allow (`base` does no file I/O except `http.py`); no test guards that rule today. Everything else in `base` imports the standard library
-      only (`typing_extensions` appears under `TYPE_CHECKING` only and is not installed in a clean environment). Moving the read to the caller needs a decision of the owner.
+      only (`typing_extensions` appears under `TYPE_CHECKING` only and is not installed in a clean environment). Moving the read to the caller needs a decision of the owner (taken on 2026-11-09 as D91; task 14).
     - _Requirements: 15.1_
 
-- [ ] 13. The language grows: comments, front matter, the formatter, prompt inputs and outputs (decisions D69 to D73; Requirements 54.16 to 54.20)
+- [x] 13. The language grows: comments, front matter, the formatter, prompt inputs and outputs (decisions D69 to D73; Requirements 54.16 to 54.20)
   - [x] 13.1 Comments `/* */` and `/** **/` in the lexer; a comment in an expression is a space; `//` stays floor division
     - Evidence (2026-11-08): `src/skye/base/dsl/lexer.py`, `parser.py` (`_expression_text`); `tests/unit/dsl/test_comments.py`.
     - _Requirements: 54.16; D71_
@@ -156,8 +171,9 @@ satisfies (`Requirement N.k` of `10-requirements.md`) or the decision it honors.
   - [x] 13.7 The resource Port: `ResourceProviderInterface` and `Resource` in `base/interfaces/resource.py`, exported by `skye.interfaces`
     - Evidence (2026-11-08): `src/skye/base/interfaces/resource.py`, `src/skye/base/interfaces/__init__.py`, `src/skye/interfaces.py`; `tests/unit/tools/test_mcp_conformance.py` (the Port, the frozen dataclass, a plain class satisfies it).
     - _Requirements: 10.5; D26_
-  - [ ] 13.8 Re-run task 12.1 on the new modules (`metadata.py`, `fmt.py`, `shapes.py`, `info.py`, `interfaces/resource.py`): standard library only, no file I/O
+  - [x] 13.8 Re-run task 12.1 on the new modules (`metadata.py`, `fmt.py`, `shapes.py`, `info.py`, `interfaces/resource.py`): standard library only, no file I/O
     - Note (2026-11-08): `uv run pytest tests -q` and `uv run pytest tests/budget -q` pass, and `uv run mypy src/skye/base/dsl` reports no error, but the open point of 12.2 (`ConfigLoader._load_from_file` reads a file in `base`) is still there, so 12.1 and this task stay open.
+    - Evidence (2026-11-09): on `src/skye/base/dsl/metadata.py`, `fmt.py`, `shapes.py`, `info.py`, `mermaid.py`, `src/skye/base/interfaces/resource.py` and `src/skye/base/config.py`: no import outside the standard library (AST scan of `src/skye/base`, see 12.1), `tests/budget/test_base_no_file_io.py` 2 passed, the `grep` for file calls outside `http.py` finds nothing, `uv run mypy src/skye/base`: no issues in 53 source files.
     - _Requirements: 3.2, 54.2, 54.11_
 
 ## Notes

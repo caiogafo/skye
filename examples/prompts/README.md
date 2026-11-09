@@ -9,7 +9,7 @@ What you learn: prompts written in the `.skye` language (the library's bundled p
 5. `output_schema.py` with `output_schema.skye`: an `output` block with field descriptions as JSON, a table and XML, the bundled `structured_output`, and a dataclass schema on a prompt with no `output` block
 6. `agent_prompt.py`: the bundled `planner_agent`, whose tools and memory sections appear only when given
 7. `group_chat.py`: three agents in one conversation with the bundled `group_chat_participant` and `group_chat_manager`, driven by a scripted fake model
-8. `validation.py`: the diagnostics (line, column, fix) of a badly written prompt, as `skye check` reports them; `skye fmt` lays a file out and `skye fmt --check` tells whether it already is
+8. `validation.py`: `skye.dsl.check_text` lists the mistakes (line, column, fix) of a badly written prompt, as `skye check` does, and `format_text` lays it out, as `skye fmt` does
 
 Run: `python examples/prompts/control_flow.py`
 

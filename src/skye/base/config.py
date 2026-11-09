@@ -418,89 +418,92 @@ ALL_ENV_VARS = ENV_CONFIG_VARS | {"SKYE_CONFIG"}
 
 
 class ConfigLoader:
-    """Loads Skye configuration from multiple sources.
+    """Builds the Skye configuration from the text of a file, the environment and code overrides.
 
-    ConfigLoader supports loading configuration from three sources with the
-    following precedence (highest to lowest):
-    1. Code overrides (passed as dict to load())
-    2. Environment variables (SKYE_ prefix)
-    3. Configuration files (JSON)
-
-    The loader merges configuration from all sources, with higher precedence
-    sources overriding lower precedence ones.
+    Precedence, highest first: code overrides, then the ``SKYE_`` environment variables, then the
+    configuration file (JSON). This class takes the **text** of the file and opens nothing: ``base``
+    does no file I/O (Requirement 3.2, D91). To read a file, call ``skye.load_config(path)``,
+    which opens it (or the one ``SKYE_CONFIG`` names) and passes the text here.
 
     Example:
-        >>> # Load from file only
-        >>> config = ConfigLoader.load(config_path=Path("skye.json"))
-        >>>
-        >>> # Load with environment variables
-        >>> os.environ["SKYE_LOG_LEVEL"] = "DEBUG"
-        >>> config = ConfigLoader.load()
-        >>>
-        >>> # Load with code overrides
-        >>> config = ConfigLoader.load(overrides={"log_level": "ERROR"})
-        >>>
-        >>> # Load from all sources
-        >>> config = ConfigLoader.load(
-        ...     config_path=Path("skye.json"),
-        ...     overrides={"enable_telemetry": False}
-        ... )
+        >>> config = ConfigLoader.from_text('{"log_level": "DEBUG"}', source="skye.json")
+        >>> config.log_level
+        'DEBUG'
+        >>> config = ConfigLoader.load(overrides={"log_level": "ERROR"})  # environment, code
+        >>> config.log_level
+        'ERROR'
     """
 
     @staticmethod
-    def load(
-        config_path: Path | None = None, overrides: dict[str, Any] | None = None
-    ) -> SkyeConfig:
-        """Load configuration from multiple sources with precedence.
-
-        Loads configuration from file, environment variables, and code overrides,
-        applying them in order of precedence: code > environment > file.
+    def load(text: str | None = None, overrides: dict[str, Any] | None = None) -> SkyeConfig:
+        """Build the configuration from a JSON text (optional), the environment and overrides.
 
         Args:
-            config_path: Optional path to a JSON configuration file.
-            overrides: Optional dictionary of configuration values to override.
+            text: The text of a JSON configuration file, or ``None`` for no file.
+            overrides: Configuration values that win over the file and the environment.
 
         Returns:
-            SkyeConfig: Validated configuration object.
+            SkyeConfig: The validated configuration.
 
         Raises:
-            ConfigurationError: If configuration file cannot be read, parsed,
-                or if configuration values fail validation.
+            ConfigurationError: If ``text`` is a path (read files with ``skye.load_config``), if
+                ``text`` is not a JSON object, if ``SKYE_CONFIG`` names a file and no text is given,
+                or if the merged values do not validate.
 
         Example:
-            >>> config = ConfigLoader.load(
-            ...     config_path=Path("config.json"),
-            ...     overrides={"log_level": "DEBUG"}
-            ... )
-            >>> config.log_level
-            'DEBUG'
+            >>> ConfigLoader.load('{"enable_telemetry": false}').enable_telemetry
+            False
         """
-        config_data: dict[str, Any] = {}
-
-        # 1. Load from file (lowest precedence); SKYE_CONFIG names the file when no path is given
-        if config_path is None and os.environ.get("SKYE_CONFIG"):
-            config_path = Path(os.environ["SKYE_CONFIG"])
-        if config_path:
-            reject_yaml(config_path)  # say it plainly: the library reads no YAML (D62)
-            try:
-                config_data = ConfigLoader._load_from_file(config_path)
-            except Exception as e:
+        if text is None:
+            named = ConfigLoader.config_path_from_env()
+            if named:
                 raise ConfigurationError(
-                    f"Failed to load configuration from file: {config_path}",
-                    details={"path": str(config_path), "error": str(e)},
-                ) from e
+                    f"SKYE_CONFIG names a file ({named}); read it with skye.load_config(), "
+                    "because ConfigLoader takes text and opens no file.",
+                    details={"path": named},
+                )
+            return ConfigLoader.from_dict({}, overrides)
+        return ConfigLoader.from_text(text, overrides=overrides)
 
-        # 2. Override with environment variables (medium precedence)
-        env_config = ConfigLoader._load_from_env()
-        config_data.update(env_config)
+    @staticmethod
+    def from_text(
+        text: str, *, source: str = "<text>", overrides: dict[str, Any] | None = None
+    ) -> SkyeConfig:
+        """Build the configuration from the text of a JSON file, then the environment and overrides.
 
-        # 3. Apply code overrides (highest precedence)
+        Args:
+            text: The JSON text; empty text, or ``null``, means an empty file.
+            source: Where the text came from (a file name), used in error messages.
+            overrides: Configuration values that win over the file and the environment.
+
+        Returns:
+            SkyeConfig: The validated configuration.
+
+        Raises:
+            ConfigurationError: If ``text`` is a path, is not valid JSON, is not an object at the
+                top level, or the merged values do not validate.
+        """
+        return ConfigLoader.from_dict(ConfigLoader.parse_text(text, source=source), overrides)
+
+    @staticmethod
+    def from_dict(data: dict[str, Any], overrides: dict[str, Any] | None = None) -> SkyeConfig:
+        """Build the configuration from file values already read, the environment and overrides.
+
+        Args:
+            data: The values of the configuration file (``${VAR}`` is substituted here).
+            overrides: Configuration values that win over the file and the environment.
+
+        Returns:
+            SkyeConfig: The validated configuration.
+
+        Raises:
+            ConfigurationError: If the merged values do not validate.
+        """
+        config_data: dict[str, Any] = dict(substitute_env_vars(dict(data)))
+        # The environment wins over the file, and code overrides win over both.
+        config_data.update(ConfigLoader._load_from_env())
         if overrides:
-            # Apply environment variable substitution to overrides
-            substituted_overrides = substitute_env_vars(overrides)
-            config_data.update(substituted_overrides)
-
-        # Validate and create SkyeConfig
+            config_data.update(substitute_env_vars(overrides))
         try:
             config: SkyeConfig = SkyeConfig.from_dict(config_data)
             return config
@@ -511,54 +514,47 @@ class ConfigLoader:
             ) from e
 
     @staticmethod
-    def _load_from_file(config_path: Path) -> dict[str, Any]:
-        """Load configuration from a JSON file.
+    def parse_text(text: str, *, source: str = "<text>") -> dict[str, Any]:
+        """The values of a JSON configuration text, as a dictionary.
 
         Args:
-            config_path: Path to configuration file.
+            text: The JSON text; empty text, or ``null``, gives an empty dictionary.
+            source: Where the text came from, used in error messages.
 
         Returns:
-            Dictionary containing configuration data with environment variables substituted.
+            The values of the top-level object.
 
         Raises:
-            ConfigurationError: If file doesn't exist, can't be read, or has invalid format.
+            ConfigurationError: If ``text`` is a path, is not valid JSON, or is not an object.
         """
-        if not config_path.exists():
+        if isinstance(text, os.PathLike) or not isinstance(text, str):
             raise ConfigurationError(
-                f"Configuration file not found: {config_path}",
-                details={"path": str(config_path)},
+                "ConfigLoader takes the text of the file, not a path;"
+                " read a file with skye.load_config(path).",
+                details={"given": type(text).__name__},
             )
-
-        # The library reads no YAML (D62); a JSON file needs nothing.
-        reject_yaml(config_path)
+        if not text.strip():
+            return {}
         try:
-            with open(config_path) as f:
-                if config_path.suffix.lower() == ".json":
-                    data = json.load(f)
-                else:
-                    raise ConfigurationError(
-                        f"Unsupported configuration file format: {config_path.suffix}",
-                        details={"path": str(config_path), "suffix": config_path.suffix},
-                    )
-            # Handle empty files
-            if data is None:
-                return {}
-
-            if not isinstance(data, dict):
-                raise ConfigurationError(
-                    "Configuration file must contain a dictionary/object at root level",
-                    details={"path": str(config_path), "type": type(data).__name__},
-                )
-
-            # Apply environment variable substitution
-            substituted: dict[str, Any] = substitute_env_vars(data)
-            return substituted
-
+            data = json.loads(text)
         except json.JSONDecodeError as e:
             raise ConfigurationError(
-                f"Failed to parse configuration file: {config_path}",
-                details={"path": str(config_path), "error": str(e)},
+                f"Failed to parse configuration file: {source}",
+                details={"path": source, "error": str(e)},
             ) from e
+        if data is None:
+            return {}
+        if not isinstance(data, dict):
+            raise ConfigurationError(
+                "Configuration file must contain a dictionary/object at root level",
+                details={"path": source, "type": type(data).__name__},
+            )
+        return data
+
+    @staticmethod
+    def config_path_from_env() -> str | None:
+        """The file that ``SKYE_CONFIG`` names, or ``None``; nothing is opened here."""
+        return os.environ.get("SKYE_CONFIG") or None
 
     @staticmethod
     def _load_from_env() -> dict[str, Any]:
@@ -567,8 +563,8 @@ class ConfigLoader:
         Reads the Skye-prefixed variables that set configuration values and converts them
         to configuration keys. The prefix is removed and the key is lowercased. There are
         exactly three Skye-prefixed variables (Requirement 23): SKYE_LOG_LEVEL and
-        SKYE_ENABLE_TELEMETRY (read here) and SKYE_CONFIG (names the config file, read in
-        ``load``). Provider credentials never come from a Skye-prefixed variable.
+        SKYE_ENABLE_TELEMETRY (read here) and SKYE_CONFIG (names the config file, which
+        ``skye.load_config`` opens). Provider credentials never come from a Skye-prefixed variable.
 
         For example:
             SKYE_LOG_LEVEL=DEBUG -> log_level: "DEBUG"

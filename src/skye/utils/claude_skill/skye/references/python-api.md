@@ -29,6 +29,9 @@ prompt spec (or a whole document) back as `.skye` text that passes `skye check` 
 `FormatError` with `.diagnostics` for a text with mistakes). `skye.utils.skye_files.load_document(path)` reads a file
 and skips the parse when the file did not change; the documents it returns are shared and read-only.
 
+In examples and application code import the public path `skye.dsl` (D78), not `skye.base.dsl`: `check_text`, `format_text`, `Diagnostic`,
+`FormatError` and `to_mermaid(spec, direction=None)`, which draws a flow or a router as a Mermaid `flowchart` (the code behind `skye render`).
+
 ## Prompt help
 
 `from skye.prompts import describe_prompt, prompt_help, PromptInfo`: `describe_prompt(document.prompt("chat"), document.metadata)`
@@ -50,6 +53,9 @@ registered template, bundled ones included. Import these from `skye.prompts`, no
   flow. `name` is optional when the file has one flow; `registry` is a dictionary of name to step, and `registry.NAME` must be one of its keys.
   `Flow.from_text(text, name=..., registry=..., filename=...)` does the same for a text. A `Flow` has `.spec`, `.name`, `.registry`,
   `.check()` (the mistakes now, with the registry keys) and `.to_text()`.
+- `skye.load_config("skye.json", overrides={...})` reads the library settings (`log_level`, `enable_telemetry`, the log level per
+  component) from a JSON file, or from the file `SKYE_CONFIG` names when no path is given; precedence is code > environment > file. The
+  settings file is JSON, not `.skye`. `skye.config.ConfigLoader` takes text (`from_text`, `from_dict`) and opens no file.
 
 ## Not built yet
 

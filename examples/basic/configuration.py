@@ -9,7 +9,8 @@ import os
 import tempfile
 from pathlib import Path
 
-from skye.config import ConfigLoader, substitute_env_vars
+import skye
+from skye.config import substitute_env_vars
 
 CONFIG = '{"log_level": "INFO", "enable_telemetry": false}'
 
@@ -19,14 +20,14 @@ def main() -> None:
         path = Path(tmp) / "skye.json"
         path.write_text(CONFIG, encoding="utf-8")
 
-        config = ConfigLoader.load(config_path=path)
+        config = skye.load_config(path)
         print("from the file:       ", config.log_level)
 
         os.environ["SKYE_LOG_LEVEL"] = "WARNING"
-        config = ConfigLoader.load(config_path=path)
+        config = skye.load_config(path)
         print("environment wins:    ", config.log_level)
 
-        config = ConfigLoader.load(config_path=path, overrides={"log_level": "ERROR"})
+        config = skye.load_config(path, overrides={"log_level": "ERROR"})
         print("code wins:           ", config.log_level)
         del os.environ["SKYE_LOG_LEVEL"]
 

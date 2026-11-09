@@ -11,14 +11,13 @@ import importlib
 import inspect
 import pkgutil
 from collections.abc import Iterator, Sequence
-from pathlib import Path
 from typing import Any
 
 import pytest
 
 import skye
 import skye.interfaces as interfaces
-from skye.base.exceptions import SkyeError, ValidationError
+from skye.base.exceptions import ValidationError
 from skye.interfaces import (
     AuthenticationInterface,
     AuthorizerInterface,
@@ -161,7 +160,7 @@ class RefCapability(CapabilityInterface):
 
 
 class RefConfigLoader(ConfigLoaderInterface):
-    def load(self, config_path: Path | None = None, overrides: dict[str, Any] | None = None):  # type: ignore[no-untyped-def]
+    def load(self, text: str | None = None, overrides: dict[str, Any] | None = None):  # type: ignore[no-untyped-def]
         raise NotImplementedError
 
 

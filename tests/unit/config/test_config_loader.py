@@ -6,12 +6,13 @@ import pytest
 
 from skye.base.config import ConfigLoader, ModelConfig, SkyeConfig
 from skye.base.exceptions import ConfigurationError
+from skye.utils.config_files import load_config
 
 
 def test_config_loader_from_full_json():
     """Test loading a complete configuration (models, plugins, rate limits) from a JSON file."""
     config_path = Path("tests/fixtures/sample_config_full.json")
-    config = ConfigLoader.load(config_path=config_path)
+    config = load_config(config_path)
 
     assert isinstance(config, SkyeConfig)
     assert config.log_level == "INFO"
@@ -47,7 +48,7 @@ def test_config_loader_from_full_json():
 def test_config_loader_from_json():
     """Test loading configuration from JSON file."""
     config_path = Path("tests/fixtures/sample_config.json")
-    config = ConfigLoader.load(config_path=config_path)
+    config = load_config(config_path)
 
     assert isinstance(config, SkyeConfig)
     assert config.log_level == "DEBUG"
@@ -96,10 +97,33 @@ def test_only_three_skye_prefixed_env_vars(monkeypatch):
 
 
 def test_skye_config_env_names_the_config_file(monkeypatch):
+    """``SKYE_CONFIG`` names the file that ``load_config`` opens (D91)."""
     monkeypatch.setenv("SKYE_CONFIG", "tests/fixtures/sample_config_full.json")
-    assert ConfigLoader.load().log_level == ConfigLoader.load(
-        config_path=Path("tests/fixtures/sample_config_full.json")
+    assert load_config().log_level == load_config(
+        Path("tests/fixtures/sample_config_full.json")
     ).log_level
+
+
+def test_config_loader_opens_no_file_when_skye_config_is_set(monkeypatch):
+    """``base`` opens no file (D91): with ``SKYE_CONFIG`` set, the loader names ``load_config``."""
+    monkeypatch.setenv("SKYE_CONFIG", "tests/fixtures/sample_config_full.json")
+    with pytest.raises(ConfigurationError, match="skye.load_config"):
+        ConfigLoader.load()
+
+
+def test_config_loader_takes_text_not_a_path():
+    """A path given to the text loader is a mistake with a clear message (D91)."""
+    with pytest.raises(ConfigurationError, match="not a path"):
+        ConfigLoader.load(Path("skye.json"))  # type: ignore[arg-type]
+
+
+def test_config_loader_from_text_and_from_dict():
+    """The text and the dictionary give the same configuration; code overrides win."""
+    from_text = ConfigLoader.from_text('{"log_level": "DEBUG"}', source="skye.json")
+    from_dict = ConfigLoader.from_dict({"log_level": "DEBUG"})
+    assert from_text.log_level == from_dict.log_level == "DEBUG"
+    assert ConfigLoader.load('{"log_level": "DEBUG"}', {"log_level": "ERROR"}).log_level == "ERROR"
+    assert ConfigLoader.from_text("").log_level == "INFO"
 
 
 def test_config_loader_from_code_overrides():
@@ -142,7 +166,7 @@ def test_config_loader_precedence(monkeypatch):
         "log_level": "CRITICAL",
     }
 
-    config = ConfigLoader.load(config_path=config_path, overrides=overrides)
+    config = load_config(config_path, overrides=overrides)
 
     # Code override should win for log_level
     assert config.log_level == "CRITICAL"
@@ -174,7 +198,7 @@ def test_config_loader_nonexistent_file():
     config_path = Path("tests/fixtures/nonexistent.json")
 
     with pytest.raises(ConfigurationError) as exc_info:
-        ConfigLoader.load(config_path=config_path)
+        load_config(config_path)
 
     assert "Configuration file not found" in str(exc_info.value)
     assert "nonexistent.json" in str(exc_info.value)
@@ -191,7 +215,7 @@ def test_config_loader_invalid_file_format():
 
     try:
         with pytest.raises(ConfigurationError) as exc_info:
-            ConfigLoader.load(config_path=temp_path)
+            load_config(temp_path)
 
         assert "Unsupported configuration file format" in str(exc_info.value)
         assert ".txt" in str(exc_info.value)
@@ -204,7 +228,7 @@ def test_config_loader_rejects_yaml(tmp_path):
     path = tmp_path / "skye.yaml"
     path.write_text("log_level: INFO\n", encoding="utf-8")
     with pytest.raises(ConfigurationError) as exc_info:
-        ConfigLoader.load(config_path=path)
+        load_config(path)
     message = str(exc_info.value)
     assert "YAML is not read" in message and ".skye" in message and "JSON" in message
 
@@ -219,7 +243,7 @@ def test_config_loader_invalid_json():
 
     try:
         with pytest.raises(ConfigurationError) as exc_info:
-            ConfigLoader.load(config_path=temp_path)
+            load_config(temp_path)
 
         assert "Failed to parse configuration file" in str(exc_info.value)
     finally:
@@ -235,7 +259,7 @@ def test_config_loader_empty_file():
         temp_path = Path(f.name)
 
     try:
-        config = ConfigLoader.load(config_path=temp_path)
+        config = load_config(temp_path)
         # Should load with all defaults
         assert config.log_level == "INFO"
         assert config.enable_telemetry is True
@@ -253,7 +277,7 @@ def test_config_loader_non_dict_root():
 
     try:
         with pytest.raises(ConfigurationError) as exc_info:
-            ConfigLoader.load(config_path=temp_path)
+            load_config(temp_path)
 
         assert "must contain a dictionary/object at root level" in str(exc_info.value)
     finally:
@@ -378,7 +402,7 @@ def test_config_validation_file_with_invalid_data():
 
     try:
         with pytest.raises(ConfigurationError) as exc_info:
-            ConfigLoader.load(config_path=temp_path)
+            load_config(temp_path)
 
         assert "Configuration validation failed" in str(exc_info.value)
     finally:
@@ -403,6 +427,6 @@ def test_config_validation_env_with_invalid_data(monkeypatch):
     }
 
     with pytest.raises(ConfigurationError) as exc_info:
-        ConfigLoader.load(config_path=config_path, overrides=overrides)
+        load_config(config_path, overrides=overrides)
 
     assert "Configuration validation failed" in str(exc_info.value)

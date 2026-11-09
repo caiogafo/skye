@@ -396,7 +396,7 @@ parses. In Python, `skye.base.dsl.check_text(text, filename, registry_names)` re
 | | Version 1 (built) | Version 2 (reserved) |
 |---|---|---|
 | Blocks | `router`, `flow`, `prompt` | `include "other.skye"` |
-| Flows | sequence, `choice`, `parallel`, bounded loops, `retry`, `timeout`, `on_error`, `foreach`, `set`, `emit` | `wait`, `on_event` (waiting for events with persistence and resume), `to_mermaid()` |
+| Flows | sequence, `choice`, `parallel`, bounded loops, `retry`, `timeout`, `on_error`, `foreach`, `set`, `emit` | `wait`, `on_event` (waiting for events with persistence and resume) |
 | Prompts | `variables`, `message`, `placeholder`, `text`, `when`, `each`, `allow_missing`, `output` (D70) | `examples`, multimodal `content`, `from`/`bind`, `parts`, type `image` |
 
 A version 2 word in a version 1 file is rejected with "is not available in this version".
@@ -411,7 +411,14 @@ skye new router main                 # a starting file on stdout (templates: sho
 skye new flow my_flow --template loop -o my_flow.skye   # sequence, branch, parallel, loop, full
 skye new prompt my_prompt --template chat               # basic, chat
 skye new --list
+skye render app.skye --name triage --stdout --fence   # the flow as a Mermaid diagram, ready for Markdown
 ```
+
+`skye render FILE` draws a flow or a router as a Mermaid `flowchart` (decision D88) and writes `FILE.mmd`; `--stdout` prints it,
+`--fence` wraps each diagram in a `mermaid` code fence (and writes `FILE.mmd.md`), `-o` chooses the file, `--direction TD|LR` the
+orientation, and `--name` picks one block when the file has several. A step is a box with what it runs, a `choice` a diamond whose edges
+carry the `when` text, a `parallel` block a subgraph with its `join` rule, `on_error` and `on_timeout` dotted arrows; a router shows each
+route with its strategy and targets and each fallback, in order. From Python: `from skye.dsl import to_mermaid`.
 
 `skye new` refuses to overwrite a file unless you pass `--force`. The text it prints passes `skye check`; it starts with front matter
 (`title` is the block name, `version = "0.1.0"`) and the lines to edit, the `description` among them, are marked `CHANGE ME`. `.gitattributes` maps `*.skye` to HCL so that GitHub highlights the files.

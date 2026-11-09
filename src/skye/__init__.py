@@ -28,7 +28,6 @@ __version__ = "0.1.1"
 
 from typing import TYPE_CHECKING, Any, Literal, overload
 
-
 if TYPE_CHECKING:
     from skye.base.completion import CompleteRequest, CompleteResponse, StreamChunk, TokenUsage
     from skye.base.exceptions import (
@@ -38,11 +37,12 @@ if TYPE_CHECKING:
         SkyeError,
         ValidationError,
     )
-    from skye.base.messages import AssistantMessage, CapabilityMessage, SystemMessage, UserMessage
-    from skye.flows import Flow
-    from skye.utils.skye_files import load
     from skye.base.interfaces.model import ModelInterface
     from skye.base.interfaces.vector_encoder import VectorEncoderInterface
+    from skye.base.messages import AssistantMessage, CapabilityMessage, SystemMessage, UserMessage
+    from skye.flows import Flow
+    from skye.utils.config_files import load_config
+    from skye.utils.skye_files import load
 
 # The commonest names, importable as ``from skye import UserMessage``; each is loaded on first use, so ``import skye`` stays light.
 _LAZY = {
@@ -60,6 +60,7 @@ _LAZY = {
     "ValidationError": "skye.base.exceptions",
     "MissingExtraError": "skye.base.exceptions",
     "load": "skye.utils.skye_files",
+    "load_config": "skye.utils.config_files",
     "Flow": "skye.flows",
 }
 
