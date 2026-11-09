@@ -67,3 +67,8 @@ docs/_notes/
 .agents/
 .agent/
 site/
+
+# Rust crate, npm package and Mojo package: kept local for now (published separately)
+rust/
+npm/
+mojo/

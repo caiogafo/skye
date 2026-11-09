@@ -102,7 +102,7 @@ Three checks run on every import: no upward import; no import outside the compon
 | `observe` | 2 | events, logs, metrics, traces | `observer`, `event_handler` |
 | `policy` | 2 | policy decisions; implements `authorizer` | `authorizer`; optionally `decision` |
 | `gateway` | 3 | the library acting as an MCP server, toolset per operation | `capability`; optionally `decision`; optional services by injection |
-| `agents` | 3 | agent loop, BaseAgent, hooks, agent-type registry | `runnable`, `model`; per enabled hook `capability`, `prompt`; optional services by injection |
+| `agents` | 3 | agent loop (`AgentLoop`, D90), `Agent`, hooks, agent-type registry | `runnable`, `model`; per enabled hook `capability`, `prompt`; optional services by injection |
 | `teams` | 3 | coordinate units toward a shared objective; owns the team-role concept | `runnable` only; optionally `prompt` |
 | `flows` | 3 | sequence units into steps; reads a `flow` block of a `.skye` file and runs it | `runnable` only; optionally `prompt` |
 
@@ -110,7 +110,8 @@ Three checks run on every import: no upward import; no import outside the compon
 `model`, `decision`, `runnable`, `storage`, `registry`, `cost_calculator`, `error_handler`, `token_counter`, `memory`,
 `vector_encoder`, `router`, `safety`, `observer`, `event_handler`, `content_reader`, `multimodal_handler`, `prompt`,
 `config_loader`, `plugin`, `capability`, `resource`, `authorizer`, `authentication`. Every cross-component dependency crosses a Port,
-never a concrete implementation.
+never a concrete implementation. The `prompt` Port also defines the provider-agnostic prompt parts that `prompts` produces and the
+model adapters translate into native request fields, so `models` never imports `prompts` (D81).
 
 A Port is a class named `*Interface` (exceptions: `Runnable`, `DecisionModel`, `StorageBackend`) and describes the call its users
 make (Requirement 16.6). Its docstring ends with a fixed footer: what it raises, what it returns when something is missing, whether
@@ -167,7 +168,8 @@ wrapped errors keep the original message and stack. Configuration sources, in pr
 ## Public API and lazy imports
 A user-facing path has at most two levels and never goes through `<pkg>.base` or into a module inside a component (Requirement 7.14, D34).
 The public paths are thin facades that only re-export `base` (Requirement 7.15): `<pkg>` (the commonest names, resolved lazily),
-`<pkg>.interfaces` (every Port), `<pkg>.data` (`Validated`, `validated`, `field`), `<pkg>.messages`, `<pkg>.completion`,
+`<pkg>.interfaces` (every Port), `<pkg>.data` (`Validated`, `validated`, `field`), `<pkg>.dsl` (`check_text`, `format_text`,
+`describe`, `to_mermaid`; D78, D83, D88), `<pkg>.messages`, `<pkg>.completion`,
 `<pkg>.exceptions`, `<pkg>.config`; each component package exports what its users need. All of it is standard-library only, so
 `import <pkg>` never reaches an optional or provider library (Requirement 7.4, 7.8). `tests/budget/test_public_imports.py` scans the
 examples, the documentation and the `README.md`.
@@ -202,9 +204,9 @@ grammar in `base` serves the flow guards and the prompt interpolation.
 
 Scope. Version 1: routers, flows (sequence, conditions, parallel, bounded loops, retry, timeout, errors, `foreach`) and the reduced `prompt`
 block that replaces the 18 bundled `.jinja` templates, checked by an equivalence test (D51, D60). Version 2, written but not built: waiting for
-events with persistence and resume (`wait`, `on_event`; version 1 reserves both words and rejects them with a clear message), `to_mermaid()`,
-`include`, and in prompts the examples, multimodal content and `bind` (the prompt `output` block moved to version 1 by D70). Tools of version 1: the written grammar, a JSON Schema of
-the blocks and `skye check <file>` (D61). JSON router files stay readable; YAML is not read (D59, D62). The language adds no third-party library
+events with persistence and resume (`wait`, `on_event`; version 1 reserves both words and rejects them with a clear message; at-least-once
+with an idempotency key per step, D87), `include`, and in prompts the examples, multimodal content and `bind` (the prompt `output` block moved to version 1 by D70). Tools of version 1: the written grammar, a JSON Schema of
+the blocks, `skye check <file>` (D61) and `skye render` with `to_mermaid()` for flows and routers (D88, moved from version 2). JSON router files stay readable; YAML is not read (D59, D62). The language adds no third-party library
 to any component (D49).
 
 Text-level features (all in `base/dsl`, text in and text out, no file I/O). **Comments** (D71): `#` to the end of the line, `/* */` and `/** **/`
@@ -217,12 +219,13 @@ result that would build a different model, is idempotent, and is the same functi
 
 Prompt features of the language. Variables are described and typed with the syntax of `output` fields (D73): a trailing string is the
 description, and `list(string)`, `list({ ... }, [])`, `map({ ... })` and nesting give a structured type that `render_prompt` checks with
-one `ValidationError` listing every path (`shapes.py`, `conform`); the default of a structured variable is the second argument (open
-decision O46). `each` has one variable and `loop.*` (D69). The `output` block (`json`, `table`, `xml`, `schema = VAR`, a format from a
+one `ValidationError` listing every path (`shapes.py`, `conform`); the default of a structured variable is the second argument (D83). `each` has one variable and `loop.*` (D69). The `output` block (`json`, `table`, `xml`, `schema = VAR`, a format from a
 `string` variable, conditional variants inside `when`) turns one declaration into the instructions for the model (D70, in `prompts`).
-`describe_prompt` / `prompt_help` (`base/dsl/info.py`, re-exported by `skye.prompts`, because `utils` may not import `prompts`; open
-decision O46) tell what a prompt takes and gives back, and `skye prompt list|info` print it (D73). The bundled prompts are all `.skye`,
-with front matter, structured inputs, one shape for `tools` and the five memories, and a usage comment a test renders (D74).
+`describe(spec)` in `base/dsl/info.py` describes any block (prompt, router, flow; D83), public in `skye.dsl` with `check_text` and
+`format_text` (D78); `skye.prompts` re-exports `describe_prompt` / `prompt_help`. They tell what a prompt takes and gives back, and `skye prompt list|info` print it (D73). The bundled prompts are all `.skye`,
+with front matter, structured inputs, one shape for `tools` and the five memories, tool parameters as JSON Schema (D80), and a usage
+comment a test renders (D74). Text templates do interpolation only; `{% %}` tags are rejected (D76). A rendered prompt is also available as
+provider-agnostic parts, a type of a Port in `base` that the model adapters translate to native fields (D81).
 
 Editors (D72). A VS Code extension ships inside the package (`utils/vscode_extension/`, plain JavaScript, no npm dependency, no build):
 a TextMate grammar, diagnostics from `skye check --format json` and "Format Document" through `skye fmt -`; it is only a client of the

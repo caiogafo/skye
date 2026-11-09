@@ -101,8 +101,8 @@ Written without the project name (it is being chosen); `<pkg>` is the import pac
 11. THE sizes SHALL be measured on Linux x86_64, the platform of the pull-request runner and of the serverless target, where the compiled wheels are larger than on a laptop, and THE limits of `budgets.toml` SHALL apply to that measure; EACH extra SHALL have its own budget, measured in its own environment, and a heavy extra SHALL weigh only on who installs it.
 12. AN extra SHALL contain only the libraries that the feature it names needs; IF an extra bundles a library that its feature does not use (for example a database driver for a backend that the user did not ask for), THEN that library SHALL move to an extra of its own or be removed, and a library that only an optional file format needs SHALL be in an extra, not in the core; the library reads no YAML (Requirement 54.12).
 13. AN extra SHALL be named after what it enables and SHALL NOT be named after a provider whose SDK it does not install: each provider has a built-in REST adapter (Requirement 9.3), so an extra named after a provider SHALL declare no library, and the extra for exact token counting SHALL be named for that function (`tokens`, decision D33).
-14. A PUBLIC import path SHALL have at most two levels (`skye.<name>`) and SHALL NOT go through `skye.base` or into a module inside a component: the commonest names come from `skye`, the Ports from `skye.interfaces`, the validated-dataclass tools from `skye.data`, and `skye.messages`, `skye.completion`, `skye.exceptions` and `skye.config` are the public paths of those modules of `base`; THE examples and the documentation SHALL use only those paths (decision D34).
-15. A FACADE (`skye.interfaces`, `skye.data`, `skye.messages`, `skye.completion`, `skye.exceptions`, `skye.config`) SHALL only re-export: it SHALL contain no logic and no name that its source module does not define, and a name SHALL be added to a facade only after it exists in its source (decision D34).
+14. A PUBLIC import path SHALL have at most two levels (`skye.<name>`) and SHALL NOT go through `skye.base` or into a module inside a component: the commonest names come from `skye`, the Ports from `skye.interfaces`, the validated-dataclass tools from `skye.data`, the checker and formatter of the `.skye` language from `skye.dsl` (decision D78), and `skye.messages`, `skye.completion`, `skye.exceptions` and `skye.config` are the public paths of those modules of `base`; THE examples and the documentation SHALL use only those paths (decision D34).
+15. A FACADE (`skye.interfaces`, `skye.data`, `skye.dsl`, `skye.messages`, `skye.completion`, `skye.exceptions`, `skye.config`) SHALL only re-export: it SHALL contain no logic and no name that its source module does not define, and a name SHALL be added to a facade only after it exists in its source (decision D34).
 
 ### Requirement 8: Codenames
 
@@ -327,6 +327,7 @@ Written without the project name (it is being chosen); `<pkg>` is the import pac
 8. EACH example folder SHALL have a short README (what the reader learns, the command, what appears, what is needed) that lists exactly the files of the folder, and `examples/README.md` SHALL number a reading order; a test SHALL fail when a README and its folder disagree.
 9. THE prompt examples (`examples/prompts/`) SHALL teach the `.skye` language first: each prompt SHALL be a `.skye` file next to the `.py` that loads it, with front matter, described and typed variables, already formatted by `skye fmt`, and ending with a `/** Example: builder.render("name", {...}) **/` comment; no example SHALL use a Jinja-style text template or import `skye.base.*` (decisions D34, D74).
 10. EVERY bundled template and every prompt example SHALL carry that usage comment with literal Python values only, and a test SHALL extract it and render it (decision D74).
+11. FOR every new component, THE example of how a user calls it, extension points included, SHALL be written in `examples/<component>/` before its design and SHALL be run by the tests from the day it is written; a later change to that example SHALL need a decision line (decision D89).
 ### Requirement 25: Embeddings
 
 **User Story:** As a developer building retrieval, I want embedding adapters behind one Port, so that I can switch embedding models without changing my code.
@@ -393,11 +394,11 @@ Written without the project name (it is being chosen); `<pkg>` is the import pac
 5. WHEN the variables of a template are extracted, THE builder SHALL return every variable name found in it.
 6. WHEN a partial builder is created with bound variables, THE builder SHALL return a new instance with those variables pre-filled.
 7. WHEN a template is composed from several parts, THE builder SHALL create a new template by joining the parts with the given separator.
-8. THE template engine SHALL evaluate conditionals, loops and filters, SHALL let the developer register custom filters available in every rendering, and SHALL support whitespace control.
+8. THE template engine SHALL do interpolation only: `{{ name }}` with filters (`tojson`, `default` and the ones the developer registers with `register_filter`, available in every rendering); IF a text template holds a control tag `{% ... %}`, THEN THE builder SHALL raise a `ValidationError` that names the line and says that conditions and loops are written in a `.skye` prompt (`when`, `each`); a variable read by interpolation SHALL be required unless it has a default or is allowed missing (decisions D76, D77).
 9. THE template engine SHALL NOT support macros, template inheritance, include directives or variable assignment (decision D20).
 10. THE variables of a `.skye` prompt MAY carry a trailing description (`task = string "The purpose"`) and a structured type written like the fields of `output` (`list(string)`, `list({ name = string, description = string("") }, [])`, `map({ ... })`, nested); WHEN a prompt is rendered, THE renderer SHALL check each value against its type and raise one `ValidationError` that lists every mistake with its path (`categories[1].name: missing`), fill the defaults of missing optional fields in a copy of the value and keep the extra keys (decision D73).
 11. IN a `.skye` prompt, `each` SHALL have one loop variable with `loop.index`, `loop.index0`, `loop.first`, `loop.last` and `loop.length`, and an `each` over a map SHALL give `{key, value}` entries; THE engine SHALL offer the filter `map(attribute)` (decision D69).
-12. THE bundled agent prompts SHALL accept the optional inputs `tools` and the five memories `episodic_memory`, `semantic_memory`, `procedural_memory`, `persona_memory` and `working_memory` with one identical shape each (the three memory agents add `id`), SHALL read the history from `placeholder "history"`, and SHALL NOT keep the older names (`chat_history`, `conversation_history`, `declarative_memory`, `procedural_memories`, `procedures`, `category_descriptions`); a test SHALL fail when two prompts declare the same input with a different shape (decision D74).
+12. THE bundled agent prompts SHALL accept the optional inputs `tools` and the five memories `episodic_memory`, `semantic_memory`, `procedural_memory`, `persona_memory` and `working_memory` with one identical shape each (the three memory agents add `id`), SHALL read the history from `placeholder "history"`, and SHALL NOT keep the older names (`chat_history`, `conversation_history`, `declarative_memory`, `procedural_memories`, `procedures`, `category_descriptions`); a test SHALL fail when two prompts declare the same input with a different shape (decision D74). THE bundled agent prompts SHALL show the parameters of a tool as its JSON Schema (`Parameters: {{ tool.parameters | tojson }}`), every prompt the same way (decision D80).
 13. EVERY bundled `.skye` template SHALL start with front matter (`title`, `description`, `version`, `tags`), and THE loader SHALL register it under that `version` (decision D71).
 14. THE bundled prompts SHALL include the families of agent prompts written for Skye (smolagents-style, reasoning, supervisors, group chat, memory upkeep and structured output); their text SHALL be original, the other libraries being read for structure only (Requirement 14.3; decision D74).
 
@@ -412,6 +413,9 @@ Written without the project name (it is being chosen); `<pkg>` is the import pac
 3. WHERE a random selector is configured, THE builder SHALL select random examples up to the maximum; WHERE a fixed selector is configured, it SHALL always use the same set.
 4. WHEN no example selector is configured, THE builder SHALL use all available examples up to a reasonable default limit.
 5. WHEN a `.skye` prompt receives examples through `add_examples`, THE builder SHALL pass the selected list of dictionaries (after the limit, random or semantic selection) and not a formatted string, except for a prompt that declares `examples = string` (decision D74).
+6. WHEN no example template is given, THE builder SHALL write each example from its own keys, one `Key: value` line per key in order (`Question: Hello`, `Answer: Bonjour`), and SHALL NOT assume the keys `input` and `output` (decision D79).
+7. WHEN `add_examples` is called with `as_messages=True`, THE builder SHALL turn each example into a user message and an assistant message: the keys `input` and `output` when present, otherwise the first key for the user and the last for the assistant (decision D79).
+8. IF an example lacks a key that the example template reads, THEN THE builder SHALL raise a `ValidationError` naming the example and the key, and SHALL NOT render an empty example (decision D79).
 
 ### Requirement 32: Prompt message roles and multimodal content
 
@@ -441,6 +445,7 @@ Written without the project name (it is being chosen); `<pkg>` is the import pac
 6. A string right after the type of a field of an `output` block SHALL be its description and SHALL reach the model in the schema (the JSON-Schema `description`, the column list of a table, the XML skeleton), at every level of nesting; IF a description is empty, THEN THE builder SHALL raise an error (decision D70).
 7. WHERE `output` names a declared `string` variable instead of a format (`output format { ... }`), THE renderer SHALL take the format from its value, and IF the value is not `json`, `table` or `xml`, or is `table` with a nested field, THEN THE renderer SHALL raise a `ValidationError` at rendering; WHERE the fields are `schema = VAR`, THE renderer SHALL read them from the declared `map` variable (decision D70).
 8. WHERE `output` blocks sit inside `when` blocks at the top of the prompt, THE renderer SHALL use the one whose conditions hold, SHALL use no output when none holds, and SHALL raise a `ValidationError` naming the conditions when more than one holds; a prompt SHALL NOT mix an unconditional `output` with conditional ones (decision D70, amended 2026-11-08).
+9. THE renderer SHALL also give a rendered prompt as provider-agnostic parts (system text, messages, content blocks, output JSON Schema and format, and the fallback text of the output instructions), a type defined by a Port in `base`; THE model adapters SHALL translate the parts into each provider's native fields (system prompt, response schema) or fall back to the text, from the model's capabilities, and `models` SHALL NOT import `prompts` (decision D81).
 
 ### Requirement 34: Prompts integration and performance
 
@@ -456,6 +461,7 @@ Written without the project name (it is being chosen); `<pkg>` is the import pac
 6. WHEN many templates are registered, THE builder SHALL keep memory use reasonable through efficient storage.
 7. THE library SHALL tell what a prompt takes and gives back: `skye.prompts.describe_prompt(spec, metadata=None)` and `prompt_help(spec, metadata=None)`, `BasePromptBuilder.describe(name)` and `.help(name)`, and the commands `skye prompt list [--json]` and `skye prompt info NAME|FILE [--name PROMPT] [--json]`; THE help SHALL list the title, description, version and tags, each input with type, default, description and whether it is required, the roles in order and each output variant with its condition; an unknown name or file SHALL exit with 2, and a file with errors with 1 and the diagnostics (decision D73).
 8. THE `prompts` component SHALL offer `PromptRunnable`, the `Runnable` that a flow step `run = prompt.NAME` reaches (decision D60).
+9. THE describe code SHALL live in `base/dsl` next to the specs and SHALL describe every kind of block (prompt, router, flow) through one `describe(spec)`, public in `skye.dsl`; `skye.prompts` SHALL keep re-exporting `describe_prompt` and `prompt_help` (decision D83).
 
 ### Requirement 35: Policy model and evaluation
 
@@ -523,13 +529,13 @@ Written without the project name (it is being chosen); `<pkg>` is the import pac
 
 #### Acceptance Criteria
 
-1. THE `agents` component SHALL provide a `BaseAgent` class that implements the agent loop for synchronous and asynchronous use.
-2. THE `BaseAgent` SHALL take as inputs the model (or the router), a `ToolProvider`, optional memory and optional hook providers.
-3. THE `BaseAgent` SHALL stop when the model returns a final answer, when the maximum number of steps is reached, when a hook stops the run, or when the run is suspended, and SHALL return a result that states why the run ended.
-4. THE default `Agent` SHALL be a `BaseAgent` subclass and SHALL NOT duplicate the loop.
-5. THE `BaseAgent` SHALL define these operations, each with a pre hook point and a post hook point: run, step, toolset selection, model call, tool call, memory read, memory write, safety check, policy check.
-6. WHEN an operation fails, THE `BaseAgent` SHALL call the error hooks of that operation.
-7. THE `BaseAgent` SHALL pass each hook a context with the `AgentState`, the operation name and the operation payload (the request before, the result after).
+1. THE `agents` component SHALL provide an `AgentLoop` class that implements the agent loop for synchronous and asynchronous use.
+2. THE `AgentLoop` SHALL take as inputs the model (or the router), a `ToolProvider`, optional memory and optional hook providers.
+3. THE `AgentLoop` SHALL stop when the model returns a final answer, when the maximum number of steps is reached (default 20, decision D84), when a hook stops the run, or when the run is suspended, and SHALL return a result that states why the run ended.
+4. THE default `Agent` SHALL be an `AgentLoop` subclass and SHALL NOT duplicate the loop; `Agent` SHALL be the class the documentation tells users to use and to subclass, and the bare loop SHALL NOT be named with a `Base` prefix (decision D90).
+5. THE `AgentLoop` SHALL define these operations, each with a pre hook point and a post hook point: run, step, toolset selection, model call, tool call, memory read, memory write, safety check, policy check.
+6. WHEN an operation fails, THE `AgentLoop` SHALL call the error hooks of that operation.
+7. THE `AgentLoop` SHALL pass each hook a context with the `AgentState`, the operation name and the operation payload (the request before, the result after).
 8. THE `agents` component SHALL list the operations in one enumeration so that hooks can be registered by name.
 
 ### Requirement 40: Hook semantics and customization
@@ -540,15 +546,16 @@ Written without the project name (it is being chosen); `<pkg>` is the import pac
 
 1. THE pre hook of an operation SHALL be able to return one of: continue unchanged, continue with a modified payload, skip the operation and supply its result, or deny the operation with a reason.
 2. THE post hook of an operation SHALL be able to return one of: keep the result, replace the result, retry the operation with a modified payload within a retry limit, or stop the run.
-3. THE `BaseAgent` SHALL run pre hooks in registration order and post hooks in reverse order.
-4. THE `BaseAgent` SHALL accept hooks written as synchronous or asynchronous functions.
-5. WHEN a hook raises an error, THE `BaseAgent` SHALL apply a per-hook setting, fail closed (stop the operation) or fail open (log and continue), the default being fail closed for hooks that protect (safety, policy, limits) and fail open for observers.
-6. THE `BaseAgent` SHALL provide a retry limit and a per-hook time limit (default values open, O11).
-7. THE `BaseAgent` SHALL let a subclass override a method for each hook point, let a caller register and remove hooks on an instance by operation name, and accept hook providers that register several hooks together.
-8. THE `BaseAgent` SHALL let hooks be restricted to a subset of tools or models, by name or tag.
-9. THE `BaseAgent` SHALL document the order in which subclass overrides, instance hooks and hook providers run.
-10. THE `BaseAgent` SHALL call the existing event-handler methods for model calls, tool calls, steps and completion.
-11. THE `BaseAgent` SHALL treat event-handler implementations as observers: their errors SHALL NOT stop the run, and they SHALL NOT modify a payload or a result.
+3. THE `AgentLoop` SHALL run pre hooks in registration order and post hooks in reverse order.
+4. THE `AgentLoop` SHALL accept hooks written as synchronous or asynchronous functions.
+5. WHEN a hook raises an error, THE `AgentLoop` SHALL apply a per-hook setting, fail closed (stop the operation) or fail open (log and continue), the default being fail closed for hooks that protect (safety, policy, limits) and fail open for observers.
+6. THE `AgentLoop` SHALL provide a retry limit and a per-hook time limit, constructor arguments with the defaults 2 retries per operation (3 attempts) and 5 seconds per hook (decision D84).
+7. THE `AgentLoop` SHALL let a subclass override a method for each hook point, let a caller register and remove hooks on an instance by operation name, and accept hook providers that register several hooks together.
+8. THE `AgentLoop` SHALL let hooks be restricted to a subset of tools or models, by name or tag.
+9. THE `AgentLoop` SHALL document the order in which subclass overrides, instance hooks and hook providers run.
+10. THE `AgentLoop` SHALL call the existing event-handler methods for model calls, tool calls, steps and completion.
+11. THE `AgentLoop` SHALL treat event-handler implementations as observers: their errors SHALL NOT stop the run, and they SHALL NOT modify a payload or a result.
+12. WHEN the model streams its answer, THE `AgentLoop` SHALL buffer the text and run the safety and policy hooks at checkpoints: every window of a configurable size (default 500 characters) on all the text received so far, and once more on the complete answer; in the default mode "hold" a window SHALL reach the caller only after its checkpoint has passed, and in the mode "show and retract" the text SHALL be sent at once and a failed checkpoint SHALL emit a `retract` event; an `on_chunk` observer SHALL see every chunk and SHALL NOT change it (decision D86).
 
 ### Requirement 41: Default agent behaviour
 
@@ -567,19 +574,19 @@ Written without the project name (it is being chosen); `<pkg>` is the import pac
 
 #### Acceptance Criteria
 
-1. THE `BaseAgent` SHALL obtain tools only through a `ToolProvider`, at the toolset selection operation, at the start of a run and again when a hook or the model asks for different tools.
-2. THE `BaseAgent` SHALL work with the local capability registry as `ToolProvider` without any gateway.
-3. WHEN the `ToolProvider` is the gateway client, THE `BaseAgent` SHALL carry the scope token in the `AgentState` and send it with every tool call, and SHALL pass the operation description to the `ToolProvider` (who writes it is open, O12).
-4. THE `BaseAgent` SHALL keep the whole run in an `AgentState` that serializes to JSON with the standard library.
-5. THE `BaseAgent` SHALL save a checkpoint through the storage Port at configurable points (after each step by default).
-6. WHEN the remaining time, read from a configurable function (the Lambda context, or a deadline elsewhere), is below a configurable margin, THE `BaseAgent` SHALL stop before the next step and return a `Suspended` result with the checkpoint identifier.
-7. WHEN given a checkpoint identifier, THE `BaseAgent` SHALL resume the run from the saved state.
-8. THE `BaseAgent` SHALL NOT use multiprocessing and SHALL NOT start work that continues after the run returns.
-9. WHEN a model asks for several tools in one step, THE `BaseAgent` SHALL run them concurrently, with asyncio or threads, up to a configurable limit, and return the results in the order the model asked for them.
-10. WHEN a model call fails, THE `BaseAgent` SHALL use the fallbacks and retries of the router before failing the operation.
-11. WHEN a tool call fails, THE `BaseAgent` SHALL return the error to the model as a tool result, unless a hook stops the run (the default per error type is open, O13).
-12. THE `BaseAgent` SHALL stop after a configurable number of consecutive failed steps.
-13. THE `BaseAgent` SHALL count tokens and cost per run from the model responses and expose them in the result.
+1. THE `AgentLoop` SHALL obtain tools only through a `ToolProvider`, at the toolset selection operation, at the start of a run and again when a hook or the model asks for different tools.
+2. THE `AgentLoop` SHALL work with the local capability registry as `ToolProvider` without any gateway.
+3. WHEN the `ToolProvider` is the gateway client, THE `AgentLoop` SHALL carry the scope token in the `AgentState` and send it with every tool call, and SHALL pass the operation description to the `ToolProvider` (who writes it is open, O12).
+4. THE `AgentLoop` SHALL keep the whole run in an `AgentState` that serializes to JSON with the standard library.
+5. WHEN checkpointing is turned on by the caller, THE `AgentLoop` SHALL save a checkpoint through the storage Port at configurable points (after each step by default); checkpointing SHALL be off by default, in Lambda too, even when a store is given (decision D85).
+6. WHEN the remaining time, read from a configurable function (the Lambda context, or a deadline elsewhere), is below a configurable margin, THE `AgentLoop` SHALL stop before the next step and return a `Suspended` result with the checkpoint identifier.
+7. WHEN given a checkpoint identifier, THE `AgentLoop` SHALL resume the run from the saved state.
+8. THE `AgentLoop` SHALL NOT use multiprocessing and SHALL NOT start work that continues after the run returns.
+9. WHEN a model asks for several tools in one step, THE `AgentLoop` SHALL run them concurrently, with asyncio or threads, up to a configurable limit, and return the results in the order the model asked for them.
+10. WHEN a model call fails, THE `AgentLoop` SHALL use the fallbacks and retries of the router before failing the operation.
+11. WHEN a tool call fails with invalid arguments, an exception raised by the tool, a timeout or a denial by policy, THE `AgentLoop` SHALL return the error to the model as a tool result; WHEN a limit is exceeded (steps, tokens, cost, time) or the error is one of configuration or credentials, THE `AgentLoop` SHALL stop the run; a hook MAY change either outcome (decision D85).
+12. THE `AgentLoop` SHALL stop after a configurable number of consecutive failed steps (default 3, decision D84).
+13. THE `AgentLoop` SHALL count tokens and cost per run from the model responses and expose them in the result.
 
 ### Requirement 43: Agent runtime packaging and tests
 
@@ -589,7 +596,7 @@ Written without the project name (it is being chosen); `<pkg>` is the import pac
 
 1. THE `agents` component SHALL use the standard library for the models of state, hooks and results (dataclasses, enums, json) and SHALL NOT add a third-party import at module level.
 2. THE `agents` component SHALL be part of the core, with no extra of its own.
-3. THE `agents` component SHALL have an entry in `budgets.toml` for import time and module count (values open, O11) and SHALL pass the budget tests.
+3. THE `agents` component SHALL have an entry in `budgets.toml` for import time and module count (values measured after the implementation, then fixed; decision D84) and SHALL pass the budget tests.
 4. THE library SHALL provide a scripted model for tests that returns prepared responses and tool calls.
 5. THE test suite SHALL cover each hook outcome (continue, modify, skip, deny, retry, replace, stop), the hook order, fail open and fail closed, suspension and resumption, and concurrent tool calls.
 
@@ -708,6 +715,7 @@ Written without the project name (it is being chosen); `<pkg>` is the import pac
 4. THE `flows` component SHALL import only `base` (and `prompts` when enabled) and SHALL resolve every step by name from a registry that the caller passes, never by import (decision D52).
 5. THE first version of `flows` SHALL cover sequence, conditions, parallel steps, bounded loops, retry, timeout and errors; waiting for an external event with persistence and resume SHALL be built in a later version (decision D51), and WHEN a first-version file uses `wait` or `on_event`, THEN THE loader SHALL reject it with a message that says the feature is not available yet.
 6. THE `flows` component SHALL read a flow from the `.skye` language (Requirement 54).
+7. WHEN persistence is built, THE `flows` component SHALL guarantee at-least-once delivery and SHALL give every step an idempotency key (run identifier, step name, visit number) to pass to external services; exactly-once SHALL NOT be promised (decision D87).
 
 ### Requirement 51: Guard
 
@@ -765,7 +773,8 @@ Written without the project name (it is being chosen); `<pkg>` is the import pac
 17. A `.skye` file MAY start with front matter: metadata between two lines `---`, written in TOML (`key = value`, read with `tomllib`) and never in YAML; IF a line is written `key: value`, THEN THE parser SHALL raise an error with the fix; THE metadata SHALL be in `Document.metadata`, the line numbers of the rest of the file SHALL NOT change, `to_text` SHALL write it back followed by one blank line, and a bundled template SHALL use the keys `title`, `description`, `version` and `tags` (decision D71).
 18. THE library SHALL provide `skye fmt` (`format_text` in `skye.base.dsl`) that formats the text without building the model, so comments, `"""` strings and front matter stay: two spaces per open bracket, no trailing space, at most one blank line in a row, exactly one after the front matter and a final newline; THE formatter SHALL give the same text when run twice, SHALL refuse a file with errors, SHALL refuse to write a result that builds a different model, SHALL offer `--check` for CI (exit status 1 when a file would change) and `-` to read standard input and write standard output, and `skye new` SHALL print text that is already formatted; WHEN given no path, THE command SHALL format every `.skye` file under the current folder, recursively (a folder argument the same), SHALL skip hidden folders, `node_modules`, `venv`, `build`, `dist` and `site-packages`, and SHALL leave out the paths matched by `--exclude GLOB` (repeatable) or by the globs of a `.skyeignore` file (one per line, `#` comments, relative to the folder searched) (decision D71).
 19. THE command `skye check` SHALL offer `--format json` (an object `{"diagnostics": [...]}` whose items have file, line, column, reason, fix and message) and `-` to read standard input with `--stdin-filename`, so that an editor shows the same errors as CI (decision D72).
-20. IN a `prompt` block, a variable of `variables = { ... }` MAY carry a description and a structured type as Requirement 30.10 states; a description SHALL be kept in `VariableSpec.description` and in the block schema, SHALL NOT be sent to the model, and SHALL NOT be accepted in the `context` of a flow or in a router; a second argument after the shape of a structured variable SHALL be its default, `list({ ... }, [])`, and anywhere else SHALL be an error (decision D73; the form of the default is open decision O46).
+20. IN a `prompt` block, a variable of `variables = { ... }` MAY carry a description and a structured type as Requirement 30.10 states; a description SHALL be kept in `VariableSpec.description` and in the block schema, SHALL NOT be sent to the model, and SHALL NOT be accepted in the `context` of a flow or in a router; a second argument after the shape of a structured variable SHALL be its default, `list({ ... }, [])`, and anywhere else SHALL be an error (decisions D73, D83).
+21. THE library SHALL draw a flow or a router as a Mermaid diagram: `to_mermaid(spec) -> str`, a pure function in `base/dsl` public in `skye.dsl`, and the command `skye render FILE [--name NAME] [--stdout] [--fence] [-o OUT] [--direction TD|LR]` that writes `FILE.mmd` or prints the diagram; the output SHALL be deterministic, SHALL draw every step and every edge (`next`, `choice` branches with their `when` text, `parallel` branches and `join`, `on_error` and `on_timeout` as dotted edges) and for a router every route and its fallback chain, and SHALL be checked by tests on the structure of the text, with no Mermaid library (decision D88).
 
 ### Requirement 55: Editor support for `.skye`
 

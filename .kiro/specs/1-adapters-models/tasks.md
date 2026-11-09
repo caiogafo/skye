@@ -103,10 +103,10 @@ honors.
 - [x] 10. Checkpoint
   - Evidence: full `models` suite green — `uv run pytest tests/unit/models tests/differential -q` → 426 passed (2026-11-03). Open follow-ups noted elsewhere in this plan: D33 (extra `tokens`) and the Jev wire format were assistant decisions pending owner ratification, the Google differential case is uncovered, and O8 (gateway selector for Jev) remains open.
 
-- [ ] 11. Native structured output and system prompt from prompt parts (open decision O44; not started)
-  - [ ] 11.1 Decide O44 with the owner (text only, `render_parts`, or `to_request`), then design the adapter side: which providers take the system prompt, images and the output schema as separate fields, and how the capabilities of the model choose native or text
-    - Note: waits for the owner; the choice is recorded in `12-decisions.md` first, then `10-requirements.md`, then this plan. No code before it is decided.
-    - _Requirements: 27.1, 9.10; O44_
+- [ ] 11. Native structured output and system prompt from prompt parts (D81; not started)
+  - [ ] 11.1 Design the adapter side of D81 (the parts type comes from the `prompt` Port in `base`, `prompts` task 9.6): which providers take the system prompt, images and the output schema as separate fields, and how the capabilities of the model choose native or text
+    - Note (2026-11-09): O44 settled by D81; Requirement 33.9 states the rule.
+    - _Requirements: 27.1, 9.10, 33.9; D81_
 
 ## Notes
 

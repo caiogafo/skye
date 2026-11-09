@@ -63,7 +63,7 @@ base/
     metadata.py           front matter (TOML between two --- lines); not frontmatter.py, `front` is a watermark (R4)
     fmt.py                format_text, FormatError: the text formatter behind `skye fmt`
     shapes.py             conform: checks a structured prompt variable and fills its optional fields in a copy
-    info.py               describe_prompt, prompt_help, PromptInfo (re-exported by skye.prompts; place is open decision O46)
+    info.py               describe(spec) for prompt, router and flow blocks; describe_prompt, prompt_help, PromptInfo (D83)
 ```
 
 ## Components and Interfaces
@@ -137,7 +137,7 @@ All of it takes text and returns text or models; nothing reads a file (Requireme
 - **Prompt variables.** The parser keeps a string after a type as a description (`Attribute.description`, `MapEntry.description`) only in
   `variables` and in `output`; the builder puts it in `VariableSpec.description` and `OutputFieldSpec.description`. A structured type
   (`list(T)`, `[T]`, `list({ ... })`, `map({ ... })`, `{ ... }`, nested) becomes `VariableSpec.item_type` / `fields`; its default is the second
-  argument (`TypeCall.second`, open decision O46). Inside a structure `map({})` / `list([])` is an optional field with that default and
+  argument (`TypeCall.second`, D83). Inside a structure `map({})` / `list([])` is an optional field with that default and
   `map({ a = string })` a shape (`_is_shape`). `shapes.conform` checks a value and lists every mistake with its path.
 - **`output`** blocks (D70) are parsed and checked here into `OutputSpec` (also inside a top-level `when`, as
   `PromptPartSpec(kind="output")`, listed by `PromptSpec.output_variants()`); `prompts` writes the instructions.

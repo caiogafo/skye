@@ -23,7 +23,7 @@ What exists, judged from the code in `src/skye/flows/flow.py`, `src/skye/base/ds
   with `base` (`tests/budget/test_import_matrix.py`, `NON_COMPONENT_TO_COMPONENT`).
 
 The owner decided that the runtime belongs to version 1 of `flows` and is built after the language work. Version 2 (waiting for
-events with persistence, `to_mermaid()`, `include`) is out of this spec's first scope (D51).
+events with persistence, `include`) is out of this spec's first scope (D51); `to_mermaid()` moved to version 1 (D88).
 
 ## Architecture
 ```
@@ -103,8 +103,8 @@ yet" lines (`00-rules`, "The Claude skill that ships with the package").
 9. `flows` imports nothing outside `base`, and no component imports `flows`.
 
 ## Open points (not decided here)
-- **O34** (version 2): the delivery guarantee of persistence; not part of this spec's first scope.
-- **O38**: `skye render` and `to_mermaid()`; version 2.
+- Settled, outside this spec's first scope: persistence (version 2) guarantees at-least-once delivery with an idempotency key per step (Requirement 50.7, D87).
+- Settled: `skye render` and `to_mermaid()` are version 1 (Requirement 54.21, D88), built in `base/dsl` and the command line under `0-base-uxui`, not in `flows`.
 - The default concurrency limit of `parallel` and `foreach`.
 - Whether the observer record of the default error end goes through the `observer` Port passed to `Flow`, or through an event hook shared with `agents`; the design uses the Port.
 - `Flow` imports `skye.utils`; the import matrix allows it, but the spec's rule "imports only `base`" (Requirement 50.4) names `base` alone. Decide whether the note in `11-design.md` should name `utils` or the file reader should move into `base`.

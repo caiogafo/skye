@@ -268,8 +268,8 @@ requirement or decision directly. A task that depended on an open decision names
 - [x] 8. The `.skye` language: public surface (spec only until the parser exists)
   - Note: nothing here is built and no example has been run through a parser. The parser itself (text in, syntax tree out, standard library, in
     `base`) is a task of `0-base-base`, to be added when it is designed; the tasks below follow it. The syntax, the error table and the scope are in
-    `design.md`, "The `.skye` language". The decisions are D49 to D61; the delivery guarantee for persistence (O34) and the fate of
-    `prompts/engine.py` (O35) are open and not needed for version 1.
+    `design.md`, "The `.skye` language". The decisions are D49 to D61; the delivery guarantee for persistence (D87) and the fate of
+    `prompts/engine.py` (D76) were settled on 2026-11-09.
   - [x] 8.1 The conformance suite of the parser
     - Turn the reference examples (four routers, seven prompts, nine flows; drafted in `.agents/tasks/uxui-dsl-examples.md`) into fixtures under
       `tests/fixtures/skye/`, and the table of load-time errors of `design.md` into a parametrized test: every version 1 example must parse and
@@ -369,7 +369,7 @@ requirement or decision directly. A task that depended on an open decision names
     - Evidence (2026-11-08): `src/skye/utils/cli.py` (`_check`); `tests/unit/utils/test_vscode.py`.
     - _Requirements: 54.19; D72_
   - [x] 10.4 Described and structured prompt variables in the grammar, the checker and `to_text`; `skye prompt list|info`
-    - Evidence (2026-11-08): `src/skye/base/dsl/parser.py`, `build.py`, `specs.py`, `emit.py`, `shapes.py`, `info.py`; `tests/unit/dsl/test_variable_descriptions.py`, `test_structured_variables.py`, `tests/unit/utils/test_cli_prompt.py`. The form of the default is open decision O46.
+    - Evidence (2026-11-08): `src/skye/base/dsl/parser.py`, `build.py`, `specs.py`, `emit.py`, `shapes.py`, `info.py`; `tests/unit/dsl/test_variable_descriptions.py`, `test_structured_variables.py`, `tests/unit/utils/test_cli_prompt.py`. The form of the default is confirmed by D83.
     - _Requirements: 54.20; D73_
   - [x] 10.5 The VS Code extension and `skye vscode`
     - Evidence (2026-11-08): `src/skye/utils/vscode_extension/` (`extension.js`, `package.json`, grammar, README), `src/skye/utils/vscode.py`; `tests/unit/utils/test_vscode.py`, `tests/unit/test_vscode_extension_files.py`; `docs/base/editor.md`. Not verified here: the extension running inside VS Code (the tests read its files and the CLI, not the editor).
@@ -378,8 +378,10 @@ requirement or decision directly. A task that depended on an open decision names
     - Evidence (2026-11-08): `docs/base/skye-language.md` (comments, front matter, `skye fmt`, `output`), `docs/base/editor.md`; skill `references/cli.md`, `language.md`, `output.md`, `prompt.md`, `router.md`, `python-api.md`; `tests/unit/dsl/test_claude_skill.py`, `tests/unit/dsl/test_docs_examples.py`.
     - _Requirements: 54.14; D64_
   - [ ] 10.7 A public import for the checker and the formatter, so an example can show a mistake and a fix without `skye.base.*`
-    - Note: open decision O41 (options: export from `skye.prompts`, a `skye.dsl` facade, or the command line only); `examples/prompts/validation.py` works around it with the `ValidationError` of `load_prompt`. No code before it is decided.
-    - _Requirements: 7.14; D34, O41_
+    - Note (2026-11-09): settled by D78, a `skye.dsl` facade (`check_text`, `format_text`, `Diagnostic`, `FormatError`); then `examples/prompts/validation.py` imports it instead of its workaround. Before: `examples/prompts/validation.py` works around it with the `ValidationError` of `load_prompt`. No code before it is decided.
+    - _Requirements: 7.14, 7.15; D34, D78_
+  - [ ] 10.8 `to_mermaid(spec) -> str` in `base/dsl` for flows and routers (deterministic; every step, edge, `choice` branch with its `when` text, `parallel` branches and `join`, dotted `on_error` and `on_timeout`, routes and fallback chains) and `skye render FILE [--name] [--stdout] [--fence] [-o] [--direction]`; tests on the structure of the text, no Mermaid library; public in `skye.dsl`; the skill names the command
+    - _Requirements: 54.21, 54.14; D88, D64_
 
 ## Notes
 

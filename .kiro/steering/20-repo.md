@@ -67,14 +67,17 @@ and `#[[file:.kiro/steering/11-design.md]]`). One spec = one component, named `<
    **How to fetch a requirement:** each steering requirement starts at `### Requirement N: <title>` and its criteria are the numbered list under
    `#### Acceptance Criteria`: `grep -n -A25 "^### Requirement 9:" .kiro/steering/10-requirements.md` reads Requirement 9, and `Requirement 9.2` is its
    second criterion. Keep that heading syntax exactly as Kiro writes it, because tools search for it.
-3. **High-level design.** If the new component, or a new Port, an allowed import, an extension point or a layer change, alters the
+3. **Example first** (D89). Before the design, write the example of how a user calls the component, extension points included, in
+   `examples/<component>/`; it fixes the names and the shape of the call and runs in `tests/examples` from the day it is written
+   (Requirement 24.11). Changing it later needs a decision line.
+4. **High-level design.** If the new component, or a new Port, an allowed import, an extension point or a layer change, alters the
    system view, update `11-design.md` (tables, diagram) in the same change. Do not describe the component's internals there.
-4. **Spec `design.md`.** Write only the detailed design of the component and open it with one line in this form:
+5. **Spec `design.md`.** Write only the detailed design of the component and open it with one line in this form:
    `Builds on: #[[file:.kiro/steering/11-design.md]] (sections: Layers, Allowed imports, Ports, Composition)`. Refer to what already exists in
    steering instead of rewriting it. If the design needs something the steering does not say, **change the steering first, then write the spec**.
-5. **Spec `tasks.md`.** Milestones in build order, each task citing the requirement numbers it satisfies. Tasks live only here.
-6. **Decision.** If the work records a choice the owner made, add `D<n>` to `12-decisions.md` with the requirements it supports.
-7. Approve in order: requirements, design, tasks. Add the component to the progression view `.kiro/specs/README.md`.
+6. **Spec `tasks.md`.** Milestones in build order, each task citing the requirement numbers it satisfies. Tasks live only here.
+7. **Decision.** If the work records a choice the owner made, add `D<n>` to `12-decisions.md` with the requirements it supports.
+8. Approve in order: requirements, design, tasks. Add the component to the progression view `.kiro/specs/README.md`.
 
 ## Changing something that exists
 Steering is always changed before the spec: first `10-requirements.md` or `11-design.md` (with the decision line), then the specs that cite them.

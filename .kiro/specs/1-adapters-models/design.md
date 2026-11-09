@@ -136,12 +136,12 @@ dataclass, not a pydantic model (Requirement 27.2, D24); a non-conforming result
 Note: the current `base/completion.py` still types `response_schema`/`structured_output` as pydantic models; moving them to
 dataclasses is open work tracked in tasks.md (D24, O4).
 
-Open (decision O44, 2026-11-08, nothing built): `prompts` returns messages and appends the output instructions as text, while providers
+Decided (D81, 2026-11-09; nothing built yet): a rendered prompt is a set of provider-agnostic parts, a type of the `prompt` Port in
+`base`, and the adapter translates it. Today `prompts` returns messages and appends the output instructions as text, while providers
 take the system prompt, images and an output schema as separate API fields (Anthropic `system`, Gemini `systemInstruction` /
-`responseSchema`, OpenAI `response_format: json_schema`, Bedrock Converse `system` and output configuration). If the owner takes the
-proposal (prompt parts consumed by the adapter), the adapter chooses the native field or the text from the capabilities of the model,
+`responseSchema`, OpenAI `response_format: json_schema`, Bedrock Converse `system` and output configuration). The adapter chooses the native field or the text from the capabilities of the model,
 which stay in `models` (D17, the import matrix), and `CompleteRequest.response_schema` may have to accept a JSON-Schema `dict`; table
-and XML have no native form. This design changes only after the owner decides O44.
+and XML have no native form. The adapter design is task 11.
 
 ### Token counting and cost
 
@@ -155,8 +155,8 @@ accepts custom pricing for private models (Requirement 19.2).
 
 The `decision` Port in `base/interfaces/decision.py` takes a finite option set and returns one choice with a probability per
 option (each in 0..1, summing to 1; an empty set is rejected). The implementation, Jev, belongs at `models/decision/jev.py`
-and is consumed by `gateway`, `router` and `guard` (design "DecisionModel (Jev)"; Requirement 9.8). This module is not yet
-present in `src/skye/models`; it is an open task in tasks.md (see also open decision O8 on whether Jev gets its own milestone).
+and is consumed by `gateway`, `router` and `guard` (design "DecisionModel (Jev)"; Requirement 9.8). It is built
+(`models/decision/jev.py`, `JevDecisionModel`); its selector in the gateway moves with open decision O19 (D89).
 
 ### Lazy loading and packaging
 

@@ -210,3 +210,15 @@ adds the last story, Requirement 19: loading a router, a flow or a prompt from a
 1. THE spec SHALL realize Requirement 54.12 of #[[file:.kiro/steering/10-requirements.md]].
 2. THE spec SHALL realize Requirement 7.12 of #[[file:.kiro/steering/10-requirements.md]].
 3. THE spec SHALL honor decision D62 of #[[file:.kiro/steering/12-decisions.md]].
+
+### Requirement 21: Public language tools and diagrams
+
+**User Story:** As a developer, I want to check, format, describe and draw a `.skye` file from one public import or one command, so that an example or a document can show a file, its mistakes and its diagram without reaching into `skye.base`.
+
+#### Acceptance Criteria
+
+1. THE spec SHALL realize Requirement 7.14 of #[[file:.kiro/steering/10-requirements.md]].
+2. THE spec SHALL realize Requirement 7.15 of #[[file:.kiro/steering/10-requirements.md]].
+3. THE spec SHALL realize Requirement 54.21 of #[[file:.kiro/steering/10-requirements.md]].
+4. THE spec SHALL honor decision D78 of #[[file:.kiro/steering/12-decisions.md]].
+5. THE spec SHALL honor decision D88 of #[[file:.kiro/steering/12-decisions.md]].

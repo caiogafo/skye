@@ -145,13 +145,13 @@ satisfies (`Requirement N.k` of `10-requirements.md`) or the decision it honors.
     - Evidence (2026-11-08): `src/skye/base/dsl/fmt.py`, `skeletons.py`; `tests/unit/dsl/test_fmt.py` (also checks that every bundled `.skye` file is formatted).
     - _Requirements: 54.18; D71_
   - [x] 13.4 Descriptions and structured types of prompt variables; `conform` with the path of each mistake
-    - Evidence (2026-11-08): `src/skye/base/dsl/parser.py` (`TypeCall.second`), `build.py`, `specs.py` (`VariableSpec.description`, `item_type`, `fields`), `emit.py`, `shapes.py`; `tests/unit/dsl/test_variable_descriptions.py`, `tests/unit/dsl/test_structured_variables.py`. The default form is open decision O46.
+    - Evidence (2026-11-08): `src/skye/base/dsl/parser.py` (`TypeCall.second`), `build.py`, `specs.py` (`VariableSpec.description`, `item_type`, `fields`), `emit.py`, `shapes.py`; `tests/unit/dsl/test_variable_descriptions.py`, `tests/unit/dsl/test_structured_variables.py`. The default form is confirmed by D83.
     - _Requirements: 54.20, 30.10; D73_
   - [x] 13.5 The `output` block in the parser, the checker and `to_text` (descriptions, format from a variable, conditional variants); `loop` inside `each`
     - Evidence (2026-11-08): `src/skye/base/dsl/build.py`, `specs.py` (`OutputSpec`, `OutputFieldSpec`, `output_variants`), `emit.py`; `tests/unit/dsl/test_output_block.py`, `tests/unit/dsl/test_conditional_output.py`; `tests/unit/prompts/test_prompt_loops.py`.
     - _Requirements: 33.5 to 33.8, 30.11; D69, D70_
   - [x] 13.6 `describe_prompt`, `prompt_help` and `PromptInfo` in `base/dsl/info.py`
-    - Evidence (2026-11-08): `src/skye/base/dsl/info.py`; `tests/unit/prompts/test_prompt_help.py`. Its place is open decision O46.
+    - Evidence (2026-11-08): `src/skye/base/dsl/info.py`; `tests/unit/prompts/test_prompt_help.py`. Its place is confirmed by D83; the generic `describe(spec)` is `2-services-prompts` task 9.5.
     - _Requirements: 34.7; D73_
   - [x] 13.7 The resource Port: `ResourceProviderInterface` and `Resource` in `base/interfaces/resource.py`, exported by `skye.interfaces`
     - Evidence (2026-11-08): `src/skye/base/interfaces/resource.py`, `src/skye/base/interfaces/__init__.py`, `src/skye/interfaces.py`; `tests/unit/tools/test_mcp_conformance.py` (the Port, the frozen dataclass, a plain class satisfies it).

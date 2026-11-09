@@ -69,6 +69,10 @@ The requirements themselves live in `.kiro/steering/10-requirements.md`; each re
 2. THE spec SHALL realize Requirement 31.2 of #[[file:.kiro/steering/10-requirements.md]].
 3. THE spec SHALL realize Requirement 31.3 of #[[file:.kiro/steering/10-requirements.md]].
 4. THE spec SHALL realize Requirement 31.4 of #[[file:.kiro/steering/10-requirements.md]].
+5. THE spec SHALL realize Requirement 31.6 of #[[file:.kiro/steering/10-requirements.md]].
+6. THE spec SHALL realize Requirement 31.7 of #[[file:.kiro/steering/10-requirements.md]].
+7. THE spec SHALL realize Requirement 31.8 of #[[file:.kiro/steering/10-requirements.md]].
+8. THE spec SHALL honor decision D79 of #[[file:.kiro/steering/12-decisions.md]].
 
 ### Requirement 5: Multimodal Content Support
 
@@ -99,7 +103,9 @@ The requirements themselves live in `.kiro/steering/10-requirements.md`; each re
 1. THE spec SHALL realize Requirement 30.8 of #[[file:.kiro/steering/10-requirements.md]].
 2. THE spec SHALL realize Requirement 30.9 of #[[file:.kiro/steering/10-requirements.md]].
 3. THE spec SHALL realize Requirement 30.7 of #[[file:.kiro/steering/10-requirements.md]].
-4. THE spec SHALL honor decision D20 of #[[file:.kiro/steering/12-decisions.md]].
+4. THE spec SHALL honor decision D76 of #[[file:.kiro/steering/12-decisions.md]].
+5. THE spec SHALL honor decision D77 of #[[file:.kiro/steering/12-decisions.md]].
+6. THE spec SHALL honor decision D20 of #[[file:.kiro/steering/12-decisions.md]].
 
 ### Requirement 8: Output Schema and Structured Generation
 
@@ -178,7 +184,9 @@ The requirements themselves live in `.kiro/steering/10-requirements.md`; each re
 2. THE spec SHALL realize Requirement 33.6 of #[[file:.kiro/steering/10-requirements.md]].
 3. THE spec SHALL realize Requirement 33.7 of #[[file:.kiro/steering/10-requirements.md]].
 4. THE spec SHALL realize Requirement 33.8 of #[[file:.kiro/steering/10-requirements.md]].
-5. THE spec SHALL honor decision D70 of #[[file:.kiro/steering/12-decisions.md]].
+5. THE spec SHALL realize Requirement 33.9 of #[[file:.kiro/steering/10-requirements.md]].
+6. THE spec SHALL honor decision D81 of #[[file:.kiro/steering/12-decisions.md]].
+7. THE spec SHALL honor decision D70 of #[[file:.kiro/steering/12-decisions.md]].
 
 ### Requirement 15: Bundled agent prompts and their conventions
 
@@ -192,6 +200,7 @@ The requirements themselves live in `.kiro/steering/10-requirements.md`; each re
 4. THE spec SHALL realize Requirement 31.5 of #[[file:.kiro/steering/10-requirements.md]].
 5. THE spec SHALL honor decision D74 of #[[file:.kiro/steering/12-decisions.md]].
 6. THE spec SHALL honor decision D71 of #[[file:.kiro/steering/12-decisions.md]].
+7. THE spec SHALL honor decision D80 of #[[file:.kiro/steering/12-decisions.md]].
 
 ### Requirement 16: Prompt help and examples
 
@@ -205,3 +214,5 @@ The requirements themselves live in `.kiro/steering/10-requirements.md`; each re
 4. THE spec SHALL realize Requirement 24.10 of #[[file:.kiro/steering/10-requirements.md]].
 5. THE spec SHALL honor decision D73 of #[[file:.kiro/steering/12-decisions.md]].
 6. THE spec SHALL honor decision D74 of #[[file:.kiro/steering/12-decisions.md]].
+7. THE spec SHALL realize Requirement 34.9 of #[[file:.kiro/steering/10-requirements.md]].
+8. THE spec SHALL honor decision D83 of #[[file:.kiro/steering/12-decisions.md]].

@@ -24,7 +24,7 @@ One section per component; the section name is the component's short name.
 | [`policy`](policy/index.md) | Policy engine (Cedar-inspired): authorization decisions. |
 | [`observe`](observe/index.md) | Events, logs, metrics and traces. |
 | [`gateway`](gateway/index.md) | MCP gateway with a toolset per operation. |
-| [`agents`](agents/index.md) | The agent loop, BaseAgent and hooks. |
+| [`agents`](agents/index.md) | The agent loop (`AgentLoop`), the default `Agent` and hooks. |
 | [`teams`](teams/index.md) | Optional teams of agents. |
 | [`flows`](flows/index.md) | Optional flows (workflows). |
 

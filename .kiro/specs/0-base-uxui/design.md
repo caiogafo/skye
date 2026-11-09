@@ -236,8 +236,9 @@ Each row is a short file and the message `skye check` prints; together they are 
 ### Scope and the reference set
 Version 1 covers routers, flows (sequence, condition, parallel, bounded loop, retry, timeout, error branch, `foreach`, typed context with `set` and
 `emit`, an agent, a team, a model through the router or a sub-flow as a step) and the reduced `prompt` block. Version 2 is written and not built:
-waiting for events with persistence and resume, `to_mermaid()`, `include`, and in prompts the examples, multimodal content and the
-partial (the output schema moved to version 1, D70); the delivery guarantee of persistence is open decision O34 and the fate of `prompts/engine.py` O35. The full reference set (four routers, seven
+waiting for events with persistence and resume, `include`, and in prompts the examples, multimodal content and the
+partial (the output schema moved to version 1, D70; `to_mermaid()` and `skye render` moved to version 1, D88); persistence guarantees at-least-once delivery
+(D87) and `prompts/engine.py` does interpolation only (D76). The full reference set (four routers, seven
 prompts, nine flows) was drafted in `.agents/tasks/uxui-dsl-examples.md`, a working file that is not versioned; task 8.1 turns it into fixtures under
 `tests/fixtures/skye/` so the conformance suite lives in the repository.
 
@@ -270,10 +271,13 @@ These are the parts of the surface a person touches while writing a `.skye` file
   relative to the folder searched) leave paths out, and the repository's own `.skyeignore` lists `tests/fixtures/*`.
 - **`skye check --format json`** and `-` with `--stdin-filename` (D72): `{"diagnostics": [{file, line, column, reason, fix, message}]}`.
 - **`skye prompt list|info`** (D73): what a prompt takes and gives back (`describe_prompt`, `prompt_help`); the code is in `base/dsl/info.py`
-  because `utils` may not import `prompts` (open decision O46).
+  because `utils` may not import `prompts`; it becomes `describe(spec)` for every kind of block (D83).
 - **The VS Code extension and `skye vscode install|uninstall|status|path|package`** (D72, Requirement 55): TextMate grammar, live diagnostics,
   "Format Document" through `skye fmt -`; plain JavaScript, no npm dependency, no build; settings `skye.command`, `skye.run`, `skye.registry`.
-- **Open:** a public import for `check_text` and `format_text` (O41; examples may not import `skye.base.*`, D34); named types (O45).
+- **`skye.dsl`** (D78): the public facade for `check_text`, `format_text`, `Diagnostic`, `FormatError`, `describe` and `to_mermaid`.
+- **`skye render FILE`** (D88): a flow or a router as a Mermaid diagram (`--stdout`, `--fence`, `-o`, `--name`, `--direction`), from
+  `to_mermaid(spec)` in `base/dsl`.
+- **Version 2:** named types (D82).
 
 ## Decisions taken and the tasks they unblock
 The owner took O24 to O33 as D36 to D45 (`.kiro/steering/12-decisions.md`). None blocks a task any more.
@@ -298,8 +302,7 @@ The owner took O24 to O33 as D36 to D45 (`.kiro/steering/12-decisions.md`). None
 | D61 | the written grammar, the JSON Schema, `skye check`, `.gitattributes`, and the loading API `Flow.from_file`, `Router.from_file`, `skye.load` | 8.2 to 8.5 |
 | D62 | the library reads no YAML: no parser, no `yaml` extra, no PyYAML; a `.yaml` file is rejected with a message naming `.skye` and JSON | 9.1 to 9.5 |
 Related and not blocking: D49 (taken: the core has no third-party dependency) closes O4, so the pydantic copy of `CapabilitySchema` leaves with the code
-migration, which is a separate task, and the budget tests fail by design until it is done; O20 (examples first) is the practice this spec follows for the
-extension points.
+migration, which is a separate task, and the budget tests fail by design until it is done; the example comes before the design for every new component (D89, Requirement 24.11).
 
 ## Correctness Properties
 
@@ -386,7 +389,7 @@ For any `.skye` block shown in `docs/`, `examples/` or `README.md`, `skye check`
   to D45), in the tables above and in `tasks.md`.
 - Three more working files were in the folder for the `.skye` language: `dsl-decisions.md` (the decisions, with working numbers), `dsl-examples.md` (the
   reference examples) and `kiro-handoff-dsl.md` (the instruction to bring the specs in line). They are now `.agents/tasks/uxui-dsl-decisions.md`,
-  `uxui-dsl-examples.md` and `uxui-kiro-handoff-dsl.md`. The decisions are D49 to D61 and O34, O35 in steering (the working numbers D54 to D76 map to the
+  `uxui-dsl-examples.md` and `uxui-kiro-handoff-dsl.md`. The decisions are D49 to D61, D76 and D87 in steering (the working numbers D54 to D76 map to the
   official ones in the first lines of `uxui-dsl-decisions.md`); the syntax, the error table and the scope are in "The `.skye` language" above.
 - Rules 1 to 4, 7 and 8 were applied before this spec (facades, decision D34, Requirement 7.14, `tests/budget/test_public_imports.py`); they are
   tasks 1.1 to 1.3, ticked.

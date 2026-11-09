@@ -9,4 +9,4 @@ last_updated: 2026-11-02
 
 *codename: cyclone*
 
-The agent loop, BaseAgent and hooks.
+The agent loop (`AgentLoop`), the default `Agent` and hooks.

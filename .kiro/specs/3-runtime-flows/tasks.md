@@ -6,7 +6,7 @@ run context and the sequential interpreter, conditions and loops, parallel steps
 detection, and packaging with the skill. Status is judged from the code in `src/skye/flows` and `src/skye/base/dsl` and from
 `tests/unit/flows` and `tests/unit/dsl`. Each task cites the steering requirement numbers it satisfies (`Requirement N.k` of
 `10-requirements.md`) or the decision it honors. Task IDs cited from other documents are `flows:N.k`. Version 2 (persistence,
-`to_mermaid()`, `include`) is not scheduled here.
+`include`) is not scheduled here; `to_mermaid()` is version 1 under `0-base-uxui` (D88).
 
 ## Tasks
 - [x] 1. What exists

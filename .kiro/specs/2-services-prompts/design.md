@@ -104,7 +104,7 @@ so a call without `schema` asks for a `name` and a `value` per item, in json by 
 
 ### Metadata and validation (Requirement 29.4 to 29.6)
 `get_template_metadata` returns required and optional variables, examples, content types, roles and the schema; `validate_template`
-returns a result without raising. The variable extraction and the syntax check use the engine's parser, so `{{ name }}`, `if` conditions and `for` sources are found and a bad template is rejected at registration with the engine's details (tasks 2.1, 2.2). Which variables are required in a text template is open decision O39.
+returns a result without raising. The variable extraction and the syntax check use the engine's parser, so `{{ name }}`, `if` conditions and `for` sources are found and a bad template is rejected at registration with the engine's details (tasks 2.1, 2.2). Text templates do interpolation only (D76): a `{% %}` tag is rejected with a `ValidationError` that points to `when` and `each` in `.skye`, and a variable read by interpolation is required unless it has a default or is allowed missing (O39 lapsed with the tags).
 
 ### The `.skye` renderer (version 1 and 2 of the `prompt` block)
 What exists: the `prompt` block of version 1 is parsed and checked in `base` (`PromptSpec`: `variables`, `message "<role>"`, `text`,
@@ -133,8 +133,8 @@ roles, history as messages, whitespace, empty messages omitted, and lines the ol
 `{% endif %}` swallowed the newline (`main_agent`, `memory_agent`, `sql_generation`, `relation_extraction`,
 `tabular_extraction`). The legacy texts it compares with are kept in `tests/unit/prompts/legacy_templates/`.
 Already enough in the engine: the filters `default`, `join`, `upper`, nested `each`, attribute access (`table.columns`). Not to be
-added (D20): macros, inheritance, include, variable assignment. The fate of `prompts/engine.py` after the conversion is open decision
-O35, decided at task 4.5.
+added (D20): macros, inheritance, include, variable assignment. `prompts/engine.py` keeps only `{{ }}` interpolation with filters
+(D76, task 9.1); custom filters are registered with `register_filter` (D77).
 
 ### Agent prompts (written in `.skye`, 2026-11-08)
 Bundled prompts written directly in `.skye`, all with the same optional inputs: `tools` (a list of `{name, description,

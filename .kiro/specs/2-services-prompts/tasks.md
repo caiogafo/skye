@@ -44,7 +44,7 @@ decision it honors. Task IDs cited from other documents are `prompts:N.k` (the f
     - Evidence (2026-11-08): `tests/unit/prompts/test_builder_registry.py::test_registration_rejects_bad_syntax_with_the_engine_details`, `test_validate_template_never_raises`.
     - _Requirements: 29.3, 29.6_
   - [x] 2.3 Raise `ValueError` naming every missing required variable for block templates too (today an undefined variable stays visible in the output)
-    - Evidence (2026-11-08): `tests/unit/prompts/test_builder_registry.py::test_block_template_names_every_missing_variable_sorted`, `test_single_missing_variable_message`, `test_defaults_partials_and_allowed_missing_satisfy_requirements`. The rule for which variables are required is open decision O39.
+    - Evidence (2026-11-08): `tests/unit/prompts/test_builder_registry.py::test_block_template_names_every_missing_variable_sorted`, `test_single_missing_variable_message`, `test_defaults_partials_and_allowed_missing_satisfy_requirements`. The rule for which variables are required lapses with the control tags (D76).
     - _Requirements: 30.2_
   - [x] 2.4 Errors in the `SkyeError` hierarchy with context, structured logging instead of `print` in `loaders.py`, `${VAR}` substitution in configuration
     - Evidence (2026-11-08): `tests/unit/prompts/test_builder_registry.py::test_defaults_substitute_environment_variables`, `test_missing_environment_variable_is_a_configuration_error`, `test_loader_logs_instead_of_printing`.
@@ -53,7 +53,7 @@ decision it honors. Task IDs cited from other documents are `prompts:N.k` (the f
     - Note: `render_template` parses the text at every call; there is no cache.
     - Evidence (2026-11-08): `tests/unit/prompts/test_builder_registry.py::test_rendering_reuses_the_compiled_template`, `test_fixed_examples_are_formatted_once_and_cache_is_bounded`, `test_partial_shares_compiled_entries`.
     - _Requirements: 34.4, 34.5, 34.6_
-  - [ ] 2.6 Remove `register_jinja_macro` (macros are not supported) and decide the name of `register_jinja_filter` with the owner (public surface, `0-base-uxui`)
+  - [ ] 2.6 Remove `register_jinja_macro` (macros are not supported) and rename `register_jinja_filter` to `register_filter` (D77, task 9.2)
     - Note (2026-11-08): `register_jinja_macro` is removed from the Port and the builder (`tests/unit/prompts/test_builder_registry.py::test_register_jinja_macro_is_gone`). `register_jinja_filter` keeps its name until the owner decides (open decision O40), so the task stays unticked.
     - _Requirements: 30.8, 30.9; D20_
   - [x]* 2.7 Property tests: registry round trip, variable merge precedence, partial immutability (properties 1, 2, 10 of `design.md`)
@@ -102,7 +102,8 @@ decision it honors. Task IDs cited from other documents are `prompts:N.k` (the f
     - _Requirements: 30.1, 32.1; D60_
   - [ ] 4.5 Keep `prompts/engine.py` for user `.jinja` templates and for the `{{ }}` interpolation of the new blocks; once 4.4 passes, decide with the owner open decision O35 (restrict the engine to interpolation only, control tags declared obsolete)
     - Note (2026-11-08): the engine is kept. 4.4 passes for all 18 converted templates; none of them uses control tags any more, but user templates and `examples/advanced/prompt_engineering.py` do, so O35 stays open for the owner and the task stays unticked.
-    - _Requirements: 30.8; D20; O35_
+    - Note (2026-11-09): settled by D76, control tags removed; done in task 9.1.
+    - _Requirements: 30.8; D20; D76_
   - [x] 4.6 `loaders.py` discovers `.skye` prompt files next to the `.jinja` ones; remove the `.jinja` copies of the bundled templates when 4.4 passes
     - Evidence (2026-11-08): `discover_templates` and `load_default_templates` in `src/skye/prompts/loaders.py` prefer `.skye` and register the front matter `version`; `tests/unit/prompts/test_builder_registry.py::test_discover_prefers_skye`, `tests/unit/prompts/test_builder_skye.py::test_loader_registers_skye_over_jinja`; the `.jinja` copies are gone from `src/`.
     - _Requirements: 29.1, 29.4; D60_
@@ -122,7 +123,7 @@ decision it honors. Task IDs cited from other documents are `prompts:N.k` (the f
     - Evidence (2026-11-08): `KNOWN_FOLDERS`, `EXEMPT_FOLDERS` and `SKIPPED_FOLDERS` are empty sets in `tests/budget/test_example_output_style.py`, `test_example_readmes.py`, `test_example_size.py` and `tests/examples/test_examples_offline.py`; `uv run pytest tests -q` passes (3461 passed, 3 skipped on 2026-11-08).
     - _Requirements: 24.3, 24.4_
   - [ ] 5.4 Rewrite `examples/advanced/prompt_engineering.py` in `.skye` (or cut it): it still uses `{% %}` text templates and `register_jinja_filter`
-    - Note: open (decision notes of 2026-11-08, section 6.5); depends on O35 and O40.
+    - Note (2026-11-09): O35 and O40 settled by D76 and D77; the rewrite is part of task 9.1.
     - _Requirements: 24.9, 24.10; D74_
 
 - [ ] 6. Licence and attribution
@@ -136,7 +137,7 @@ decision it honors. Task IDs cited from other documents are `prompts:N.k` (the f
     - Evidence (2026-11-08): `src/skye/prompts/skye_prompts.py`, `src/skye/prompts/engine.py`; `tests/unit/prompts/test_prompt_loops.py`, `tests/unit/prompts/test_engine.py`.
     - _Requirements: 30.11; D69_
   - [x] 7.2 Described and structured variables checked at render time: one `ValidationError` with the path of each mistake, defaults of optional fields filled in a copy, extra keys kept
-    - Evidence (2026-11-08): `src/skye/base/dsl/shapes.py` (`conform`) used by `render_prompt`; `tests/unit/dsl/test_structured_variables.py`, `tests/unit/dsl/test_variable_descriptions.py`, `tests/unit/prompts/test_skye_prompts.py`. The form of the default (`list({ ... }, [])`) is open decision O46.
+    - Evidence (2026-11-08): `src/skye/base/dsl/shapes.py` (`conform`) used by `render_prompt`; `tests/unit/dsl/test_structured_variables.py`, `tests/unit/dsl/test_variable_descriptions.py`, `tests/unit/prompts/test_skye_prompts.py`. The form of the default (`list({ ... }, [])`) is confirmed by D83.
     - _Requirements: 30.10; D73_
   - [x] 7.3 The `output` block: `json`, `table`, `xml`, `schema = VAR`, field descriptions, the format from a variable, instructions appended to the last user message
     - Evidence (2026-11-08): `src/skye/prompts/output_format.py`, `output_instructions` in `src/skye/prompts/skye_prompts.py`, `set_output_schema(..., output_format=)` and `get_output_instructions` in `src/skye/prompts/messages.py`, the engine filters `toxml` and `totable`; `tests/unit/prompts/test_output_instructions.py`, `tests/unit/dsl/test_output_block.py`.
@@ -145,14 +146,14 @@ decision it honors. Task IDs cited from other documents are `prompts:N.k` (the f
     - Evidence (2026-11-08): `active_output` in `src/skye/prompts/skye_prompts.py`, `_skye_output_instructions` in `src/skye/prompts/messages.py` (uses `spec.output_variants()`); `tests/unit/dsl/test_conditional_output.py`, `tests/unit/prompts/test_structured_output_prompts.py`.
     - _Requirements: 33.8; D70_
   - [x] 7.5 Prompt help: `describe_prompt`, `prompt_help`, `BasePromptBuilder.describe` and `.help`, and the commands `skye prompt list` and `skye prompt info`
-    - Evidence (2026-11-08): `src/skye/base/dsl/info.py` (re-exported by `skye.prompts`), `src/skye/prompts/messages.py`, `src/skye/utils/cli.py`; `tests/unit/prompts/test_prompt_help.py`, `tests/unit/utils/test_cli_prompt.py`. The place of the code is open decision O46.
+    - Evidence (2026-11-08): `src/skye/base/dsl/info.py` (re-exported by `skye.prompts`), `src/skye/prompts/messages.py`, `src/skye/utils/cli.py`; `tests/unit/prompts/test_prompt_help.py`, `tests/unit/utils/test_cli_prompt.py`. The place of the code is confirmed by D83.
     - _Requirements: 34.7; D73_
   - [x] 7.6 Front matter read by the loader and registered as the template version; `add_examples` passes the selected list of dicts to a `.skye` prompt
     - Evidence (2026-11-08): `src/skye/prompts/loaders.py`, `_wants_example_list` in `src/skye/prompts/messages.py`; `tests/unit/prompts/test_builder_skye.py`, `tests/unit/prompts/test_builder_examples.py::test_skye_list_examples_get_the_selected_dicts`, `test_skye_string_examples_are_still_formatted`.
     - _Requirements: 30.13, 31.5; D71, D74_
   - [ ] 7.7 Prompts as parts for a native provider call (system, content blocks, output schema): `render_parts` or `to_request`
-    - Note: open decision O44 (owner request of 2026-11-08); no code before it is decided. Not-yet-decided points: few-shot without a hand-written shape (O42), how tool parameters are shown (O43), named types (O45).
-    - _Requirements: 33.5; O44_
+    - Note (2026-11-09): settled by D81 (parts with no provider in them; the model side translates them through a Port in `base`); done in task 9.6. Few-shot (D79), tool parameters (D80) and named types (D82, version 2) are settled too.
+    - _Requirements: 33.5, 33.9; D81_
 
 - [ ] 8. Bundled agent prompts written in `.skye` (decision D74; Requirement 30.12 to 30.14)
   - [x] 8.1 The new families, with original text: smolagents (`smol_code_agent`, `smol_tool_calling_agent`, `smol_planning`, `smol_managed_agent`), reasoning (`chain_of_thought_agent`, `tree_of_thoughts_agent`, `self_reflection_agent`, `planner_agent`), supervisors (`supervisor_router`, `supervisor_planner`, `supervisor_reviewer`, `supervisor_hierarchical`), group chat (`group_chat_participant`, `group_chat_manager`, `group_chat_summarizer`), memory upkeep (`memory_update_agent`, `memory_consolidation_agent`, `working_memory_agent`) and structured output (`structured_output`, `structured_output_json`, `_table`, `_xml`)
@@ -161,3 +162,18 @@ decision it honors. Task IDs cited from other documents are `prompts:N.k` (the f
   - [x] 8.2 One shape for `tools` and the five memories in every agent prompt, `placeholder "history"` everywhere, the old input names removed, front matter and a usage comment in every template
     - Evidence (2026-11-08): `tests/unit/prompts/test_bundled_conventions.py` (identical shapes, front matter, formatted, comment convention, the `Example:` comment is extracted and rendered), `tests/unit/prompts/test_agent_prompt_inputs.py`, `tests/unit/prompts/test_jinja_agent_inputs.py`; `uv run skye check` and `uv run skye fmt --check` on `src/skye/prompts/templates` and `examples` were clean on 2026-11-08.
     - _Requirements: 30.12, 30.13, 24.10; D71, D74_
+
+- [ ] 9. Decisions of 2026-11-09 (D76 to D83)
+  - [ ] 9.1 Text templates do interpolation only: remove the `{% %}` control tags from `prompts/engine.py` (keep `{{ }}` and the filters), reject a tag with a `ValidationError` naming the line and pointing to `when` and `each`; move `docs/prompts/index.md`, `docs/base/skye-language.md` and `examples/advanced/prompt_engineering.py` to `.skye`; drop the required-variable rule for tags
+    - _Requirements: 30.2, 30.8, 24.9; D76_
+  - [ ] 9.2 Rename `register_jinja_filter` to `register_filter` on the Port and in `BasePromptBuilder`, with no alias; update the tests, the example and the skill
+    - _Requirements: 30.8; D77_
+  - [ ] 9.3 Few-shot: the text of an example from its own keys when no example template is given; `add_examples(..., as_messages=True)` gives user/assistant pairs; a key missing from an example is a `ValidationError` (today such an example renders as nothing)
+    - _Requirements: 31.6, 31.7, 31.8; D79_
+  - [ ] 9.4 Show tool parameters as JSON Schema in the four smolagents-style prompts too (`each param in tool.parameters` becomes `tool.parameters | tojson`)
+    - _Requirements: 30.12; D80_
+  - [ ] 9.5 `describe(spec)` in `base/dsl/info.py` for prompt, router and flow blocks, public in `skye.dsl` (with the `0-base-uxui` facade); `skye.prompts` keeps `describe_prompt` and `prompt_help`
+    - _Requirements: 34.9; D83_
+  - [ ] 9.6 Prompt parts: the provider-agnostic parts type in the `prompt` Port of `base`, produced by the renderer; the model side translates it (`1-adapters-models` task 11)
+    - Note: names (`render_parts`, `PromptParts`) are fixed in the design before code.
+    - _Requirements: 33.9; D81_

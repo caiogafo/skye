@@ -19,8 +19,8 @@ The requirements themselves live in `.kiro/steering/10-requirements.md`; each re
 ## Glossary
 
 - **Agent loop**: The repeated cycle of building a model request, calling the model, running the tools it asks for, and adding the results to the conversation, until the agent produces a final answer or a stop condition is met
-- **BaseAgent**: The abstract class that implements the agent loop and the hook points
-- **Agent**: The default agent shipped with Skye, a BaseAgent with default hooks
+- **AgentLoop**: The class that implements the agent loop and the hook points, without default providers (decision D90; formerly `BaseAgent`)
+- **Agent**: The default agent shipped with Skye, an AgentLoop with the default providers; the class to use and to subclass
 - **Operation**: A step of the loop that has its own pre and post hook point (run, step, toolset selection, model call, tool call, memory read, memory write, safety check, policy check)
 - **Hook**: A user-provided function or object attached to an operation
 - **Interceptor**: A hook that can change, replace, retry or stop an operation. Not to be confused with an observer
@@ -43,6 +43,7 @@ The requirements themselves live in `.kiro/steering/10-requirements.md`; each re
 2. THE spec SHALL realize Requirement 39.2 of #[[file:.kiro/steering/10-requirements.md]].
 3. THE spec SHALL realize Requirement 39.3 of #[[file:.kiro/steering/10-requirements.md]].
 4. THE spec SHALL realize Requirement 39.4 of #[[file:.kiro/steering/10-requirements.md]].
+5. THE spec SHALL honor decision D90 of #[[file:.kiro/steering/12-decisions.md]].
 
 ### Requirement 2: Operations and hook points
 
@@ -67,6 +68,9 @@ The requirements themselves live in `.kiro/steering/10-requirements.md`; each re
 4. THE spec SHALL realize Requirement 40.4 of #[[file:.kiro/steering/10-requirements.md]].
 5. THE spec SHALL realize Requirement 40.5 of #[[file:.kiro/steering/10-requirements.md]].
 6. THE spec SHALL realize Requirement 40.6 of #[[file:.kiro/steering/10-requirements.md]].
+7. THE spec SHALL realize Requirement 40.12 of #[[file:.kiro/steering/10-requirements.md]].
+8. THE spec SHALL honor decision D84 of #[[file:.kiro/steering/12-decisions.md]].
+9. THE spec SHALL honor decision D86 of #[[file:.kiro/steering/12-decisions.md]].
 
 ### Requirement 4: Customization
 
@@ -138,6 +142,7 @@ The requirements themselves live in `.kiro/steering/10-requirements.md`; each re
 2. THE spec SHALL realize Requirement 42.11 of #[[file:.kiro/steering/10-requirements.md]].
 3. THE spec SHALL realize Requirement 42.12 of #[[file:.kiro/steering/10-requirements.md]].
 4. THE spec SHALL realize Requirement 42.13 of #[[file:.kiro/steering/10-requirements.md]].
+5. THE spec SHALL honor decision D85 of #[[file:.kiro/steering/12-decisions.md]].
 
 ### Requirement 11: Dependencies and budgets
 
