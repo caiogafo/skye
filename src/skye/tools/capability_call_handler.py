@@ -15,7 +15,7 @@ The CapabilityCallHandler is now a thin delegation layer that:
 This aligns with the provider transformation architecture where all provider-specific
 logic is contained within provider client classes.
 
-See docs/models/provider-transformation-architecture.md for complete architecture documentation.
+See docs/guides/extend/custom-provider.md for how provider adapters are built.
 """
 
 import logging

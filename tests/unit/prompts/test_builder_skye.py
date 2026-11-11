@@ -74,7 +74,7 @@ def test_render_dispatches_to_render_prompt(
     monkeypatch.setitem(sys.modules, "skye.prompts.skye_prompts", fake)
 
     builder.register_template("greet", PROMPT)
-    builder.register_jinja_filter("shout", str.upper)
+    builder.register_filter("shout", str.upper)
     builder.set_default_values({"tone": "dry", "unused": "u"})
     child = builder.partial(name="partial")
     history = [{"role": "user", "content": "before"}]
@@ -91,7 +91,7 @@ def test_render_dispatches_to_render_prompt(
 def test_render_with_the_real_renderer(builder: BasePromptBuilder) -> None:
     pytest.importorskip("skye.prompts.skye_prompts")
     builder.register_template("greet", PROMPT)
-    builder.register_jinja_filter("shout", lambda v: f"{v}!")
+    builder.register_filter("shout", lambda v: f"{v}!")
     messages = builder.render(
         "greet", {"name": "Ada", "history": [{"role": "assistant", "content": "hi"}]}
     )

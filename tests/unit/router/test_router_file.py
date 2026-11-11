@@ -76,7 +76,9 @@ def test_the_config_dictionary_has_the_names_of_the_old_file(skye_file):
     )  # "90s": the suffix is gone from the file, not from the dictionary
     assert config["routes"][0]["targets"][0]["api_key"] == "sk-from-env"  # env.NAME was replaced
     assert config["fallbacks"] == [{"primary": "smart", "fallbacks": ["cheap"]}]
-    assert config["retry_policies"] == [{"error_type": "RateLimitError", "max_retries": 3}]
+    assert config["retry_policies"] == [
+        {"error_type": "RateLimitError", "max_retries": 3, "retry_after_seconds": 5.0}
+    ]  # retry_after = "5s" is applied since 2026-11-11 (router task 6.1)
     assert config["allowed_fails_policies"] == [
         {"error_type": "RateLimitError", "allowed_fails_per_minute": 100}
     ]

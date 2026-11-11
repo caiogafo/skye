@@ -1,7 +1,7 @@
 """Configuration models for the model router.
 
-This module contains all validated dataclasses used for router configuration,
-including targets, routes, fallbacks, and policies.
+This module contains all validated dataclasses used for router configuration, including targets,
+routes, fallbacks, and policies.
 """
 
 import dataclasses
@@ -24,7 +24,9 @@ class ModelTarget(Validated):
         api_version: API version (optional, for Azure)
         region: Region for the deployment (optional)
         timeout: Request timeout in seconds (optional)
-        max_retries: Maximum retry attempts (optional)
+        max_retries: Retries of this target for an error type the retry policy retries; it replaces
+            the policy's count for this target (optional; an error type the policy does not retry is
+            never retried)
         weight: Weight for weighted routing (optional)
         tpm: Tokens per minute limit (optional)
         rpm: Requests per minute limit (optional)
@@ -32,7 +34,11 @@ class ModelTarget(Validated):
         cost_per_1k_completion_tokens: Price of 1000 completion tokens, read by ``cost_based``
             (optional)
         tags: Tags for tag-based routing (optional)
-        metadata: Additional metadata (optional)
+        metadata: Additional metadata, not read by the router (optional)
+        options: Keyword arguments passed as they are to the provider client, after the fields
+            above, for what a provider needs and the target has no field for: ``project_id`` and
+            ``location`` of Google, ``azure_endpoint`` or ``deployment_name`` of Azure (optional).
+            ``${NAME}`` in a string value is replaced by the variable.
 
     Example:
         >>> target = ModelTarget(
@@ -55,7 +61,9 @@ class ModelTarget(Validated):
     api_version: str | None = field(default=None, description="API version")
     region: str | None = field(default=None, description="Deployment region")
     timeout: float | None = field(default=None, description="Request timeout in seconds")
-    max_retries: int | None = field(default=None, description="Maximum retry attempts")
+    max_retries: int | None = field(
+        default=None, ge=0, description="Retries of this target, replacing the policy's count"
+    )
     weight: float = field(default=1.0, description="Weight for weighted routing")
     tpm: int | None = field(default=None, description="Tokens per minute limit")
     rpm: int | None = field(default=None, description="Requests per minute limit")
@@ -67,9 +75,13 @@ class ModelTarget(Validated):
     )
     tags: list[str] = field(default_factory=list, description="Tags for routing")
     metadata: dict[str, Any] = field(default_factory=dict, description="Additional metadata")
+    options: dict[str, Any] = field(
+        default_factory=dict, description="Keyword arguments passed to the provider client"
+    )
 
     extras: dict[str, Any] = field(default_factory=dict, init=False, repr=False, compare=False)
-    #: The fields that were written with ``${NAME}``, as written (the value itself is already substituted); used to export a
+    #: The fields that were written with ``${NAME}``, as written (the value itself is already
+    # substituted); used to export a
     #: router without its secrets (``ModelRouter.to_config``, ``to_skye``).
     env_refs: dict[str, str] = field(default_factory=dict, init=False, repr=False, compare=False)
 
@@ -81,10 +93,9 @@ class ModelTarget(Validated):
     def _substitute_env_vars(self) -> None:
         """Substitute ${VAR_NAME} patterns with environment variables in string fields.
 
-        This method processes all declared string fields and replaces
-        environment variable references with their actual values. It uses
-        the substitute_env_vars function from skye.base.config. Extra fields
-        are kept as given.
+        This method processes all declared string fields and replaces environment variable
+        references with their actual values. It uses the substitute_env_vars function from
+        skye.base.config. Extra fields are kept as given.
 
         Raises:
             ConfigurationError: If a referenced environment variable is not found.
@@ -147,15 +158,17 @@ def _ignore_unknown_keywords(cls: type) -> type:
 class RouteConfig(Validated):
     """Configuration for a route with one or more targets.
 
-    A route defines an alias that maps to one or more model targets.
-    When multiple targets are defined, the routing strategy determines
-    which target to use.
+    A route defines an alias that maps to one or more model targets. When multiple targets are
+    defined, the routing strategy determines which target to use.
 
     Args:
         alias: Alias name for this route (e.g., "fast", "gpt-3.5-turbo")
         targets: List of model targets for this route
-        strategy: Strategy for selecting between targets
-        fallback_on_error: Try next target on error (optional)
+        strategy: Strategy for selecting between targets; ``None`` (the default) uses the router's
+            strategy
+        fallback_on_error: When the selected target fails (after its retries), try the other
+            available targets of this route before the fallback chain (default ``True``); ``False``
+            goes straight to the fallback chain
 
     Example:
         >>> route = RouteConfig(
@@ -171,10 +184,12 @@ class RouteConfig(Validated):
 
     alias: str = field(description="Alias name for this route")
     targets: list[ModelTarget] = field(min_length=1, description="Model targets")
-    strategy: RoutingStrategy = field(
-        default=RoutingStrategy.ROUND_ROBIN, description="Routing strategy"
+    strategy: RoutingStrategy | None = field(
+        default=None, description="Routing strategy (None: the router's)"
     )
-    fallback_on_error: bool = field(default=True, description="Try next target on error")
+    fallback_on_error: bool = field(
+        default=True, description="Try the other targets of the route on error"
+    )
 
 
 @_ignore_unknown_keywords
@@ -204,21 +219,33 @@ class FallbackConfig(Validated):
 class RetryPolicyConfig(Validated):
     """Configuration for retry policies per error type.
 
-    Defines how many times to retry for different error types.
+    Defines how many times the router retries the same target for one kind of error, and how long it
+    waits first. The error type is the name of an error class; it matches that class and its
+    subclasses (``ProviderError`` matches every provider error, the most specific name wins).
 
     Args:
-        error_type: Type of error (e.g., "RateLimitError", "TimeoutError")
+        error_type: Name of an error class (e.g., "RateLimitError", "ServerError",
+            "ProviderTimeoutError")
         max_retries: Maximum number of retry attempts
+        retry_after_seconds: Wait before each retry, in seconds (``None``: no wait of its own). The
+            error's own ``retry_after`` (the provider's ``Retry-After``) wins when it is longer.
+        exponential_backoff: Double the wait after each retry (1x, 2x, 4x, ...)
 
     Example:
         >>> policy = RetryPolicyConfig(
         ...     error_type="RateLimitError",
-        ...     max_retries=3
+        ...     max_retries=3,
+        ...     retry_after_seconds=1.0,
+        ...     exponential_backoff=True,
         ... )
     """
 
     error_type: str = field(description="Error type")
     max_retries: int = field(ge=0, description="Maximum retry attempts")
+    retry_after_seconds: float | None = field(
+        default=None, ge=0, description="Wait before each retry, in seconds"
+    )
+    exponential_backoff: bool = field(default=False, description="Double the wait each retry")
 
 
 @_ignore_unknown_keywords
@@ -226,11 +253,11 @@ class RetryPolicyConfig(Validated):
 class AllowedFailsPolicyConfig(Validated):
     """Configuration for allowed fails before cooldown.
 
-    Defines how many failures of each type are allowed per minute
-    before cooling down a deployment.
+    Defines how many failures of each type are allowed per minute before cooling down a deployment.
 
     Args:
-        error_type: Type of error
+        error_type: Name of an error class; it matches that class and its subclasses, as in
+            ``RetryPolicyConfig``
         allowed_fails_per_minute: Number of failures allowed per minute
 
     Example:
@@ -241,9 +268,7 @@ class AllowedFailsPolicyConfig(Validated):
     """
 
     error_type: str = field(description="Error type")
-    allowed_fails_per_minute: int = field(
-        ge=0, description="Allowed failures per minute"
-    )
+    allowed_fails_per_minute: int = field(ge=0, description="Allowed failures per minute")
 
 
 @validated

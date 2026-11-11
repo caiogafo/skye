@@ -49,16 +49,13 @@ prompt "smol_managed_agent" {
       text = "A manager agent has given you a task. Carry it out as well as you can, then report back: the manager sees only your final report, not the steps you took to get there."
     }
 
-    /** Optional tools, one line each with their parameters and what they return. **/
+    /** Optional tools, one line each, with the JSON Schema of their parameters (D80) and what they return. **/
     when tools {
       text = "## Tools"
       text = "You can use these tools:"
       each tool in tools {
         text = "- `{{ tool.name }}`: {{ tool.description }}"
-        when "parameters" in tool and tool.parameters {
-          text = "    Arguments:"
-          each param in tool.parameters { text = "    - `{{ param.key }}`: {{ param.value }}" }
-        }
+        when "parameters" in tool and tool.parameters { text = "    Parameters: {{ tool.parameters | tojson }}" }
         when "returns" in tool and tool.returns { text = "    Returns: {{ tool.returns }}" }
       }
     }

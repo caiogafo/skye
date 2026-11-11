@@ -6,7 +6,7 @@ import pytest
 
 from skye.base.exceptions import ValidationError
 
-from skye.tools.schema import CapabilitySchema
+from skye.base.interfaces.capability import CapabilitySchema
 
 
 class TestCapabilitySchemaCreation:

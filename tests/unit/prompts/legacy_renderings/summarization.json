@@ -1,0 +1,7 @@
+[
+ "[USER]\nPlease summarize the following text.\n\nText to summarize:\nA long article about climate.\n\nSummary:",
+ "[SYSTEM]\nYou summarize news.\n\n[USER]\nSummaries for busy readers.\n\nPlease summarize the following text in no more than 50 words using a formal style.\n\nExamples:\nInput: long text\nOutput: short text\n\n\n\nText to summarize:\nThe council met on Monday.\n\nPlease format your summary as bullet points.\nSummary:",
+ "[USER]\nPlease summarize the following text in no more than 20 words.\n\nText to summarize:\nT\n\nPlease format your summary as a single paragraph.\nSummary:",
+ "[USER]\nPlease summarize the following text using a casual style.\n\nText to summarize:\nT\n\nPlease format your summary with the following structure:\n- Main topic:\n- Key points:\n- Conclusion:\nSummary:",
+ "[USER]\nPlease summarize the following text.\n\nText to summarize:\nT\n\nSummary:"
+]

@@ -27,10 +27,10 @@ def fresh(shared: BasePromptBuilder) -> BasePromptBuilder:
 # -- 2.1 variables from the engine's parser -------------------------------------------------------
 
 
-def test_block_variables_include_if_conditions_and_for_sources(shared: BasePromptBuilder) -> None:
+def test_block_variables_include_conditions_and_filter_operands(shared: BasePromptBuilder) -> None:
     builder = fresh(shared)
     builder.register_template(
-        "t", "{{ name }}{% if mood %}!{% endif %}{% for x in things %}{{ x.y }}{% endfor %}"
+        "t", "{{ name }}{{ '!' if mood else '' }}{{ things | map('y') | join }}"
     )
     assert builder.get_template_variables("t") == ["name", "mood", "things"]
 
@@ -43,7 +43,7 @@ def test_simple_variables_take_the_root_name(shared: BasePromptBuilder) -> None:
 
 def test_metadata_lists_exactly_the_variables_found(shared: BasePromptBuilder) -> None:
     builder = fresh(shared)
-    builder.register_template("t", "{{ a }}{% if b %}{{ c }}{% endif %}{{ text }}")
+    builder.register_template("t", "{{ a }}{{ b | default('') }}{{ c | default('') }}{{ text }}")
     meta = builder.get_template_metadata("t")
     assert meta["variables"] == ["a"]
     assert sorted(meta["variables"] + meta["optional_variables"]) == ["a", "b", "c", "text"]
@@ -54,8 +54,8 @@ def test_metadata_lists_exactly_the_variables_found(shared: BasePromptBuilder) -
 
 def test_registration_rejects_bad_syntax_with_the_engine_details(shared: BasePromptBuilder) -> None:
     builder = fresh(shared)
-    with pytest.raises(ValidationError, match=r"'broken'.*Missing \{% endif %\}") as info:
-        builder.register_template("broken", "{% if x %}never closed")
+    with pytest.raises(ValidationError, match=r"'broken'.*Unexpected token") as info:
+        builder.register_template("broken", "{{ x y }}")
     assert info.value.details["template"] == "broken"
     with pytest.raises(KeyError):
         builder.get_template("broken")
@@ -65,7 +65,7 @@ def test_validate_template_never_raises(shared: BasePromptBuilder) -> None:
     builder = fresh(shared)
     assert builder.validate_template("missing")["valid"] is False
     builder.register_template("t", "{{ a }}")
-    builder._templates["t:1.0"] = "{% for %}"
+    builder._templates["t:1.0"] = "{{ x | }}"
     result = builder.validate_template("t")
     assert result["valid"] is False and result["errors"]
     builder.register_template("ok", "{{ a }} {{ text }}")
@@ -83,7 +83,7 @@ def test_validate_template_never_raises(shared: BasePromptBuilder) -> None:
 
 def test_block_template_names_every_missing_variable_sorted(shared: BasePromptBuilder) -> None:
     builder = fresh(shared)
-    builder.register_template("t", "{{ zeta }} {{ alpha }} {% if beta %}{{ gamma }}{% endif %}")
+    builder.register_template("t", "{{ zeta }} {{ alpha }} {{ gamma | default('') }}")
     with pytest.raises(ValueError, match=r"^Missing required variables: alpha, zeta") as info:
         builder.render("t", {})
     assert isinstance(info.value, ValidationError)
@@ -129,7 +129,7 @@ def test_loader_logs_instead_of_printing(
     tmp_path: Path, capsys: pytest.CaptureFixture[str], caplog: pytest.LogCaptureFixture
 ) -> None:
     (tmp_path / "good.jinja").write_text("Hi {{ name }}")
-    (tmp_path / "bad.jinja").write_text("{% if x %}")
+    (tmp_path / "bad.jinja").write_text("{{ x y }}")
     builder = BasePromptBuilder()
     with caplog.at_level(logging.WARNING, logger="skye.prompts.loaders"):
         assert load_default_templates(builder, tmp_path) == 1
@@ -158,7 +158,7 @@ def test_rendering_reuses_the_compiled_template(
 def test_fixed_examples_are_formatted_once_and_cache_is_bounded(shared: BasePromptBuilder) -> None:
     builder = BasePromptBuilder(max_cached_examples=2)
     calls: list[str] = []
-    builder.register_jinja_filter("seen", lambda v: calls.append(v) or v)
+    builder.register_filter("seen", lambda v: calls.append(v) or v)
     for name in ("a", "b", "c"):
         builder.register_template(name, "{{ examples }}")
         builder.add_examples(name, [{"q": name}], "Q: {{ q | seen }}")
@@ -185,12 +185,25 @@ def test_partial_shares_compiled_entries(shared: BasePromptBuilder) -> None:
 def test_register_jinja_macro_is_gone(shared: BasePromptBuilder) -> None:
     assert not hasattr(PromptBuilderInterface, "register_jinja_macro")
     assert not hasattr(shared, "register_jinja_macro")
-    assert "Jinja2" not in (PromptBuilderInterface.register_jinja_filter.__doc__ or "")
+    assert "Jinja2" not in (PromptBuilderInterface.register_filter.__doc__ or "")
+
+
+def test_register_filter_replaces_register_jinja_filter_with_no_alias(
+    shared: BasePromptBuilder,
+) -> None:
+    # Task 9.2, decision D77.
+    assert "register_filter" in PromptBuilderInterface.__abstractmethods__
+    assert not hasattr(PromptBuilderInterface, "register_jinja_filter")
+    assert not hasattr(shared, "register_jinja_filter")
+    builder = fresh(shared)
+    builder.register_filter("shout", lambda v: f"{str(v).upper()}!")
+    builder.register_template("t", "{{ name | shout }}")
+    assert builder.render("t", {"name": "ada"})[0].content == "ADA!"
 
 
 # -- 2.7 properties 1, 2, 10 (parametrized: Hypothesis is not a dev dependency) -------------------
 
-TEXTS = ["", "plain", "Hi {name}", "{{ a }}{% if b %}x{% endif %}", "ünïcode {{ e }}", "a\n\nb"]
+TEXTS = ["", "plain", "Hi {name}", "{{ a }}{{ b | default('x') }}", "ünïcode {{ e }}", "a\n\nb"]
 VERSIONS = ["1.0", "1.1", "2.0", "10.0-beta"]
 
 

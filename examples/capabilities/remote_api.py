@@ -44,11 +44,10 @@ async def main() -> None:
     if not response.has_capability_calls():
         print(response.content)
         return
-    try:
-        for message in await response.aexecute_capability_calls():
-            print(f"{message.capability_name}: {message.content[:100]}")
-    except OSError as error:
-        print(f"the API is not reachable from here ({error}); the call and its arguments are shown above")
+    # A failing call does not raise: it comes back as a message with the status "error" (the endpoint is unreachable, say)
+    for message in await response.aexecute_capability_calls():
+        note = " (the API is not reachable from here)" if message.is_error else ""
+        print(f"{message.capability_name} [{message.status.value}]{note}: {message.content[:100]}")
     print("the model asked for:", [(c.name, c.arguments) for c in response.capability_calls])
 
 

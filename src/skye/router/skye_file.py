@@ -2,12 +2,9 @@
 D59, D62).
 
 ``base`` parses the text and builds a :class:`~skye.base.dsl.RouterSpec`; this module turns that
-spec into the
-dictionary that :meth:`ModelRouter.from_config_dict` already accepts, so a router has one path from
-configuration to
-object whatever the format. The library reads no YAML: a ``.yaml`` or ``.yml`` file is rejected with
-a message that
-names the supported formats (Requirement 54.12).
+spec into the dictionary that :meth:`ModelRouter.from_config_dict` already accepts, so a router has
+one path from configuration to object whatever the format. The library reads no YAML: a ``.yaml`` or
+``.yml`` file is rejected with a message that names the supported formats (Requirement 54.12).
 """
 
 from __future__ import annotations
@@ -70,6 +67,18 @@ def _target(target: Any) -> dict[str, Any]:
         out["tags"] = list(target.tags)
     if target.metadata:
         out["metadata"] = dict(target.metadata)
+    if target.options:
+        out["options"] = dict(target.options)
+    return out
+
+
+def _retry_policy(policy: RetryPolicySpec) -> dict[str, Any]:
+    """A retry policy of the block as a dictionary (``retry_after = "5s"`` is ``retry_after_seconds``)."""
+    out: dict[str, Any] = {"error_type": policy.error_type, "max_retries": policy.max_retries}
+    if policy.retry_after is not None:
+        out["retry_after_seconds"] = parse_duration(policy.retry_after)
+    if policy.exponential_backoff:
+        out["exponential_backoff"] = True
     return out
 
 
@@ -77,10 +86,9 @@ def router_spec_to_config(spec: RouterSpec) -> dict[str, Any]:
     """The configuration dictionary of a router block, ``${NAME}`` references left in place.
 
     The shorthand ``route "x" = ["provider/model", ...]`` gives the first entry to the route and one
-    route
-    ``x/fallback<N>`` to each of the others, chained as the fallbacks of ``x`` (as the dictionary
-    shorthand of
-    ``ModelRouter`` does); a ``fallback = [...]`` written in the route is added after them.
+    route ``x/fallback<N>`` to each of the others, chained as the fallbacks of ``x`` (as the
+    dictionary shorthand of ``ModelRouter`` does); a ``fallback = [...]`` written in the route is
+    added after them.
     """
     routes: list[dict[str, Any]] = []
     fallbacks: list[dict[str, Any]] = []
@@ -105,9 +113,7 @@ def router_spec_to_config(spec: RouterSpec) -> dict[str, Any]:
         "routes": routes,
         "fallbacks": fallbacks,
         "enable_pre_call_checks": spec.enable_pre_call_checks,
-        "retry_policies": [
-            {"error_type": p.error_type, "max_retries": p.max_retries} for p in spec.retry_policies
-        ],
+        "retry_policies": [_retry_policy(p) for p in spec.retry_policies],
         "allowed_fails_policies": [
             {"error_type": p.error_type, "allowed_fails_per_minute": p.allowed_fails_per_minute}
             for p in spec.allowed_fails_policies
@@ -135,6 +141,7 @@ _TARGET_SPEC_FIELDS = (
     "cost_per_1k_completion_tokens",
     "tags",
     "metadata",
+    "options",
 )
 
 
@@ -150,11 +157,9 @@ def config_to_router_spec(config: dict[str, Any], name: str | None = None) -> Ro
     :func:`router_spec_to_config`).
 
     A route's strategy is kept only when it differs from the router's, the cooldown only when it is
-    not 60 seconds, and
-    ``fallbacks`` entries become the ``fallback`` list of their route. Fields a block cannot hold
-    (extra fields of a target)
-    are dropped. ``${NAME}`` strings stay as they are; ``skye.base.dsl.to_text`` writes them as
-    ``env.NAME``.
+    not 60 seconds, and ``fallbacks`` entries become the ``fallback`` list of their route. Fields a
+    block cannot hold (extra fields of a target) are dropped. ``${NAME}`` strings stay as they are; ``skye.base.dsl.to_text``
+    writes them as ``env.NAME``.
 
     Args:
         config: A dictionary in the shape of ``ModelRouter.to_config()``.
@@ -187,7 +192,16 @@ def config_to_router_spec(config: dict[str, Any], name: str | None = None) -> Ro
         enable_pre_call_checks=bool(config.get("enable_pre_call_checks", True)),
         routes=routes,
         retry_policies=[
-            RetryPolicySpec(error_type=p["error_type"], max_retries=p["max_retries"])
+            RetryPolicySpec(
+                error_type=p["error_type"],
+                max_retries=p["max_retries"],
+                retry_after=(
+                    format_duration(float(p["retry_after_seconds"]))
+                    if p.get("retry_after_seconds") is not None
+                    else None
+                ),
+                exponential_backoff=bool(p.get("exponential_backoff", False)),
+            )
             for p in config.get("retry_policies", [])
         ],
         allowed_fails_policies=[
@@ -210,9 +224,8 @@ def load_router_config(
             object.
         name: The label of the router block when a ``.skye`` file holds several.
         keep_target_references: Leave ``${NAME}`` in the string fields of the targets
-            (``ModelTarget`` substitutes them and
-            remembers them as written, so that ``ModelRouter.to_config`` and ``to_skye`` can write
-            ``env.NAME`` back).
+            (``ModelTarget`` substitutes them and remembers them as written, so that
+            ``ModelRouter.to_config`` and ``to_skye`` can write ``env.NAME`` back).
             ``ModelRouter.from_file`` sets it; the default returns every value substituted.
 
     Raises:
@@ -270,11 +283,10 @@ def substitute_env_vars_keeping_target_references(config: dict[str, Any]) -> dic
     targets.
 
     ``ModelTarget`` substitutes those itself and remembers the reference as written (``env_refs``),
-    which is what lets
-    ``ModelRouter.to_config`` and ``to_skye`` write ``env.NAME`` back instead of the secret. The
-    result is the same router.
+    which is what lets ``ModelRouter.to_config`` and ``to_skye`` write ``env.NAME`` back instead of
+    the secret. The result is the same router.
     """
-    held: list[tuple[int, int, dict[str, str]]] = []
+    held: list[tuple[int, int, dict[str, str], dict[str, str]]] = []
     for r, route in enumerate(config.get("routes", [])):
         for t, target in enumerate(route.get("targets", [])):
             fields = {
@@ -282,11 +294,22 @@ def substitute_env_vars_keeping_target_references(config: dict[str, Any]) -> dic
                 for k in _TARGET_STRING_FIELDS
                 if isinstance(target.get(k), str) and "${" in target[k]
             }
-            if fields:
-                held.append((r, t, fields))
+            options = target.get("options")
+            option_refs = {
+                k: v
+                for k, v in (options.items() if isinstance(options, dict) else ())
+                if isinstance(v, str) and "${" in v
+            }
+            if fields or option_refs:
+                held.append((r, t, fields, option_refs))
                 for key in fields:
                     del target[key]
+                if option_refs:
+                    target["options"] = {k: v for k, v in options.items() if k not in option_refs}
     substituted: dict[str, Any] = substitute_env_vars(config)
-    for r, t, fields in held:
-        substituted["routes"][r]["targets"][t].update(fields)
+    for r, t, fields, option_refs in held:
+        target_out = substituted["routes"][r]["targets"][t]
+        target_out.update(fields)
+        if option_refs:
+            target_out["options"] = {**target_out.get("options", {}), **option_refs}
     return substituted

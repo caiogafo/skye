@@ -57,6 +57,7 @@ from __future__ import annotations
 import copy
 import dataclasses
 import logging
+import re
 from collections.abc import Callable, Iterable, Mapping, Sequence
 from typing import Any
 
@@ -65,6 +66,7 @@ from skye.base.dsl.expressions import references
 from skye.base.dsl.shapes import conform
 from skye.base.exceptions import ValidationError
 from skye.base.messages import AssistantMessage, SkyeMessage, SystemMessage, UserMessage
+from skye.base.prompt_parts import OutputSchema, PromptParts
 from skye.prompts.engine import render_template
 from skye.prompts.output_format import (
     OUTPUT_FORMATS,
@@ -139,10 +141,7 @@ def render_prompt(
             not match its shape (``Invalid variables``, every mistake by path), a role is invalid,
             a history entry is not a message, or an ``each`` is over something that is not a list.
     """
-    scope = _scope(spec, variables)
-    renderer = _Renderer(variables, history or {}, filters)
-    messages: list[SkyeMessage] = []
-    renderer.top(spec.parts, scope, messages)
+    messages, scope = _render_messages(spec, variables, history, filters)
     instructions = output_instructions(spec, scope)
     if instructions:
         _append_instructions(messages, instructions)
@@ -151,6 +150,106 @@ def render_prompt(
         extra={"prompt": spec.name, "messages": len(messages)},
     )
     return messages
+
+
+def render_parts(
+    spec: PromptSpec,
+    variables: Mapping[str, Any],
+    *,
+    history: History | None = None,
+    filters: Filters | None = None,
+) -> PromptParts:
+    """Render a prompt spec into provider-agnostic parts (Requirement 33.9, decisions D81, D101).
+
+    Give the result to ``client.complete(parts, model=...)``: the model adapter puts the system
+    text and the output schema in the provider's own fields, or falls back to the text.
+
+    Args:
+        spec: The prompt, from :func:`load_prompt` or ``Document.prompt``.
+        variables: The values of the declared variables, as for :func:`render_prompt`.
+        history: Messages to insert at each ``placeholder``, by placeholder name.
+        filters: Extra filters for the ``{{ }}`` interpolation.
+
+    Returns:
+        The parts: ``system`` is the text of the system messages (joined with a blank line;
+        ``None`` when there is none), ``messages`` the other messages in order, ``output`` the
+        JSON Schema of the active ``json`` output block as an :class:`OutputSchema` (named after
+        the prompt; ``None`` for free text, ``table`` and ``xml``) and ``fallback_text`` its
+        instructions (``None`` without an output block). Unlike :func:`render_prompt`, the
+        instructions are not appended to the last user message.
+
+    Raises:
+        ValidationError: As :func:`render_prompt` and :func:`output_instructions`.
+
+    Example:
+        >>> spec = load_prompt('prompt "p" {\n  message "user" { text = "Hi" }\n}\n')
+        >>> render_parts(spec, {}).messages[0].content
+        'Hi'
+    """
+    messages, scope = _render_messages(spec, variables, history, filters)
+    active = _active_fields(spec, scope)
+    output: OutputSchema | None = None
+    fallback: str | None = None
+    if active is not None:
+        output_format, schema = active
+        fallback = format_instructions(schema, output_format, spec.name)
+        if output_format == "json":
+            output = OutputSchema(name=schema_name(spec.name), schema=schema)
+    return split_system(messages, output, fallback)
+
+
+def output_json_schema(
+    spec: PromptSpec, variables: Mapping[str, Any] | None = None
+) -> dict[str, Any] | None:
+    """The JSON Schema of the active ``output`` block of a prompt, or ``None`` (free text).
+
+    The schema is the same whatever the format (``json``, ``table`` or ``xml``): an object with
+    one property per field, its description, and ``required`` for the fields without a default.
+
+    Args:
+        spec: The prompt.
+        variables: The values of the variables, read as by :func:`output_instructions`.
+
+    Raises:
+        ValidationError: As :func:`output_instructions`.
+    """
+    active = _active_fields(spec, variables)
+    return active[1] if active is not None else None
+
+
+def schema_name(name: str) -> str:
+    """A prompt or template name as an output schema name (letters, digits, ``_`` and ``-``)."""
+    return re.sub(r"[^A-Za-z0-9_-]", "_", name) or "output"
+
+
+def split_system(
+    messages: Sequence[SkyeMessage],
+    output: OutputSchema | None = None,
+    fallback_text: str | None = None,
+) -> PromptParts:
+    """Parts from rendered messages: the system texts apart, the other messages in order."""
+    system = [m.content for m in messages if isinstance(m, SystemMessage) and m.content]
+    rest = tuple(m for m in messages if not isinstance(m, SystemMessage))
+    return PromptParts(
+        messages=rest,
+        system="\n\n".join(system) if system else None,
+        output=output,
+        fallback_text=fallback_text or None,
+    )
+
+
+def _render_messages(
+    spec: PromptSpec,
+    variables: Mapping[str, Any],
+    history: History | None,
+    filters: Filters | None,
+) -> tuple[list[SkyeMessage], dict[str, Any]]:
+    """The messages of the prompt (without output instructions) and the scope they used."""
+    scope = _scope(spec, variables)
+    renderer = _Renderer(variables, history or {}, filters)
+    messages: list[SkyeMessage] = []
+    renderer.top(spec.parts, scope, messages)
+    return messages, scope
 
 
 def active_output(
@@ -222,9 +321,20 @@ def output_instructions(spec: PromptSpec, variables: Mapping[str, Any] | None = 
             have a list or map column (the message names it), or more than one conditional
             output is active.
     """
+    active = _active_fields(spec, variables)
+    if active is None:
+        return ""
+    output_format, schema = active
+    return format_instructions(schema, output_format, spec.name)
+
+
+def _active_fields(
+    spec: PromptSpec, variables: Mapping[str, Any] | None
+) -> tuple[str, dict[str, Any]] | None:
+    """The format and the JSON Schema of the active output block, or ``None``."""
     output = active_output(spec, variables)
     if output is None:
-        return ""
+        return None
     fields = list(output.fields)
     if output.schema_from is not None:
         name = output.schema_from
@@ -242,7 +352,7 @@ def output_instructions(spec: PromptSpec, variables: Mapping[str, Any] | None = 
                 supported=list(OUTPUT_FORMATS),
                 prompt=spec.name,
             )
-    return format_instructions(fields_schema(fields), output_format, spec.name)
+    return output_format, fields_schema(fields)
 
 
 def _output_variable(
@@ -533,5 +643,9 @@ __all__ = [
     "active_output",
     "load_prompt",
     "output_instructions",
+    "output_json_schema",
+    "render_parts",
     "render_prompt",
+    "schema_name",
+    "split_system",
 ]

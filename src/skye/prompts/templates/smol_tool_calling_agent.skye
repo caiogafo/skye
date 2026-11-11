@@ -79,16 +79,13 @@ prompt "smol_tool_calling_agent" {
         """
     }
 
-    /** Optional tools, one line each with their parameters and what they return. **/
+    /** Optional tools, one line each, with the JSON Schema of their parameters (D80) and what they return. **/
     when tools {
       text = "## Tools"
       text = "You can call these tools, together with `final_answer`:"
       each tool in tools {
         text = "- `{{ tool.name }}`: {{ tool.description }}"
-        when "parameters" in tool and tool.parameters {
-          text = "    Arguments:"
-          each param in tool.parameters { text = "    - `{{ param.key }}`: {{ param.value }}" }
-        }
+        when "parameters" in tool and tool.parameters { text = "    Parameters: {{ tool.parameters | tojson }}" }
         when "returns" in tool and tool.returns { text = "    Returns: {{ tool.returns }}" }
       }
       text = "- `final_answer`: ends the task and returns the answer. Arguments: `answer`, the final result. Call it once, when you are done."

@@ -35,7 +35,7 @@ import pytest
 from skye.base import http
 from skye.base.exceptions import ProviderError, ValidationError
 from skye.base.messages import AssistantMessage, UserMessage
-from skye.tools.interface import CapabilityInterface
+from skye.base.interfaces.capability import CapabilityInterface
 from skye.tools.mcp_client import BuiltinMCPClient
 from skye.tools.mcp_resource import Resource
 

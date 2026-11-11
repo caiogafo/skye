@@ -11,8 +11,7 @@ F = TypeVar("F", bound=Callable[..., Any])
 
 
 @overload
-def capability(func: F) -> F:
-    ...
+def capability(func: F) -> F: ...
 
 
 @overload
@@ -20,8 +19,7 @@ def capability(
     *,
     name: str | None = None,
     description: str | None = None,
-) -> Callable[[F], F]:
-    ...
+) -> Callable[[F], F]: ...
 
 
 def capability(

@@ -47,10 +47,95 @@ def test_examples_are_injected_for_both_template_kinds(
     assert content == "Task\nQ=in0 A=out0\n\nQ=in1 A=out1\n\nNow: x"
 
 
-def test_example_missing_a_field_is_skipped(builder: BasePromptBuilder) -> None:
+# -- task 9.3, decision D79 ------------------------------------------------------------------------
+
+
+def test_without_an_example_template_each_example_is_written_from_its_own_keys(
+    builder: BasePromptBuilder,
+) -> None:
+    builder.register_template("t", "{{ examples }}Now: {{ q }}")
+    builder.add_examples(
+        "t",
+        [
+            {"question": "Hello", "answer": "Bonjour"},
+            {"input": "a", "output": "b"},
+            {"user_query": "tags?", "tags": ["x", "y"]},
+        ],
+    )
+    assert builder.render("t", {"q": "x"})[0].content == (
+        "Question: Hello\nAnswer: Bonjour\n\n"
+        "Input: a\nOutput: b\n\n"
+        'User query: tags?\nTags: ["x", "y"]\n\n'
+        "Now: x"
+    )
+
+
+@pytest.mark.parametrize(
+    "example_template", ["Input: {input}\nOutput: {output}", "{{ input }}={{ output }}"]
+)
+def test_a_key_the_example_template_reads_is_required(
+    builder: BasePromptBuilder, example_template: str
+) -> None:
+    with pytest.raises(ValidationError, match=r"example 1 .*'output'") as info:
+        builder.add_examples("t", [{"input": "b", "output": "c"}, {"input": "a"}], example_template)
+    assert info.value.details["example"] == 1
+    assert info.value.details["missing"] == ["output"]
+
+
+def test_a_key_read_through_default_may_be_missing(builder: BasePromptBuilder) -> None:
     builder.register_template("t", "{{ examples }}")
-    builder.add_examples("t", [{"input": "a"}, {"input": "b", "output": "c"}])
-    assert builder.render("t", {})[0].content.strip() == "Input: b\nOutput: c"
+    builder.add_examples("t", [{"input": "a"}], "{{ input }}={{ output | default('?') }}")
+    assert builder.render("t", {})[0].content.strip() == "a=?"
+
+
+def test_as_messages_gives_user_and_assistant_pairs_before_the_last_user_message(
+    builder: BasePromptBuilder,
+) -> None:
+    builder.register_template("t", "[SYSTEM]\nTranslate to French.\n[USER]\n{{ q }}")
+    builder.add_examples(
+        "t",
+        [
+            {"input": "Hello", "note": "greeting", "output": "Bonjour"},
+            {"english": "Thanks", "level": "easy", "french": "Merci"},
+        ],
+        as_messages=True,
+    )
+    messages = builder.render("t", {"q": "Goodbye"})
+    assert [(m.role, m.content) for m in messages] == [
+        ("system", "Translate to French."),
+        ("user", "Hello"),
+        ("assistant", "Bonjour"),
+        ("user", "Thanks"),
+        ("assistant", "Merci"),
+        ("user", "Goodbye"),
+    ]
+    assert builder.get_template_metadata("t")["has_examples"] is True
+
+
+def test_as_messages_works_for_a_skye_prompt_and_follows_the_selector(
+    builder: BasePromptBuilder,
+) -> None:
+    builder.register_template("fs", _SKYE_LIST)
+    builder.add_examples("fs", EXAMPLES[:4], as_messages=True)
+    builder.set_example_selector("fs", "fixed", max_examples=2)
+    messages = builder.render("fs", {"q": "x"})
+    assert [(m.role, m.content) for m in messages] == [
+        ("user", "in0"),
+        ("assistant", "out0"),
+        ("user", "in1"),
+        ("assistant", "out1"),
+        ("user", "Now: x"),
+    ]
+
+
+def test_as_messages_needs_two_keys(builder: BasePromptBuilder) -> None:
+    with pytest.raises(ValidationError, match=r"example 0 .*two keys"):
+        builder.add_examples("t", [{"input": "alone"}], as_messages=True)
+
+
+def test_as_messages_and_an_example_template_do_not_mix(builder: BasePromptBuilder) -> None:
+    with pytest.raises(ValidationError, match="as_messages"):
+        builder.add_examples("t", EXAMPLES[:1], "Q={input}", as_messages=True)
 
 
 def test_unknown_selector_type_lists_the_supported_ones(builder: BasePromptBuilder) -> None:
@@ -158,9 +243,7 @@ def test_skye_list_examples_get_the_selected_dicts(builder: BasePromptBuilder) -
 
 def test_skye_list_examples_use_the_semantic_selector(builder: BasePromptBuilder) -> None:
     builder.register_template("fs", _SKYE_LIST)
-    builder.add_examples(
-        "fs", [{"input": "ccc", "output": "1"}, {"input": "aaa", "output": "2"}]
-    )
+    builder.add_examples("fs", [{"input": "ccc", "output": "1"}, {"input": "aaa", "output": "2"}])
     builder.set_example_selector("fs", "semantic", max_examples=1, embedder=_embed, input_key="q")
     content = builder.format("fs", {"q": "aa"})
     assert "Q=aaa A=2" in content

@@ -7,7 +7,7 @@ import pytest
 
 from skye.tools.exceptions import CapabilityValidationError
 from skye.tools.local_function import LocalFunctionCapability
-from skye.tools.schema import CapabilitySchema
+from skye.base.interfaces.capability import CapabilitySchema
 
 
 class TestLocalFunctionCapabilityCreation:

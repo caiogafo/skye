@@ -10,7 +10,9 @@ serverless runtime needs no compiled or third-party template dependency.
 
 Three kinds of template text are accepted:
 
-* block templates (``{{ name }}``, ``{% if %}``, ``{% for %}``), rendered by the engine;
+* block templates (``{{ name }}`` with filters), rendered by the engine; interpolation only: a
+  ``{% %}`` control tag is rejected at registration (decision D76), conditions and loops are
+  written in a ``.skye`` prompt;
 * simple templates (``{name}``), rendered with ``str.format``;
 * ``.skye`` prompt text (a ``prompt "name" { ... }`` block, D60), rendered by
   ``skye.prompts.skye_prompts.render_prompt``.
@@ -58,6 +60,7 @@ from skye.base.messages import (
     SystemMessage,
     UserMessage,
 )
+from skye.base.prompt_parts import OutputSchema, PromptParts
 from skye.prompts.engine import CompiledTemplate, TemplateSyntaxError, compile_template
 from skye.prompts.loaders import load_default_templates
 from skye.prompts.output_format import check_format, format_instructions
@@ -78,8 +81,6 @@ logger = logging.getLogger(__name__)
 
 #: How many examples are used when no selector (or a selector without ``max_examples``) is set.
 DEFAULT_MAX_EXAMPLES = 5
-#: How each example is written when ``add_examples`` gets no example template.
-DEFAULT_EXAMPLE_TEMPLATE = "Input: {input}\nOutput: {output}"
 #: How many formatted example texts (fixed selection) are kept; the oldest is dropped first.
 DEFAULT_EXAMPLE_CACHE_SIZE = 256
 
@@ -142,9 +143,8 @@ _BLANK = _Blank()
 class BasePromptBuilder(PromptBuilderInterface):
     """Base implementation of PromptBuilderInterface.
 
-    Loads the bundled templates (``.skye`` and ``{{ var }}``/``{% if %}``/``{% for %}`` files of the
-    templates folder) and renders templates into ``SkyeMessage`` objects that every provider
-    accepts.
+    Loads the bundled templates (the ``.skye`` files of the templates folder) and renders
+    templates into ``SkyeMessage`` objects that every provider accepts.
 
     Features:
     - Versioned registry (``name:version``), templates parsed once at registration
@@ -178,6 +178,7 @@ class BasePromptBuilder(PromptBuilderInterface):
         self._examples: dict[str, list[dict[str, Any]]] = {}
         self._example_templates: dict[str, str] = {}
         self._example_entries: dict[str, _TemplateEntry] = {}
+        self._examples_as_messages: set[str] = set()
         self._example_selectors: dict[str, dict[str, Any]] = {}
         self._example_cache: OrderedDict[str, str] = OrderedDict()
         self._example_vectors: dict[str, list[list[float]]] = {}
@@ -229,23 +230,74 @@ class BasePromptBuilder(PromptBuilderInterface):
             ValidationError: (a ``ValueError``) If required variables are missing (all are
                 named), a role marker is unknown or content is invalid.
         """
+        return self._render(template_name, variables, instructions=True)[0]
+
+    def render_parts(self, template_name: str, variables: dict[str, Any]) -> PromptParts:
+        """Render a template into provider-agnostic parts (Requirement 33.9, decision D101).
+
+        Give the result to ``client.complete(parts, model=...)``: the model adapter puts the
+        system text and the output schema in the provider's own fields, or falls back to the text.
+
+        Args:
+            template_name: The template (its latest version is used).
+            variables: The values, as for :meth:`render`.
+
+        Returns:
+            ``system``: the text of the system messages (``None`` when there is none);
+            ``messages``: the other messages, as :meth:`render` gives them but without the output
+            instructions of a ``.skye`` ``output`` block; ``output``: the JSON Schema of a
+            ``json`` output (from :meth:`set_output_schema`, else the ``.skye`` ``output``
+            block) as an ``OutputSchema`` named after the template, ``None`` for free text,
+            ``table`` and ``xml``; ``fallback_text``: the output instructions
+            (:meth:`get_output_instructions`), ``None`` when there are none.
+
+        Raises:
+            KeyError: If the template is not registered.
+            ValidationError: As :meth:`render`.
+        """
+        from skye.prompts.output_format import format_instructions
+        from skye.prompts.skye_prompts import _active_fields, schema_name, split_system
+
+        messages, entry, merged = self._render(template_name, variables, instructions=False)
+        schema: dict[str, Any] | None = self._schema_json.get(template_name)
+        output_format = self._output_formats.get(template_name, "json")
+        fallback = ""
+        if schema is not None:
+            fallback = self.get_output_instructions(template_name, variables)
+        elif entry.kind == "skye":
+            active = _active_fields(entry.spec, merged)
+            if active is not None:
+                output_format, schema = active
+                fallback = format_instructions(schema, output_format, entry.spec.name)
+        output = None
+        if schema is not None and output_format == "json":
+            output = OutputSchema(name=schema_name(template_name), schema=schema)
+        return split_system(messages, output, fallback or None)
+
+    def _render(
+        self, template_name: str, variables: Mapping[str, Any], *, instructions: bool
+    ) -> tuple[list[SkyeMessage], _TemplateEntry, dict[str, Any]]:
+        """The messages, the entry and the merged variables of one rendering."""
         key = self._latest_key(template_name)
         entry = self._entries[key]
         merged = self._merge_variables(list(entry.variables), variables)
-        if template_name in self._examples and "examples" not in variables:
+        as_messages = template_name in self._examples_as_messages
+        if template_name in self._examples and "examples" not in variables and not as_messages:
             if entry.kind == "skye" and _wants_example_list(entry.spec):
                 merged["examples"] = self._select_examples(template_name, merged)
             else:
                 merged["examples"] = self._examples_text(template_name, merged)
 
         if entry.kind == "skye":
-            messages = self._render_skye(template_name, entry, merged)
+            messages = self._render_skye(template_name, entry, merged, instructions=instructions)
         else:
             self._check_required(template_name, entry, merged)
             text = self._render_text(template_name, key, entry, merged)
             messages = self._create_messages(template_name, text, merged)
+        if as_messages:
+            self._insert_example_messages(template_name, messages, merged)
         self._apply_content(template_name, messages, merged)
-        return messages
+        return messages, entry, merged
 
     def partial(self, **kwargs: str | Callable[[], str]) -> BasePromptBuilder:
         """Return a new builder with ``kwargs`` bound; this builder is left unchanged.
@@ -331,9 +383,9 @@ class BasePromptBuilder(PromptBuilderInterface):
     def get_template_variables(self, template_name: str) -> list[str]:
         """Return the variable names of a template, in first-seen order.
 
-        For a block template these are the free names the engine finds (``{{ x }}``, ``if``
-        conditions, ``for`` sources; not loop variables or ``loop``); for a ``.skye`` prompt the
-        declared variables.
+        For a block template these are the free names the engine finds in ``{{ }}`` (the root of
+        ``{{ user.name }}``, the operands of filters and conditional expressions); for a ``.skye``
+        prompt the declared variables.
         """
         return list(self._entries[self._latest_key(template_name)].variables)
 
@@ -383,27 +435,71 @@ class BasePromptBuilder(PromptBuilderInterface):
         template_name: str,
         examples: list[dict[str, Any]],
         example_template: str | None = None,
+        *,
+        as_messages: bool = False,
     ) -> None:
-        """Store few-shot examples; they are injected as the variable ``examples``.
+        """Store few-shot examples; they are injected as the variable ``examples`` or as messages.
 
         A ``.skye`` prompt that declares ``examples`` as a list (or does not declare it as a
         string) gets the selected examples as a list of dictionaries, unformatted; a text template,
-        or a ``.skye`` prompt with ``examples = string``, gets them formatted with
-        ``example_template``. Selection (limit, random, semantic) applies to both.
+        or a ``.skye`` prompt with ``examples = string``, gets them as text: written with
+        ``example_template`` when given, else from each example's own keys, one ``Key: value``
+        line per key in order (``{"question": "Hello", "answer": "Bonjour"}`` gives
+        ``Question: Hello`` and ``Answer: Bonjour``). With ``as_messages=True`` each example
+        becomes a user message and an assistant message instead, inserted before the last user
+        message: the values of ``input`` and ``output`` when the example has both, otherwise its
+        first key for the user and its last key for the assistant. Selection (limit, random,
+        semantic) applies to every form (decision D79).
 
         Args:
             template_name: Template the examples belong to.
             examples: The examples (dictionaries).
             example_template: How one example is written: ``{key}`` or ``{{ key }}`` style.
-                Default ``"Input: {input}\\nOutput: {output}"``.
+            as_messages: Give each example as a user/assistant message pair.
 
         Raises:
-            ValidationError: If the example template does not parse.
+            ValidationError: If the example template does not parse, an example lacks a key it
+                reads (the example's index and the keys are named), ``as_messages`` is combined
+                with an example template, or an example given as messages has fewer than two
+                keys.
         """
-        text = example_template or DEFAULT_EXAMPLE_TEMPLATE
-        self._example_entries[template_name] = self._compile_text(f"{template_name}:examples", text)
-        self._examples[template_name] = list(examples)
-        self._example_templates[template_name] = text
+        examples = list(examples)
+        if as_messages:
+            if example_template is not None:
+                raise ValidationError(
+                    "add_examples: as_messages=True writes each example as messages; "
+                    "do not pass an example_template too",
+                    field="example_template",
+                    value=example_template,
+                    template=template_name,
+                )
+            for index, example in enumerate(examples):
+                _example_turns(template_name, index, example)
+            self._example_entries.pop(template_name, None)
+            self._example_templates.pop(template_name, None)
+            self._examples_as_messages.add(template_name)
+        elif example_template is not None:
+            entry = self._compile_text(f"{template_name}:examples", example_template)
+            for index, example in enumerate(examples):
+                missing = [key for key in entry.required if key not in example]
+                if missing:
+                    raise ValidationError(
+                        f"add_examples: example {index} of template '{template_name}' lacks "
+                        f"{', '.join(repr(k) for k in missing)}, read by the example template",
+                        field="examples",
+                        value=missing,
+                        template=template_name,
+                        example=index,
+                        missing=missing,
+                    )
+            self._example_entries[template_name] = entry
+            self._example_templates[template_name] = example_template
+            self._examples_as_messages.discard(template_name)
+        else:
+            self._example_entries.pop(template_name, None)
+            self._example_templates.pop(template_name, None)
+            self._examples_as_messages.discard(template_name)
+        self._examples[template_name] = examples
         self._forget_examples(template_name)
 
     def set_example_selector(
@@ -501,8 +597,8 @@ class BasePromptBuilder(PromptBuilderInterface):
             checked[variable] = content_type
         self._content_configs.setdefault(template_name, {}).update(checked)
 
-    def register_jinja_filter(self, filter_name: str, filter_func: Callable[[Any], Any]) -> None:
-        """Register a filter for the stdlib template engine (``{{ value | name }}``)."""
+    def register_filter(self, filter_name: str, filter_func: Callable[[Any], Any]) -> None:
+        """Register a filter for ``{{ value | name }}``, in text and ``.skye`` prompts (D77)."""
         self._custom_filters[filter_name] = filter_func
         self._example_cache.clear()
 
@@ -779,7 +875,7 @@ class BasePromptBuilder(PromptBuilderInterface):
         load_default_templates(self)
 
     def _is_block_template(self, template: str) -> bool:
-        """Check if template uses `{{ }}`, `{% %}` or `{# #}` syntax."""
+        """True when the text uses ``{{ }}`` or ``{# #}`` (or a ``{% %}`` tag, then rejected)."""
         return bool(_BLOCK_RE.search(template))
 
     def _compile_entry(self, name: str, text: str, filename: str | None) -> _TemplateEntry:
@@ -794,8 +890,11 @@ class BasePromptBuilder(PromptBuilderInterface):
             try:
                 compiled = compile_template(text)
             except TemplateSyntaxError as e:
+                details: dict[str, Any] = {"template": name}
+                if e.line is not None:
+                    details["line"] = e.line
                 raise ValidationError(
-                    f"Invalid template '{name}': {e}", field="template", value=name, template=name
+                    f"Invalid template '{name}': {e}", field="template", value=name, **details
                 ) from e
             return _TemplateEntry(
                 "block", compiled.variables, compiled.required_variables, compiled
@@ -894,9 +993,15 @@ class BasePromptBuilder(PromptBuilderInterface):
             ) from e
 
     def _render_skye(
-        self, template_name: str, entry: _TemplateEntry, merged: dict[str, Any]
+        self,
+        template_name: str,
+        entry: _TemplateEntry,
+        merged: dict[str, Any],
+        *,
+        instructions: bool = True,
     ) -> list[SkyeMessage]:
-        """Render a ``.skye`` prompt with ``skye.prompts.skye_prompts.render_prompt``."""
+        """Render a ``.skye`` prompt with ``skye.prompts.skye_prompts.render_prompt`` (or without
+        the output instructions, for :meth:`render_parts`)."""
         from skye.prompts.skye_prompts import render_prompt
 
         placeholders = self._message_placeholders.get(template_name, {})
@@ -905,14 +1010,26 @@ class BasePromptBuilder(PromptBuilderInterface):
             if merged.get(name) is not None:
                 history[name] = self._history(name, merged, placeholders.get(name, "user"))
         variables = {k: v for k, v in merged.items() if k not in history}
-        messages = list(
-            render_prompt(
+        if instructions:
+            messages = list(
+                render_prompt(
+                    entry.spec,
+                    variables,
+                    history=history or None,
+                    filters=self._custom_filters or None,
+                )
+            )
+        else:
+            from skye.prompts.skye_prompts import render_parts
+
+            parts = render_parts(
                 entry.spec,
                 variables,
                 history=history or None,
                 filters=self._custom_filters or None,
             )
-        )
+            system = [SystemMessage(content=parts.system)] if parts.system else []
+            messages = [*system, *parts.messages]
         rest = {k: v for k, v in placeholders.items() if k not in history}
         self._insert_histories(messages, rest, merged)
         return messages
@@ -1128,25 +1245,57 @@ class BasePromptBuilder(PromptBuilderInterface):
         return [examples[i] for i in order[:limit]]
 
     def _format_examples(self, template_name: str, examples: list[dict[str, Any]]) -> str:
-        """Write each example with the example template; one that lacks a field is skipped."""
+        """Write each example with the example template, or from its own keys."""
         if not examples:
             return ""
-        entry = self._example_entries.get(template_name) or self._compile_text(
-            "examples", DEFAULT_EXAMPLE_TEMPLATE
-        )
-        text = self._example_templates.get(template_name, DEFAULT_EXAMPLE_TEMPLATE)
+        entry = self._example_entries.get(template_name)
         formatted: list[str] = []
-        for ex in examples:
-            if any(v not in ex for v in entry.required):
+        for index, ex in enumerate(examples):
+            if entry is None:
+                formatted.append(_keys_text(ex))
                 continue
+            missing = [key for key in entry.required if key not in ex]
+            if missing:  # added after add_examples checked them (the list is the caller's)
+                raise ValidationError(
+                    f"Example {index} of template '{template_name}' lacks "
+                    f"{', '.join(repr(k) for k in missing)}, read by the example template",
+                    field="examples",
+                    value=missing,
+                    template=template_name,
+                    example=index,
+                    missing=missing,
+                )
             try:
                 if entry.compiled is not None:
                     formatted.append(entry.compiled.render(ex, self._custom_filters))
                 else:
-                    formatted.append(text.format_map(ex))
-            except (KeyError, IndexError, AttributeError):
-                continue
+                    formatted.append(self._example_templates[template_name].format_map(ex))
+            except (KeyError, IndexError, AttributeError) as e:
+                raise ValidationError(
+                    f"Example {index} of template '{template_name}' could not be written: {e!r}",
+                    field="examples",
+                    value=index,
+                    template=template_name,
+                    example=index,
+                ) from e
         return "\n\n".join(formatted) + "\n\n" if formatted else ""
+
+    def _insert_example_messages(
+        self, template_name: str, messages: list[SkyeMessage], variables: Mapping[str, Any]
+    ) -> None:
+        """Insert the selected examples as user/assistant pairs before the last user message."""
+        turns: list[SkyeMessage] = []
+        for index, example in enumerate(self._select_examples(template_name, variables)):
+            user, assistant = _example_turns(template_name, index, example)
+            turns.append(UserMessage(content=user))
+            turns.append(AssistantMessage(content=assistant))
+        if not turns:
+            return
+        at = next(
+            (i for i in range(len(messages) - 1, -1, -1) if messages[i].role == "user"),
+            len(messages),
+        )
+        messages[at:at] = turns
 
     # ------------------------------------------------------------------------------------------
     # Helpers: content
@@ -1363,6 +1512,40 @@ def _load_image(value: Any, image_format: str, variable: str) -> Any:
     if not path.is_file():
         raise invalid(f"no file at {path}")
     return path
+
+
+def _value_text(value: Any) -> str:
+    """A value of an example as text: JSON for a list or a map, ``str`` otherwise."""
+    if isinstance(value, Mapping | list | tuple):
+        return _to_json(value)
+    return str(value)
+
+
+def _keys_text(example: Mapping[str, Any]) -> str:
+    """One ``Key: value`` line per key, in order (``user_query`` gives ``User query``)."""
+    lines = []
+    for key, value in example.items():
+        label = str(key).replace("_", " ")
+        lines.append(f"{label[:1].upper()}{label[1:]}: {_value_text(value)}")
+    return "\n".join(lines)
+
+
+def _example_turns(template_name: str, index: int, example: Mapping[str, Any]) -> tuple[str, str]:
+    """The user and the assistant text of an example given as messages (decision D79)."""
+    if "input" in example and "output" in example:
+        return _value_text(example["input"]), _value_text(example["output"])
+    keys = list(example)
+    if len(keys) < 2:
+        raise ValidationError(
+            f"add_examples(as_messages=True): example {index} of template '{template_name}' "
+            "needs two keys (input and output, or a first key for the user and a last key for "
+            "the assistant)",
+            field="examples",
+            value=keys,
+            template=template_name,
+            example=index,
+        )
+    return _value_text(example[keys[0]]), _value_text(example[keys[-1]])
 
 
 def _example_text(example: Mapping[str, Any], key: str | None) -> str:

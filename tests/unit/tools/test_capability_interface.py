@@ -2,8 +2,8 @@
 
 import pytest
 
-from skye.tools.interface import CapabilityInterface
-from skye.tools.schema import CapabilitySchema
+from skye.base.interfaces.capability import CapabilityInterface
+from skye.base.interfaces.capability import CapabilitySchema
 
 
 class MockCapability(CapabilityInterface):
