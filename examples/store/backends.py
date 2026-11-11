@@ -2,12 +2,12 @@
 
 Skye keeps all durable state external. ``skye.store`` ships the core backends on the standard
 library (``InMemoryBackend``, ``FileSystemBackend``) and optional ones that need a third-party
-library (``DynamoDBBackend`` needs boto3, ``RedisBackend`` needs redis, ``PostgreSQLBackend`` needs
-asyncpg). The optional backends are constructed inside a guard so the script stays green when the
-extra is absent.
+library (``DynamoDBBackend`` needs boto3, preinstalled in Lambda; ``RedisBackend`` needs the ``redis``
+extra; ``PostgreSQLBackend`` uses the RDS Data API, pg8000 or asyncpg). Nothing connects until the first
+operation, so constructing them needs no server.
 
-Every backend shares the same async API: ``connect``, ``set``, ``get``, ``increment``,
-``get_multiple`` (and ``set_multiple``).
+Every backend shares the same async API: ``set``, ``get``, ``delete``, ``increment``, ``get_multiple``,
+``set_multiple`` and, for most, ``keys``.
 """
 
 import asyncio
@@ -35,6 +35,7 @@ async def exercise(backend: object, label: str) -> None:
 
     await backend.set("user:2", {"name": "Grace"})
     print(f"{label} get_multiple:", await backend.get_multiple(["user:1", "user:2", "missing"]))
+    print(f"{label} keys(user:):", await backend.keys("user:"))
 
 
 async def main() -> None:
@@ -48,7 +49,7 @@ async def main() -> None:
     # 3. Optional backends need an extra; guard their construction so the example stays green when
     #    boto3 / redis / asyncpg are not installed.
     try:
-        DynamoDBBackend(table_name="skye-demo", region_name="us-east-1")
+        DynamoDBBackend(table_name="skye-demo", region_name="eu-west-1")
         print("DynamoDBBackend constructed (boto3 present)")
     except (ImportError, MissingExtraError):
         print("DynamoDBBackend skipped: boto3 not installed")
@@ -61,9 +62,9 @@ async def main() -> None:
 
     try:
         PostgreSQLBackend(connection_string="postgresql://localhost/skye")
-        print("PostgreSQLBackend constructed (asyncpg present)")
+        print("PostgreSQLBackend constructed (pg8000 or asyncpg present)")
     except (ImportError, MissingExtraError):
-        print("PostgreSQLBackend skipped: asyncpg not installed")
+        print("PostgreSQLBackend skipped: install skyeai[postgres] or skyeai[postgres-asyncpg]")
 
 
 if __name__ == "__main__":

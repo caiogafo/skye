@@ -21,7 +21,7 @@ from skye.base.exceptions import (
 from skye.base.messages import AssistantMessage, UserMessage
 from skye.tools import mcp_boundary as b
 from skye.tools.exceptions import CapabilityExecutionError
-from skye.tools.interface import CapabilityInterface
+from skye.base.interfaces.capability import CapabilityInterface
 from skye.tools.mcp_client import BuiltinMCPClient, create_mcp_client
 from skye.tools.mcp_resource import Resource
 

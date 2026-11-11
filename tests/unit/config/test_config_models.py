@@ -185,74 +185,23 @@ def test_model_config():
 
 
 def test_skye_config():
-    """Test SkyeConfig model."""
+    """Test SkyeConfig model: only the keys that code reads (D106)."""
     # Test with default values
     skye_config = SkyeConfig()
     assert skye_config.log_level == "INFO"
-    assert skye_config.enable_telemetry is True
     assert skye_config.correlation_id_header == "X-Correlation-ID"
-    assert skye_config.models == {}
-    assert skye_config.plugins == {}
-    assert skye_config.default_routing_strategy == "round_robin"
-    assert skye_config.enable_fallbacks is True
-    assert skye_config.enable_rate_limiting is True
+    assert skye_config.component_log_levels == {}
 
     # Test with custom values
     skye_config_custom = SkyeConfig(
         log_level="DEBUG",
-        enable_telemetry=False,
         correlation_id_header="X-Request-ID",
-        default_routing_strategy="least_busy",
-        enable_fallbacks=False,
-        enable_rate_limiting=False,
+        component_log_levels={"router": "warning"},
     )
     assert skye_config_custom.log_level == "DEBUG"
-    assert skye_config_custom.enable_telemetry is False
     assert skye_config_custom.correlation_id_header == "X-Request-ID"
-    assert skye_config_custom.default_routing_strategy == "least_busy"
-    assert skye_config_custom.enable_fallbacks is False
-    assert skye_config_custom.enable_rate_limiting is False
-
-    # Test with nested model configs
-    skye_config_with_models = SkyeConfig(
-        models={
-            "gpt-4": ModelConfig(
-                model_id="gpt-4",
-                provider="openai",
-                temperature=0.7,
-            ),
-            "claude-3": ModelConfig(
-                model_id="claude-3-sonnet",
-                provider="anthropic",
-                temperature=0.5,
-            ),
-        }
-    )
-    assert len(skye_config_with_models.models) == 2
-    assert "gpt-4" in skye_config_with_models.models
-    assert "claude-3" in skye_config_with_models.models
-    assert skye_config_with_models.models["gpt-4"].model_id == "gpt-4"
-    assert skye_config_with_models.models["claude-3"].provider == "anthropic"
-
-    # Test with plugins
-    skye_config_with_plugins = SkyeConfig(
-        plugins={
-            "memory": {
-                "type": "redis",
-                "host": "localhost",
-                "port": 6379,
-            },
-            "observe": {
-                "type": "opentelemetry",
-                "endpoint": "http://localhost:4318",
-            },
-        }
-    )
-    assert len(skye_config_with_plugins.plugins) == 2
-    assert "memory" in skye_config_with_plugins.plugins
-    assert "observe" in skye_config_with_plugins.plugins
-    assert skye_config_with_plugins.plugins["memory"]["type"] == "redis"
-    assert skye_config_with_plugins.plugins["observe"]["endpoint"] == "http://localhost:4318"
+    assert skye_config_custom.level_for("router") == "WARNING"
+    assert skye_config_custom.level_for("models") == "DEBUG"
 
 
 def test_model_config_validation():

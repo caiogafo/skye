@@ -1,4 +1,4 @@
-"""Tests for the standard-library prompt template engine (no Jinja2)."""
+"""Tests for the standard-library prompt template engine (no Jinja2; interpolation only, D76)."""
 
 import ast
 from pathlib import Path
@@ -20,24 +20,19 @@ def test_variables_and_attributes() -> None:
 
 def test_undefined_left_visible_and_falsy() -> None:
     assert render_template("{{ nope }}", {}) == "{{ nope }}"
-    assert render_template("{% if nope %}x{% else %}y{% endif %}", {}) == "y"
+    assert render_template('{{ "x" if nope else "y" }}', {}) == "y"
 
 
-def test_if_elif_else() -> None:
-    t = '{% if k == "a" %}A{% elif k == "b" %}B{% else %}Z{% endif %}'
+def test_inline_conditions_and_comparisons() -> None:
+    t = '{{ "A" if k == "a" else ("B" if k == "b" else "Z") }}'
     assert [render_template(t, {"k": v}) for v in "abc"] == ["A", "B", "Z"]
+    assert render_template("{{ 'yes' if 'a' in xs else 'no' }}", {"xs": ["a"]}) == "yes"
 
 
-def test_for_loop_helpers_and_dict_items() -> None:
-    t = "{% for x in xs %}{{ loop.index }}={{ x }}{% if not loop.last %},{% endif %}{% endfor %}"
-    assert render_template(t, {"xs": ["a", "b"]}) == "1=a,2=b"
-    assert (
-        render_template("{% for k, v in d.items() %}{{ k }}:{{ v }};{% endfor %}", {"d": {"a": 1}})
-        == "a:1;"
-    )
-    assert (
-        render_template("{% for x in xs %}{{ x }}{% else %}none{% endfor %}", {"xs": []}) == "none"
-    )
+def test_method_calls_and_map() -> None:
+    assert render_template("{{ d.items() | list | length }}", {"d": {"a": 1, "b": 2}}) == "2"
+    xs = [{"name": "a"}, {"name": "b"}]
+    assert render_template("{{ xs | map('name') | join(',') }}", {"xs": xs}) == "a,b"
 
 
 def test_filters_and_inline_if() -> None:
@@ -52,8 +47,8 @@ def test_custom_filter() -> None:
 
 
 def test_whitespace_control() -> None:
-    assert render_template("a\n{% if x %}\nb\n{% endif %}\nc", {"x": True}) == "a\nb\nc"
-    assert render_template("a  {%- if x -%}  b{% endif %}", {"x": True}) == "ab"
+    assert render_template("a  {{- x -}}  b", {"x": "X"}) == "aXb"
+    assert render_template("a\n  {# note #}\nb", {}) == "a\nb"
 
 
 def test_comments_dropped() -> None:
@@ -61,12 +56,14 @@ def test_comments_dropped() -> None:
 
 
 def test_syntax_errors() -> None:
-    with pytest.raises(TemplateSyntaxError):
+    with pytest.raises(TemplateSyntaxError, match="when"):
         render_template("{% if x %}no end", {})
     with pytest.raises(TemplateSyntaxError):
         render_template("{{ x | nofilter }}", {"x": 1})
     with pytest.raises(TemplateSyntaxError):
         render_template("{% macro m() %}", {})
+    with pytest.raises(TemplateSyntaxError):
+        render_template("{{ x + }}", {"x": 1})
 
 
 def test_no_jinja_imports_in_prompts_package() -> None:
@@ -82,29 +79,20 @@ def test_no_jinja_imports_in_prompts_package() -> None:
 
 def test_compile_template_lists_free_names_in_first_seen_order() -> None:
     compiled = engine.compile_template(
-        "{{ b }} {% if a and c.x %}{{ a | upper }}{% endif %}"
-        "{% for item in items %}{{ item.name }} {{ loop.index }} {{ b }} {{ other }}{% endfor %}"
+        "{{ b }} {{ a | upper if c.x else '' }} {{ items | map('name') | join }} {{ b }}"
         "{{ True }} {{ 'lit' }} {{ d['k'] }}"
     )
-    assert compiled.variables == ("b", "a", "c", "items", "other", "d")
+    assert compiled.variables == ("b", "a", "c", "items", "d")
 
 
-def test_loop_and_loop_variables_are_free_outside_their_loop() -> None:
-    compiled = engine.compile_template("{% for x in xs %}{{ x }}{% endfor %}{{ x }} {{ loop }}")
-    assert compiled.variables == ("xs", "x", "loop")
-
-
-def test_required_variables_are_the_unconditional_ones() -> None:
-    compiled = engine.compile_template(
-        '{{ a }} {{ b | default("z") }} {% if c %}{{ d }}{% endif %}'
-        "{% for i in e %}{{ f }}{% endfor %}"
-    )
-    assert compiled.variables == ("a", "b", "c", "d", "e", "f")
-    assert compiled.required_variables == ("a", "e")
+def test_required_variables_are_the_ones_not_read_through_default() -> None:
+    compiled = engine.compile_template('{{ a }} {{ b | default("z") }} {{ c if d else e }}')
+    assert compiled.variables == ("a", "b", "c", "d", "e")
+    assert compiled.required_variables == ("a", "c", "d", "e")
 
 
 def test_compiled_template_renders_like_render_template() -> None:
-    source = "{% for x in xs %}{{ loop.index }}:{{ x | twice }} {% endfor %}"
+    source = "{{ xs | length }}:{{ xs | join | twice }}"
     filters = {"twice": lambda v: v * 2}
     compiled = engine.compile_template(source)
     for xs in (["a"], ["a", "b"], []):

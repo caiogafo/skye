@@ -1,15 +1,17 @@
 """Equivalence of the bundled `.jinja` prompts and their `.skye` conversions (task 4.4, D60).
 
-For every ``src/skye/prompts/templates/<name>.skye`` that exists, this test renders the frozen
-legacy copy ``tests/unit/prompts/legacy_templates/<name>.jinja`` and the new ``.skye`` prompt with
-the same data and compares the resulting messages. With no ``.skye`` file the test skips cleanly.
+For every converted ``src/skye/prompts/templates/<name>.skye``, this test compares the new
+``.skye`` prompt with the frozen output of the old ``.jinja`` template for the same data. The old
+templates used ``{% if %}`` and ``{% for %}``, which the engine no longer runs (decision D76, task
+9.1), so their output was rendered once, before the tags were removed, and frozen in
+``tests/unit/prompts/legacy_renderings/<name>.json``: one rendered text per case of
+``equivalence_cases/<name>.json``, in the same order.
 
 How each side is rendered:
-    * Legacy: ``skye.prompts.engine.render_template(jinja_text, variables)``, then the output is
-      split into role sections at lines that are exactly ``[SYSTEM]``, ``[USER]`` or
-      ``[ASSISTANT]`` (after stripping). Text before the first marker is a ``user`` section.
-      Sections whose normalised text is empty are dropped. Each section is one
-      ``(role, content)`` message.
+    * Legacy: the frozen text of the case, split into role sections at lines that are exactly
+      ``[SYSTEM]``, ``[USER]`` or ``[ASSISTANT]`` (after stripping). Text before the first marker
+      is a ``user`` section. Sections whose normalised text is empty are dropped. Each section is
+      one ``(role, content)`` message.
     * New: ``skye.prompts.skye_prompts.load_prompt(skye_text, name=<name>)`` followed by
       ``render_prompt(spec, variables, history=<case history>)``. The prompt inside
       ``<name>.skye`` must be named ``<name>`` (``prompt "<name>" { ... }``).
@@ -18,7 +20,7 @@ Normalisation (applied to the content of every message on both sides): strip eac
 runs of spaces and tabs into one space, drop blank lines, join the remaining lines with ``"\\n"``.
 Then the two lists of ``(role, content)`` pairs must be equal, message by message.
 
-Case files (written by whoever converts a template, one per converted template):
+Case files (frozen with the conversion; a case cannot be added without its old output):
     ``tests/unit/prompts/equivalence_cases/<name>.json`` is a JSON list of cases. A ``.skye``
     template without a case file fails the test. Each case is either
 
@@ -35,7 +37,7 @@ Case files (written by whoever converts a template, one per converted template):
           }
 
       ``note`` (optional) is shown in the failure message. ``history`` (optional) maps a name to
-      a list of ``{"role", "content"}`` objects. On the legacy side the entries are merged into
+      a list of ``{"role", "content"}`` objects. On the legacy side the entries were merged into
       the variables (the old templates read history as a variable and print ``[ROLE]`` markers
       for it); on the new side they are passed as ``render_prompt(history=...)``, which a
       ``placeholder "<name>"`` consumes. A ``placeholder`` also falls back to a variable of the
@@ -48,10 +50,8 @@ Case files (written by whoever converts a template, one per converted template):
       ``variables`` and the same turns as ``history`` in ``skye_variables`` (read by the
       ``placeholder "history"``).
 
-    Write enough cases to cover every ``if``/``elif``/``else`` and ``for`` branch of the old
-    template (each branch taken and not taken, empty and non-empty lists). Give a value to every
-    variable the old template prints without a guard: the legacy engine prints a missing variable
-    as ``{{ name }}``.
+    The cases cover every ``if``/``elif``/``else`` and ``for`` branch of the old template (each
+    branch taken and not taken, empty and non-empty lists).
 
 Intended differences between the old and the new rendering are listed in
 ``INTENDED_DIFFERENCES`` below; everything else must match. Add an entry there when a conversion
@@ -67,7 +67,6 @@ from typing import Any
 
 import pytest
 
-from skye.prompts.engine import render_template
 from skye.prompts.skye_prompts import load_prompt, render_prompt
 
 INTENDED_DIFFERENCES: list[str] = [
@@ -126,7 +125,7 @@ LEGACY_HISTORY_HEADINGS: dict[str, str] = {
 REPO_ROOT = Path(__file__).resolve().parents[3]
 TEMPLATES_DIR = REPO_ROOT / "src" / "skye" / "prompts" / "templates"
 HERE = Path(__file__).resolve().parent
-LEGACY_DIR = HERE / "legacy_templates"
+LEGACY_DIR = HERE / "legacy_renderings"
 CASES_DIR = HERE / "equivalence_cases"
 
 _MARKER = re.compile(r"^\[(SYSTEM|USER|ASSISTANT)\]$")
@@ -134,7 +133,7 @@ _SPACES = re.compile(r"[ \t]+")
 
 # Only conversions are compared: a new prompt written directly in .skye has no legacy template.
 SKYE_NAMES = sorted(
-    p.stem for p in TEMPLATES_DIR.glob("*.skye") if (LEGACY_DIR / f"{p.stem}.jinja").exists()
+    p.stem for p in TEMPLATES_DIR.glob("*.skye") if (LEGACY_DIR / f"{p.stem}.json").exists()
 )
 
 
@@ -212,17 +211,11 @@ def test_intended_differences_are_listed() -> None:
     assert all(isinstance(item, str) and item for item in INTENDED_DIFFERENCES)
 
 
-def test_every_bundled_template_has_a_legacy_copy() -> None:
-    for jinja in TEMPLATES_DIR.glob("*.jinja"):
-        assert (LEGACY_DIR / jinja.name).exists(), f"missing legacy copy of {jinja.name}"
-
-
-def test_every_legacy_template_is_bundled_as_skye_or_jinja() -> None:
-    # A converted template must keep its .skye; one still in .jinja (version 2 needed) keeps its .jinja.
-    for legacy in LEGACY_DIR.glob("*.jinja"):
-        assert (TEMPLATES_DIR / f"{legacy.stem}.skye").exists() or (TEMPLATES_DIR / legacy.name).exists(), (
-            f"{legacy.stem} is bundled neither as .skye nor as .jinja"
-        )
+def test_every_legacy_rendering_has_its_skye_prompt_and_one_text_per_case() -> None:
+    for legacy in LEGACY_DIR.glob("*.json"):
+        assert (TEMPLATES_DIR / f"{legacy.stem}.skye").exists(), f"{legacy.stem}.skye is missing"
+        texts = json.loads(legacy.read_text(encoding="utf-8"))
+        assert len(texts) == len(_cases(legacy.stem)), f"{legacy.name}: one text per case"
 
 
 def test_split_legacy_markers() -> None:
@@ -247,18 +240,13 @@ def test_join_lines_matches_glued_legacy_output() -> None:
     SKYE_NAMES or [pytest.param("<none>", marks=pytest.mark.skip(reason="no .skye templates yet"))],
 )
 def test_skye_matches_legacy(name: str) -> None:
-    legacy_path = LEGACY_DIR / f"{name}.jinja"
-    assert legacy_path.exists(), (
-        f"no legacy template {legacy_path.name} to compare {name}.skye with"
-    )
-    legacy_text = legacy_path.read_text(encoding="utf-8")
+    legacy_path = LEGACY_DIR / f"{name}.json"
+    legacy_texts = json.loads(legacy_path.read_text(encoding="utf-8"))
     spec = load_prompt((TEMPLATES_DIR / f"{name}.skye").read_text(encoding="utf-8"), name=name)
 
     for index, raw in enumerate(_cases(name)):
         variables, history, note, glued = parse_case(raw)
-        expected = drop_history_heading(
-            name, split_legacy(render_template(legacy_text, {**variables, **history}))
-        )
+        expected = drop_history_heading(name, split_legacy(legacy_texts[index]))
         skye_variables = {**variables, **(raw.get("skye_variables") or {})}
         messages = render_prompt(spec, skye_variables, history=history or None)
         actual = [(m.role, normalise(m.content)) for m in messages]

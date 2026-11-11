@@ -222,79 +222,50 @@ class TestConfigLoaderWithEnvVarSubstitution:
 
     def test_json_config_with_several_env_vars(self, monkeypatch, tmp_path):
         """Test loading a JSON configuration file with several environment variables."""
-        monkeypatch.setenv("OPENAI_API_KEY", "sk-test-key-123")
-        monkeypatch.setenv("AZURE_API_BASE", "https://azure.openai.com")
+        monkeypatch.setenv("APP_LOG_LEVEL", "WARNING")
+        monkeypatch.setenv("APP_HEADER", "X-Trace-ID")
 
         config_file = tmp_path / "config.json"
         config_file.write_text(json.dumps({
-            "log_level": "INFO",
-            "models": {
-                "gpt-4": {"model_id": "gpt-4", "provider": "openai", "api_key": "${OPENAI_API_KEY}"},
-                "azure-gpt": {
-                    "model_id": "azure-gpt",
-                    "provider": "azure",
-                    "api_key": "${OPENAI_API_KEY}",
-                    "api_base": "${AZURE_API_BASE}",
-                },
-            },
+            "log_level": "${APP_LOG_LEVEL}",
+            "correlation_id_header": "${APP_HEADER}",
         }))
 
         config = load_config(config_file)
 
-        assert config.models["gpt-4"].api_key == "sk-test-key-123"
-        assert config.models["azure-gpt"].api_key == "sk-test-key-123"
-        assert config.models["azure-gpt"].api_base == "https://azure.openai.com"
+        assert config.log_level == "WARNING"
+        assert config.correlation_id_header == "X-Trace-ID"
 
     def test_json_config_with_env_vars(self, monkeypatch, tmp_path):
-        """Test loading JSON configuration with environment variables."""
-        monkeypatch.setenv("API_KEY", "secret-key")
+        """Test loading JSON configuration with environment variables in a nested value."""
+        monkeypatch.setenv("ROUTER_LEVEL", "DEBUG")
 
         config_file = tmp_path / "config.json"
         config_file.write_text(
             """
 {
   "log_level": "INFO",
-  "models": {
-    "test-model": {
-      "model_id": "test",
-      "provider": "test-provider",
-      "api_key": "${API_KEY}"
-    }
-  }
+  "component_log_levels": {"router": "${ROUTER_LEVEL}"}
 }
 """
         )
 
         config = load_config(config_file)
 
-        assert config.models["test-model"].api_key == "secret-key"
+        assert config.component_log_levels["router"] == "DEBUG"
 
     def test_code_overrides_with_env_vars(self, monkeypatch):
         """Test code overrides with environment variable substitution."""
-        monkeypatch.setenv("OVERRIDE_KEY", "override-value")
+        monkeypatch.setenv("OVERRIDE_HEADER", "X-Override")
 
-        overrides = {
-            "log_level": "DEBUG",
-            "models": {
-                "test": {
-                    "model_id": "test",
-                    "provider": "test-provider",
-                    "api_key": "${OVERRIDE_KEY}",
-                }
-            },
-        }
+        config = ConfigLoader.load(overrides={"correlation_id_header": "${OVERRIDE_HEADER}"})
 
-        config = ConfigLoader.load(overrides=overrides)
-
-        assert config.models["test"].api_key == "override-value"
+        assert config.correlation_id_header == "X-Override"
 
     def test_missing_env_var_in_file_raises_error(self, tmp_path):
         """Test that missing environment variable in a file raises error."""
         config_file = tmp_path / "config.json"
-        config_file.write_text(json.dumps({
-            "log_level": "INFO",
-            "models": {"test": {"model_id": "test", "provider": "test-provider", "api_key": "${MISSING_VAR}"}},
-        }))
+        config_file.write_text(json.dumps({"log_level": "INFO", "correlation_id_header": "${MISSING_VAR}"}))
 
         with pytest.raises(ConfigurationError) as exc_info:
             load_config(config_file)
@@ -303,42 +274,29 @@ class TestConfigLoaderWithEnvVarSubstitution:
 
     def test_mixed_env_vars_and_static_values(self, monkeypatch, tmp_path):
         """Test configuration with mix of env vars and static values."""
-        monkeypatch.setenv("DYNAMIC_KEY", "dynamic-value")
+        monkeypatch.setenv("DYNAMIC_LEVEL", "ERROR")
 
         config_file = tmp_path / "config.json"
         config_file.write_text(json.dumps({
             "log_level": "INFO",
-            "models": {
-                "model1": {"model_id": "model1", "provider": "provider1", "api_key": "${DYNAMIC_KEY}", "timeout": 30},
-                "model2": {"model_id": "model2", "provider": "provider2", "api_key": "static-key", "timeout": 60},
-            },
+            "component_log_levels": {"router": "${DYNAMIC_LEVEL}", "models": "DEBUG"},
         }))
 
         config = load_config(config_file)
 
-        assert config.models["model1"].api_key == "dynamic-value"
-        assert config.models["model1"].timeout == 30
-        assert config.models["model2"].api_key == "static-key"
-        assert config.models["model2"].timeout == 60
+        assert config.level_for("router") == "ERROR"
+        assert config.level_for("models") == "DEBUG"
+        assert config.log_level == "INFO"
 
-    def test_env_var_in_nested_plugin_config(self, monkeypatch, tmp_path):
-        """Test environment variable substitution in nested plugin configuration."""
-        monkeypatch.setenv("REDIS_URL", "redis://localhost:6379")
-        monkeypatch.setenv("OBSERVE_ENDPOINT", "http://localhost:4318")
-
+    def test_substitution_happens_at_each_load(self, monkeypatch, tmp_path):
+        """Nothing is cached (D66): a variable changed between two loads is seen by the second."""
         config_file = tmp_path / "config.json"
-        config_file.write_text(json.dumps({
-            "log_level": "INFO",
-            "plugins": {
-                "memory": {"type": "redis", "url": "${REDIS_URL}"},
-                "observe": {"type": "otlp", "endpoint": "${OBSERVE_ENDPOINT}"},
-            },
-        }))
+        config_file.write_text(json.dumps({"correlation_id_header": "${HEADER}"}))
 
-        config = load_config(config_file)
-
-        assert config.plugins["memory"]["url"] == "redis://localhost:6379"
-        assert config.plugins["observe"]["endpoint"] == "http://localhost:4318"
+        monkeypatch.setenv("HEADER", "X-One")
+        assert load_config(config_file).correlation_id_header == "X-One"
+        monkeypatch.setenv("HEADER", "X-Two")
+        assert load_config(config_file).correlation_id_header == "X-Two"
 
 
 if __name__ == "__main__":

@@ -1,0 +1,6 @@
+[
+ "[SYSTEM]\nYou are a helpful AI assistant. \n\n[USER]\nWhat is a list?\n\n",
+ "[SYSTEM]\nYou are a lawyer specialized in law. \nYour personality traits: precise, formal.\nPlease follow these guidelines:\n- Cite sources\n- Be brief\n\n[USER]\nHello there\n\n[ASSISTANT]\nHi, how can I help?\n\n[USER]\nExplain contracts\n\nContext: Italian law\nPlease format your response as bullet points.\n",
+ "[SYSTEM]\nYou are a helpful AI assistant. \n\n[USER]\nHi\n\n",
+ "[SYSTEM]\nYou are a helpful AI assistant specialized in math. \n\n[USER]\nHello there\n\n[USER]\nNext?\n\n"
+]

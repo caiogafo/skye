@@ -9,7 +9,9 @@ every field the router reads: routes, targets, strategies, fallback chains, retr
 policies, cooldown and
 pre-call checks, and the ``cost_per_1k_*_tokens`` of a target (read by ``cost_based``, real fields
 since 2026-11-08). Not compared, because the router never reads it (owner decision, noted for
-version 2): ``priority`` of a target.
+version 2): ``priority`` of a target. Renamed: the error type ``TimeoutError`` of a policy is
+``ProviderTimeoutError``
+since decision D104 (the old name matched no error a provider raises).
 """
 
 from __future__ import annotations
@@ -28,6 +30,7 @@ LEGACY = ROOT / "tests" / "fixtures" / "legacy_router_yaml"
 EXAMPLES = ROOT / "examples" / "routing"
 CASES = [("router_config", "main"), ("router_config_simple", "simple")]
 DROPPED_TARGET_FIELDS = ("priority",)
+RENAMED_ERROR_TYPES = {"TimeoutError": "ProviderTimeoutError"}
 
 
 def _set_env(monkeypatch, text: str) -> None:
@@ -55,7 +58,7 @@ def _used(router: ModelRouter) -> dict:
         "pre_call_checks": router.pre_call_checks_enabled,
         "routes": {
             alias: {
-                "strategy": route.strategy.value,
+                "strategy": (route.strategy or router.strategy).value,
                 "fallback_on_error": route.fallback_on_error,
                 "targets": [_fields(t) for t in route.targets],
             }
@@ -71,6 +74,11 @@ def _used(router: ModelRouter) -> dict:
 @pytest.mark.parametrize(("stem", "label"), CASES)
 def test_the_skye_router_equals_the_old_yaml_router(stem, label, monkeypatch):
     old = json.loads((LEGACY / f"{stem}.json").read_text(encoding="utf-8"))
+    for key in ("retry_policies", "allowed_fails_policies"):
+        for policy in old.get(key, []):
+            policy["error_type"] = RENAMED_ERROR_TYPES.get(
+                policy["error_type"], policy["error_type"]
+            )
     _set_env(monkeypatch, json.dumps(old))
     before = ModelRouter.from_config_dict(old)
     after = ModelRouter.from_file(EXAMPLES / f"{stem}.skye", name=label)
@@ -84,6 +92,11 @@ def test_the_fields_the_language_reads_are_kept(stem, label):
     the YAML did.
     """
     old = json.loads((LEGACY / f"{stem}.json").read_text(encoding="utf-8"))
+    for key in ("retry_policies", "allowed_fails_policies"):
+        for policy in old.get(key, []):
+            policy["error_type"] = RENAMED_ERROR_TYPES.get(
+                policy["error_type"], policy["error_type"]
+            )
     spec = build(
         (EXAMPLES / f"{stem}.skye").read_text(encoding="utf-8"),
         filename=str(EXAMPLES / f"{stem}.skye"),
@@ -101,6 +114,11 @@ def test_the_fields_the_language_reads_are_kept(stem, label):
 @pytest.mark.parametrize(("stem", "label"), CASES)
 def test_only_the_unread_target_fields_were_dropped(stem, label):
     old = json.loads((LEGACY / f"{stem}.json").read_text(encoding="utf-8"))
+    for key in ("retry_policies", "allowed_fails_policies"):
+        for policy in old.get(key, []):
+            policy["error_type"] = RENAMED_ERROR_TYPES.get(
+                policy["error_type"], policy["error_type"]
+            )
     spec = build(
         (EXAMPLES / f"{stem}.skye").read_text(encoding="utf-8"),
         filename=str(EXAMPLES / f"{stem}.skye"),

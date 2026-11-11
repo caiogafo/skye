@@ -21,10 +21,10 @@ builder is the only caller (no second implementation of the Port exists).
 
 | File | Role |
 |---|---|
-| `prompts/engine.py` | Standard-library template engine: `{{ expr }}`, `{# comment #}`, `if`/`elif`/`else`, `for` (with `loop.index`, `index0`, `first`, `last`, `length`), whitespace control, the built-in filters (`join`, `upper`, `lower`, `title`, `capitalize`, `trim`, `length`, `default`, `string`, `list`, `first`, `last`, `int`, `float`, `replace`, `tojson`) and filters added by the caller. An undefined variable stays visible and is falsy. Nothing is evaluated with `eval`. Realizes Requirement 30.8 and 30.9. |
+| `prompts/engine.py` | Standard-library template engine, interpolation only (D76): `{{ expr }}` (names, attributes, comparisons, the conditional expression `a if c else b`), `{# comment #}`, whitespace control with `{{-`/`-}}`, the built-in filters (`join`, `upper`, `lower`, `title`, `capitalize`, `trim`, `length`, `default`, `string`, `list`, `first`, `last`, `int`, `float`, `replace`, `tojson`, `toxml`, `totable`, `map`) and filters added by the caller. A `{% %}` control tag raises `TemplateSyntaxError` naming the tag and its line (`line` attribute) and pointing to `when` and `each`. An undefined variable stays visible and is falsy. Nothing is evaluated with `eval`. Realizes Requirement 30.8 and 30.9. |
 | `prompts/messages.py` | `BasePromptBuilder`: registry (`name:version`), variable merge, examples, role sections, content and schema configuration, metadata and validation. Re-exports the message types for peers. |
 | `prompts/loaders.py` | `load_default_templates(builder)`: reads the files of `prompts/templates/` and registers them as version `1.0`. |
-| `prompts/skye_prompts.py` | The `.skye` renderer: `load_prompt`, `render_prompt` (a `PromptSpec` plus variables gives `SkyeMessage`s with real roles) and `PromptRunnable` (the `Runnable` a flow step `run = prompt.NAME` will reach once the flow runtime exists). |
+| `prompts/skye_prompts.py` | The `.skye` renderer: `load_prompt`, `render_prompt` (a `PromptSpec` plus variables gives `SkyeMessage`s with real roles), `render_parts` (the same as a `PromptParts`, D81, D101), `output_json_schema` and `PromptRunnable` (the `Runnable` a flow step `run = prompt.NAME` will reach once the flow runtime exists). |
 | `prompts/templates/` | The bundled prompts, all `.skye`: the 18 original templates converted (task 4.3) and the agent prompts written directly in `.skye` (see "Agent prompts"). |
 
 Flow of one rendering: look up the latest (or the given) version, extract the variable names, merge defaults, partial variables and
@@ -42,7 +42,13 @@ allowed-missing set. `partial(**vars)` returns a new builder with those variable
 string order of the version (assumption: kept as it is, not changed here).
 
 ### Examples (Requirement 31)
-`add_examples` stores the examples with an example template; `set_example_selector(name, type, max_examples)` chooses `fixed` or
+`add_examples(name, examples, example_template=None, *, as_messages=False)` stores the examples (D79, Requirement 31.6 to 31.8):
+with no example template each example is written from its own keys, one `Key: value` line per key in order (`user_query` gives
+`User query`, a list or map value is JSON); with an example template every key it reads (not through `default`) must be in every
+example, else `add_examples` raises `ValidationError` with the index of the example and the missing keys; with `as_messages=True`
+each selected example becomes a `UserMessage` and an `AssistantMessage` (`input`/`output` when both exist, else the first and the last
+key; fewer than two keys is a `ValidationError`), inserted before the last user message, and `examples` is not passed as a variable.
+`set_example_selector(name, type, max_examples)` chooses `fixed` or
 `random` or `semantic` (similarity, with an embedder callable passed in, never an import of `models`); one default limit (`DEFAULT_MAX_EXAMPLES`) serves with and without a selector (tasks 3.1, 3.2). For a `.skye` prompt that declares `examples` as a list, `add_examples` passes the selected list of dictionaries and not a formatted string; a prompt that declares `examples = string` still gets formatted text (D74, Requirement 31.5).
 
 ### Roles and placeholders (Requirement 32.1 to 32.3)
@@ -70,6 +76,18 @@ message (a new user message when there is none). The builder reuses the same wri
 output_format="json")` keeps today's JSON text for `json` and uses the `table` / `xml` text otherwise (the Port has the same
 parameter), and `get_output_instructions(name, variables=None)` returns the `.skye` block's text when no schema was set. The engine
 filters `toxml` and `totable`, next to `tojson`, are for the other direction: putting data into a prompt.
+
+Prompt parts (D81, D101, Requirement 33.9). The names are `render_parts` and `PromptParts`. `PromptParts` and `OutputSchema` are
+frozen dataclasses in `base` (`skye/base/prompt_parts.py`), exported by the `prompt` Port module and re-exported by `skye.prompts`.
+`skye.prompts.render_parts(spec, variables, *, history=None, filters=None)` renders like `render_prompt` but does not append the
+output instructions: the system messages become `system` (joined with a blank line), the other messages stay in order, the active
+`json` output block becomes `OutputSchema(name, schema)` (the prompt name with every character outside letters, digits, `_` and `-`
+replaced by `_`), and its instructions become `fallback_text`; a `table` or `xml` output gives only `fallback_text`.
+`BasePromptBuilder.render_parts(name, variables)` does the same for a registered template, with the schema of `set_output_schema` (a
+`json` one) or of the `.skye` block, named after the template. The Port `PromptRenderingInterface.render_parts` is concrete: its
+default splits the system messages out of `render` and has no output, so other builders keep working. `output_json_schema(spec,
+variables)` gives the JSON Schema of the active block alone. The model side (`1-adapters-models` task 11) chooses native fields or the
+fallback text.
 
 Field descriptions (D70). A string right after a field's type is its description: `total = number "Total amount including VAT"`,
 at every level (`list({ amount = number "Amount" }) "One entry per line"`) and in the comma form. The parser reads it only inside an
@@ -104,7 +122,13 @@ so a call without `schema` asks for a `name` and a `value` per item, in json by 
 
 ### Metadata and validation (Requirement 29.4 to 29.6)
 `get_template_metadata` returns required and optional variables, examples, content types, roles and the schema; `validate_template`
-returns a result without raising. The variable extraction and the syntax check use the engine's parser, so `{{ name }}`, `if` conditions and `for` sources are found and a bad template is rejected at registration with the engine's details (tasks 2.1, 2.2). Text templates do interpolation only (D76): a `{% %}` tag is rejected with a `ValidationError` that points to `when` and `each` in `.skye`, and a variable read by interpolation is required unless it has a default or is allowed missing (O39 lapsed with the tags).
+returns a result without raising. The variable extraction and the syntax check use the engine's parser, so the names read in `{{ }}` are found and a bad template is rejected at registration with the engine's details (tasks 2.1, 2.2). Text templates do interpolation only (D76): a `{% %}` tag is rejected with a `ValidationError` that names the tag and its line (`details["line"]`) and points to `when` and `each` in `.skye`, and a variable read by interpolation is required unless it has a default (a builder default, a partial variable or the `default` filter) or is allowed missing (O39 lapsed with the tags).
+
+Help for every kind of block (D83, Requirement 34.9): `describe(spec, metadata=None)` in `skye/base/dsl/info.py`, public in
+`skye.dsl`, returns a `PromptInfo` for a prompt (as `describe_prompt`), a `RouterInfo` (routes with their targets as
+`provider/model`, strategy and fallbacks) for a router and a `FlowInfo` (context fields as inputs, the start and one `NodeInfo` per
+step, parallel or choice) for a flow, and raises `TypeError` for anything else. `skye.prompts` keeps `describe_prompt` and
+`prompt_help`.
 
 ### The `.skye` renderer (version 1 and 2 of the `prompt` block)
 What exists: the `prompt` block of version 1 is parsed and checked in `base` (`PromptSpec`: `variables`, `message "<role>"`, `text`,
@@ -131,7 +155,8 @@ separator) were converted once D69 added, without new syntax, `loop.*` inside `e
 over a map, and the engine filter `map(attribute)`. The equivalence test (task 4.4) lists the intended differences: real
 roles, history as messages, whitespace, empty messages omitted, and lines the old templates glued together because an
 `{% endif %}` swallowed the newline (`main_agent`, `memory_agent`, `sql_generation`, `relation_extraction`,
-`tabular_extraction`). The legacy texts it compares with are kept in `tests/unit/prompts/legacy_templates/`.
+`tabular_extraction`). The old engine cannot render the legacy `{% %}` templates any more (D76), so their output for every case was
+rendered once and frozen in `tests/unit/prompts/legacy_renderings/` (task 9.1); the test compares against those texts.
 Already enough in the engine: the filters `default`, `join`, `upper`, nested `each`, attribute access (`table.columns`). Not to be
 added (D20): macros, inheritance, include, variable assignment. `prompts/engine.py` keeps only `{{ }}` interpolation with filters
 (D76, task 9.1); custom filters are registered with `register_filter` (D77).
@@ -140,7 +165,8 @@ added (D20): macros, inheritance, include, variable assignment. `prompts/engine.
 Bundled prompts written directly in `.skye`, all with the same optional inputs: `tools` (a list of `{name, description,
 parameters, returns}`), the memory lists `episodic_memory`, `semantic_memory`, `procedural_memory`, `persona_memory`,
 `working_memory` (a section per non-empty kind, nothing when all are empty), `system_prompt` to replace the role sentence, and a
-`placeholder "history"`. smolagents-style (`smol_code_agent`, `smol_tool_calling_agent`, `smol_planning`, `smol_managed_agent`);
+`placeholder "history"`. Every agent prompt shows the parameters of a tool as its JSON Schema, `Parameters: {{ tool.parameters | tojson }}`
+(D80, the four smolagents-style prompts converted in task 9.4). smolagents-style (`smol_code_agent`, `smol_tool_calling_agent`, `smol_planning`, `smol_managed_agent`);
 reasoning (`self_reflection_agent`, `chain_of_thought_agent`, `tree_of_thoughts_agent`, `planner_agent`); supervisors
 (`supervisor_router`, `supervisor_planner`, `supervisor_reviewer`, `supervisor_hierarchical`); shared conversation of several
 agents (`group_chat_participant`, which answers a pass token unless its triggers match or it is mentioned, `group_chat_manager`,

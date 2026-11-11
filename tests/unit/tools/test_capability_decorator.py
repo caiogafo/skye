@@ -4,9 +4,9 @@ import pytest
 
 from skye.tools.decorator import capability
 from skye.tools.exceptions import CapabilityValidationError
-from skye.tools.interface import CapabilityInterface
+from skye.base.interfaces.capability import CapabilityInterface
 from skye.tools.local_function import LocalFunctionCapability
-from skye.tools.schema import CapabilitySchema
+from skye.base.interfaces.capability import CapabilitySchema
 
 
 class TestCapabilityDecorator:

@@ -1,5 +1,5 @@
 # Size and load budgets for Skye. Checked by tests/budget and by the "budgets"
-# GitHub workflow on every pull request. See docs/budgets.md.
+# GitHub workflow on every pull request. See docs/project/budgets.md.
 #
 # Principles, in this order of preference, for everything Skye imports:
 #   1. the Python standard library;
@@ -92,14 +92,32 @@ max_compiled_over_core = 0
 max_over_core_mb = 1
 target_over_core_mb = 1
 
-[extras.memory]
+# Store backends: one extra per backend (decision D99). The redis Extra declares only `redis` (pure Python; the
+# numbers are those of the former memory Extra, which carried it until D99).
+[extras.redis]
 max_compiled_over_core = 0
 max_over_core_mb = 13
 target_over_core_mb = 4
 
-# The postgres Extra declares only `asyncpg`, for the PostgreSQL store backend. Its compiled wheel is large (+14.0 MB on Linux x86_64,
-# 2026-11-02), which is why it is not part of the memory Extra: only who uses PostgreSQL installs it.
+# The valkey Extra declares only `valkey` (valkey-py, pure Python, a fork of redis-py; D102). Measured 2026-11-11
+# (`make budget`, macOS arm64, 2 packages): +1.1 MB, 0 compiled; the limit left from the redis Extra (13 MB) is lowered.
+# The footprint job confirms it on Linux x86_64.
+[extras.valkey]
+max_compiled_over_core = 0
+max_over_core_mb = 3
+target_over_core_mb = 2
+
+# The postgres Extra declares only `pg8000` (pure Python, with scramp and asn1crypto; decision D100). Measured
+# 2026-11-11 (`make budget`, macOS arm64, 6 packages): +1.7 MB, 0 compiled; the limit was 4 MB. The footprint job
+# confirms it on Linux x86_64.
 [extras.postgres]
+max_compiled_over_core = 0
+max_over_core_mb = 3
+target_over_core_mb = 2
+
+# The postgres-asyncpg Extra declares only `asyncpg`, the faster compiled driver. Its wheel is large (+14.0 MB on
+# Linux x86_64, 2026-11-02, then measured as the postgres Extra), which is why it is a separate choice.
+[extras.postgres-asyncpg]
 max_compiled_over_core = 1
 max_over_core_mb = 15
 target_over_core_mb = 2
@@ -113,9 +131,9 @@ target_over_core_mb = 4
 # from pyproject.toml and from this list. The test fails if an extra is empty and
 # not listed here, and if a listed extra stops being empty.
 [extras_policy]
-known_empty = ["agents", "guard", "observe", "prompts", "teams", "flows", "tools", "openai", "bedrock", "anthropic", "google", "cohere"]   # provider extras are empty: one built-in stdlib REST adapter each (Requirement 20); "observe" has no telemetry import yet. "tools" carries no third-party library: fastmcp lives in the separate "mcp" extra (Requirement 15).
+known_empty = ["agents", "memory", "guard", "observe", "prompts", "teams", "flows", "tools", "openai", "bedrock", "anthropic", "google", "cohere"]   # provider extras are empty: one built-in stdlib REST adapter each (Requirement 20); "observe" has no telemetry import yet. "tools" carries no third-party library: fastmcp lives in the separate "mcp" extra (Requirement 15).
 # Convenience bundles. They are not budgeted one by one: each member extra is.
 bundles = ["llm-providers", "embedding-providers", "all-providers", "providers", "all"]
 # Extras that only install an optional third-party library Skye does not need (Requirement 7.10, decision D67):
 # not measured by the footprint gate. Skye itself (the core and every other extra) stays under its budgets.
-not_gated = ["mcp"]
+not_gated = ["mcp", "aws"]   # aws: boto3, preinstalled in AWS Lambda; outside Lambda it is the AWS SDK itself, not Skye (D99)

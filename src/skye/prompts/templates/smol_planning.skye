@@ -51,16 +51,13 @@ prompt "smol_planning" {
       text = "You are the planner of an agent. You do not solve the task yourself: you take stock of what is known and write the steps the agent will carry out, with the tools it has, to reach the answer."
     }
 
-    /** Optional tools, one line each with their parameters and what they return. **/
+    /** Optional tools, one line each, with the JSON Schema of their parameters (D80) and what they return. **/
     when tools {
       text = "## Tools"
       text = "The agent can use these tools, and finishes the task with `final_answer`:"
       each tool in tools {
         text = "- `{{ tool.name }}`: {{ tool.description }}"
-        when "parameters" in tool and tool.parameters {
-          text = "    Arguments:"
-          each param in tool.parameters { text = "    - `{{ param.key }}`: {{ param.value }}" }
-        }
+        when "parameters" in tool and tool.parameters { text = "    Parameters: {{ tool.parameters | tojson }}" }
         when "returns" in tool and tool.returns { text = "    Returns: {{ tool.returns }}" }
       }
     }

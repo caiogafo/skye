@@ -1,7 +1,7 @@
 """Fallbacks, retry policies, health, usage and cooldown of a router.
 
-A router balances several targets, falls back to other models when one fails, and tracks the health and the rate-limit usage of each
-model. State can live in memory, or in an external store (Redis, DynamoDB) when the process does not survive between invocations.
+A router balances targets, falls back when one fails, retries per error class of ``skye.exceptions`` (waiting 1 s, 2 s, 4 s here) and
+tracks health and usage. State lives in memory, or in a store passed as ``storage=`` when the process does not survive between calls.
 
 With OPENAI_API_KEY set the targets are OpenAI models; without a key they are a scripted provider, and the example says which.
 """
@@ -36,8 +36,8 @@ def main() -> None:
         ],
         fallbacks=[FallbackConfig(primary="gpt-4", fallbacks=["gpt-3.5-turbo"])],
         retry_policies=[
-            RetryPolicyConfig(error_type="RateLimitError", max_retries=3),
-            RetryPolicyConfig(error_type="TimeoutError", max_retries=2),
+            RetryPolicyConfig(error_type="RateLimitError", max_retries=3, retry_after_seconds=1.0, exponential_backoff=True),
+            RetryPolicyConfig(error_type="ProviderTimeoutError", max_retries=2),
         ],
     )
 

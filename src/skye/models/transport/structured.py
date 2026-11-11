@@ -2,6 +2,8 @@
 
 ``response_schema`` is a dataclass (the standard, ``@validated`` or plain ``@dataclass``). A class with
 ``model_json_schema`` and ``model_validate_json`` (a user's pydantic model) is accepted too, without the library importing pydantic.
+An ``OutputSchema`` of ``base`` (a JSON Schema from rendered prompt parts, D101) is accepted too;
+its reply is a ``dict``, checked against the whole schema (``schema_check``).
 A reply that does not conform raises ``ValidationError`` naming the field.
 """
 
@@ -13,7 +15,9 @@ from collections.abc import Mapping
 from typing import Any
 
 from skye.base.exceptions import ValidationError
+from skye.base.prompt_parts import OutputSchema
 from skye.base.validated import from_mapping, json_schema, validate_instance
+from skye.models.transport.schema_check import check_json
 
 
 STRUCTURED_TOOL = "skye_structured_output"
@@ -25,8 +29,27 @@ def schema_instruction(cls: Any) -> str:
     return "Reply only with a JSON object that follows this JSON Schema: " + json.dumps(schema_of(cls), separators=(",", ":"))
 
 
+def schema_name(cls: Any) -> str:
+    """The name sent to providers that ask for one: the ``OutputSchema`` name or the class name."""
+    if isinstance(cls, OutputSchema):
+        return cls.name
+    return str(getattr(cls, "__name__", "answer"))
+
+
+def wants_strict(cls: Any) -> bool:
+    """Whether strict adherence is asked: always for a class, as set for an ``OutputSchema``."""
+    return cls.strict if isinstance(cls, OutputSchema) else True
+
+
 def schema_of(cls: Any) -> dict[str, Any]:
-    """The JSON Schema of a declared output class (a dataclass, or a class with ``model_json_schema``)."""
+    """The JSON Schema of a declared output.
+
+    An ``OutputSchema``, a dataclass, or a class with ``model_json_schema``.
+    """
+    if isinstance(cls, OutputSchema):
+        # A deep, plain copy: the caller's mapping is never changed
+        copied: dict[str, Any] = json.loads(json.dumps(cls.schema))
+        return copied
     if hasattr(cls, "model_json_schema"):
         schema: dict[str, Any] = cls.model_json_schema()
         return schema
@@ -62,12 +85,48 @@ def strict_schema(schema: dict[str, Any]) -> dict[str, Any] | None:
     return converted
 
 
+#: Keywords a native JSON-output mode may reject (numeric and length bounds); the reply is still checked against them here.
+_LOOSE_KEYWORDS = frozenset({"minimum", "maximum", "exclusiveMinimum", "exclusiveMaximum", "multipleOf", "minLength", "maxLength"})
+
+
+def closed_schema(schema: Mapping[str, Any]) -> dict[str, Any]:
+    """The schema as a JSON-output mode with closed objects wants it (Anthropic ``output_config.format``).
+
+    Every object with ``properties`` gets ``additionalProperties: false`` unless it says otherwise, and the numeric and
+    length bounds are left out (the provider may reject them); :func:`parse_structured` still checks the reply against
+    the full schema.
+    """
+    def convert(node: Any) -> Any:
+        if not isinstance(node, Mapping):
+            return node
+        out: dict[str, Any] = {}
+        for key, value in node.items():
+            if key in _LOOSE_KEYWORDS:
+                continue
+            if key in ("properties", "$defs", "definitions", "patternProperties") and isinstance(value, Mapping):
+                out[key] = {name: convert(sub) for name, sub in value.items()}
+            elif key in ("anyOf", "allOf", "oneOf", "prefixItems") and isinstance(value, list):
+                out[key] = [convert(sub) for sub in value]
+            elif key in ("items", "additionalProperties", "not"):
+                out[key] = [convert(sub) for sub in value] if isinstance(value, list) else convert(value)
+            else:
+                out[key] = value
+        if ("properties" in out or out.get("type") == "object") and "additionalProperties" not in out:
+            out["additionalProperties"] = False
+        return out
+
+    converted: dict[str, Any] = convert(schema)
+    return converted
+
+
 class _NotStrict(Exception):
     pass
 
 
 def parse_structured(cls: Any, text: str) -> Any:
     """Read the JSON ``text`` of a reply as ``cls``; raises ``ValidationError`` naming the field when it does not conform."""
+    if isinstance(cls, OutputSchema):
+        return _parse_json_object(cls, text)
     name = getattr(cls, "__name__", str(cls))
     try:
         if hasattr(cls, "model_validate_json"):
@@ -98,4 +157,84 @@ def parse_structured(cls: Any, text: str) -> Any:
         raise ValidationError(f"The response does not conform to {name}: {e}", field=field, value=text) from e
 
 
-__all__ = ["STRUCTURED_TOOL", "schema_instruction", "schema_of", "strict_schema", "parse_structured"]
+def _parse_json_object(output: OutputSchema, text: str) -> dict[str, Any]:
+    """The reply as a ``dict``, checked against the whole schema (types, nested objects, arrays, enums, required)."""
+    try:
+        data = json.loads(text)
+    except json.JSONDecodeError as e:
+        raise ValidationError(
+            f"The response is not JSON for {output.name}: {e}", field="<root>", value=text
+        ) from e
+    if not isinstance(data, dict):
+        raise ValidationError(
+            f"The response is not a JSON object for {output.name}", field="<root>", value=text
+        )
+    check_json(data, output.schema, name=output.name, text=text)
+    return data
+
+
+_GEMINI_KEYS = {
+    "type", "format", "description", "nullable", "enum", "items", "properties", "required",
+    "minItems", "maxItems", "minimum", "maximum", "propertyOrdering", "anyOf", "title",
+}
+
+
+def gemini_schema(schema: Mapping[str, Any]) -> dict[str, Any] | None:
+    """The schema in Gemini's ``responseSchema`` subset, or ``None`` when it needs more.
+
+    Types are upper case (``STRING``, ``OBJECT``), ``["string", "null"]`` becomes ``nullable``,
+    and ``additionalProperties`` and ``$schema`` are dropped (Gemini rejects them). A ``$ref``,
+    ``$defs`` or another keyword outside the subset gives ``None``, and the caller asks for JSON
+    with the schema in the instructions instead.
+    """
+    def convert(node: Any) -> Any:
+        if not isinstance(node, Mapping):
+            raise _NotStrict
+        out: dict[str, Any] = {}
+        for key, value in node.items():
+            if key in ("additionalProperties", "$schema"):
+                continue
+            if key not in _GEMINI_KEYS:
+                raise _NotStrict
+            if key == "type":
+                types = [value] if isinstance(value, str) else list(value)
+                if "null" in types:
+                    out["nullable"] = True
+                    types.remove("null")
+                if len(types) != 1:
+                    raise _NotStrict
+                out["type"] = types[0].upper()
+            elif key == "properties":
+                out["properties"] = {name: convert(sub) for name, sub in value.items()}
+            elif key == "items":
+                out["items"] = convert(value)
+            elif key == "anyOf":
+                options = [sub for sub in value if sub.get("type") != "null"]
+                if len(options) < len(value):
+                    out["nullable"] = True
+                if len(options) == 1:
+                    out.update(convert(options[0]))
+                else:
+                    out["anyOf"] = [convert(sub) for sub in options]
+            else:
+                out[key] = value
+        return out
+
+    try:
+        converted: dict[str, Any] = convert(schema)
+    except (_NotStrict, AttributeError, TypeError):
+        return None
+    return converted
+
+
+__all__ = [
+    "STRUCTURED_TOOL",
+    "closed_schema",
+    "gemini_schema",
+    "parse_structured",
+    "schema_instruction",
+    "schema_name",
+    "schema_of",
+    "strict_schema",
+    "wants_strict",
+]

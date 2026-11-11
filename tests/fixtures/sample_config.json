@@ -1,23 +1,7 @@
 {
   "log_level": "DEBUG",
-  "enable_telemetry": false,
   "correlation_id_header": "X-Request-ID",
-  "default_routing_strategy": "least_busy",
-  "enable_fallbacks": false,
-  "enable_rate_limiting": false,
-  "models": {
-    "gpt-3.5": {
-      "model_id": "gpt-3.5-turbo",
-      "provider": "openai",
-      "temperature": 0.8,
-      "max_tokens": 1000,
-      "timeout": 30
-    }
-  },
-  "plugins": {
-    "guard": {
-      "type": "content_filter",
-      "enabled": true
-    }
+  "component_log_levels": {
+    "router": "WARNING"
   }
 }

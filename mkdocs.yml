@@ -1,5 +1,5 @@
 site_name: Skye
-site_description: Modular GenAI library for building AI agents and intelligent applications
+site_description: A serverless-first Python library for LLM applications and agents, standard library only
 site_url: !ENV [READTHEDOCS_CANONICAL_URL, "https://skye.readthedocs.io/en/latest/"]
 repo_url: https://github.com/ggiallo28/skye
 repo_name: ggiallo28/skye
@@ -7,75 +7,160 @@ edit_uri: edit/main/docs/
 docs_dir: docs
 exclude_docs: |
   _notes/
+  _hooks/
+
+# Syntax highlighting for ```skye code blocks (decision D103); the lexer lives with the docs, not in the package.
+hooks:
+  - docs/_hooks/skye_lexer.py
 
 theme:
   name: material
   features:
+    - navigation.tabs
+    - navigation.tabs.sticky
     - navigation.sections
+    - navigation.indexes
     - navigation.top
+    - navigation.footer
+    - navigation.instant
     - search.suggest
+    - search.highlight
     - content.code.copy
+    - content.code.annotate
+    - content.tabs.link
+    - toc.follow
   palette:
     - media: "(prefers-color-scheme: light)"
       scheme: default
+      primary: indigo
+      accent: light blue
       toggle:
         icon: material/brightness-7
         name: Dark mode
     - media: "(prefers-color-scheme: dark)"
       scheme: slate
+      primary: indigo
+      accent: light blue
       toggle:
         icon: material/brightness-4
         name: Light mode
+  icon:
+    repo: fontawesome/brands/github
+
+plugins:
+  - search
+  - git-revision-date-localized:
+      type: date
+      fallback_to_build_date: true
+  - mkdocstrings:
+      handlers:
+        python:
+          paths: [src]
+          options:
+            docstring_style: google
+            show_source: false
+            show_root_heading: true
+            show_root_full_path: false
+            members_order: source
+            filters: ["!^_"]
+            show_signature_annotations: true
+            separate_signature: true
+            merge_init_into_class: true
+            show_if_no_docstring: false
+            docstring_options:
+              warn_unknown_params: false
+              warn_missing_types: false
 
 markdown_extensions:
   - admonition
+  - attr_list
+  - md_in_html
   - tables
   - toc:
       permalink: true
-  - pymdownx.highlight
-  - pymdownx.superfences
+  - pymdownx.details
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets:
+      base_path: ["."]
+      check_paths: true
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.tabbed:
+      alternate_style: true
 
 nav:
   - Home: index.md
-  - Getting started: getting-started.md
-  - Architecture: architecture.md
-  - Base:
-      - Overview: base/index.md
-      - The .skye language: base/skye-language.md
-      - Editor support: base/editor.md
-      - Configuration: base/configuration.md
-      - Core interfaces: base/interfaces.md
-      - Extending Skye: base/extending.md
-  - Models:
-      - Overview: models/index.md
-      - Provider guide: models/provider-guide.md
-      - Structured outputs: models/structured-outputs.md
-      - Provider transformation architecture: models/provider-transformation-architecture.md
-      - Provider architecture validation: models/provider-architecture-validation.md
-      - Provider consolidation summary: models/provider-consolidation-summary.md
-  - Router:
-      - Overview: router/index.md
-      - Routing guide: router/routing-guide.md
-      - Advanced features: router/overview.md
-  - Prompts: prompts/index.md
-  - Tools:
-      - Overview: tools/index.md
-      - Function calling: tools/function-calling.md
-  - Auth: auth/index.md
-  - Agents: agents/index.md
-  - Memory: memory/index.md
-  - Store: store/index.md
-  - Teams: teams/index.md
-  - Flows: flows/index.md
-  - Guard: guard/index.md
-  - Policy: policy/index.md
-  - Gateway: gateway/index.md
-  - Observe:
-      - Overview: observe/index.md
-      - Observability: observe/observability.md
+  - Get started:
+      - get-started/index.md
+      - First model call: get-started/first-call.md
+      - First router: get-started/first-router.md
+      - First .skye file: get-started/first-skye-file.md
+      - Deploy on AWS Lambda: get-started/lambda.md
+  - Guides:
+      - guides/index.md
+      - Models:
+          - Call a provider: guides/models/call-a-provider.md
+          - Streaming and async: guides/models/streaming.md
+          - Structured output: guides/models/structured-output.md
+          - Images: guides/models/images.md
+          - Embeddings: guides/models/embeddings.md
+          - Tokens and cost: guides/models/tokens-and-cost.md
+      - Routing:
+          - Aliases and fallbacks: guides/routing/aliases-and-fallbacks.md
+          - Strategies: guides/routing/strategies.md
+          - Health and cooldown: guides/routing/health-and-cooldown.md
+          - Router state in a store: guides/routing/router-state.md
+      - Prompts:
+          - Write a prompt in .skye: guides/prompts/write-a-prompt.md
+          - Variables and filters: guides/prompts/variables-and-filters.md
+          - Few-shot examples: guides/prompts/few-shot.md
+          - Output schema: guides/prompts/output-schema.md
+      - Tools:
+          - Local functions: guides/tools/local-functions.md
+          - Remote APIs: guides/tools/remote-apis.md
+          - MCP client: guides/tools/mcp-client.md
+      - State:
+          - Choose a store backend: guides/state/choose-a-backend.md
+      - Security:
+          - Credentials and secrets: guides/security/credentials.md
+      - Configuration: guides/configuration.md
+      - Observability: guides/observability.md
+      - Extend Skye:
+          - guides/extend/index.md
+          - Custom provider: guides/extend/custom-provider.md
+          - Custom store backend: guides/extend/custom-store.md
+          - Custom capability: guides/extend/custom-capability.md
+  - Concepts:
+      - concepts/index.md
+      - Architecture: concepts/architecture.md
+      - Serverless first: concepts/serverless-first.md
+      - The .skye language: concepts/skye-language.md
+      - Agents (preview): concepts/agents-preview.md
   - Reference:
-      - Size and load budgets: budgets.md
-      - Deployment: deployment.md
-      - Development: development.md
-      - Glossary: glossary.md
-      - Roadmap: roadmap.md
+      - reference/index.md
+      - Python API:
+          - skye: reference/api/skye.md
+          - skye.models: reference/api/models.md
+          - skye.router: reference/api/router.md
+          - skye.prompts: reference/api/prompts.md
+          - skye.tools: reference/api/tools.md
+          - skye.store: reference/api/store.md
+          - skye.auth: reference/api/auth.md
+          - skye.dsl: reference/api/dsl.md
+          - skye.interfaces: reference/api/interfaces.md
+          - skye.exceptions: reference/api/exceptions.md
+      - CLI: reference/cli.md
+      - .skye language: reference/skye-language.md
+      - Editor support: reference/editor.md
+      - Configuration keys: reference/configuration-keys.md
+      - Extras: reference/extras.md
+  - Project:
+      - Status and roadmap: project/roadmap.md
+      - Size and load budgets: project/budgets.md
+      - Contributing: project/contributing.md
+      - Glossary: project/glossary.md

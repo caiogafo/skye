@@ -83,7 +83,7 @@ requirement or decision directly. A task that depended on an open decision names
       `StorageAdapterInterface` from `__all__` (and the facade, the extension page and the tests that list them); `ModelInterface` does not extend `Runnable`.
     - _Requirements: 7.1; D41_
   - [x] 3.7 Port docstring footer
-    - Evidence: footer in the 22 Port modules; `tests/unit/test_port_docstrings.py`. Wording came from Port docstrings and a few implementations; Kiro or the owner should review it against the code.
+    - Evidence: footer in the 22 Port modules; `tests/unit/test_port_docstrings.py`. Wording came from Port docstrings and a few implementations; the owner should review it against the code.
     - Add `Raises:`, `Missing:`, `Concurrency:` to each of the 23 Port modules under `base/interfaces/`; a test
       (`tests/unit/test_port_docstrings.py`) fails on a missing label. Content comes from reading each implementation, not guessed.
     - _Requirements: 6.1_
@@ -250,7 +250,7 @@ requirement or decision directly. A task that depended on an open decision names
       this moot.
     - _Requirements: 7.4 of steering; O4_
 
-- [x] 7. Checkpoint (run by Kiro, not by the implementer)
+- [x] 7. Checkpoint (run by a reviewer, not by the implementer)
   - [x] 7.1 Run the whole test suite and fix what fails; ask the user if questions arise
     - Evidence (2026-11-07, offline, on the regenerated `uv.lock`): `uv run pytest tests -q` gave 2295 passed, 3 skipped, 0 failed; `uv run pytest tests/budget -q` gave 290 passed.
       Failures found and fixed: `examples/serverless/lambda_handler.py` created a Bedrock client at import with no credentials (it also failed on the clean HEAD; it now uses
@@ -259,7 +259,7 @@ requirement or decision directly. A task that depended on an open decision names
       `KNOWN_STALE`, `known_leaks`, `known_import_failures`, `known_compiled`; non-empty with a named debt are `KNOWN_DUPLICATES` (the two older `tools` copies of `CapabilitySchema` and
       `CapabilityInterface`), `KNOWN_LONG` (`advanced/custom_providers.py`, 90 lines, because `BaseModelProvider` has 11 abstract hooks; proposal S5.5, not yet a task) and
       `KNOWN_FOLDERS` (`prompts/`, `prompts:5`).
-    - Kiro runs `uv run pytest tests/ -q` and `uv run pytest tests/budget -q`. The implementation of the other tasks was written without
+    - The reviewer runs `uv run pytest tests/ -q` and `uv run pytest tests/budget -q`. The implementation of the other tasks was written without
       running the suite, so expect to repair failures in the new tests and in the code they guard: do that here, one failure at a time.
     - Confirm every new allowlist (`KNOWN_DUPLICATES`, `KNOWN_MISMATCHES`, `KNOWN_LONG`) is non-empty only where a real, named debt remains.
     - Report which tasks are still unticked: after D36 to D45 only the split of long examples in 5.8 may remain.

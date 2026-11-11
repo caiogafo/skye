@@ -2,12 +2,20 @@
 
 Pure standard library: no third-party import. ``models.transport.http`` re-exports the
 JSON helpers; ``tools.remote_api`` uses :func:`request`.
+
+A failure is raised as the :class:`ProviderError` subclass the response calls for (decision D104):
+429 is :class:`RateLimitError`, 5xx :class:`ServerError`, 401 and 403 :class:`AuthenticationError`,
+any other 4xx :class:`BadRequestError` (:class:`ContentPolicyError` when the body names a content
+policy), a timeout or a dropped connection :class:`ProviderTimeoutError`. The server's
+``Retry-After`` (or ``retry-after-ms``) header becomes ``retry_after`` in seconds.
 """
 
 from __future__ import annotations
 
 import base64
+import email.utils
 import json
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -15,23 +23,105 @@ from collections.abc import Iterator
 from dataclasses import dataclass
 from typing import Any
 
-from skye.base.exceptions import ProviderError
+from skye.base.exceptions import (
+    AuthenticationError,
+    BadRequestError,
+    ContentPolicyError,
+    ProviderError,
+    ProviderTimeoutError,
+    RateLimitError,
+    ServerError,
+)
+
+#: Text in an error body that marks a content-policy refusal (OpenAI, Azure OpenAI), lowercase.
+CONTENT_POLICY_MARKERS = (
+    "content_policy",
+    "content_filter",
+    "content policy",
+    "content management policy",
+)
 
 
-def _build(url: str, payload: Any, headers: dict[str, str] | None, method: str) -> urllib.request.Request:
+def _build(
+    url: str, payload: Any, headers: dict[str, str] | None, method: str
+) -> urllib.request.Request:
     hdrs = {"Content-Type": "application/json", **(headers or {})}
     body = json.dumps(payload).encode("utf-8") if payload is not None else None
     return urllib.request.Request(url, data=body, headers=hdrs, method=method)
 
 
+def retry_after_seconds(headers: Any) -> float | None:
+    """The wait a response asks for, in seconds, from ``retry-after-ms`` or ``Retry-After``.
+
+    ``Retry-After`` is a number of seconds or an HTTP date (a date in the past gives ``0.0``).
+
+    Args:
+        headers: The response headers (anything with ``get``), or ``None``.
+
+    Returns:
+        The seconds to wait, or ``None`` when the headers say nothing readable.
+    """
+    if headers is None:
+        return None
+    millis = headers.get("retry-after-ms")
+    if millis:
+        try:
+            return max(float(millis) / 1000.0, 0.0)
+        except ValueError:
+            pass
+    value = headers.get("Retry-After")
+    if not value:
+        return None
+    try:
+        return max(float(value), 0.0)
+    except ValueError:
+        pass
+    try:
+        when = email.utils.parsedate_to_datetime(value)
+    except (TypeError, ValueError):
+        return None
+    return float(max(when.timestamp() - time.time(), 0.0))
+
+
+def _status_class(status: int, body: str) -> type[ProviderError]:
+    if status == 429:
+        return RateLimitError
+    if status >= 500:
+        return ServerError
+    if status in (401, 403):
+        return AuthenticationError
+    if 400 <= status < 500:
+        lowered = body.lower()
+        if any(marker in lowered for marker in CONTENT_POLICY_MARKERS):
+            return ContentPolicyError
+        return BadRequestError
+    return ProviderError
+
+
+def _is_timeout(e: BaseException) -> bool:
+    reason = e.reason if isinstance(e, urllib.error.URLError) else e
+    if isinstance(reason, TimeoutError):  # socket.timeout is TimeoutError
+        return True
+    return isinstance(reason, ConnectionError) and not isinstance(reason, ConnectionRefusedError)
+
+
 def _wrap(e: Exception, provider: str) -> ProviderError:
+    err: ProviderError
     if isinstance(e, urllib.error.HTTPError):
         detail = ""
         try:
             detail = e.read().decode("utf-8", "replace")
         except Exception:  # pragma: no cover - best effort
             pass
-        err = ProviderError(f"HTTP {e.code}: {detail or e.reason}", provider=provider, status_code=e.code)
+        cls = _status_class(e.code, detail)
+        err = cls(
+            f"HTTP {e.code}: {detail or e.reason}",
+            provider=provider,
+            status_code=e.code,
+            retry_after=retry_after_seconds(e.headers),
+        )
+    elif _is_timeout(e):
+        err = ProviderTimeoutError(f"Timeout or dropped connection: {e}", provider=provider)
     else:
         err = ProviderError(f"Transport error: {e}", provider=provider)
     err.__cause__ = e
@@ -139,7 +229,8 @@ def request(
 ) -> HttpResponse:
     """Send a request (query ``params`` and/or a JSON body) and return the raw response.
 
-    Raises :class:`ProviderError` (with ``status_code``) on an HTTP error status or a
+    Raises the :class:`ProviderError` subclass of the status (with ``status_code``) on an HTTP
+    error status, :class:`ProviderTimeoutError` on a timeout, a plain ``ProviderError`` on another
     transport failure.
     """
     if params:

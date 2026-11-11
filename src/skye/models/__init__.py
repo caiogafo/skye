@@ -29,6 +29,12 @@ Example:
     >>> embedder = ProviderRegistry.get_embedding_provider("openai", model="text-embedding-3-small")
     >>> vectors = embedder.encode_batch(["text1", "text2"])
 
+A custom provider that calls an HTTP service uses the same standard-library transport as the
+built-in ones: ``post_json(url, payload, headers=..., authenticator=..., provider=...)`` returns
+the decoded JSON as a ``JsonObject`` (attribute access), ``stream_sse_json`` yields one per
+server-sent event. Both raise the ``ProviderError`` subclass of the response (D104), which is
+what the client's retries read.
+
 Codename: zephyr.
 """
 
@@ -51,6 +57,12 @@ from skye.models.decision.jev import JevDecisionModel
 from skye.models.transport.multimodal import ImageHandler
 from skye.models.registry import ProviderRegistry
 from skye.models.transport.token_counter import TokenCounter
+from skye.models.transport import rest as _rest
+
+# The HTTP transport of the built-in adapters, public for custom providers
+JsonObject = _rest.JsonObject
+post_json = _rest.post_json
+stream_sse_json = _rest.stream_sse_json
 
 # Register model providers
 ProviderRegistry.register_model_provider("openai", OpenAIProvider)
@@ -85,4 +97,7 @@ __all__ = [
     "CohereEmbeddingProvider",
     "GoogleEmbeddingProvider",
     "GoogleMultimodalEmbeddingProvider",
+    "JsonObject",
+    "post_json",
+    "stream_sse_json",
 ]

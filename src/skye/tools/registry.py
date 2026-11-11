@@ -12,14 +12,15 @@ from typing import Any
 
 from skye.base.capability_execution import arun_capability_call, format_capability_result
 from skye.base.completion import CapabilityCall
+from skye.base.interfaces.capability import CapabilityInterface, CapabilitySchema
 from skye.base.interfaces.tool_provider import CapabilityContext
 from skye.base.messages import CapabilityMessage
 from skye.tools.exceptions import (
+    CapabilityError,
+    CapabilityExecutionError,
     CapabilityNotFoundError,
     CapabilityValidationError,
 )
-from skye.tools.interface import CapabilityInterface
-from skye.tools.schema import CapabilitySchema
 
 logger = logging.getLogger(__name__)
 
@@ -255,11 +256,7 @@ class CapabilityRegistry:
         """
         with self._registry_lock:
             prefix = namespace if namespace.endswith(".") else f"{namespace}."
-            return [
-                cap
-                for name, cap in self._capabilities.items()
-                if name.startswith(prefix)
-            ]
+            return [cap for name, cap in self._capabilities.items() if name.startswith(prefix)]
 
     def count(self) -> int:
         """Get the total number of registered capabilities.
@@ -342,9 +339,7 @@ class CapabilityRegistry:
                 query_lower = query.lower()
 
                 # Calculate similarity using SequenceMatcher
-                similarity = SequenceMatcher(
-                    None, query_lower, searchable_text
-                ).ratio()
+                similarity = SequenceMatcher(None, query_lower, searchable_text).ratio()
 
                 # Also check for substring matches (boost score)
                 if query_lower in searchable_text:
@@ -469,7 +464,8 @@ class CapabilityRegistry:
 
         Raises:
             CapabilityNotFoundError: If the capability is not registered
-            CapabilityValidationError: If execution fails
+            CapabilityValidationError: If the arguments do not match the schema
+            CapabilityExecutionError: If the capability fails while running
 
         Example:
             >>> registry = CapabilityRegistry.get_instance()
@@ -491,13 +487,10 @@ class CapabilityRegistry:
             result = capability.execute(**arguments)
 
             # Log execution
+            # The arguments are never logged: they may hold personal data
             logger.info(
                 "Capability executed successfully",
-                extra={
-                    "capability_name": capability_name,
-                    "tool_call_id": tool_call_id,
-                    "arguments": arguments,
-                },
+                extra={"capability_name": capability_name, "tool_call_id": tool_call_id},
             )
 
             # Return raw result if requested
@@ -515,16 +508,19 @@ class CapabilityRegistry:
                 capability_name=capability_name,
             )
 
+        except CapabilityError:
+            # A validation error (bad arguments) stays one; an execution error is already one
+            raise
         except Exception as e:
             logger.error(
                 "Capability execution failed",
                 extra={
                     "capability_name": capability_name,
                     "tool_call_id": tool_call_id,
-                    "error": str(e),
+                    "error_type": type(e).__name__,
                 },
             )
-            raise CapabilityValidationError(
+            raise CapabilityExecutionError(
                 f"Failed to execute capability '{capability_name}': {e}",
                 capability_name=capability_name,
                 original_error=str(e),
@@ -556,7 +552,8 @@ class CapabilityRegistry:
 
         Raises:
             CapabilityNotFoundError: If the capability is not registered
-            CapabilityValidationError: If execution fails
+            CapabilityValidationError: If the arguments do not match the schema
+            CapabilityExecutionError: If the capability fails while running
 
         Example:
             >>> registry = CapabilityRegistry.get_instance()
@@ -578,13 +575,10 @@ class CapabilityRegistry:
             result = await capability.aexecute(**arguments)
 
             # Log execution
+            # The arguments are never logged: they may hold personal data
             logger.info(
                 "Capability executed successfully (async)",
-                extra={
-                    "capability_name": capability_name,
-                    "tool_call_id": tool_call_id,
-                    "arguments": arguments,
-                },
+                extra={"capability_name": capability_name, "tool_call_id": tool_call_id},
             )
 
             # Return raw result if requested
@@ -602,16 +596,19 @@ class CapabilityRegistry:
                 capability_name=capability_name,
             )
 
+        except CapabilityError:
+            # A validation error (bad arguments) stays one; an execution error is already one
+            raise
         except Exception as e:
             logger.error(
                 "Capability execution failed (async)",
                 extra={
                     "capability_name": capability_name,
                     "tool_call_id": tool_call_id,
-                    "error": str(e),
+                    "error_type": type(e).__name__,
                 },
             )
-            raise CapabilityValidationError(
+            raise CapabilityExecutionError(
                 f"Failed to execute capability '{capability_name}': {e}",
                 capability_name=capability_name,
                 original_error=str(e),

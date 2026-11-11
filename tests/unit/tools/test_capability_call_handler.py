@@ -8,9 +8,9 @@ from skye.base.completion import CompleteResponse, TokenUsage
 from skye.tools.capability_call_handler import CapabilityCallHandler
 from skye.tools.capability_models import CapabilityCall, CapabilityResult
 from skye.tools.exceptions import CapabilityCallParsingError
-from skye.tools.interface import CapabilityInterface
+from skye.base.interfaces.capability import CapabilityInterface
 from skye.tools.registry import CapabilityRegistry
-from skye.tools.schema import CapabilitySchema
+from skye.base.interfaces.capability import CapabilitySchema
 
 
 class MockCapability(CapabilityInterface):

@@ -15,7 +15,7 @@ Example:
     >>> from skye.base.completion import CompleteRequest
     >>> from skye.base.messages import UserMessage
     >>>
-    >>> provider = BedrockProvider(region_name="us-east-1")
+    >>> provider = BedrockProvider(region_name="us-east-1")  # or set AWS_REGION and pass nothing
     >>> request = CompleteRequest(
     ...     messages=[UserMessage(content="Hello")],
     ...     model="anthropic.claude-3-sonnet-20240229-v1:0"
@@ -32,11 +32,35 @@ from collections.abc import Iterator
 from datetime import datetime, timezone
 from typing import Any
 
+from skye.base.prompt_parts import PromptParts
+from skye.models.transport.cost import usage_of
 from skye.base.completion import CompleteRequest, CompleteResponse, StreamChunk, TokenUsage
+from skye.base.interfaces.authentication import AuthenticationInterface
 from skye.models.base import BaseModelProvider
-from skye.models.transport.structured import STRUCTURED_TOOL, schema_of
+from skye.models.transport.credentials import resolve_aws_region
+from skye.models.transport.structured import (
+    STRUCTURED_TOOL,
+    closed_schema,
+    schema_instruction,
+    schema_name,
+    schema_of,
+)
 from skye.models.transport import rest
 from skye.models.transport.eventstream import post_eventstream_json
+
+
+#: The Claude models that refuse a forced ``toolChoice`` (``any`` or ``tool``); the same list as the
+#: Anthropic adapter's (an adapter imports no other adapter; a test keeps the two equal). D108.
+CLAUDE_REFUSING_FORCED_CHOICE = ("opus-5-5", "sonnet-5-5", "fable-5-1", "mythos-5-1")
+
+
+def _native_json_output(model: str | None) -> bool:
+    """Whether a Bedrock model takes ``outputConfig.textFormat``: the Anthropic Claude models.
+
+    Model ids look like ``anthropic.claude-...``, or with a cross-Region prefix ``us.anthropic.claude-...``.
+    """
+    name = (model or "").lower()
+    return "anthropic." in name or "claude" in name
 
 
 class BedrockProvider(BaseModelProvider):
@@ -48,43 +72,53 @@ class BedrockProvider(BaseModelProvider):
     Uses the built-in stdlib REST adapter; no AWS SDK is imported.
     
     Args:
-        region_name: AWS region name (default: "us-east-1")
+        region_name: AWS region name; when omitted, the region of ``authenticator``, then
+            ``AWS_REGION``, then ``AWS_DEFAULT_REGION`` (there is no silent default)
         profile_name: Optional AWS profile name
-        **kwargs: Additional configuration parameters
-    
+        authenticator: An authenticator already built (``skye.auth.aws.bedrock_authenticator``);
+            its ``region`` is used when ``region_name`` is not given
+        **kwargs: Additional configuration parameters (``api_key``, ``aws_access_key_id``,
+            ``aws_secret_access_key``, ``aws_session_token``, ``endpoint_url``, ``timeout``)
+
+    Raises:
+        ConfigurationError: No region is given or found; the message names ``AWS_REGION``.
+
     Example:
         >>> provider = BedrockProvider(region_name="us-west-2")
         >>> response = provider.complete(request)
     """
 
-    
     def __init__(
         self,
-        region_name: str = "us-east-1",
+        region_name: str | None = None,
         profile_name: str | None = None,
+        authenticator: AuthenticationInterface | None = None,
         **kwargs: Any
     ) -> None:
         """Initialize Bedrock provider.
-        
+
         Args:
-            region_name: AWS region name (default: "us-east-1")
+            region_name: AWS region name (see the class docstring for the fallbacks)
             profile_name: Optional AWS profile name
+            authenticator: Optional authenticator already built
             **kwargs: Additional configuration parameters
         """
+        region = resolve_aws_region(region_name, authenticator)
         super().__init__(
-            region_name=region_name,
+            region_name=region,
             profile_name=profile_name,
             **kwargs
         )
-        self.region_name = region_name
+        self.region_name = region
         self.profile_name = profile_name
-    
+        self._auth: Any = authenticator
+
     def _initialize_client(self) -> Any:
         """No vendor client: requests go through the stdlib REST transport."""
         return None
 
     def _authenticator(self) -> Any:
-        if getattr(self, "_auth", None) is None:
+        if self._auth is None:
             from skye.auth.aws import bedrock_authenticator
 
             self._auth = bedrock_authenticator(
@@ -105,7 +139,7 @@ class BedrockProvider(BaseModelProvider):
 
     async def acomplete(
         self,
-        messages: list[Any] | str | CompleteRequest | None = None,
+        messages: list[Any] | str | CompleteRequest | PromptParts | None = None,
         model: str | None = None,
         router: Any | None = None,
         temperature: float | None = None,
@@ -174,7 +208,15 @@ class BedrockProvider(BaseModelProvider):
                         for call in msg.capability_calls
                     ]
                 result.append({"role": msg.role, "content": content})
-        return result
+        # Converse wants the roles to alternate: consecutive user (or assistant) messages, such as
+        # several capability results or the instruction of an emulated choice (D108), become one.
+        merged: list[dict[str, Any]] = []
+        for entry in result:
+            if merged and entry["role"] != "system" and merged[-1]["role"] == entry["role"]:
+                merged[-1] = {"role": entry["role"], "content": [*merged[-1]["content"], *entry["content"]]}
+            else:
+                merged.append(entry)
+        return merged
     
     def _transform_capabilities(self, capabilities: list[Any]) -> list[dict[str, Any]]:
         """Transform Skye capabilities to Bedrock Converse API format.
@@ -276,14 +318,27 @@ class BedrockProvider(BaseModelProvider):
         if not request.messages:
             raise ValueError("messages must be provided for Bedrock provider")
         
+        messages = self._transform_messages(request.messages)
+        # Converse takes the system prompt as a top-level field, not as a message
+        system = [block for m in messages if m["role"] == "system" for block in m["content"]]
         bedrock_request: dict[str, Any] = {
             "modelId": request.model,
-            "messages": self._transform_messages(request.messages),
+            "messages": [m for m in messages if m["role"] != "system"],
             "inferenceConfig": {
                 "temperature": request.temperature
             }
         }
         
+        # Claude models take the schema natively (``outputConfig.textFormat``, below). Other Converse models
+        # cannot force the answer tool and offer the others in one turn, so with capabilities the schema
+        # travels as instructions and the final text answer is checked against it.
+        native = bool(request.response_schema) and _native_json_output(request.model)
+        if request.response_schema and request.capabilities and not native:
+            system = [*system, {"text": schema_instruction(request.response_schema)}]
+
+        if system:
+            bedrock_request["system"] = system
+
         if request.max_tokens:
             bedrock_request["inferenceConfig"]["maxTokens"] = request.max_tokens
         
@@ -322,14 +377,30 @@ class BedrockProvider(BaseModelProvider):
                         # Already formatted capability choice
                         bedrock_request["toolConfig"]["toolChoice"] = request.capability_choice
         
-        # Structured output: no native mode, so the answer is forced through one tool (function calling)
-        if request.response_schema and not request.capabilities:
+        # Structured output on Claude: native JSON output, no forced tool (a forced ``toolChoice`` fails
+        # on Claude Opus 5.5, Sonnet 5.5 and Fable 5.1; owner decision of 2026-11-11). The schema is a
+        # JSON string and every object is closed, as Bedrock requires.
+        if native:
+            bedrock_request["outputConfig"] = {
+                "textFormat": {
+                    "type": "json_schema",
+                    "structure": {
+                        "jsonSchema": {
+                            "schema": json.dumps(closed_schema(schema_of(request.response_schema))),
+                            "name": schema_name(request.response_schema),
+                        }
+                    },
+                }
+            }
+
+        # Structured output on other Converse models: the answer is forced through one tool
+        if request.response_schema and not request.capabilities and not native:
             bedrock_request["toolConfig"] = {
                 "tools": [
                     {
                         "toolSpec": {
                             "name": STRUCTURED_TOOL,
-                            "description": f"Return the answer as a {request.response_schema.__name__}.",
+                            "description": f"Return the answer as a {schema_name(request.response_schema)}.",
                             "inputSchema": {"json": schema_of(request.response_schema)},
                         }
                     }
@@ -457,11 +528,16 @@ class BedrockProvider(BaseModelProvider):
             }
             finish_reason = finish_reason_map.get(stop_reason, stop_reason)
         
+        # The last event, "metadata", reports the tokens of the whole call.
+        reported = (chunk.get("metadata") or {}).get("usage") or {}
+        usage = usage_of(reported.get("inputTokens"), reported.get("outputTokens"), reported.get("totalTokens"))
+
         return StreamChunk(
             id="",  # Bedrock streaming doesn't provide chunk IDs
             delta=delta,
             finish_reason=finish_reason,
-            index=0
+            index=0,
+            usage=usage,
         )
     
     def _call_provider(self, request: dict[str, Any]) -> Any:
@@ -527,6 +603,11 @@ class BedrockProvider(BaseModelProvider):
 
         return formatted
     
+    def refuses_forced_choice(self, model: str) -> bool:
+        """The Claude models that refuse a forced ``tool_choice`` refuse ``toolChoice`` ``any`` and
+        ``tool`` on Bedrock as well (D108)."""
+        return bool(model) and any(name in model for name in CLAUDE_REFUSING_FORCED_CHOICE)
+
     def get_model_info(self) -> dict[str, Any]:
         """Return model metadata and capabilities.
         

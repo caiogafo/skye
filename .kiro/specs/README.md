@@ -24,6 +24,7 @@ component and is listed separately.
 | 15 | flows | stream | migrated | `3-runtime-flows/` |
 
 Cross-cutting (not a component): `0-base-structure` — system structure, the docs wiki and the old consolidation work; `0-base-uxui` — the
-public surface a user touches (import paths, names, Port contracts, examples, docstrings; decision D35, was `uxui`).
+public surface a user touches (import paths, names, Port contracts, examples, docstrings; decision D35, was `uxui`); `0-base-plugins` —
+plugins, the registrar and the provider profile (decisions D107 and D108, Requirements 56 to 61; requirements only, awaiting approval, then design and tasks).
 
 No spec is legacy any more: the four old folders (`prompts-support`, `policy-engine`, `agent-runtime`, `gateway`) were renamed with `git mv`, their `requirements.md` carries `codename` and `previous_name`, and `LEGACY_SPECS` in `tests/budget/test_specs_format.py` is empty. Every component spec has requirements, design and tasks except `gateway`, which has its requirements only: its design and tasks wait for open decision O19 (`12-decisions.md`), which asks whether a separate `gateway` stays a component or its work becomes the job of the `tools` registry. Until the owner decides, the spec keeps its place at layer 3 and Requirements 44 to 48 stay as they are. "Migrated" here means the spec files follow the Kiro format and cite steering; most tasks of `policy`, `agents`, `store` (partly), `router` (partly), `memory`, `guard`, `observe`, `teams` and `flows` are still open code work.

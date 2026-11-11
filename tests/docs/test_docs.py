@@ -1,7 +1,7 @@
 """Deterministic checks of the documentation wiki (Requirement 15.5).
 
 Every page under docs/ (except docs/_notes, which holds personal local notes and is not part of the wiki) has front matter with
-a title, a status and a last_updated date; every relative link in the wiki and in README.md resolves; and every page can be
+a title and a status (the date of a page comes from git, decision D103); every relative link in the wiki and in README.md resolves; and every page can be
 reached from docs/index.md by following links. Offline, no network.
 """
 
@@ -13,7 +13,10 @@ from pathlib import Path
 from tests.budget.measure import ROOT
 
 DOCS = ROOT / "docs"
-REQUIRED_KEYS = ("title", "status", "last_updated")
+REQUIRED_KEYS = ("title", "status")
+#: Pages that only link to others and may be short.
+INDEX_PAGES = {"index.md"}
+MIN_LINES = 20
 LINK = re.compile(r"(?<!\!)\[[^\]]*\]\(([^)\s]+)\)")
 
 
@@ -94,9 +97,42 @@ def test_the_checks_catch_a_bad_page(tmp_path):
 
 
 def test_extension_page_has_a_row_for_every_exported_name():
-    """Requirement 15.10: `docs/base/extending.md` lists every name of `skye.interfaces.__all__`."""
+    """Requirement 15.10: `docs/guides/extend/index.md` lists every name of `skye.interfaces.__all__`."""
     import skye.interfaces as interfaces
 
-    text = (DOCS / "base" / "extending.md").read_text(encoding="utf-8")
+    text = (DOCS / "guides" / "extend" / "index.md").read_text(encoding="utf-8")
     missing = [name for name in interfaces.__all__ if f"| `{name}` |" not in text]
-    assert not missing, f"docs/base/extending.md has no row for {missing}"
+    assert not missing, f"docs/guides/extend/index.md has no row for {missing}"
+
+
+def test_no_page_is_a_stub():
+    """D103: no empty page; a page that is not an index has at least MIN_LINES lines of content."""
+    short = []
+    for page in pages():
+        if page.name in INDEX_PAGES or "reference/api" in page.relative_to(DOCS).as_posix():
+            continue
+        body = re.sub(r"^---\n.*?\n---\n", "", page.read_text(encoding="utf-8"), flags=re.DOTALL)
+        lines = [line for line in body.splitlines() if line.strip()]
+        if len(lines) < MIN_LINES or "TODO" in body:
+            short.append(f"{page.relative_to(ROOT)} ({len(lines)} lines)")
+    assert not short, f"stub pages (fewer than {MIN_LINES} lines or a TODO): {short}"
+
+
+def test_no_page_dates_itself_by_hand():
+    """D103: the date of a page comes from git; `last_updated` and a codename line are not written in pages."""
+    bad = [
+        str(p.relative_to(ROOT))
+        for p in pages()
+        if "last_updated:" in p.read_text(encoding="utf-8") or "*codename:" in p.read_text(encoding="utf-8")
+    ]
+    assert not bad, f"pages with a hand-written date or a codename line: {bad}"
+
+
+def test_every_nav_entry_exists_and_every_page_is_in_the_nav():
+    """D103: mkdocs.yml and docs/ agree: no missing page, no page left out of the navigation."""
+    nav_text = (ROOT / "mkdocs.yml").read_text(encoding="utf-8").split("\nnav:", 1)[1]
+    in_nav = set(re.findall(r"([\w./-]+\.md)", nav_text))
+    missing = sorted(p for p in in_nav if not (DOCS / p).exists())
+    on_disk = {p.relative_to(DOCS).as_posix() for p in pages()}
+    left_out = sorted(on_disk - in_nav)
+    assert not missing and not left_out, f"in nav but missing: {missing}; not in nav: {left_out}"

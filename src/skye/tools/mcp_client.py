@@ -26,13 +26,12 @@ from typing import Any
 
 from skye.base import http
 from skye.base.exceptions import ConfigurationError, ProviderError, ValidationError
+from skye.base.interfaces.capability import CapabilityInterface, CapabilitySchema
 from skye.base.interfaces.resource import Resource, ResourceProviderInterface
 from skye.base.messages import SkyeMessage
 from skye.tools import mcp_boundary as boundary
 from skye.tools.exceptions import CapabilityExecutionError
-from skye.tools.interface import CapabilityInterface
 from skye.tools.mcp_boundary import MCPPrompt
-from skye.tools.schema import CapabilitySchema
 
 PROTOCOL_VERSION = "2025-06-18"
 

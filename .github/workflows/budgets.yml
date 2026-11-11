@@ -1,6 +1,6 @@
 name: budgets
 
-# Size and load budgets for Skye (see budgets.toml and docs/budgets.md).
+# Size and load budgets for Skye (see budgets.toml and docs/project/budgets.md).
 # A pull request that makes the library heavier, slower to load, or dependent on a
 # compiled package fails here.
 
@@ -44,9 +44,11 @@ jobs:
           - "test_core or test_serverless"
           # one target per extra that has a budget in budgets.toml (tests/budget/test_workflow_matrix.py keeps the list in step)
           - "test_extra_footprint and auth"
-          - "test_extra_footprint and memory"
           - "test_extra_footprint and postgres"
+          - "test_extra_footprint and postgres-asyncpg"
+          - "test_extra_footprint and redis"
           - "test_extra_footprint and tokens"
+          - "test_extra_footprint and valkey"
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v5

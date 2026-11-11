@@ -11,11 +11,70 @@ Example:
     >>> usage = TokenUsage(prompt_tokens=100, completion_tokens=50, total_tokens=150)
     >>> cost = CostCalculator.calculate_cost("gpt-4", usage)
     >>> print(f"${cost:.4f}")
-    $0.0045
+    $0.0060
 """
 
+import re
+from typing import Any
+
 from skye.base.completion import TokenUsage
+from skye.base.exceptions import ValidationError
 from skye.base.interfaces.cost_calculator import CostCalculatorInterface
+
+
+#: What may follow a known model name in the name a provider reports: a date (``-2024-08-06``, ``-20240229``), a
+#: version (``-0613``, ``@001``, ``:0``). Anything else is another model, not a dated one.
+_VERSION_SUFFIX = re.compile(r"-\d{4}-\d{2}-\d{2}|-\d{6,8}|-\d{4}|@[\w.-]+|:\d+")
+
+
+def usage_of(prompt: Any, completion: Any, total: Any = None) -> TokenUsage | None:
+    """The tokens a provider reported, or ``None`` when it reported none.
+
+    A missing, ``None`` or negative number counts as 0; both counts at 0 mean the provider said nothing.
+    ``total`` defaults to the sum of the two.
+
+    Example:
+        >>> usage_of(10, 5)
+        TokenUsage(prompt_tokens=10, completion_tokens=5, total_tokens=15)
+        >>> usage_of(None, 0) is None
+        True
+    """
+
+    def count(value: Any) -> int:
+        return value if isinstance(value, int) and not isinstance(value, bool) and value > 0 else 0
+
+    prompt_tokens, completion_tokens = count(prompt), count(completion)
+    if prompt_tokens == 0 and completion_tokens == 0:
+        return None
+    return TokenUsage(
+        prompt_tokens=prompt_tokens,
+        completion_tokens=completion_tokens,
+        total_tokens=count(total) or prompt_tokens + completion_tokens,
+    )
+
+
+def check_pricing(pricing: object) -> dict[str, float] | None:
+    """Return ``pricing`` when it is ``None`` or ``{"prompt": p, "completion": c}`` (USD per 1M tokens, 0 or more).
+
+    Raises:
+        ValidationError: The prices are not those two non-negative numbers.
+
+    Example:
+        >>> check_pricing({"prompt": 1, "completion": 2.5})
+        {'prompt': 1.0, 'completion': 2.5}
+    """
+    if pricing is None:
+        return None
+    if not isinstance(pricing, dict) or set(pricing) != {"prompt", "completion"}:
+        raise ValidationError(
+            'pricing must be {"prompt": price, "completion": price} in USD per 1M tokens', "pricing", pricing
+        )
+    prices: dict[str, float] = {}
+    for key, value in pricing.items():
+        if isinstance(value, bool) or not isinstance(value, (int, float)) or value < 0:
+            raise ValidationError(f"pricing[{key!r}] must be a number of 0 or more", "pricing", pricing)
+        prices[key] = float(value)
+    return prices
 
 
 class CostCalculator(CostCalculatorInterface):
@@ -24,8 +83,12 @@ class CostCalculator(CostCalculatorInterface):
     This class provides methods to estimate costs for API calls based on
     token usage and model pricing. Pricing is per 1M tokens.
 
+    The built-in prices are the list prices of November 2024 and are not kept up to date: newer
+    models are missing and prices change. For a real bill, pass your own prices
+    (``add_custom_pricing``) or read the provider's current price list.
+
     Attributes:
-        PRICING: Dictionary of pricing data for known models.
+        PRICING: Dictionary of pricing data for known models (list prices of November 2024).
 
     Example:
         >>> usage = TokenUsage(prompt_tokens=1000, completion_tokens=500, total_tokens=1500)
@@ -34,7 +97,7 @@ class CostCalculator(CostCalculatorInterface):
         True
     """
 
-    # Pricing data (per 1M tokens) - Updated as of November 2024
+    # Pricing data (per 1M tokens): list prices of November 2024, not updated since
     PRICING: dict[str, dict[str, float]] = {
         # OpenAI GPT-4 models
         "gpt-4-turbo": {"prompt": 10.00, "completion": 30.00},
@@ -150,6 +213,75 @@ class CostCalculator(CostCalculatorInterface):
             True
         """
         return cls.PRICING.get(model)
+
+    @classmethod
+    def pricing_for(cls, model: str) -> dict[str, float] | None:
+        """Pricing of ``model``, allowing a dated or versioned name: ``claude-3-opus-20240229`` finds ``claude-3-opus``.
+
+        The exact name wins. Otherwise the longest known name counts only when what follows it is a date or a version
+        (``-2024-08-06``, ``-20240229``, ``-0613``, ``@001``, ``:0``). Another model that merely starts with a known
+        name (``gpt-4o`` for ``gpt-4``) is not priced at the price of the shorter one: it has no price here.
+
+        Example:
+            >>> CostCalculator.pricing_for("gpt-4-0613") == CostCalculator.get_pricing("gpt-4")
+            True
+            >>> CostCalculator.pricing_for("claude-3-opus-20240229") == CostCalculator.get_pricing("claude-3-opus")
+            True
+            >>> CostCalculator.pricing_for("no-such-model") is None
+            True
+        """
+        exact = cls.PRICING.get(model)
+        if exact is not None:
+            return exact
+        known = [
+            name
+            for name in cls.PRICING
+            if model.startswith(name) and _VERSION_SUFFIX.fullmatch(model[len(name) :])
+        ]
+        return cls.PRICING[max(known, key=len)] if known else None
+
+    @classmethod
+    def breakdown(
+        cls,
+        model: str,
+        usage: TokenUsage,
+        custom_pricing: dict[str, float] | None = None,
+        *,
+        exact: bool = True,
+    ) -> dict[str, Any] | None:
+        """The cost of ``usage`` split into the prompt and the completion, or ``None`` when the model has no price.
+
+        Unlike :meth:`calculate_cost`, an unknown model is not 0.0: it is ``None``, so "free" is never guessed.
+
+        Args:
+            model: Model identifier (a dated name is accepted, see :meth:`pricing_for`).
+            usage: The tokens to price.
+            custom_pricing: Prices that win over the table (``prompt`` and ``completion``, USD per 1M tokens).
+            exact: ``True`` when the tokens are the provider's count, ``False`` when they were estimated.
+
+        Returns:
+            ``{"prompt": usd, "completion": usd, "total": usd, "currency": "USD", "exact": bool}``.
+
+        Example:
+            >>> usage = TokenUsage(prompt_tokens=1000, completion_tokens=500, total_tokens=1500)
+            >>> cost = CostCalculator.breakdown("gpt-4", usage)
+            >>> round(cost["prompt"], 4), round(cost["completion"], 4), round(cost["total"], 4)
+            (0.03, 0.03, 0.06)
+            >>> CostCalculator.breakdown("no-such-model", usage) is None
+            True
+        """
+        pricing = custom_pricing or cls.pricing_for(model)
+        if not pricing:
+            return None
+        prompt = (usage.prompt_tokens / 1_000_000) * pricing["prompt"]
+        completion = (usage.completion_tokens / 1_000_000) * pricing["completion"]
+        return {
+            "prompt": prompt,
+            "completion": completion,
+            "total": prompt + completion,
+            "currency": "USD",
+            "exact": exact,
+        }
 
     @classmethod
     def list_models(cls) -> list[str]:

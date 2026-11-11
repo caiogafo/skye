@@ -11,8 +11,9 @@ from unittest.mock import patch
 import pytest
 
 import skye
-from skye.base.exceptions import ValidationError
+from skye.base.exceptions import ProviderError, UnsupportedModalityError, ValidationError
 from skye.base.messages import UserMessage
+from skye.models.transport.retry import is_retryable
 from tests.examples.fake_network import fake_urlopen
 
 PIXEL = base64.b64decode(
@@ -74,8 +75,16 @@ def test_bedrock_sends_image_bytes_as_base64():
 
 
 def test_bedrock_rejects_an_image_url():
-    with pytest.raises(ValidationError):
-        _sent("bedrock", "anthropic.claude-3-sonnet", UserMessage(content="x", images=["https://x/y.png"]), region_name="us-east-1", aws_access_key_id="a", aws_secret_access_key="b")
+    """Requirement 26.3: a ProviderError that names the modality; the input is left unchanged; nothing is retried."""
+    message = UserMessage(content="x", images=["https://x/y.png"])
+    with pytest.raises(UnsupportedModalityError) as caught:
+        _sent("bedrock", "anthropic.claude-3-sonnet", message, region_name="us-east-1", aws_access_key_id="a", aws_secret_access_key="b")
+    error = caught.value
+    assert isinstance(error, ProviderError) and not isinstance(error, ValidationError)
+    assert error.modality == "image" and error.provider == "bedrock" and error.status_code is None
+    assert "image" in str(error)
+    assert message.images == ["https://x/y.png"] and message.content == "x"
+    assert not is_retryable(error)
 
 
 def test_google_gets_inline_data_and_file_uri_parts():

@@ -2,9 +2,10 @@
 
 Discovers template files in the `templates/` directory and registers them on a
 prompt builder (liteprompt-style loaders and registry; rendering uses the stdlib engine in
-`skye.prompts.engine`, not Jinja2). `*.skye` prompt files (D60) are read next to `*.jinja`,
-`*.txt`, `*.template` and `*.tmpl`; when a `.skye` file and another file share a name, only the
-`.skye` one is registered.
+`skye.prompts.engine`, not Jinja2, interpolation only). `*.skye` prompt files (D60) are read next
+to `*.jinja`, `*.txt`, `*.template` and `*.tmpl` text templates (`{{ }}` and filters; a `{% %}`
+tag makes the file fail to load, D76); when a `.skye` file and another file share a name, only
+the `.skye` one is registered.
 """
 
 from __future__ import annotations

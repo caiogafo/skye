@@ -7,6 +7,7 @@ import pytest
 
 from skye.base.messages import CapabilityMessage
 from skye.tools import (
+    CapabilityExecutionError,
     CapabilityInterface,
     CapabilityNotFoundError,
     CapabilityRegistry,
@@ -805,7 +806,7 @@ class TestCapabilityRegistryExecution:
         capability = FailingCapability()
         registry.register(capability)
 
-        with pytest.raises(CapabilityValidationError) as exc_info:
+        with pytest.raises(CapabilityExecutionError) as exc_info:
             registry.execute("failing_tool", {})
 
         assert "failing_tool" in str(exc_info.value)
@@ -874,7 +875,7 @@ class TestCapabilityRegistryExecution:
         capability = FailingCapability()
         registry.register(capability)
 
-        with pytest.raises(CapabilityValidationError) as exc_info:
+        with pytest.raises(CapabilityExecutionError) as exc_info:
             await registry.aexecute("failing_tool", {})
 
         assert "failing_tool" in str(exc_info.value)

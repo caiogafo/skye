@@ -154,7 +154,27 @@ every listing and call with the authorizer when one is provided.
 | observability exporter | `observer` | `observe` | registering it in the observe registry |
 | credential provider | credential-source Port | `auth` | registering it in the `auth` registry |
 
-Adding one never edits a file outside the owner; a check rejects it otherwise.
+Adding one never edits a file outside the owner; a check rejects it otherwise. Every kind is also reachable through a plugin (next section).
+
+## Plugins and provider profiles
+Proposal of D108 (Requirements 56 to 61); the spec is `0-base-plugins`. One entry for every kind: a plugin is an object with
+`register(registrar)`; the registrar has one method per kind (`model_provider`, `embedding_provider`, `store_backend`,
+`credential_source`, `routing_strategy`, `mcp_client`, `decision_model`, `tokenizer`, `capability`, `prompt_filter`, `agent_type`).
+- **Where.** `PluginInterface`, `RegistrarInterface`, `ProviderProfile`, `ModelProfile`, `RegionRule`, `resolve_region` and the lookup of
+  a `ModelProfile` are in `base` (data, Protocols and in-memory tables; no I/O). The scan of the entry-point group `skye.plugins` is
+  I/O and is outside `base` (O60); a lookup that finds no name triggers it once, lazily. `import <pkg>` never scans.
+- **Built-ins use the same door.** The built-in providers, backends, strategies, MCP clients and decision models register through the
+  registrar, by `"module:attribute"` text so that nothing is imported before first use. The registries that exist today stay as views.
+- **The profile is the one home of provider knowledge.** It carries the key variable, the region rule, the default endpoint, the client
+  settings (Azure's names), the model profiles (prices, tokenizer, message overhead, `get_model_info` keys) and the error mapper. Cost,
+  token counting, the router and `auth` read it; none keeps a table of provider names. Logic stays in the adapter module (error
+  handler, schema conversion); the profile points to it.
+- **The store keeps its own representation.** `CounterStore.count`, a capability for liveness and remaining lifetime, and the default
+  backend created by `skye.store.backend("memory")` mean that the router never reads a stored shape or compares a timestamp with the clock.
+- **Control.** Optional allowlist `plugins` in the configuration file; `skye.use(plugin)` for explicit registration; `skye plugins` lists
+  what is installed and registered. Conformance: one public `check_<kind>` per kind, run over the built-ins too.
+- **Checks.** `tests/budget/test_provider_knowledge.py` and `tests/budget/test_storage_knowledge.py` (allowlists that only shrink);
+  the cold-start and size budgets do not rise.
 
 ## Base contracts
 `base` holds the shapes every component shares. Message types: `SkyeMessage` with the role variants (`UserMessage`, `AssistantMessage`,
@@ -162,7 +182,7 @@ Adding one never edits a file outside the owner; a check rejects it otherwise.
 metadata, token usage, model identifier, provider; streaming yields chunks in one format). The capability schema (name, description,
 parameters) is a pure contract in `base`; handlers and the registry stay in `tools`. Errors: `SkyeError` with `ProviderError`
 (provider context, status), `ConfigurationError`, `ValidationError` (field and value), `CapabilityExecutionError` and `MissingExtraError`;
-wrapped errors keep the original message and stack. Configuration sources, in priority order: code, environment, file (JSON or a `.skye` file; no YAML, D62);
+wrapped errors keep the original message and stack. Configuration sources, in priority order: code, environment, file (JSON in version 1, D92; a `.skye` form is open decision O48; no YAML, D62);
 `${VAR}` is substituted in JSON and `env.NAME` is the form in `.skye`; invalid values raise `ConfigurationError`. The Ports are listed in "Ports"; each performs no I/O.
 
 ## Public API and lazy imports
@@ -243,14 +263,17 @@ are `memory`, `observe` if no stdlib path exists, `mcp` and `auth`.
 Adapters expose `invoke` (the `Runnable` Port) and delegate to `acomplete`; vendor SDKs appear only in `tests/differential`. Where an external type exists it is converted once, inside the owner (Requirement 9.5).
 
 ## Store layout
-| Backend | Module | Presence | Driver |
-|---|---|---|---|
-| in-memory | `store/memory.py` | core | standard library |
-| file | `store/file.py` | core | standard library |
-| DynamoDB | `store/dynamodb.py` | first-choice durable backend | boto3 (preinstalled in the serverless runtime) |
-| Redis | `store/redis.py` | extra `memory` | `redis.asyncio` |
-| PostgreSQL | used by `memory` | extra `memory` | `asyncpg` (pure Python, preferred over compiled `psycopg2`) |
-Each backend is a separate module reached only through the storage Port.
+| Backend | Module | Capabilities | Extra | Driver |
+|---|---|---|---|---|
+| in-memory | `store/memory.py` | key-value, counter, scan | none (default, D97) | standard library |
+| file | `store/file.py` | key-value, counter, scan | none | standard library |
+| DynamoDB | `store/dynamodb.py` | key-value, counter, scan | `aws` (only outside Lambda) | boto3 |
+| Redis / Valkey | `store/redis.py` | key-value, counter, scan | `valkey` or `redis` | valkey-py, else redis-py (D102) |
+| PostgreSQL | `store/postgres.py` | key-value, counter, scan | none (Data API), `postgres` (pg8000), `postgres-asyncpg` | RDS Data API through boto3, then pg8000, then asyncpg (D100) |
+| durable function | `store/durable_function.py` | key-value, counter | none | the caller's durable context |
+Each backend is a separate module reached only through the storage Ports (`KeyValueStore`, `CounterStore`, `ScanStore`; D98), created
+with `skye.store.backend(name, **config)` or directly, and checked by the public conformance suite. The default is in-memory; a durable
+backend is always chosen by the caller (D97).
 
 ## DecisionModel (Jev)
 `base/interfaces/decision.py` defines the one `DecisionModel` Port: a finite option set in, one choice and a probability per option out
@@ -315,7 +338,7 @@ marked as a failure. 20. A guessable-name alias stores no second value, and the 
 | prompts | cirrus | teams, flows | front, stream |
 
 Front matter of the spec and the docs section; one italic line under the section index title; last line of the package docstring;
-`docs/glossary.md`. Nowhere else (R8).
+`docs/project/glossary.md`. Nowhere else (R8).
 
 ## Testing
 Deterministic checks guard the architecture: the import matrix, the codename test, the extras footprint test, the clean-import test,

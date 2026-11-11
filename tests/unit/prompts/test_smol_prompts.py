@@ -5,6 +5,7 @@ Covers the code agent, the tool-calling agent, the planning step and the managed
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from typing import Any
 
@@ -95,8 +96,9 @@ def test_tools_and_every_memory_type(name: str) -> None:
     system = _system(messages)
     assert "## Tools" in system
     assert "`web_search`: Search the web for a query." in system
-    assert "`query`: the text to search for" in system
-    assert "`limit`: integer" in system
+    # Decision D80: the parameters as JSON Schema, as in every other agent prompt.
+    assert 'Parameters: {"query": "the text to search for", "limit": "integer"}' in system
+    assert "`query`:" not in system
     assert "Returns: a list of results" in system
     assert "`clock`: Return the current time." in system
     for heading in MEMORY_HEADINGS:
@@ -240,3 +242,17 @@ def test_managed_agent_defaults() -> None:
     assert messages[0].content.startswith("You are an agent working as a member of a team.")
     assert messages[-1].content.startswith("Task from your manager:")
     assert "## Additional context" not in messages[-1].content
+
+
+@pytest.mark.parametrize("name", NAMES)
+def test_tool_parameters_are_shown_as_json_schema(name: str) -> None:
+    schema = {
+        "type": "object",
+        "properties": {"unit": {"type": "string", "enum": ["c", "f"], "default": "c"}},
+        "required": ["unit"],
+    }
+    tool = {"name": "weather", "description": "Weather now.", "parameters": schema}
+    system = _system(_render(name, {"task": "t", "tools": [tool]}))
+    assert f"Parameters: {json.dumps(schema)}" in system
+    text = (TEMPLATES_DIR / f"{name}.skye").read_text(encoding="utf-8")
+    assert "each param in tool.parameters" not in text

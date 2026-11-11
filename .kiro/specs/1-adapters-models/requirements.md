@@ -53,6 +53,7 @@ The `models` component holds the adapters for every model API kind — language 
 1. THE spec SHALL realize Requirement 9.1 of #[[file:.kiro/steering/10-requirements.md]].
 2. THE spec SHALL realize Requirement 9.2 of #[[file:.kiro/steering/10-requirements.md]].
 3. THE spec SHALL realize Requirement 18.1 of #[[file:.kiro/steering/10-requirements.md]].
+4. THE spec SHALL honor decision D104 of #[[file:.kiro/steering/12-decisions.md]].
 
 ### Requirement 5: Provider-agnostic transformation at the boundary
 
@@ -104,6 +105,9 @@ The `models` component holds the adapters for every model API kind — language 
 1. THE spec SHALL realize Requirement 27.1 of #[[file:.kiro/steering/10-requirements.md]].
 2. THE spec SHALL realize Requirement 27.2 of #[[file:.kiro/steering/10-requirements.md]].
 3. THE spec SHALL honor decision D24 of #[[file:.kiro/steering/12-decisions.md]].
+4. THE spec SHALL realize Requirement 33.9 of #[[file:.kiro/steering/10-requirements.md]].
+5. THE spec SHALL honor decision D81 of #[[file:.kiro/steering/12-decisions.md]].
+6. THE spec SHALL honor decision D101 of #[[file:.kiro/steering/12-decisions.md]].
 
 ### Requirement 10: Token counting and cost
 
@@ -171,3 +175,4 @@ The `models` component holds the adapters for every model API kind — language 
 2. THE spec SHALL realize Requirement 9.12 of #[[file:.kiro/steering/10-requirements.md]].
 3. THE spec SHALL realize Requirement 7.8 of #[[file:.kiro/steering/10-requirements.md]].
 4. THE spec SHALL honor decision D28 of #[[file:.kiro/steering/12-decisions.md]].
+5. THE spec SHALL honor decision D18 of #[[file:.kiro/steering/12-decisions.md]].

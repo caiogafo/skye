@@ -102,22 +102,25 @@ def test_not_json_is_a_validation_error():
         parse_structured(Person, "not json")
 
 
-def test_anthropic_forces_one_tool_and_reads_its_input():
-    reply = {"id": "m", "type": "message", "role": "assistant", "model": "claude", "stop_reason": "tool_use",
-             "content": [{"type": "tool_use", "id": "t1", "name": STRUCTURED_TOOL, "input": ANSWER}],
+def test_anthropic_uses_the_native_output_format_and_reads_the_text():
+    """No forced tool: ``tool_choice`` ``tool``/``any`` is a 400 on Opus 5.5, Sonnet 5.5, Fable 5.1."""
+    reply = {"id": "m", "type": "message", "role": "assistant", "model": "claude-opus-5-5",
+             "stop_reason": "end_turn", "content": [{"type": "text", "text": json.dumps(ANSWER)}],
              "usage": {"input_tokens": 1, "output_tokens": 1}}
-    response, sent = _run("anthropic", "claude-3-opus-20240229", reply, api_key="k")
-    assert sent["tools"][0]["name"] == STRUCTURED_TOOL
-    assert sent["tools"][0]["input_schema"]["properties"]["age"] == {"type": "integer"}
-    assert sent["tool_choice"] == {"type": "tool", "name": STRUCTURED_TOOL}
+    response, sent = _run("anthropic", "claude-opus-5-5", reply, api_key="k")
+    schema = sent["output_config"]["format"]["schema"]
+    assert sent["output_config"]["format"]["type"] == "json_schema"
+    assert schema["properties"]["age"] == {"type": "integer"}
+    assert schema.get("additionalProperties") is False
+    assert "tool_choice" not in sent and "tools" not in sent
     assert response.structured_output == Person("Alice", 30)
     assert not response.capability_calls
 
 
-def test_bedrock_forces_one_tool_and_reads_its_input():
+def test_bedrock_forces_one_tool_on_a_model_without_native_output():
     reply = {"output": {"message": {"role": "assistant", "content": [{"toolUse": {"toolUseId": "t", "name": STRUCTURED_TOOL, "input": ANSWER}}]}},
              "stopReason": "tool_use", "usage": {"inputTokens": 1, "outputTokens": 1, "totalTokens": 2}}
-    response, sent = _run("bedrock", "anthropic.claude-3-sonnet", reply, region_name="us-east-1", aws_access_key_id="a", aws_secret_access_key="b")
+    response, sent = _run("bedrock", "meta.llama3-70b-instruct-v1:0", reply, region_name="us-east-1", aws_access_key_id="a", aws_secret_access_key="b")
     tool = sent["toolConfig"]["tools"][0]["toolSpec"]
     assert tool["name"] == STRUCTURED_TOOL and tool["inputSchema"]["json"]["properties"]["name"] == {"type": "string"}
     assert sent["toolConfig"]["toolChoice"] == {"tool": {"name": STRUCTURED_TOOL}}
@@ -125,10 +128,11 @@ def test_bedrock_forces_one_tool_and_reads_its_input():
     assert not response.capability_calls
 
 
-def test_google_asks_for_json_with_the_schema_in_the_instructions():
+def test_google_sends_the_schema_natively_as_response_schema():
     reply = {"candidates": [{"content": {"role": "model", "parts": [{"text": json.dumps(ANSWER)}]}, "finishReason": "STOP"}],
              "usageMetadata": {"promptTokenCount": 1, "candidatesTokenCount": 1, "totalTokenCount": 2}}
     response, sent = _run("google", "gemini-1.5-pro", reply, project_id="p", location="us-central1", credentials="token")
     assert sent["generationConfig"]["responseMimeType"] == "application/json"
-    assert "JSON Schema" in sent["systemInstruction"]["parts"][-1]["text"]
+    assert sent["generationConfig"]["responseSchema"]["properties"]["age"] == {"type": "INTEGER"}
+    assert "systemInstruction" not in sent
     assert response.structured_output == Person("Alice", 30)

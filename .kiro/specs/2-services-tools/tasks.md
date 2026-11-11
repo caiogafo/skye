@@ -14,10 +14,10 @@ cited from other documents are `tools:N.k`.
 
 - [x] 1. Capability interface and schema
   - [x] 1.1 `CapabilityInterface` (get_schema, execute, aexecute)
-    - Evidence: `src/skye/tools/interface.py`; `tests/unit/tools/test_capability_interface.py`.
+    - Evidence: `src/skye/base/interfaces/capability.py` (the base Port, re-exported by `skye.tools` since 8.1); `tests/unit/tools/test_capability_interface.py`.
     - _Requirements: 16.1, 16.2_
   - [x] 1.2 `CapabilitySchema` (name, description, parameters, returns)
-    - Evidence: `src/skye/tools/schema.py`; `tests/unit/tools/test_capability_schema.py`.
+    - Evidence: `src/skye/base/interfaces/capability.py` (frozen, name and description stripped, blank rejected; `src/skye/tools/schema.py` removed in 8.1); `tests/unit/tools/test_capability_schema.py`.
     - _Requirements: 16.1_
   - [x] 1.3 Move `CapabilitySchema` / `CapabilityResult` / `CapabilityCall` off pydantic to dataclasses (D24)
     - Evidence (2026-11-08): `CapabilitySchema`, `CapabilityResult` and `CapabilityCall` are `Validated` dataclasses and no module of `src/skye/tools` imports pydantic; `tests/unit/tools/test_mcp_conformance.py::test_no_module_of_tools_imports_pydantic`, `test_capability_types_are_validated_dataclasses`, `test_invalid_data_raises_validation_error_with_field_context`.
@@ -87,6 +87,20 @@ cited from other documents are `tools:N.k`.
 - [ ] 7. Final checkpoint
   - Ensure all tests pass, ask the user if questions arise.
 
+- [x] 8. Fixes found by the documentation review (2026-11-11)
+  - [x] 8.1 One `CapabilityInterface`/`CapabilitySchema` pair: the base Port, re-exported by `skye.tools`
+    - Evidence (2026-11-11): `src/skye/tools/interface.py` and `src/skye/tools/schema.py` are removed; `src/skye/tools/__init__.py` re-exports the classes of `src/skye/base/interfaces/capability.py`, whose `CapabilitySchema` now carries the guarantees of the removed copy (frozen, name and description stripped, blank rejected); the `CapabilitySchema` and `CapabilityInterface` entries are gone from `KNOWN_DUPLICATES` (`tests/budget/test_unique_names.py`) and the two files from `tests/budget/test_extras_footprint.py`; `tests/unit/tools/test_doc_review_fixes.py::test_tools_reexports_the_base_port_types`, `test_registry_accepts_a_schema_built_from_skye_interfaces`, `test_list_schemas_returns_base_capability_schema`, `test_base_schema_keeps_the_tools_guarantees`.
+    - _Requirements: 16.1, 16.11, 22.4_
+  - [x] 8.2 `CapabilityRegistry.execute` and `aexecute` raise `CapabilityExecutionError` when the capability fails
+    - Evidence (2026-11-11): `src/skye/tools/registry.py` (a `CapabilityError` from the capability, such as a validation error for bad arguments, passes through unchanged; any other exception becomes `CapabilityExecutionError` with the original as `__cause__`); `tests/unit/tools/test_doc_review_fixes.py::test_execute_failure_is_an_execution_error`, `test_aexecute_failure_is_an_execution_error`, `test_invalid_arguments_stay_a_validation_error`; `tests/unit/tools/test_capability_registry.py` (the two tests that expected `CapabilityValidationError` now expect `CapabilityExecutionError`).
+    - _Requirements: 18.1, 18.2_
+  - [x] 8.3 `@capability` schemas follow nested types, `Optional`, `Union`, `Literal` and the `Args:` section; no call argument in the logs
+    - Evidence (2026-11-11): `src/skye/tools/local_function.py` (`_type_to_json_schema`: `list[X]`, `set[X]`, `tuple`, `dict[str, X]` nested, `X | None` is `X` and not required, other unions `anyOf`, `Literal` `enum`; `_docstring_args` reads the Google-style `Args:` section into each parameter's `description`; with `schema_override` the capability and its errors use the overridden name; the logs of `LocalFunctionCapability` and `CapabilityRegistry` carry the capability name and the outcome, never the arguments); `tests/unit/tools/test_doc_review_fixes.py::test_nested_container_types`, `test_optional_is_the_inner_type_and_not_required`, `test_union_is_any_of`, `test_literal_is_enum`, `test_args_section_descriptions`, `test_schema_override_errors_name_the_overridden_capability`, `test_local_function_does_not_log_arguments`.
+    - _Requirements: 6.1, 16.1, 18.3_
+  - [x] 8.4 Documentation and example follow the fixes
+    - Evidence (2026-11-11): the warnings about the two schema classes are removed from `docs/guides/extend/custom-capability.md` and `docs/guides/extend/index.md`; `docs/guides/tools/local-functions.md` documents the type mapping, the `Args:` descriptions, `CapabilityExecutionError` and the logs without arguments; `examples/capabilities/remote_api.py` reads the `error` status of the returned messages instead of catching an `OSError` that `aexecute_capability_calls` never raises (`docs/guides/tools/remote-apis.md` snippet range updated); `uv run mkdocs build --strict`, `tests/docs`, `tests/examples`.
+    - _Requirements: 6.1, 16.10_
+
 ## Notes
 
 - Tasks marked with `*` are optional (tests/observability) and can be skipped for a faster path.
@@ -94,7 +108,7 @@ cited from other documents are `tools:N.k`.
 - `tools` carries no third-party library; `fastmcp` is the separate `mcp` extra, imported lazily only in `mcp_fastmcp.py`
   (design "Extras and budgets"; Requirement 10.7, 7.3).
 - The open items at migration (1.3, 6.1 to 6.4) were closed on 2026-11-08 and ticked with their evidence. Milestones 2, 3, 5 and 7 stay
-  unticked only because they hold the checkpoints, which are run by Kiro (the suite passes: see the final report of that day).
+  unticked only because they hold the checkpoints, which are run in the final verification (the suite passes: see the final report of that day).
 
 ## Task Dependency Graph
 
@@ -107,7 +121,8 @@ cited from other documents are `tools:N.k`.
     { "id": 3, "tasks": ["4.1", "4.2"] },
     { "id": 4, "tasks": ["4.3", "4.4"] },
     { "id": 5, "tasks": ["6.1", "6.2", "6.3", "6.5"] },
-    { "id": 6, "tasks": ["6.4"] }
+    { "id": 6, "tasks": ["6.4"] },
+    { "id": 7, "tasks": ["8.1", "8.2", "8.3", "8.4"] }
   ]
 }
 ```

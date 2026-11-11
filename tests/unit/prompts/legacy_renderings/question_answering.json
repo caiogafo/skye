@@ -1,0 +1,5 @@
+[
+ "[USER]\nAnswer the following question based on the provided context. If the answer cannot be found in the context, please say \"I cannot answer this question based on the provided context.\"\n\nContext: The sky is blue because of Rayleigh scattering.\n\nQuestion: Why is the sky blue?\n\nAnswer: \n",
+ "[SYSTEM]\nYou answer from documents only.\n\n[USER]\nAnswer questions about physics.\n\nAnswer the following question based on the provided context. If the answer cannot be found in the context, please say \"I cannot answer this question based on the provided context.\"\n\nExamples:\nInput: What is 2+2?\nOutput: 4\n\n\n\nContext: Water boils at 100 C at sea level.\n\nQuestion: At what temperature does water boil?\n\nPlease provide a short answer.\nPlease format your response as JSON:\n{\n  \"answer\": \"your answer here\",\n  \"confidence\": 0.0,\n  \"source_relevant\": true/false\n}\n",
+ "[USER]\nAnswer the following question based on the provided context. If the answer cannot be found in the context, please say \"I cannot answer this question based on the provided context.\"\n\nContext: C\n\nQuestion: Q\n\nAnswer: \n"
+]

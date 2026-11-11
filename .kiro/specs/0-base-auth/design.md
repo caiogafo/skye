@@ -137,8 +137,8 @@ refreshes lazily on the calling thread, not on a timer. No interactive login is 
 
 Provider credentials are read only from each provider's standard variables — `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`,
 `AWS_SESSION_TOKEN`, `AWS_BEARER_TOKEN_BEDROCK`, `GOOGLE_OAUTH_ACCESS_TOKEN`, `GOOGLE_API_KEY`, `GOOGLE_APPLICATION_CREDENTIALS`,
-the Azure and OpenAI-compatible equivalents — never from a prefixed variable. The only three prefixed variables are
-`SKYE_LOG_LEVEL`, `SKYE_CONFIG`, `SKYE_ENABLE_TELEMETRY`, owned by `base` (D18); `auth` adds none.
+the Azure and OpenAI-compatible equivalents — never from a prefixed variable. The only prefixed variables are
+`SKYE_LOG_LEVEL` and `SKYE_CONFIG`, owned by `base` (D18; the telemetry variable left with its key, D106); `auth` adds none.
 
 ## Data Models
 

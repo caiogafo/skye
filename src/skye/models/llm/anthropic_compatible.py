@@ -31,11 +31,14 @@ import json
 from datetime import datetime, timezone
 from typing import Any
 
+from skye.base.prompt_parts import PromptParts
+from skye.models.transport.cost import usage_of
 from skye.base.completion import CompleteRequest, CompleteResponse, StreamChunk, TokenUsage
 from skye.base.exceptions import ConfigurationError
 from skye.base.messages import AssistantMessage
 from skye.models.base import BaseModelProvider
-from skye.models.transport.structured import STRUCTURED_TOOL, schema_of
+from skye.models.transport.credentials import resolve_api_key
+from skye.models.transport.structured import STRUCTURED_TOOL, closed_schema, schema_of
 from skye.models.transport import rest
 
 # Import CapabilityCall for capability call extraction
@@ -47,6 +50,16 @@ except ImportError:
 
 
 ANTHROPIC_VERSION = "2023-06-01"
+
+#: The Claude models that refuse a forced ``tool_choice`` (``any`` or ``tool``) with a 400, matched
+#: anywhere in the model id so that Bedrock ids (``us.anthropic.claude-opus-5-5-...``) match too.
+#: For them the client emulates the forced choice (decision D108).
+CLAUDE_REFUSING_FORCED_CHOICE = ("opus-5-5", "sonnet-5-5", "fable-5-1", "mythos-5-1")
+
+
+def claude_refuses_forced_choice(model: str | None) -> bool:
+    """Whether a Claude model id names a model that refuses a forced ``tool_choice``."""
+    return bool(model) and any(name in str(model) for name in CLAUDE_REFUSING_FORCED_CHOICE)
 
 
 class AnthropicCompatibleProvider(BaseModelProvider):
@@ -67,19 +80,24 @@ class AnthropicCompatibleProvider(BaseModelProvider):
     default_api_base: str | None = None
     #: Provider label reported in errors and model info.
     provider_name = "anthropic_compatible"
-
+    #: The provider-standard variable read when no ``api_key`` is given (D18); ``None`` means the key must be passed.
+    api_key_env_var: str | None = None
 
     def __init__(
         self,
-        api_key: str,
+        api_key: str | None = None,
         **kwargs: Any
     ) -> None:
         """Initialize the provider.
-        
+
         Args:
-            api_key: Anthropic API key
+            api_key: The key; the class's standard variable (``api_key_env_var``) when omitted
             **kwargs: Additional configuration parameters
+
+        Raises:
+            ConfigurationError: No key is given and the standard variable is not set (the error names it).
         """
+        api_key = resolve_api_key(api_key, self.api_key_env_var)
         base = kwargs.pop("api_base", None) or self.default_api_base
         if not base:
             raise ConfigurationError("api_base is required for an Anthropic-compatible endpoint")
@@ -319,16 +337,17 @@ class AnthropicCompatibleProvider(BaseModelProvider):
                     # Already formatted tool choice
                     anthropic_request["tool_choice"] = request.capability_choice
         
-        # Structured output: no native mode, so the answer is forced through one tool (function calling)
-        if request.response_schema and not request.capabilities:
-            anthropic_request["tools"] = [
-                {
-                    "name": STRUCTURED_TOOL,
-                    "description": f"Return the answer as a {request.response_schema.__name__}.",
-                    "input_schema": schema_of(request.response_schema),
-                }
-            ]
-            anthropic_request["tool_choice"] = {"type": "tool", "name": STRUCTURED_TOOL}
+        # Structured output, with or without capabilities: the native JSON output
+        # (``output_config.format``). No answer is forced through a tool: ``tool_choice`` ``tool`` and
+        # ``any`` return a 400 on Claude Opus 5.5, Sonnet 5.5 and Fable 5.1 (owner decision of
+        # 2026-11-11). With capabilities, the model may call them and its final answer follows the schema.
+        if request.response_schema:
+            output_config = dict(anthropic_request.get("output_config") or {})
+            output_config["format"] = {
+                "type": "json_schema",
+                "schema": closed_schema(schema_of(request.response_schema)),
+            }
+            anthropic_request["output_config"] = output_config
 
         # Provider-specific metadata
         if request.metadata:
@@ -418,6 +437,16 @@ class AnthropicCompatibleProvider(BaseModelProvider):
         finish_reason = None
         etype = getattr(chunk, "type", None)
         delta = getattr(chunk, "delta", None)
+        usage = None
+        if etype == "message_start":
+            # The input tokens come here; the output tokens are still a first count, so only the prompt is taken.
+            raw = getattr(getattr(chunk, "message", None), "usage", None)
+            usage = usage_of(getattr(raw, "input_tokens", None), 0) if raw is not None else None
+        elif etype == "message_delta":
+            # A running count of the output tokens (the input tokens too, on newer API versions).
+            raw = getattr(chunk, "usage", None)
+            if raw is not None:
+                usage = usage_of(getattr(raw, "input_tokens", None), getattr(raw, "output_tokens", None))
 
         if etype == "content_block_delta":
             if delta is not None and hasattr(delta, "text"):
@@ -430,7 +459,8 @@ class AnthropicCompatibleProvider(BaseModelProvider):
             id=getattr(chunk, "message_id", ""),
             delta=delta_content,
             finish_reason=finish_reason,
-            index=getattr(chunk, "index", 0)
+            index=getattr(chunk, "index", 0),
+            usage=usage,
         )
 
     def _call_provider(self, request: dict[str, Any]) -> Any:
@@ -449,7 +479,7 @@ class AnthropicCompatibleProvider(BaseModelProvider):
 
     async def acomplete(
         self,
-        messages: list[Any] | str | CompleteRequest | None = None,
+        messages: list[Any] | str | CompleteRequest | PromptParts | None = None,
         model: str | None = None,
         router: Any | None = None,
         temperature: float | None = None,
@@ -499,6 +529,10 @@ class AnthropicCompatibleProvider(BaseModelProvider):
 
         return formatted
     
+    def refuses_forced_choice(self, model: str) -> bool:
+        """Claude Opus 5.5, Sonnet 5.5, Fable 5.1 and Mythos 5.1 refuse a forced ``tool_choice`` (D108)."""
+        return claude_refuses_forced_choice(model)
+
     def get_model_info(self) -> dict[str, Any]:
         """Return model metadata and capabilities.
         
@@ -509,7 +543,7 @@ class AnthropicCompatibleProvider(BaseModelProvider):
             "provider": self.provider_name,
             "supports_streaming": True,
             "supports_function_calling": True,  # Via tool use
-            "supports_structured_output": False,  # No native support
+            "supports_structured_output": True,  # Native: output_config.format (json_schema)
             "supports_multimodal": True,  # Claude 3 supports images
             "supports_thinking": True  # Claude 3 Opus supports extended thinking
         }

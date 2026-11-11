@@ -18,6 +18,7 @@ from typing import Any
 
 from skye.models.base import BaseEmbeddingProvider
 from skye.models.transport import rest
+from skye.models.transport.credentials import resolve_aws_region
 
 
 class BedrockEmbeddingProvider(BaseEmbeddingProvider):
@@ -45,16 +46,20 @@ class BedrockEmbeddingProvider(BaseEmbeddingProvider):
         "amazon.titan-embed-text-v2:0": 1024,
     }
     
-    def __init__(self, model: str, region_name: str, **config: Any) -> None:
+    def __init__(self, model: str, region_name: str | None = None, **config: Any) -> None:
         """Initialize Bedrock embedding provider.
-        
+
         Args:
             model: Model identifier (e.g., 'amazon.titan-embed-text-v1')
-            region_name: AWS region name
+            region_name: AWS region name; ``AWS_REGION``, then ``AWS_DEFAULT_REGION`` when omitted
             **config: Additional configuration parameters (e.g., profile_name)
+
+        Raises:
+            ConfigurationError: No region is given or found.
         """
-        super().__init__(model=model, region_name=region_name, **config)
-        self.region_name = region_name
+        region = resolve_aws_region(region_name)
+        super().__init__(model=model, region_name=region, **config)
+        self.region_name = region
     
     def _initialize_client(self) -> Any:
         """No vendor client: requests go through the stdlib REST transport."""

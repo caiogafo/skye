@@ -63,17 +63,19 @@ class GoogleMultimodalEmbeddingProvider(BaseEmbeddingProvider):
         self,
         project_id: str,
         location: str,
+        model: str | None = None,
         **config: Any
     ) -> None:
         """Initialize Google multimodal embedding provider.
-        
+
         Args:
             project_id: Google Cloud project ID
             location: Region location (e.g., 'us-central1')
+            model: The model (default ``multimodalembedding@001``)
             **config: Additional configuration parameters
         """
         super().__init__(
-            model=self.MODEL_NAME,
+            model=model or self.MODEL_NAME,
             project_id=project_id,
             location=location,
             **config
@@ -94,12 +96,13 @@ class GoogleMultimodalEmbeddingProvider(BaseEmbeddingProvider):
         return self._authenticator
 
     def _predict(self, instance: dict[str, Any]) -> dict[str, Any]:
-        url = _model_url(self.location, self.project_id, self.MODEL_NAME, "predict")
+        url = _model_url(self.location, self.project_id, self.model, "predict")
         response = rest.post_json(
             url, {"instances": [instance]}, authenticator=self.authenticator, provider="google"
         )
         predictions = response.to_dict().get("predictions") or [{}]
-        return predictions[0]
+        first: dict[str, Any] = predictions[0]
+        return first
 
     def _encode_batch_impl(self, texts: list[str]) -> list[list[float]]:
         """Encode multiple texts/images to vectors.

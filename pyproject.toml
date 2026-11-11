@@ -49,8 +49,15 @@ tools = []  # empty extra: a module of the core, no third-party libraries
 # mcp: fastmcp, the optional full-capability substitute for the built-in stdlib MCP client,
 # chosen only by create_mcp_client(target, impl="fastmcp") (Requirement 21).
 mcp = ["fastmcp-slim[client]>=4.0"]  # client only: full fastmcp also pulls the server stack (pyyaml, watchfiles, websockets, jsonref)
-memory = ["redis>=5.0"]
-postgres = ["asyncpg>=0.29"]  # the PostgreSQL store backend (compiled wheel)
+# memory: no store driver of its own; install the extra of the backend you store in (decision D99).
+memory = []
+# Store backends: one extra per backend, never per component (decisions D96, D99, D100). In-memory, file and the
+# durable function need none; the RDS Data API driver of PostgreSQL needs only boto3.
+redis = ["redis>=5.0"]
+valkey = ["valkey>=6.0"]  # valkey-py, same API as redis-py; preferred by RedisBackend when installed (D102)
+postgres = ["pg8000>=1.30"]  # pure Python, any PostgreSQL
+postgres-asyncpg = ["asyncpg>=0.29"]  # compiled, the fastest PostgreSQL driver
+aws = ["boto3>=1.28"]  # DynamoDB and the RDS Data API outside AWS Lambda (preinstalled in Lambda)
 guard = []
 teams = []  # empty extra: a module of the core, no third-party libraries
 flows = []  # empty extra: a module of the core, no third-party libraries
@@ -61,7 +68,16 @@ llm-providers = ["tiktoken>=0.5"]
 embedding-providers = ["tiktoken>=0.5"]
 all-providers = ["tiktoken>=0.5"]
 providers = ["tiktoken>=0.5"]
-all = ["tiktoken>=0.5", "redis>=5.0", "asyncpg>=0.29", "fastmcp-slim[client]>=4.0", "rsa>=4.9"]
+# boto3 is left out of `all`: it is the AWS SDK, preinstalled in AWS Lambda; install `skyeai[aws]` outside it.
+all = [
+    "tiktoken>=0.5",
+    "redis>=5.0",
+    "valkey>=6.0",
+    "pg8000>=1.30",
+    "asyncpg>=0.29",
+    "fastmcp-slim[client]>=4.0",
+    "rsa>=4.9",
+]
 
 [dependency-groups]
 dev = [
@@ -86,6 +102,8 @@ dev = [
 docs = [
     "mkdocs>=1.6,<2",
     "mkdocs-material>=9.5",
+    "mkdocstrings[python]>=0.26",  # the Python API reference, from the docstrings (D103)
+    "mkdocs-git-revision-date-localized-plugin>=1.2",  # page dates from git (D103)
 ]
 
 [build-system]

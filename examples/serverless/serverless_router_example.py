@@ -3,7 +3,7 @@
 A router tracks the health, the cooldown and the rate-limit usage of each model. In a long-lived process that state lives in memory; in a
 function that is frozen or replaced between invocations it has to live in a store. The store is one argument: ``ModelRouter(storage=...)``.
 This example uses the in-memory default and the file backend (two routers sharing one directory). Redis, DynamoDB, PostgreSQL and the AWS
-Durable Function backend are used the same way: see ``docs/store/index.md``.
+Durable Function backend are used the same way: see ``docs/guides/state/choose-a-backend.md``.
 """
 
 import os

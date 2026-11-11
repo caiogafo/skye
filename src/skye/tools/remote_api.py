@@ -11,9 +11,8 @@ from typing import Any
 
 from skye.base.http import HttpResponse
 from skye.base.http import request as http_request
+from skye.base.interfaces.capability import CapabilityInterface, CapabilitySchema
 from skye.tools.exceptions import CapabilityValidationError
-from skye.tools.interface import CapabilityInterface
-from skye.tools.schema import CapabilitySchema
 
 logger = logging.getLogger(__name__)
 

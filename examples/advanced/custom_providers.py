@@ -35,7 +35,7 @@ class ShoutProvider(BaseModelProvider):
     def _transform_request(self, request) -> dict[str, Any]:
         return {"model": request.model, "messages": self._transform_messages(request.messages)}
 
-    # The call itself (here a local function; in a real provider an HTTP call with `skye.base.http`)
+    # The call itself (here a local function; in a real provider `skye.models.post_json(url, body, headers=...)`)
     def _call_provider(self, request: dict[str, Any]) -> Any:
         text = request["messages"][-1]["text"]
         return {"id": "shout-1", "model": request["model"], "text": text.upper(), "tokens": len(text.split())}

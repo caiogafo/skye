@@ -4,6 +4,9 @@ This module provides a unified interface for registering, managing, and invoking
 capabilities across different LLM providers. Capabilities can be local Python
 functions, remote HTTP APIs, or MCP (Model Context Protocol) server capabilities.
 
+``CapabilityInterface`` and ``CapabilitySchema`` are the base Port types (``skye.interfaces``),
+re-exported here under the same names: a capability built from either import path registers.
+
 Example:
     >>> from skye.tools import capability, CapabilityInterface, CapabilitySchema
     >>>
@@ -18,6 +21,7 @@ Example:
 Codename: updraft.
 """
 
+from skye.base.interfaces.capability import CapabilityInterface, CapabilitySchema
 from skye.tools.capability_call_handler import CapabilityCallHandler
 from skye.tools.capability_models import CapabilityCall, CapabilityResult
 from skye.tools.decorator import capability
@@ -28,7 +32,6 @@ from skye.tools.exceptions import (
     CapabilityNotFoundError,
     CapabilityValidationError,
 )
-from skye.tools.interface import CapabilityInterface
 from skye.tools.local_function import LocalFunctionCapability
 from skye.tools.mcp_boundary import MCPPrompt, MCPPromptArgument
 from skye.tools.mcp_client import (
@@ -40,7 +43,6 @@ from skye.tools.mcp_client import (
 from skye.tools.mcp_resource import Resource, ResourceProviderInterface
 from skye.tools.registry import CapabilityRegistry
 from skye.tools.remote_api import RemoteAPICapability
-from skye.tools.schema import CapabilitySchema
 
 __all__ = [
     "CapabilityInterface",

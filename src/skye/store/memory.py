@@ -1,59 +1,110 @@
-"""In-memory storage backend (moved from routes/storage_backends.py)."""
+"""In-memory backend: the default of the library (decision D97), standard library only.
 
-import json
-import time
-from typing import Any, Dict, List, Optional, Tuple
+Right for a test, a container or a Lambda that serves web requests and keeps its process warm; wrong
+for pure serverless, where every
+invocation may start empty (choose a durable backend there). Values are copied on the way in and
+out, so a caller cannot change what
+is stored by mutating a returned ``dict``.
 
-from skye.base.interfaces import StorageBackend
+Example:
+    >>> import asyncio
+    >>> from skye.store import InMemoryBackend
+    >>> async def demo():
+    ...     store = InMemoryBackend()
+    ...     await store.set("user:1", {"name": "Ada"})
+    ...     await store.increment("hits", 2)
+    ...     return await store.get("user:1"), await store.get("hits"), await store.keys("user:")
+    >>> asyncio.run(demo())
+    ({'name': 'Ada'}, {'count': 2}, ['user:1'])
+
+Raises: ``ValidationError`` for an invalid key, value or time to live (D95).
+Missing: an absent or expired key reads as ``None``.
+Concurrency: one event loop; ``increment`` holds a lock, so concurrent tasks never lose an update.
+    Not shared across processes.
+"""
+
+from __future__ import annotations
+
+import asyncio
+import copy
+from typing import Any
+
+from skye.base.interfaces.storage import ScanStore, StorageBackend, check_key, check_ttl
+from skye.store._common import (
+    Clock,
+    check_data,
+    check_items,
+    check_limit,
+    default_clock,
+    expiry_of,
+    is_expired,
+)
 
 
-class InMemoryBackend(StorageBackend):
-    """In-memory storage backend for single-instance environments."""
+class InMemoryBackend(StorageBackend, ScanStore):
+    """Key-value, counter and scan in a ``dict`` of this process.
 
-    def __init__(self) -> None:
-        """Initialize in-memory backend."""
-        self._data: Dict[str, Tuple[Dict[str, Any], Optional[float]]] = {}
+    Args:
+        clock: The time source for expiry; ``time.time`` by default (tests pass a fake one).
+    """
 
-    async def connect(self) -> None:
-        """Initialize in-memory storage (no-op)."""
-        pass
+    def __init__(self, *, clock: Clock = default_clock) -> None:
+        """Create an empty store."""
+        self._data: dict[str, tuple[dict[str, Any], float | None]] = {}
+        self._clock = clock
+        self._lock = asyncio.Lock()
 
-    def _is_expired(self, key: str) -> bool:
-        """Check if key is expired."""
-        if key not in self._data:
-            return True
-        _, expiry = self._data[key]
-        return expiry is not None and time.time() > expiry
-
-    async def get(self, key: str) -> Optional[Dict[str, Any]]:
-        """Get data from memory."""
-        if self._is_expired(key):
-            self._data.pop(key, None)
+    def _live(self, key: str) -> dict[str, Any] | None:
+        entry = self._data.get(key)
+        if entry is None:
             return None
-        
-        data, _ = self._data.get(key, (None, None))
-        return data
+        value, expiry = entry
+        if is_expired(expiry, self._clock):
+            del self._data[key]
+            return None
+        return value
 
-    async def set(self, key: str, data: Dict[str, Any], ttl: Optional[int] = None) -> None:
-        """Set data in memory."""
-        expiry = time.time() + ttl if ttl else None
-        self._data[key] = (data, expiry)
+    async def get(self, key: str) -> dict[str, Any] | None:
+        """The value of ``key`` (a copy), or ``None``."""
+        value = self._live(check_key(key))
+        return None if value is None else copy.deepcopy(value)
 
-    async def increment(self, key: str, amount: int = 1, ttl: Optional[int] = None) -> int:
-        """Atomically increment counter in memory."""
-        current_data = await self.get(key) or {}
-        new_value = current_data.get('count', 0) + amount
-        await self.set(key, {'count': new_value}, ttl)
-        return new_value
+    async def set(self, key: str, data: dict[str, Any], ttl: int | None = None) -> None:
+        """Store a copy of ``data`` under ``key``."""
+        check_key(key)
+        check_data(data)
+        self._data[key] = (copy.deepcopy(data), expiry_of(ttl, self._clock))
 
-    async def get_multiple(self, keys: List[str]) -> Dict[str, Optional[Dict[str, Any]]]:
-        """Get multiple keys from memory."""
-        result = {}
-        for key in keys:
-            result[key] = await self.get(key)
-        return result
+    async def delete(self, key: str) -> bool:
+        """Remove ``key``; ``True`` when it was there and live."""
+        present = self._live(check_key(key)) is not None
+        self._data.pop(key, None)
+        return present
 
-    async def set_multiple(self, data: Dict[str, Dict[str, Any]], ttl: Optional[int] = None) -> None:
-        """Set multiple keys in memory."""
+    async def increment(self, key: str, amount: int = 1, ttl: int | None = None) -> int:
+        """Add ``amount`` to the counter of ``key`` under a lock and return the new value."""
+        check_key(key)
+        check_ttl(ttl)
+        async with self._lock:
+            current = self._live(key) or {}
+            value = int(current.get("count", 0)) + amount
+            self._data[key] = ({"count": value}, expiry_of(ttl, self._clock))
+            return value
+
+    async def set_multiple(self, data: dict[str, dict[str, Any]], ttl: int | None = None) -> None:
+        """Store every item; nothing is written when one key or value is invalid."""
+        check_items(data)
+        check_ttl(ttl)
         for key, value in data.items():
             await self.set(key, value, ttl)
+
+    async def keys(self, prefix: str = "", limit: int | None = None) -> list[str]:
+        """The live keys that start with ``prefix``, sorted."""
+        check_limit(limit)
+        found = sorted(
+            k for k in list(self._data) if k.startswith(prefix) and self._live(k) is not None
+        )
+        return found if limit is None else found[:limit]
+
+
+__all__ = ["InMemoryBackend"]

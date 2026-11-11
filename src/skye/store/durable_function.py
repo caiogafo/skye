@@ -1,87 +1,124 @@
-"""AWS Durable Function storage backend (moved from routes/storage_backends.py)."""
+"""Lambda durable function backend: state kept by the durable context the caller passes in (no
+extra).
 
-import json
-import time
-from typing import Any, Dict, List, Optional, Tuple
+When a function runs as an AWS Lambda durable function, its durable context keeps state across the
+invocations of one execution.
+This backend stores each value there under ``key_prefix + key``, with the expiry beside it. The
+context object is the caller's: any
+object with ``get_state(name)`` and ``set_state(name, value)`` works, so the backend does not import
+the durable execution SDK.
 
-from skye.base.interfaces import StorageBackend
+Example:
+    >>> import asyncio
+    >>> from skye.store import DurableFunctionBackend
+    >>> class Context:
+    ...     def __init__(self): self.state = {}
+    ...     def get_state(self, name): return self.state.get(name)
+    ...     def set_state(self, name, value): self.state[name] = value
+    >>> async def demo():
+    ...     store = DurableFunctionBackend(Context())
+    ...     await store.set("run", {"step": 3})
+    ...     return await store.get("run")
+    >>> asyncio.run(demo())
+    {'step': 3}
+
+Raises: ``ValidationError`` for an invalid key, value or time to live; ``ProviderError`` naming the
+    operation when the context fails.
+Missing: an absent or expired key reads as ``None``.
+Concurrency: one execution runs one handler at a time; ``increment`` also holds a lock for the tasks
+    of that handler.
+"""
+
+from __future__ import annotations
+
+import asyncio
+from typing import Any
+
+from skye.base.interfaces.storage import StorageBackend, check_key, check_ttl
+from skye.store._common import (
+    Clock,
+    check_data,
+    check_items,
+    default_clock,
+    expiry_of,
+    is_expired,
+    provider_errors,
+)
+
+_VALUE = "value"
+_EXPIRY = "expires_at"
 
 
 class DurableFunctionBackend(StorageBackend):
-    """AWS Durable Function storage backend for serverless workflows."""
+    """Key-value and counter in the durable context of a Lambda durable function.
 
-    def __init__(self, context: Any, key_prefix: str = "skye:"):
-        """Initialize Durable Function backend.
-        
-        Args:
-            context: DurableContext from aws_durable_execution_sdk
-            key_prefix: Prefix for all keys
-        """
+    Args:
+        context: The durable context (anything with ``get_state`` and ``set_state``).
+        key_prefix: Prepended to every key.
+        clock: The time source for expiry; ``time.time`` by default.
+    """
+
+    def __init__(
+        self, context: Any, key_prefix: str = "skye:", *, clock: Clock = default_clock
+    ) -> None:
+        """Keep the context; nothing is read until the first operation."""
         self.context = context
         self.key_prefix = key_prefix
+        self._clock = clock
+        self._lock = asyncio.Lock()
 
-    async def connect(self) -> None:
-        """Initialize durable function storage (no-op)."""
-        pass
+    def _name(self, key: str) -> str:
+        return self.key_prefix + check_key(key)
 
-    def _make_key(self, key: str) -> str:
-        """Create prefixed key."""
-        return f"{self.key_prefix}{key}"
-
-    async def get(self, key: str) -> Optional[Dict[str, Any]]:
-        """Get data from durable function context."""
-        try:
-            # Use durable context to get persistent data
-            data = self.context.get_state(self._make_key(key))
-            
-            if data is None:
-                return None
-            
-            # Check TTL if present
-            import time
-            if '_ttl' in data and time.time() > data['_ttl']:
-                await self.set(key, None)  # Remove expired data
-                return None
-            
-            # Remove TTL metadata before returning
-            result = {k: v for k, v in data.items() if k != '_ttl'}
-            return result
-        except Exception:
+    def _read(self, name: str) -> dict[str, Any] | None:
+        stored = self.context.get_state(name)
+        if not isinstance(stored, dict) or not isinstance(stored.get(_VALUE), dict):
             return None
+        if is_expired(stored.get(_EXPIRY), self._clock):
+            self.context.set_state(name, None)
+            return None
+        return dict(stored[_VALUE])
 
-    async def set(self, key: str, data: Dict[str, Any], ttl: Optional[int] = None) -> None:
-        """Set data in durable function context."""
-        try:
-            if data is None:
-                # Remove the key
-                self.context.set_state(self._make_key(key), None)
-                return
-            
-            # Add TTL metadata if specified
-            storage_data = dict(data)
-            if ttl:
-                import time
-                storage_data['_ttl'] = time.time() + ttl
-            
-            self.context.set_state(self._make_key(key), storage_data)
-        except Exception:
-            pass  # Ignore errors in durable context
+    async def get(self, key: str) -> dict[str, Any] | None:
+        """The value of ``key``, or ``None``."""
+        name = self._name(key)
+        with provider_errors("durable_function", "get"):
+            return self._read(name)
 
-    async def increment(self, key: str, amount: int = 1, ttl: Optional[int] = None) -> int:
-        """Atomically increment counter in durable function context."""
-        current_data = await self.get(key) or {}
-        new_value = current_data.get('count', 0) + amount
-        await self.set(key, {'count': new_value}, ttl)
-        return new_value
+    async def set(self, key: str, data: dict[str, Any], ttl: int | None = None) -> None:
+        """Store ``data`` with its expiry in the durable context."""
+        name = self._name(key)
+        stored = {_VALUE: dict(check_data(data)), _EXPIRY: expiry_of(ttl, self._clock)}
+        with provider_errors("durable_function", "set"):
+            self.context.set_state(name, stored)
 
-    async def get_multiple(self, keys: List[str]) -> Dict[str, Optional[Dict[str, Any]]]:
-        """Get multiple keys from durable function context."""
-        result = {}
-        for key in keys:
-            result[key] = await self.get(key)
-        return result
+    async def delete(self, key: str) -> bool:
+        """Clear ``key``; ``True`` when it held a live value."""
+        name = self._name(key)
+        with provider_errors("durable_function", "delete"):
+            present = self._read(name) is not None
+            self.context.set_state(name, None)
+            return present
 
-    async def set_multiple(self, data: Dict[str, Dict[str, Any]], ttl: Optional[int] = None) -> None:
-        """Set multiple keys in durable function context."""
+    async def increment(self, key: str, amount: int = 1, ttl: int | None = None) -> int:
+        """Add ``amount`` to the counter of ``key`` under a lock."""
+        name = self._name(key)
+        check_ttl(ttl)
+        async with self._lock:
+            with provider_errors("durable_function", "increment"):
+                current = self._read(name) or {}
+                value = int(current.get("count", 0)) + amount
+                self.context.set_state(
+                    name, {_VALUE: {"count": value}, _EXPIRY: expiry_of(ttl, self._clock)}
+                )
+                return value
+
+    async def set_multiple(self, data: dict[str, dict[str, Any]], ttl: int | None = None) -> None:
+        """Store every item; nothing is written when one key or value is invalid."""
+        check_items(data)
+        check_ttl(ttl)
         for key, value in data.items():
             await self.set(key, value, ttl)
+
+
+__all__ = ["DurableFunctionBackend"]

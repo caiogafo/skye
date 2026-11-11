@@ -5,10 +5,11 @@ This package provides a comprehensive routing solution with support for:
 - Health tracking and metrics
 - Rate limiting (TPM/RPM)
 - Multiple routing strategies
-- Fallback chains
+- Fallback chains, also when no target of an alias is available
+- Retry policies per error class (``RateLimitError``, ``ServerError``, ...), with waits
 - Tag-based routing
 - Cooldown mechanisms
-- Multiple storage backends (in-memory, Redis, DynamoDB, PostgreSQL, FileSystem, DurableFunction)
+- Any backend of ``skye.store`` (in memory by default; Redis, DynamoDB, ... passed explicitly)
 
 Example (With Aliases):
     >>> from skye.router import ModelRouter, ModelTarget, RouteConfig
@@ -45,15 +46,13 @@ Example (With Aliases):
     ... )
 
 Example (With External Storage):
+    >>> import skye.store
     >>> from skye.router import ModelRouter
-    >>> from skye.store import RedisBackend
     >>>
-    >>> # Use Redis for persistent state in serverless environments
-    >>> storage = RedisBackend("redis://localhost:6379")
-    >>> router = ModelRouter(
-    ...     routes=[...],
-    ...     storage=storage
-    ... )
+    >>> # Keep health and limits in a shared store when the process does not survive between invocations
+    >>> storage = skye.store.backend("redis", redis_url="redis://localhost:6379")
+    >>> router = ModelRouter(routes=[...], storage=storage)
+    >>> router = ModelRouter.from_file("router.skye", storage=storage)  # the same for a file
 
 Example (Direct Registration):
     >>> from skye.router import ModelRouter
@@ -77,11 +76,12 @@ Example (Direct Registration):
     >>>
     >>> # Check health
     >>> health = router.get_model_health("gpt-4")
-    >>> print(f"Success rate: {health['success_rate']:.1%}")
+    >>> print(f"Success rate: {health.success_rate:.1%}")
 
 Codename: jet.
 """
 
+from skye.base.interfaces.router import RoutingStrategy
 from skye.router.config_models import (
     AllowedFailsPolicyConfig,
     CooldownInfo,
@@ -92,7 +92,6 @@ from skye.router.config_models import (
     RouteConfig,
     UsageStats,
 )
-from skye.base.interfaces.router import RoutingStrategy
 from skye.router.model_router import ModelRouter
 from skye.router.skye_file import load_router_config
 

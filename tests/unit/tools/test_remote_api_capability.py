@@ -6,7 +6,7 @@ import pytest
 
 from skye.tools.exceptions import CapabilityValidationError
 from skye.tools.remote_api import RemoteAPICapability
-from skye.tools.schema import CapabilitySchema
+from skye.base.interfaces.capability import CapabilitySchema
 from tests.unit.tools import _urllib_responses as responses
 
 

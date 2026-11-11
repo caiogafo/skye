@@ -1,16 +1,9 @@
-"""Tiny standard-library template engine for Skye prompts.
+"""Tiny standard-library template engine for Skye prompts: interpolation only (decision D76).
 
-Replaces the former Jinja2 dependency with a small, dependency-free subset that covers the
-bundled ``templates/`` files and the prompts tests. Supported syntax:
+Replaces the former Jinja2 dependency with a small, dependency-free subset. Supported syntax:
 
 * ``{{ expr }}`` output; ``{# comment #}``.
-* ``{% if %}``, ``{% elif %}``, ``{% else %}``, ``{% endif %}``.
-* ``{% for x in expr %}`` / ``{% for k, v in expr %}`` with optional ``{% else %}`` and
-  ``{% endfor %}``; inside a loop ``loop.index``, ``loop.index0``, ``loop.first``,
-  ``loop.last``, ``loop.length``.
-* Whitespace control: ``{%-``/``-%}``/``{{-``/``-}}`` strip adjacent whitespace; a newline
-  right after a block tag is dropped and indentation before a block tag is stripped
-  (the former ``trim_blocks``/``lstrip_blocks`` behaviour).
+* Whitespace control: ``{{-`` / ``-}}`` strip the adjacent whitespace.
 * Expressions: names, dotted attribute / ``[key]`` access, method calls (``d.items()``),
   string / number / ``True``/``False``/``None`` literals, list literals, ``not``/``and``/``or``,
   ``== != < > <= >= in not in``, conditional ``a if cond else b`` and filters ``x | f(args)``.
@@ -22,6 +15,10 @@ bundled ``templates/`` files and the prompts tests. Supported syntax:
   one row per map, the columns in order of first appearance, or the ones given:
   ``totable(["name", "price"])``). To ask the model to ANSWER in a format, use the ``output``
   block of a ``.skye`` prompt instead.
+
+Control tags (``{% ... %}``: conditions, loops and anything else) are not supported: a text that
+holds one raises :class:`TemplateSyntaxError` naming the tag and its line. Conditions and loops are
+written in a ``.skye`` prompt, with ``when`` and ``each``.
 
 Undefined variables are left visible (``{{ name }}``) and are falsy, as with Jinja2's
 ``DebugUndefined``. No code is evaluated with ``eval``; only the grammar above is interpreted.
@@ -45,7 +42,16 @@ __all__ = [
 
 
 class TemplateSyntaxError(ValueError):
-    """Raised when a template or an expression inside it cannot be parsed."""
+    """Raised when a template or an expression inside it cannot be parsed.
+
+    Attributes:
+        line: The line of the template the error is on (1-based), or ``None`` when unknown.
+    """
+
+    def __init__(self, message: str, *, line: int | None = None) -> None:
+        """Keep the message and the line."""
+        super().__init__(message)
+        self.line = line
 
 
 class Undefined:
@@ -490,12 +496,26 @@ def _apply_filter(ctx: dict[str, Any], name: str, value: Any, args: list[Any]) -
 
 _TAG_RE = re.compile(r"\{#.*?#\}|\{%.*?%\}|\{\{.*?\}\}", re.DOTALL)
 
-# AST nodes are plain tuples: ("text", str) | ("out", expr) | ("if", [(cond, body)], else_body)
-# | ("for", names, iter_expr, body, else_body)
+# AST nodes are plain tuples: ("text", str) | ("out", expr)
+
+
+def _control_tag_error(source: str, start: int, tag: str) -> TemplateSyntaxError:
+    """The error for a ``{% %}`` tag: its line, the tag, and where conditions and loops go."""
+    line = source.count("\n", 0, start) + 1
+    return TemplateSyntaxError(
+        f"line {line}: the control tag {tag!r} is not supported; text templates do interpolation "
+        "only ({{ name }} with filters). Write conditions and loops in a .skye prompt, with "
+        "`when` and `each`",
+        line=line,
+    )
 
 
 def _lex(source: str) -> list[tuple[str, str]]:
-    """Split into ``("text"|"block"|"var", payload)`` items applying whitespace control."""
+    """Split into ``("text"|"var", payload)`` items applying whitespace control.
+
+    Raises:
+        TemplateSyntaxError: For a ``{% %}`` control tag (decision D76).
+    """
     items: list[tuple[str, str]] = []
     pos = 0
     strip_next_ws = False
@@ -516,10 +536,12 @@ def _lex(source: str) -> list[tuple[str, str]]:
             items.append(("text", text))
 
     for m in _TAG_RE.finditer(source):
-        text = source[pos : m.start()]
         tag = m.group(0)
+        if tag.startswith("{%"):
+            raise _control_tag_error(source, m.start(), tag)
+        text = source[pos : m.start()]
         pos = m.end()
-        kind = "var" if tag.startswith("{{") else ("comment" if tag.startswith("{#") else "block")
+        is_var = tag.startswith("{{")
         inner = tag[2:-2]
         left_strip = inner.startswith("-")
         right_strip = inner.endswith("-")
@@ -530,12 +552,12 @@ def _lex(source: str) -> list[tuple[str, str]]:
         add_text(text)
         if left_strip:
             _rstrip_last_text(items)
-        elif kind != "var":
-            _lstrip_blocks(items, at_start=(m.start() == 0))
-        if kind != "comment":
-            items.append((kind, inner.strip()))
+        elif not is_var:
+            _lstrip_line(items, at_start=(m.start() == 0))
+        if is_var:
+            items.append(("var", inner.strip()))
         strip_next_ws = right_strip
-        trim_newline = kind != "var" and not right_strip
+        trim_newline = not is_var and not right_strip
     add_text(source[pos:])
     # Jinja drops a single trailing newline by default.
     if items and items[-1][0] == "text" and items[-1][1].endswith("\n"):
@@ -554,7 +576,8 @@ def _rstrip_last_text(items: list[tuple[str, str]]) -> None:
             items.pop()
 
 
-def _lstrip_blocks(items: list[tuple[str, str]], at_start: bool) -> None:
+def _lstrip_line(items: list[tuple[str, str]], at_start: bool) -> None:
+    """Drop the indentation before a comment that stands alone on its line."""
     if not items or items[-1][0] != "text":
         return
     text = items[-1][1]
@@ -567,155 +590,40 @@ def _lstrip_blocks(items: list[tuple[str, str]], at_start: bool) -> None:
             items.pop()
 
 
-class _TemplateParser:
-    def __init__(self, source: str) -> None:
-        self.items = _lex(source)
-        self.i = 0
-        # Free root names in first-seen order, and the ones read unconditionally (outside any
-        # ``if`` and loop body, not through ``default``): those must be given at rendering.
-        self.variables: dict[str, None] = {}
-        self.required: dict[str, None] = {}
-        self.scopes: list[set[str]] = []
-        self.depth = 0
-
-    def expr(self, src: str) -> Callable[[dict[str, Any]], Any]:
-        """Compile one expression and record the free names it reads."""
-        parser = _Parser(src)
-        node = parser.parse()
+def _parse(source: str) -> tuple[list[Any], tuple[str, ...], tuple[str, ...]]:
+    """The nodes, the free names in first-seen order and the required ones (not ``default``-ed)."""
+    nodes: list[Any] = []
+    variables: dict[str, None] = {}
+    required: dict[str, None] = {}
+    for kind, payload in _lex(source):
+        if kind == "text":
+            nodes.append(("text", payload))
+            continue
+        parser = _Parser(payload)
+        nodes.append(("out", parser.parse()))
         for name in parser.names:
-            if any(name in scope for scope in self.scopes) or (self.scopes and name == "loop"):
-                continue
-            self.variables.setdefault(name, None)
-            if self.depth == 0 and name not in parser.defaulted:
-                self.required.setdefault(name, None)
-        return node
-
-    def parse(self) -> list[Any]:
-        body, end = self.block(())
-        if end is not None:
-            raise TemplateSyntaxError(f"Unexpected {{% {end} %}}")
-        return body
-
-    def block(self, terminators: tuple[str, ...]) -> tuple[list[Any], str | None]:
-        nodes: list[Any] = []
-        while self.i < len(self.items):
-            kind, payload = self.items[self.i]
-            self.i += 1
-            if kind == "text":
-                nodes.append(("text", payload))
-            elif kind == "var":
-                nodes.append(("out", self.expr(payload)))
-            else:
-                word = payload.split(None, 1)[0] if payload else ""
-                if word in terminators:
-                    return nodes, payload
-                if word == "if":
-                    nodes.append(self.parse_if(payload))
-                elif word == "for":
-                    nodes.append(self.parse_for(payload))
-                else:
-                    raise TemplateSyntaxError(f"Unsupported or unexpected tag: {{% {payload} %}}")
-        if terminators:
-            raise TemplateSyntaxError(f"Missing {{% {terminators[-1]} %}}")
-        return nodes, None
-
-    def parse_if(self, head: str) -> Any:
-        self.depth += 1
-        try:
-            return self._parse_if(head)
-        finally:
-            self.depth -= 1
-
-    def _parse_if(self, head: str) -> Any:
-        branches: list[tuple[Callable[[dict[str, Any]], Any], list[Any]]] = []
-        else_body: list[Any] = []
-        cond = self.expr(head[2:])
-        while True:
-            body, end = self.block(("elif", "else", "endif"))
-            branches.append((cond, body))
-            if end is None or end.split()[0] == "endif":
-                break
-            if end.split()[0] == "elif":
-                cond = self.expr(end[4:])
-                continue
-            else_body, end2 = self.block(("endif",))
-            if end2 is None:
-                raise TemplateSyntaxError("Missing {% endif %}")
-            break
-        return ("if", branches, else_body)
-
-    def parse_for(self, head: str) -> Any:
-        m = re.match(r"for\s+(.+?)\s+in\s+(.+)$", head, re.DOTALL)
-        if not m:
-            raise TemplateSyntaxError(f"Invalid for tag: {{% {head} %}}")
-        names = [n.strip() for n in m.group(1).split(",") if n.strip()]
-        if not names or not all(re.fullmatch(r"[A-Za-z_]\w*", n) for n in names):
-            raise TemplateSyntaxError(f"Invalid loop variable in: {{% {head} %}}")
-        iterable = self.expr(m.group(2))
-        self.depth += 1
-        self.scopes.append(set(names))
-        try:
-            body, end = self.block(("else", "endfor"))
-        finally:
-            self.scopes.pop()
-        else_body: list[Any] = []
-        try:
-            if end is not None and end.split()[0] == "else":
-                else_body, end = self.block(("endfor",))
-        finally:
-            self.depth -= 1
-        if end is None:
-            raise TemplateSyntaxError("Missing {% endfor %}")
-        return ("for", names, iterable, body, else_body)
+            variables.setdefault(name, None)
+            if name not in parser.defaulted:
+                required.setdefault(name, None)
+    return nodes, tuple(variables), tuple(required)
 
 
 def _render_nodes(nodes: list[Any], ctx: dict[str, Any], out: list[str]) -> None:
     for node in nodes:
-        tag = node[0]
-        if tag == "text":
+        if node[0] == "text":
             out.append(node[1])
-        elif tag == "out":
+        else:
             out.append(str(node[1](ctx)))
-        elif tag == "if":
-            for cond, body in node[1]:
-                if cond(ctx):
-                    _render_nodes(body, ctx, out)
-                    break
-            else:
-                _render_nodes(node[2], ctx, out)
-        else:  # for
-            _, names, iterable, body, else_body = node
-            seq = iterable(ctx)
-            items = list(seq.items()) if isinstance(seq, Mapping) else list(seq)
-            if not items:
-                _render_nodes(else_body, ctx, out)
-                continue
-            n = len(items)
-            for idx, item in enumerate(items):
-                inner = dict(ctx)
-                if len(names) == 1:
-                    inner[names[0]] = item
-                else:
-                    for name, value in zip(names, item):
-                        inner[name] = value
-                inner["loop"] = {
-                    "index": idx + 1,
-                    "index0": idx,
-                    "first": idx == 0,
-                    "last": idx == n - 1,
-                    "length": n,
-                }
-                _render_nodes(body, inner, out)
 
 
 class CompiledTemplate:
     """A parsed template: render it many times without parsing the text again.
 
     Attributes:
-        variables: The free variable names the template reads, in first-seen order (loop
-            variables inside their loop, ``loop``, constants and filter names are not included).
-        required_variables: The names read unconditionally (outside any ``if`` and loop body and
-            not through the ``default`` filter); a renderer may require them.
+        variables: The free variable names the template reads, in first-seen order (constants
+            and filter names are not included).
+        required_variables: The names read other than through the ``default`` filter; a renderer
+            requires them unless they have a default or are allowed missing (Requirement 30.8).
     """
 
     __slots__ = ("_nodes", "required_variables", "variables")
@@ -761,11 +669,11 @@ def compile_template(source: str) -> CompiledTemplate:
         The compiled template with its free variable names.
 
     Raises:
-        TemplateSyntaxError: If the template or an expression in it cannot be parsed.
+        TemplateSyntaxError: If an expression cannot be parsed, or the text holds a ``{% %}``
+            control tag (its ``line`` is set; decision D76).
     """
-    parser = _TemplateParser(source)
-    nodes = parser.parse()
-    return CompiledTemplate(nodes, tuple(parser.variables), tuple(parser.required))
+    nodes, variables, required = _parse(source)
+    return CompiledTemplate(nodes, variables, required)
 
 
 def render_template(

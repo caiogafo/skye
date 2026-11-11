@@ -1,46 +1,154 @@
-"""Storage backend Port: the asynchronous key-value store used by ``store`` and the router.
+"""Storage Ports: small capability Protocols for the key-value stores of ``store`` (Requirement 12,
+decision D98).
 
-The vector-store Port that used to live here (``StorageAdapterInterface``, decision D41) had no implementation and was removed;
-it will be designed again with the first vector store of ``memory``.
+A component asks only for the capabilities it uses, and a backend implements what it can:
 
-Raises: ProviderError when the backend is unreachable, ValidationError for invalid data.
-Missing: ``get``, ``get_by_id`` and ``query`` return ``None`` or an empty collection for an absent key, never raise for absence; an expired entry is absent.
-Concurrency: backends are used from many tasks: ``increment`` must be atomic; ``connect`` is called once before use.
+* ``KeyValueStore``: ``get``, ``set``, ``delete``, ``get_multiple``, ``set_multiple`` (every
+  backend);
+* ``CounterStore``: an atomic ``increment`` (the router);
+* ``ScanStore``: ``keys(prefix, limit)``, implemented by five backends of ``store`` (in-memory,
+  file, Redis/Valkey, DynamoDB, PostgreSQL): every backend but the durable function.
+
+``StorageBackend`` is key-value plus counter, the abstract base class every backend of ``store``
+subclasses, so the code that typed
+against it keeps working. A vector store is added with the first vector store of ``memory`` (D41).
+
+A stored value is a JSON-compatible ``dict``. A time to live is ``None`` (no expiry) or a positive
+``int`` of seconds; any other value
+raises ``ValidationError`` before anything is written (D95). ``check_ttl`` is the one place that
+rule lives.
+
+Raises: ``ValidationError`` for an invalid key or time to live; ``ProviderError`` when the backend
+    is unreachable or rejects a call.
+Missing: ``get`` returns ``None`` for an absent or expired key, ``get_multiple`` maps such a key to
+    ``None``, ``delete`` returns
+    ``False`` and ``keys`` leaves it out; absence never raises.
+Concurrency: a backend is shared by many tasks; ``increment`` is atomic across them (and across
+    processes for the external stores).
 """
 
+from __future__ import annotations
+
 from abc import ABC, abstractmethod
-from typing import Any, Dict, List, Optional
+from typing import Any, Protocol, runtime_checkable
+
+from skye.base.exceptions import ValidationError
 
 
-class StorageBackend(ABC):
-    """Abstract base class for storage backends."""
+def check_ttl(ttl: object) -> int | None:
+    """Return ``ttl`` when it is ``None`` or a positive ``int``; raise otherwise (decision D95).
+
+    Example:
+        >>> check_ttl(30), check_ttl(None)
+        (30, None)
+        >>> check_ttl(0)
+        Traceback (most recent call last):
+        ...
+        skye.base.exceptions.ValidationError: ttl must be None or a positive number of seconds, got 0 | Details: {'field': 'ttl', 'value': 0}
+    """
+    if ttl is None:
+        return None
+    if isinstance(ttl, bool) or not isinstance(ttl, int) or ttl <= 0:
+        raise ValidationError(
+            f"ttl must be None or a positive number of seconds, got {ttl!r}", "ttl", ttl
+        )
+    return ttl
+
+
+def check_key(key: object) -> str:
+    """Return ``key`` when it is a non-empty ``str``; raise ``ValidationError`` otherwise."""
+    if not isinstance(key, str) or not key:
+        raise ValidationError(f"a storage key must be a non-empty string, got {key!r}", "key", key)
+    return key
+
+
+@runtime_checkable
+class KeyValueStore(Protocol):
+    """Read, write and delete JSON objects by key, with an optional time to live."""
+
+    async def get(self, key: str) -> dict[str, Any] | None:
+        """The value of ``key``, or ``None`` when it is absent or expired."""
+        ...
+
+    async def set(self, key: str, data: dict[str, Any], ttl: int | None = None) -> None:
+        """Store ``data`` under ``key``, replacing any value; it expires after ``ttl`` seconds."""
+        ...
+
+    async def delete(self, key: str) -> bool:
+        """Remove ``key``; ``True`` when it was there."""
+        ...
+
+    async def get_multiple(self, keys: list[str]) -> dict[str, dict[str, Any] | None]:
+        """Every key of ``keys`` mapped to its value or ``None``, in the order given."""
+        ...
+
+    async def set_multiple(self, data: dict[str, dict[str, Any]], ttl: int | None = None) -> None:
+        """Store every item of ``data`` with the same time to live."""
+        ...
+
+
+@runtime_checkable
+class CounterStore(Protocol):
+    """An atomic counter stored as ``{"count": n}`` under a key."""
+
+    async def increment(self, key: str, amount: int = 1, ttl: int | None = None) -> int:
+        """Add ``amount`` to the counter of ``key`` (an absent or expired key starts at 0) and
+        return the new value.
+
+        The stored value becomes ``{"count": n}``; ``ttl`` replaces the expiry of the key, ``None``
+        removes it.
+        """
+        ...
+
+
+@runtime_checkable
+class ScanStore(Protocol):
+    """List the keys that start with a prefix."""
+
+    async def keys(self, prefix: str = "", limit: int | None = None) -> list[str]:
+        """The live keys that start with ``prefix``, sorted, at most ``limit`` of them."""
+        ...
+
+
+class StorageBackend(KeyValueStore, CounterStore, ABC):
+    """Key-value plus counter: the base class of every backend of ``store`` (decision D98).
+
+    ``connect`` prepares the backend (a client, a table) and ``close`` releases it; both are safe to
+    call more than once and
+    the other methods connect on first use, so calling ``connect`` is optional.
+    """
+
+    async def connect(self) -> None:  # noqa: B027 - optional hook
+        """Prepare the backend; the default does nothing."""
+
+    async def close(self) -> None:  # noqa: B027 - optional hook
+        """Release what the backend holds; the default does nothing."""
 
     @abstractmethod
-    async def connect(self) -> None:
-        """Initialize/connect to the storage backend."""
-        pass
+    async def get(self, key: str) -> dict[str, Any] | None:
+        """The value of ``key``, or ``None`` when it is absent or expired."""
 
     @abstractmethod
-    async def get(self, key: str) -> Optional[Dict[str, Any]]:
-        """Get data from storage."""
-        pass
+    async def set(self, key: str, data: dict[str, Any], ttl: int | None = None) -> None:
+        """Store ``data`` under ``key``; it expires after ``ttl`` seconds when given."""
 
     @abstractmethod
-    async def set(self, key: str, data: Dict[str, Any], ttl: Optional[int] = None) -> None:
-        """Set data in storage with optional TTL."""
-        pass
+    async def delete(self, key: str) -> bool:
+        """Remove ``key``; ``True`` when it was there."""
 
     @abstractmethod
-    async def increment(self, key: str, amount: int = 1, ttl: Optional[int] = None) -> int:
-        """Atomically increment a counter."""
-        pass
+    async def increment(self, key: str, amount: int = 1, ttl: int | None = None) -> int:
+        """Atomically add ``amount`` to the counter of ``key`` and return the new value."""
 
-    @abstractmethod
-    async def get_multiple(self, keys: List[str]) -> Dict[str, Optional[Dict[str, Any]]]:
-        """Get multiple keys at once."""
-        pass
+    async def get_multiple(self, keys: list[str]) -> dict[str, dict[str, Any] | None]:
+        """Every key mapped to its value or ``None``; the default calls ``get`` once per key."""
+        return {key: await self.get(key) for key in keys}
 
-    @abstractmethod
-    async def set_multiple(self, data: Dict[str, Dict[str, Any]], ttl: Optional[int] = None) -> None:
-        """Set multiple keys at once."""
-        pass
+    async def set_multiple(self, data: dict[str, dict[str, Any]], ttl: int | None = None) -> None:
+        """Store every item with the same time to live; the default calls ``set`` once per key."""
+        check_ttl(ttl)
+        for key, value in data.items():
+            await self.set(key, value, ttl)
+
+
+__all__ = ["CounterStore", "KeyValueStore", "ScanStore", "StorageBackend", "check_key", "check_ttl"]

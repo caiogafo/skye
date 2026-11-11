@@ -18,6 +18,7 @@ Example:
     >>> providers = ProviderRegistry.list_model_providers()
 """
 
+import inspect
 from typing import Any, Literal, Type, overload
 
 from skye.base.exceptions import ConfigurationError
@@ -109,15 +110,20 @@ class ProviderRegistry(ProviderRegistryInterface):
         """
         if name not in cls._model_providers:
             available = ", ".join(cls._model_providers.keys()) or "none"
+            hint = (
+                f" '{name}' is an embedding provider: pass provider_type=\"embedding\"."
+                if name in cls._embedding_providers
+                else ""
+            )
             raise ConfigurationError(
-                f"Model provider '{name}' not found. "
-                f"Available providers: {available}. "
-                f"Install with: pip install skyeai[{name}]"
+                f"Model provider '{name}' not found. Available model providers: {available}.{hint}"
             )
 
         provider_class = cls._model_providers[name]
         try:
             return provider_class(**config)
+        except ConfigurationError:
+            raise  # it already says what is missing (a key, a region) and names the variable
         except Exception as e:
             raise ConfigurationError(
                 f"Failed to instantiate provider '{name}': {str(e)}"
@@ -150,14 +156,14 @@ class ProviderRegistry(ProviderRegistryInterface):
         if name not in cls._embedding_providers:
             available = ", ".join(cls._embedding_providers.keys()) or "none"
             raise ConfigurationError(
-                f"Embedding provider '{name}' not found. "
-                f"Available providers: {available}. "
-                f"Install with: pip install skyeai[{name}]"
+                f"Embedding provider '{name}' not found. Available embedding providers: {available}."
             )
 
         provider_class = cls._embedding_providers[name]
         try:
             return provider_class(**config)
+        except ConfigurationError:
+            raise  # it already says what is missing (a key, a region) and names the variable
         except Exception as e:
             raise ConfigurationError(
                 f"Failed to instantiate embedding provider '{name}': {str(e)}"
@@ -210,9 +216,12 @@ def provider(name: str, **config: Any) -> ModelInterface | VectorEncoderInterfac
     Returns a provider instance that supports direct method calls.
 
     Args:
-        name: Provider name (e.g., "openai", "bedrock", "anthropic").
+        name: Provider name (e.g., "openai", "bedrock", "anthropic", "cohere").
         **config: Provider-specific configuration. Use provider_type="embedding"
-            to get an embedding provider instead of a model provider.
+            to get an embedding provider instead of a model provider; a name that has only an
+            embedding provider (``cohere``) gives it without ``provider_type``. ``region`` is an
+            alias of the AWS ``region_name`` and of the Google ``location``; ``location`` stays
+            ``location`` for Google. ``max_retries`` (0 turns retries off) goes to the client.
 
     Returns:
         ModelInterface or VectorEncoderInterface instance that supports boto3-style calls.
@@ -262,19 +271,46 @@ def provider(name: str, **config: Any) -> ModelInterface | VectorEncoderInterfac
         ... )
         >>> vectors = embedder.encode_batch(["text1", "text2"])
     """
-    # Normalize parameter names for convenience
-    # Allow "region" as alias for "region_name" (boto3-style)
-    if "region" in config and "region_name" not in config:
-        config["region_name"] = config.pop("region")
-    
-    # Allow "location" as alias for "region_name" (GCP-style)
-    if "location" in config and "region_name" not in config:
-        config["region_name"] = config.pop("location")
+    provider_type = config.pop("provider_type", None)
+    if provider_type is None:
+        # A name registered only for embeddings (``cohere``) gives its embedding client.
+        only_embedding = (
+            name in ProviderRegistry._embedding_providers and name not in ProviderRegistry._model_providers
+        )
+        provider_type = "embedding" if only_embedding else "model"
 
-    # Check if this is an embedding provider request
-    provider_type = config.pop("provider_type", "model")
-    
+    registered = (
+        ProviderRegistry._embedding_providers if provider_type == "embedding" else ProviderRegistry._model_providers
+    )
+    target = registered.get(name)
+    if target is not None:
+        _normalize_location(target, config)
+
     if provider_type == "embedding":
         return ProviderRegistry.get_embedding_provider(name, **config)
-    else:
-        return ProviderRegistry.get_model_provider(name, **config)
+    return ProviderRegistry.get_model_provider(name, **config)
+
+
+def _parameters(cls: type) -> set[str]:
+    try:
+        return set(inspect.signature(cls).parameters)
+    except (TypeError, ValueError):
+        return set()
+
+
+def _normalize_location(cls: type, config: dict[str, Any]) -> None:
+    """Let ``region`` and ``location`` name the parameter the class takes.
+
+    An AWS client takes ``region_name`` (``region`` and ``location`` are aliases of it); a Google
+    client takes ``location`` (``region`` is an alias of it), which is never renamed.
+    """
+    accepted = _parameters(cls)
+    if "location" in accepted:
+        if "region" in config and "location" not in config:
+            config["location"] = config.pop("region")
+        if "region_name" in config and "location" not in config:
+            config["location"] = config.pop("region_name")
+    elif "region_name" in accepted:
+        for alias in ("region", "location"):
+            if alias in config and "region_name" not in config:
+                config["region_name"] = config.pop(alias)

@@ -1,198 +1,414 @@
-"""PostgreSQL storage backend (moved from routes/storage_backends.py)."""
+"""PostgreSQL backend with three optional drivers, chosen in order (decision D100).
 
+1. The **RDS Data API** through ``boto3`` when ``cluster_arn`` and ``secret_arn`` are given: HTTP
+   calls, no connection to manage, IAM
+   authorization, nothing to install in Lambda (extra ``aws`` elsewhere). Aurora only.
+2. **pg8000** when installed (extra ``postgres``): pure Python, any PostgreSQL; synchronous, so it
+   runs in a worker thread.
+3. **asyncpg** when installed (extra ``postgres-asyncpg``): compiled, the fastest.
+
+``driver="data-api" | "pg8000" | "asyncpg"`` forces one. The table (created on first use) is
+``key TEXT PRIMARY KEY, data JSONB, expires_at DOUBLE PRECISION`` (seconds since the epoch). Every
+statement is written once with
+``:name`` parameters, so no value is ever put into the SQL text, and the table name is checked as an
+identifier.
+
+Example:
+    >>> from skye.store import PostgreSQLBackend
+    >>> store = PostgreSQLBackend("postgresql://app@db.example.com/app")  # doctest: +SKIP
+    >>> aurora = PostgreSQLBackend(
+    ...     cluster_arn="arn:aws:rds:...", secret_arn="arn:aws:secretsmanager:...", database="app"
+    ... )
+
+Raises: ``ValidationError`` for an invalid key, value, time to live or table name;
+    ``MissingExtraError`` when no driver is available;
+    ``ProviderError`` naming the operation when a statement fails. The connection string is never
+    put in an error or a log.
+Missing: an absent or expired row reads as ``None``.
+Concurrency: ``increment`` is one ``INSERT ... ON CONFLICT DO UPDATE ... RETURNING``, atomic across
+    processes; the pg8000 and
+    asyncpg drivers use one connection per backend, guarded by a lock.
+"""
+
+from __future__ import annotations
+
+import asyncio
+import importlib.util
 import json
-import time
-from typing import Any, Dict, List, Optional, Tuple
+import re
+from typing import Any, Literal, Protocol
+from urllib.parse import unquote, urlsplit
 
-from skye.base.interfaces import StorageBackend
+from skye.base.exceptions import MissingExtraError, ValidationError
+from skye.base.interfaces.storage import ScanStore, StorageBackend, check_key, check_ttl
+from skye.base.lazy_import import missing_extra
+from skye.store._common import (
+    Clock,
+    check_data,
+    check_items,
+    check_limit,
+    default_clock,
+    expiry_of,
+    like_prefix,
+    provider_errors,
+)
+
+Driver = Literal["data-api", "pg8000", "asyncpg"]
+_IDENTIFIER = re.compile(r"^[A-Za-z_][A-Za-z0-9_]{0,62}(\.[A-Za-z_][A-Za-z0-9_]{0,62})?$")
+#: A quoted SQL string (left as it is) or a ``:name`` parameter outside one.
+_PARAM = re.compile(r"'(?:[^']|'')*'|(?<![:\w]):([A-Za-z_]\w*)")
 
 
-class PostgreSQLBackend(StorageBackend):
-    """PostgreSQL storage backend for persistent database storage."""
+def statements(table: str) -> dict[str, str]:
+    """The SQL of every operation for ``table``.
 
-    def __init__(self, connection_string: str, table_name: str = "skye_storage"):
-        """Initialize PostgreSQL backend.
-        
-        Args:
-            connection_string: PostgreSQL connection string
-            table_name: Table name for storing data
-        """
-        self.connection_string = connection_string
-        self.table_name = table_name
-        self._pool = None
+    Parameters are ``:name`` and there is no ``::`` cast, which pg8000 and the Data API
+    would read as a parameter.
+    """
+    live = "(expires_at IS NULL OR expires_at > :now)"
+    return {
+        "create": (
+            f"CREATE TABLE IF NOT EXISTS {table} "
+            "(key TEXT PRIMARY KEY, data JSONB NOT NULL, expires_at DOUBLE PRECISION)"
+        ),
+        "get": f"SELECT CAST(data AS TEXT) AS data FROM {table} WHERE key = :key AND {live}",
+        "set": (
+            f"INSERT INTO {table} (key, data, expires_at) "
+            "VALUES (:key, CAST(:data AS JSONB), :exp) "
+            "ON CONFLICT (key) DO UPDATE SET data = EXCLUDED.data, expires_at = EXCLUDED.expires_at"
+        ),
+        "delete": f"DELETE FROM {table} WHERE key = :key RETURNING {live} AS live",
+        "increment": (
+            f"INSERT INTO {table} AS s (key, data, expires_at) "
+            "VALUES (:key, jsonb_build_object('count', CAST(:amount AS BIGINT)), :exp) "
+            "ON CONFLICT (key) DO UPDATE SET data = jsonb_build_object('count', "
+            "CASE WHEN s.expires_at IS NOT NULL AND s.expires_at <= :now THEN 0 "
+            "ELSE COALESCE(CAST(s.data->>'count' AS BIGINT), 0) END + CAST(:amount AS BIGINT)), "
+            "expires_at = EXCLUDED.expires_at "
+            "RETURNING CAST(data->>'count' AS BIGINT) AS count"
+        ),
+        "keys": (
+            f"SELECT key FROM {table} WHERE key LIKE :pattern ESCAPE '\\' AND {live} ORDER BY key"
+        ),
+    }
 
-    async def connect(self) -> None:
-        """Initialize PostgreSQL connection and create table if needed."""
-        await self._get_pool()  # This will create the pool and table
 
-    async def _get_pool(self):
-        """Get connection pool (lazy initialization)."""
-        if self._pool is None:
-            try:
-                import asyncpg
-                self._pool = await asyncpg.create_pool(self.connection_string)
-                
-                # Create table if it doesn't exist
-                async with self._pool.acquire() as conn:
-                    await conn.execute(f"""
-                        CREATE TABLE IF NOT EXISTS {self.table_name} (
-                            key VARCHAR(255) PRIMARY KEY,
-                            data JSONB NOT NULL,
-                            expires_at TIMESTAMP
-                        )
-                    """)
-                    
-                    # Create index on expires_at for efficient cleanup
-                    await conn.execute(f"""
-                        CREATE INDEX IF NOT EXISTS idx_{self.table_name}_expires_at 
-                        ON {self.table_name} (expires_at)
-                    """)
-            except ImportError:
-                raise ImportError("asyncpg package required for PostgreSQLBackend. Install with: pip install skyeai[postgres]")
-        return self._pool
+class _Executor(Protocol):
+    """One driver: run a named statement with ``:name`` parameters and return the rows as dicts."""
 
-    async def _cleanup_expired(self, conn) -> None:
-        """Clean up expired entries."""
-        await conn.execute(f"""
-            DELETE FROM {self.table_name} 
-            WHERE expires_at IS NOT NULL AND expires_at < NOW()
-        """)
+    async def run(self, name: str, sql: str, params: dict[str, Any]) -> list[dict[str, Any]]: ...
 
-    async def get(self, key: str) -> Optional[Dict[str, Any]]:
-        """Get data from PostgreSQL."""
-        pool = await self._get_pool()
-        
-        async with pool.acquire() as conn:
-            # Clean up expired entries periodically
-            import random
-            if random.random() < 0.1:  # 10% chance
-                await self._cleanup_expired(conn)
-            
-            row = await conn.fetchrow(f"""
-                SELECT data FROM {self.table_name} 
-                WHERE key = $1 AND (expires_at IS NULL OR expires_at > NOW())
-            """, key)
-            
-            return dict(row['data']) if row else None
+    async def close(self) -> None: ...
 
-    async def set(self, key: str, data: Dict[str, Any], ttl: Optional[int] = None) -> None:
-        """Set data in PostgreSQL."""
-        import json
-        
-        pool = await self._get_pool()
-        
-        async with pool.acquire() as conn:
-            expires_at = None
-            if ttl:
-                expires_at = f"NOW() + INTERVAL '{ttl} seconds'"
-            
-            if expires_at:
-                await conn.execute(f"""
-                    INSERT INTO {self.table_name} (key, data, expires_at) 
-                    VALUES ($1, $2, {expires_at})
-                    ON CONFLICT (key) DO UPDATE SET 
-                        data = EXCLUDED.data, 
-                        expires_at = EXCLUDED.expires_at
-                """, key, json.dumps(data))
-            else:
-                await conn.execute(f"""
-                    INSERT INTO {self.table_name} (key, data, expires_at) 
-                    VALUES ($1, $2, NULL)
-                    ON CONFLICT (key) DO UPDATE SET 
-                        data = EXCLUDED.data, 
-                        expires_at = NULL
-                """, key, json.dumps(data))
 
-    async def increment(self, key: str, amount: int = 1, ttl: Optional[int] = None) -> int:
-        """Atomically increment counter in PostgreSQL."""
-        pool = await self._get_pool()
-        
-        async with pool.acquire() as conn:
-            # Use PostgreSQL's atomic operations
-            expires_at = None
-            if ttl:
-                expires_at = f"NOW() + INTERVAL '{ttl} seconds'"
-            
-            if expires_at:
-                row = await conn.fetchrow(f"""
-                    INSERT INTO {self.table_name} (key, data, expires_at) 
-                    VALUES ($1, '{{"count": {amount}}}', {expires_at})
-                    ON CONFLICT (key) DO UPDATE SET 
-                        data = jsonb_set(
-                            COALESCE({self.table_name}.data, '{{}}'::jsonb), 
-                            '{{count}}', 
-                            (COALESCE(({self.table_name}.data->>'count')::int, 0) + {amount})::text::jsonb
-                        ),
-                        expires_at = EXCLUDED.expires_at
-                    RETURNING (data->>'count')::int as count
-                """, key)
-            else:
-                row = await conn.fetchrow(f"""
-                    INSERT INTO {self.table_name} (key, data, expires_at) 
-                    VALUES ($1, '{{"count": {amount}}}', NULL)
-                    ON CONFLICT (key) DO UPDATE SET 
-                        data = jsonb_set(
-                            COALESCE({self.table_name}.data, '{{}}'::jsonb), 
-                            '{{count}}', 
-                            (COALESCE(({self.table_name}.data->>'count')::int, 0) + {amount})::text::jsonb
-                        )
-                    RETURNING (data->>'count')::int as count
-                """, key)
-            
-            return row['count']
+class DataApiExecutor:
+    """The RDS Data API through ``boto3`` (``rds-data``); results come back as JSON records."""
 
-    async def get_multiple(self, keys: List[str]) -> Dict[str, Optional[Dict[str, Any]]]:
-        """Get multiple keys from PostgreSQL."""
-        if not keys:
-            return {}
-        
-        pool = await self._get_pool()
-        
-        async with pool.acquire() as conn:
-            rows = await conn.fetch(f"""
-                SELECT key, data FROM {self.table_name} 
-                WHERE key = ANY($1) AND (expires_at IS NULL OR expires_at > NOW())
-            """, keys)
-            
-            result = {key: None for key in keys}
-            for row in rows:
-                result[row['key']] = dict(row['data'])
-            
-            return result
+    def __init__(
+        self,
+        cluster_arn: str,
+        secret_arn: str,
+        database: str | None,
+        region_name: str | None,
+        client: Any = None,
+    ) -> None:
+        """Remember the ARNs; the client is created on first use."""
+        self._cluster_arn = cluster_arn
+        self._secret_arn = secret_arn
+        self._database = database
+        self._region_name = region_name
+        self._client = client
 
-    async def set_multiple(self, data: Dict[str, Dict[str, Any]], ttl: Optional[int] = None) -> None:
-        """Set multiple keys in PostgreSQL."""
-        if not data:
-            return
-        
-        import json
-        pool = await self._get_pool()
-        
-        async with pool.acquire() as conn:
-            expires_at = None
-            if ttl:
-                expires_at = f"NOW() + INTERVAL '{ttl} seconds'"
-            
-            # Use batch insert with ON CONFLICT
-            values = []
-            for key, value in data.items():
-                if expires_at:
-                    values.append(f"('{key}', '{json.dumps(value)}', {expires_at})")
-                else:
-                    values.append(f"('{key}', '{json.dumps(value)}', NULL)")
-            
-            values_str = ', '.join(values)
-            
-            await conn.execute(f"""
-                INSERT INTO {self.table_name} (key, data, expires_at) 
-                VALUES {values_str}
-                ON CONFLICT (key) DO UPDATE SET 
-                    data = EXCLUDED.data, 
-                    expires_at = EXCLUDED.expires_at
-            """)
+    @staticmethod
+    def parameter(name: str, value: Any) -> dict[str, Any]:
+        """A Data API parameter for one Python value."""
+        if value is None:
+            return {"name": name, "value": {"isNull": True}}
+        if isinstance(value, bool):
+            return {"name": name, "value": {"booleanValue": value}}
+        if isinstance(value, int):
+            return {"name": name, "value": {"longValue": value}}
+        if isinstance(value, float):
+            return {"name": name, "value": {"doubleValue": value}}
+        return {"name": name, "value": {"stringValue": str(value)}}
+
+    async def run(self, name: str, sql: str, params: dict[str, Any]) -> list[dict[str, Any]]:
+        """``ExecuteStatement`` in a worker thread."""
+        if self._client is None:
+            boto3 = missing_extra("boto3", extra="aws")
+            kwargs = {"region_name": self._region_name} if self._region_name else {}
+            self._client = boto3.client("rds-data", **kwargs)
+        request: dict[str, Any] = {
+            "resourceArn": self._cluster_arn,
+            "secretArn": self._secret_arn,
+            "sql": sql,
+            "parameters": [self.parameter(k, v) for k, v in params.items()],
+            "formatRecordsAs": "JSON",
+        }
+        if self._database:
+            request["database"] = self._database
+        response = await asyncio.to_thread(self._client.execute_statement, **request)
+        records = response.get("formattedRecords")
+        return list(json.loads(records)) if records else []
 
     async def close(self) -> None:
-        """Close the connection pool."""
-        if self._pool:
-            await self._pool.close()
-            self._pool = None
+        """Nothing to release: the Data API has no connection."""
+
+
+def connection_arguments(dsn: str) -> dict[str, Any]:
+    """The keyword arguments of ``pg8000.native.Connection`` for a ``postgresql://`` URL."""
+    parts = urlsplit(dsn)
+    if parts.scheme not in ("postgres", "postgresql"):
+        raise ValidationError(
+            "a PostgreSQL connection string starts with postgresql:// or postgres://",
+            "connection_string",
+            parts.scheme,
+        )
+    arguments: dict[str, Any] = {
+        "user": unquote(parts.username or "postgres"),
+        "host": parts.hostname or "localhost",
+    }
+    if parts.port:
+        arguments["port"] = parts.port
+    if parts.password is not None:
+        arguments["password"] = unquote(parts.password)
+    database = parts.path.lstrip("/")
+    if database:
+        arguments["database"] = unquote(database)
+    query = dict(item.split("=", 1) for item in parts.query.split("&") if "=" in item)
+    if query.get("sslmode") in ("require", "verify-ca", "verify-full"):
+        arguments["ssl_context"] = True
+    return arguments
+
+
+class Pg8000Executor:
+    """``pg8000.native``: one connection, used from a worker thread under a lock."""
+
+    def __init__(self, dsn: str, module: Any = None) -> None:
+        """Remember the connection string; the connection opens on first use."""
+        self._dsn = dsn
+        self._module = module
+        self._connection: Any = None
+        self._lock = asyncio.Lock()
+
+    def _run(self, sql: str, params: dict[str, Any]) -> list[dict[str, Any]]:
+        if self._connection is None:
+            module = self._module or missing_extra(
+                "pg8000.native", extra="postgres", package="pg8000"
+            )
+            self._connection = module.Connection(**connection_arguments(self._dsn))
+        rows = self._connection.run(sql, **params) or []
+        names = [column["name"] for column in (self._connection.columns or [])]
+        return [dict(zip(names, row, strict=False)) for row in rows]
+
+    async def run(self, name: str, sql: str, params: dict[str, Any]) -> list[dict[str, Any]]:
+        """Run the statement in a worker thread."""
+        async with self._lock:
+            return await asyncio.to_thread(self._run, sql, params)
+
+    async def close(self) -> None:
+        """Close the connection."""
+        if self._connection is not None:
+            await asyncio.to_thread(self._connection.close)
+            self._connection = None
+
+
+def positional(sql: str, params: dict[str, Any]) -> tuple[str, list[Any]]:
+    """``:name`` parameters to asyncpg's ``$1``, ``$2``; a name used twice keeps one number."""
+    order: list[str] = []
+
+    def number(match: re.Match[str]) -> str:
+        name = match.group(1)
+        if name is None:  # a quoted string
+            return match.group(0)
+        if name not in order:
+            order.append(name)
+        return f"${order.index(name) + 1}"
+
+    return _PARAM.sub(number, sql), [params[name] for name in order]
+
+
+class AsyncpgExecutor:
+    """``asyncpg``: one connection, guarded by a lock."""
+
+    def __init__(self, dsn: str, module: Any = None) -> None:
+        """Remember the connection string; the connection opens on first use."""
+        self._dsn = dsn
+        self._module = module
+        self._connection: Any = None
+        self._lock = asyncio.Lock()
+
+    async def run(self, name: str, sql: str, params: dict[str, Any]) -> list[dict[str, Any]]:
+        """Run the statement on the connection."""
+        async with self._lock:
+            if self._connection is None:
+                module = self._module or missing_extra("asyncpg", extra="postgres-asyncpg")
+                self._connection = await module.connect(self._dsn)
+            text, values = positional(sql, params)
+            rows = await self._connection.fetch(text, *values)
+            return [dict(row) for row in rows]
+
+    async def close(self) -> None:
+        """Close the connection."""
+        if self._connection is not None:
+            await self._connection.close()
+            self._connection = None
+
+
+def choose_driver(dsn: str | None, cluster_arn: str | None, secret_arn: str | None) -> Driver:
+    """The first available driver of D100, or ``MissingExtraError`` naming the extras."""
+    if cluster_arn and secret_arn:
+        return "data-api"
+    if dsn is None:
+        raise ValidationError(
+            "PostgreSQLBackend needs a connection string, "
+            "or cluster_arn and secret_arn for the Data API",
+            "connection_string",
+            None,
+        )
+    if importlib.util.find_spec("pg8000") is not None:
+        return "pg8000"
+    if importlib.util.find_spec("asyncpg") is not None:
+        return "asyncpg"
+    error = MissingExtraError(extra="postgres", missing="pg8000")
+    error.add_note(
+        "Or the faster compiled driver: pip install skyeai[postgres-asyncpg]; "
+        "or pass cluster_arn and secret_arn to use the "
+        "RDS Data API (nothing to install in AWS Lambda)."
+    )
+    raise error
+
+
+class PostgreSQLBackend(StorageBackend, ScanStore):
+    """Key-value, counter and scan in a PostgreSQL table.
+
+    Args:
+        connection_string: A ``postgresql://`` URL, for pg8000 and asyncpg.
+        table_name: The table (``name`` or ``schema.name``), created on first use.
+        cluster_arn: The Aurora cluster ARN, for the Data API.
+        secret_arn: The Secrets Manager ARN of the database credentials, for the Data API.
+        database: The database name, for the Data API.
+        region_name: The AWS region of the Data API; ``None`` uses the default AWS configuration.
+        driver: Force a driver instead of the order of D100.
+        executor: A driver object to use instead of building one (tests pass a fake one).
+        clock: The time source for expiry; ``time.time`` by default.
+    """
+
+    def __init__(
+        self,
+        connection_string: str | None = None,
+        table_name: str = "skye_storage",
+        *,
+        cluster_arn: str | None = None,
+        secret_arn: str | None = None,
+        database: str | None = None,
+        region_name: str | None = None,
+        driver: Driver | None = None,
+        executor: _Executor | None = None,
+        clock: Clock = default_clock,
+    ) -> None:
+        """Check the settings and choose the driver; nothing connects until the first operation."""
+        if not _IDENTIFIER.match(table_name):
+            raise ValidationError(
+                f"table_name must be a SQL identifier (name or schema.name), got {table_name!r}",
+                "table_name",
+                table_name,
+            )
+        self.table_name = table_name
+        self._sql = statements(table_name)
+        self._clock = clock
+        self._ready = False
+        self.driver: Driver | None
+        if executor is not None:
+            self.driver = driver
+            self._executor: _Executor = executor
+            return
+        self.driver = driver or choose_driver(connection_string, cluster_arn, secret_arn)
+        if self.driver == "data-api":
+            if not (cluster_arn and secret_arn):
+                raise ValidationError(
+                    "the Data API driver needs cluster_arn and secret_arn", "cluster_arn", None
+                )
+            self._executor = DataApiExecutor(cluster_arn, secret_arn, database, region_name)
+        elif connection_string is None:
+            raise ValidationError(
+                f"the {self.driver} driver needs a connection string", "connection_string", None
+            )
+        elif self.driver == "pg8000":
+            self._executor = Pg8000Executor(connection_string)
+        else:
+            self._executor = AsyncpgExecutor(connection_string)
+
+    async def _run(self, name: str, operation: str, **params: Any) -> list[dict[str, Any]]:
+        with provider_errors("postgres", operation):
+            if not self._ready:
+                await self._executor.run("create", self._sql["create"], {})
+                self._ready = True
+            return await self._executor.run(name, self._sql[name], params)
+
+    async def connect(self) -> None:
+        """Open the connection and create the table if needed."""
+        await self._run("keys", "connect", pattern="", now=self._clock())
+
+    async def close(self) -> None:
+        """Close the connection of the driver."""
+        await self._executor.close()
+
+    async def get(self, key: str) -> dict[str, Any] | None:
+        """The value of ``key``, or ``None``."""
+        rows = await self._run("get", "get", key=check_key(key), now=self._clock())
+        if not rows:
+            return None
+        data = rows[0]["data"]
+        value = json.loads(data) if isinstance(data, str) else data
+        return value if isinstance(value, dict) else None
+
+    async def set(self, key: str, data: dict[str, Any], ttl: int | None = None) -> None:
+        """Insert or replace the row of ``key``."""
+        payload = json.dumps(check_data(data))
+        await self._run(
+            "set", "set", key=check_key(key), data=payload, exp=expiry_of(ttl, self._clock)
+        )
+
+    async def delete(self, key: str) -> bool:
+        """Delete the row of ``key``; ``True`` when it was live."""
+        rows = await self._run("delete", "delete", key=check_key(key), now=self._clock())
+        return bool(rows and rows[0].get("live"))
+
+    async def increment(self, key: str, amount: int = 1, ttl: int | None = None) -> int:
+        """One upsert that adds ``amount`` and returns the count; an expired counter restarts."""
+        check_key(key)
+        check_ttl(ttl)
+        rows = await self._run(
+            "increment",
+            "increment",
+            key=key,
+            amount=amount,
+            exp=expiry_of(ttl, self._clock),
+            now=self._clock(),
+        )
+        return int(rows[0]["count"])
+
+    async def set_multiple(self, data: dict[str, dict[str, Any]], ttl: int | None = None) -> None:
+        """Write every item, one statement each; nothing is written when one item is invalid."""
+        check_items(data)
+        check_ttl(ttl)
+        for key, value in data.items():
+            await self.set(key, value, ttl)
+
+    async def keys(self, prefix: str = "", limit: int | None = None) -> list[str]:
+        """The live keys that start with ``prefix``, sorted."""
+        check_limit(limit)
+        rows = await self._run("keys", "keys", pattern=like_prefix(prefix), now=self._clock())
+        found = [row["key"] for row in rows]
+        return found if limit is None else found[:limit]
+
+
+__all__ = [
+    "AsyncpgExecutor",
+    "DataApiExecutor",
+    "Pg8000Executor",
+    "PostgreSQLBackend",
+    "choose_driver",
+    "statements",
+]

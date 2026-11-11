@@ -243,20 +243,22 @@ router "main" {
   }
 
   /** RETRY POLICIES
-      How many times to retry each kind of error. `retry_after` and
-      `exponential_backoff` are read by the language, but the router does not
-      apply them yet: only `max_retries` has an effect today. **/
-  retry_policy "RateLimitError"      { max_retries = 3, retry_after = "5s", exponential_backoff = true }
-  retry_policy "TimeoutError"        { max_retries = 2, retry_after = "3s", exponential_backoff = true }
-  retry_policy "ServerError"         { max_retries = 2, retry_after = "5s", exponential_backoff = true }
-  retry_policy "AuthenticationError" { max_retries = 0 }   # do not retry authentication errors
+      How many times to retry the same target for each kind of error, and how
+      long to wait first: `retry_after`, doubled after each retry with
+      `exponential_backoff` (5s, 10s, 20s). A provider's own Retry-After wins
+      when it is longer. The names are the error classes of skye.exceptions;
+      a name also matches its subclasses. **/
+  retry_policy "RateLimitError"       { max_retries = 3, retry_after = "5s", exponential_backoff = true }
+  retry_policy "ProviderTimeoutError" { max_retries = 2, retry_after = "3s", exponential_backoff = true }
+  retry_policy "ServerError"          { max_retries = 2, retry_after = "5s", exponential_backoff = true }
+  retry_policy "AuthenticationError"  { max_retries = 0 }   # do not retry authentication errors
 
   /** COOLDOWN POLICIES
       How many failures per minute are allowed before a model is put in cooldown.
       This prevents cascading failures. **/
-  allowed_fails_policy "RateLimitError" { allowed_fails_per_minute = 100 }
-  allowed_fails_policy "TimeoutError"   { allowed_fails_per_minute = 50 }
-  allowed_fails_policy "ServerError"    { allowed_fails_per_minute = 20 }
+  allowed_fails_policy "RateLimitError"       { allowed_fails_per_minute = 100 }
+  allowed_fails_policy "ProviderTimeoutError" { allowed_fails_per_minute = 50 }
+  allowed_fails_policy "ServerError"          { allowed_fails_per_minute = 20 }
 }
 
 /** ENVIRONMENT VARIABLES USED

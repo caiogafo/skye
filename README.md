@@ -27,7 +27,7 @@ Skye AI provides a foundational layer for building AI agents and intelligent app
 
 ```bash
 pip install skyeai            # the base: messages, completion, errors, config, Ports (standard library only)
-pip install skyeai[memory]    # add only what you need: tokens, auth, memory, postgres, mcp, ...
+pip install skyeai[redis]     # add only what you need: tokens, auth, redis, postgres, aws, mcp, ...
 ```
 
 Every extra is optional and loaded lazily. All extras and install options: [getting started](https://skye.readthedocs.io/en/latest/getting-started/).
@@ -70,21 +70,19 @@ Every example is run offline against a fake network by `tests/examples`, so it c
 
 ## Documentation
 
-The documentation is online at **[skye.readthedocs.io](https://skye.readthedocs.io)**, with one section per component. The same pages are in [`docs/`](https://skye.readthedocs.io/en/latest/) in the repository.
+The documentation is online at **[skye.readthedocs.io](https://skye.readthedocs.io)**; the source of every page is in `docs/`.
 
-| Topic | Page |
+| You want to | Page |
 |---|---|
-| Getting started, install, quick start | [getting started](https://skye.readthedocs.io/en/latest/getting-started/) |
-| Architecture and layers | [architecture](https://skye.readthedocs.io/en/latest/architecture/) |
-| Core interfaces and configuration | [interfaces](https://skye.readthedocs.io/en/latest/base/interfaces/), [configuration](https://skye.readthedocs.io/en/latest/base/configuration/) |
-| Providers, embeddings, multimodal, streaming | [provider guide](https://skye.readthedocs.io/en/latest/models/provider-guide/) |
-| Function calling and capabilities | [function calling](https://skye.readthedocs.io/en/latest/tools/function-calling/) |
-| Routing, `.skye` files, health, fallbacks | [router overview](https://skye.readthedocs.io/en/latest/router/overview/), [routing guide](https://skye.readthedocs.io/en/latest/router/routing-guide/) |
-| Lazy loading and serverless deployment | [deployment](https://skye.readthedocs.io/en/latest/deployment/) |
-| Size and load budgets | [budgets](https://skye.readthedocs.io/en/latest/budgets/) |
-| Codename glossary | [glossary](https://skye.readthedocs.io/en/latest/glossary/) |
-| Development: setup, tests, code quality | [development](https://skye.readthedocs.io/en/latest/development/) |
-| Roadmap | [roadmap](https://skye.readthedocs.io/en/latest/roadmap/) |
+| Install and make a first call | [Get started](https://skye.readthedocs.io/en/latest/get-started/) |
+| Call a provider, stream, get structured output | [Models guides](https://skye.readthedocs.io/en/latest/guides/models/call-a-provider/) |
+| Route across models with fallbacks | [Routing guides](https://skye.readthedocs.io/en/latest/guides/routing/aliases-and-fallbacks/) |
+| Write prompts and routers in `.skye` | [The .skye language](https://skye.readthedocs.io/en/latest/concepts/skye-language/), [reference](https://skye.readthedocs.io/en/latest/reference/skye-language/) |
+| Keep state across invocations | [Choose a store backend](https://skye.readthedocs.io/en/latest/guides/state/choose-a-backend/) |
+| Deploy on AWS Lambda | [Deploy on AWS Lambda](https://skye.readthedocs.io/en/latest/get-started/lambda/) |
+| Look up a class or a function | [Python API](https://skye.readthedocs.io/en/latest/reference/api/skye/), [CLI](https://skye.readthedocs.io/en/latest/reference/cli/) |
+| Understand the design | [Architecture](https://skye.readthedocs.io/en/latest/concepts/architecture/), [Serverless first](https://skye.readthedocs.io/en/latest/concepts/serverless-first/) |
+| See what is planned | [Status and roadmap](https://skye.readthedocs.io/en/latest/project/roadmap/) |
 
 How the project is specified: the requirements, the design and the decisions are in `.kiro/steering/` (`10-requirements.md`, `11-design.md`, `12-decisions.md`) and the per-component specs in `.kiro/specs/`.
 

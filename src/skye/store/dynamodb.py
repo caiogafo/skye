@@ -1,128 +1,270 @@
-"""DynamoDB storage backend (moved from routes/storage_backends.py)."""
+"""DynamoDB backend through ``boto3`` (preinstalled in AWS Lambda; extra ``aws`` elsewhere, decision
+D99).
 
-import json
-import time
-from typing import Any, Dict, List, Optional, Tuple
+The table has a string partition key ``pk``; the expiry is the number attribute ``ttl`` (seconds
+since the epoch), which you can
+enable as the table's TTL attribute so DynamoDB deletes expired items. DynamoDB deletes them late
+(within days), so this backend also
+checks the expiry on every read: an expired item is absent at once (D95). ``boto3`` is synchronous,
+so every call runs in a worker
+thread (``asyncio.to_thread``). There is no default region: it comes from the argument or from the
+usual AWS configuration (in
+Lambda, ``AWS_REGION``).
 
-from skye.base.interfaces import StorageBackend
+``keys`` runs a ``Scan`` with a ``begins_with`` filter: it reads the whole table and is meant for
+small tables or maintenance, not a hot
+path.
+
+Example:
+    >>> from skye.store import DynamoDBBackend
+    >>> store = DynamoDBBackend("skye-state")  # nothing is called until the first operation
+
+Raises: ``ValidationError`` for an invalid key, value or time to live; ``MissingExtraError`` (extra
+    ``aws``) when ``boto3`` is absent;
+    ``ProviderError`` naming the operation when a call fails.
+Missing: an absent or expired item reads as ``None``.
+Concurrency: ``increment`` is one ``UpdateItem`` with ``ADD``, atomic across processes.
+"""
+
+from __future__ import annotations
+
+import asyncio
+from decimal import Decimal
+from typing import Any
+
+from skye.base.interfaces.storage import ScanStore, StorageBackend, check_key, check_ttl
+from skye.base.lazy_import import missing_extra
+from skye.store._common import (
+    Clock,
+    check_data,
+    check_items,
+    check_limit,
+    default_clock,
+    expiry_of,
+    is_expired,
+    provider_errors,
+)
+
+_KEY = "pk"
+_TTL = "ttl"
 
 
-class DynamoDBBackend(StorageBackend):
-    """DynamoDB storage backend for AWS serverless environments."""
+def _to_dynamo(value: Any) -> Any:
+    """JSON values to DynamoDB values: a ``float`` becomes a ``Decimal`` (boto3 rejects floats)."""
+    if isinstance(value, float):
+        return Decimal(str(value))
+    if isinstance(value, dict):
+        return {k: _to_dynamo(v) for k, v in value.items()}
+    if isinstance(value, list):
+        return [_to_dynamo(v) for v in value]
+    return value
 
-    def __init__(self, table_name: str, region_name: str = "us-east-1"):
-        """Initialize DynamoDB backend.
-        
-        Args:
-            table_name: DynamoDB table name
-            region_name: AWS region
-        """
-        self.table_name = table_name
+
+def _from_dynamo(value: Any) -> Any:
+    """DynamoDB values back to JSON: a whole ``Decimal`` becomes ``int``, any other ``float``."""
+    if isinstance(value, Decimal):
+        return int(value) if value == value.to_integral_value() else float(value)
+    if isinstance(value, dict):
+        return {k: _from_dynamo(v) for k, v in value.items()}
+    if isinstance(value, list):
+        return [_from_dynamo(v) for v in value]
+    return value
+
+
+class DynamoDBBackend(StorageBackend, ScanStore):
+    """Key-value, counter and scan in a DynamoDB table.
+
+    Args:
+        table_name: The table; its partition key is the string ``pk``.
+        region_name: The AWS region; ``None`` uses the default AWS configuration (no silent
+            ``us-east-1``).
+        resource: A ``boto3`` DynamoDB resource to use instead of creating one (tests pass a fake
+            one).
+        clock: The time source for expiry; ``time.time`` by default.
+    """
+
+    def __init__(
+        self,
+        table_name: str,
+        region_name: str | None = None,
+        *,
+        resource: Any = None,
+        clock: Clock = default_clock,
+    ) -> None:
+        """Remember the settings; ``boto3`` is imported on first use."""
+        self.table_name = check_key(table_name)
         self.region_name = region_name
-        self._dynamodb = None
+        self._resource = resource
+        self._table: Any = None
+        self._clock = clock
+
+    def _get_table(self) -> Any:
+        if self._table is None:
+            if self._resource is None:
+                boto3 = missing_extra("boto3", extra="aws")
+                kwargs = {"region_name": self.region_name} if self.region_name else {}
+                self._resource = boto3.resource("dynamodb", **kwargs)
+            self._table = self._resource.Table(self.table_name)
+        return self._table
 
     async def connect(self) -> None:
-        """Initialize DynamoDB connection."""
-        await self._get_dynamodb()  # This will create the connection
+        """Create the client and the table handle (no network call)."""
+        self._get_table()
 
-    async def _get_dynamodb(self):
-        """Get DynamoDB resource (lazy initialization)."""
-        if self._dynamodb is None:
+    def _item_value(self, item: dict[str, Any] | None) -> dict[str, Any] | None:
+        if not item:
+            return None
+        expiry = item.get(_TTL)
+        if is_expired(None if expiry is None else float(expiry), self._clock):
+            return None
+        return {k: _from_dynamo(v) for k, v in item.items() if k not in (_KEY, _TTL)}
+
+    def _item(self, key: str, data: dict[str, Any], ttl: int | None) -> dict[str, Any]:
+        item = {k: _to_dynamo(v) for k, v in data.items()}
+        item[_KEY] = key
+        expiry = expiry_of(ttl, self._clock)
+        if expiry is not None:
+            item[_TTL] = int(expiry)
+        return item
+
+    async def get(self, key: str) -> dict[str, Any] | None:
+        """The item of ``key`` without its ``pk`` and ``ttl``, or ``None``."""
+        check_key(key)
+        with provider_errors("dynamodb", "get"):
+            table = self._get_table()
+            response = await asyncio.to_thread(table.get_item, Key={_KEY: key}, ConsistentRead=True)
+        return self._item_value(response.get("Item"))
+
+    async def set(self, key: str, data: dict[str, Any], ttl: int | None = None) -> None:
+        """Put the item of ``key``."""
+        check_key(key)
+        check_data(data)
+        if _KEY in data or _TTL in data:
+            from skye.base.exceptions import ValidationError
+
+            raise ValidationError(
+                f"the attributes {_KEY!r} and {_TTL!r} are reserved by DynamoDBBackend",
+                "data",
+                sorted(data),
+            )
+        item = self._item(key, data, ttl)
+        with provider_errors("dynamodb", "set"):
+            table = self._get_table()
+            await asyncio.to_thread(table.put_item, Item=item)
+
+    async def delete(self, key: str) -> bool:
+        """Delete the item of ``key``; ``True`` when a live item was there."""
+        check_key(key)
+        with provider_errors("dynamodb", "delete"):
+            table = self._get_table()
+            response = await asyncio.to_thread(
+                table.delete_item, Key={_KEY: key}, ReturnValues="ALL_OLD"
+            )
+        return self._item_value(response.get("Attributes")) is not None
+
+    async def increment(self, key: str, amount: int = 1, ttl: int | None = None) -> int:
+        """``ADD`` to ``count`` in one ``UpdateItem``; an expired counter starts again."""
+        check_key(key)
+        check_ttl(ttl)
+        now = int(self._clock())
+        expiry = expiry_of(ttl, self._clock)
+        names = {"#c": "count", "#t": _TTL}
+        values: dict[str, Any] = {":a": amount, ":now": now}
+        update = "ADD #c :a"
+        if expiry is None:
+            update += " REMOVE #t"
+        else:
+            update += " SET #t = :t"
+            values[":t"] = int(expiry)
+        with provider_errors("dynamodb", "increment"):
+            table = self._get_table()
             try:
-                import boto3
-                self._dynamodb = boto3.resource('dynamodb', region_name=self.region_name)
-            except ImportError:
-                raise ImportError("boto3 package required for DynamoDBBackend. Install with: pip install boto3")
-        return self._dynamodb
+                response = await asyncio.to_thread(
+                    table.update_item,
+                    Key={_KEY: key},
+                    UpdateExpression=update,
+                    ConditionExpression="attribute_not_exists(#t) OR #t > :now",
+                    ExpressionAttributeNames=names,
+                    ExpressionAttributeValues=values,
+                    ReturnValues="UPDATED_NEW",
+                )
+            except Exception as error:
+                failed = type(error).__name__ == "ConditionalCheckFailedException"
+                if not (failed or "ConditionalCheckFailed" in str(error)):
+                    raise
+                # The counter had expired but DynamoDB had not deleted it yet: start again.
+                await asyncio.to_thread(
+                    table.put_item, Item=self._item(key, {"count": amount}, ttl)
+                )
+                return amount
+        return int(response["Attributes"]["count"])
 
-    async def get(self, key: str) -> Optional[Dict[str, Any]]:
-        """Get data from DynamoDB."""
-        dynamodb = await self._get_dynamodb()
-        table = dynamodb.Table(self.table_name)
-        
-        try:
-            response = table.get_item(Key={'pk': key})
-            item = response.get('Item')
-            if item:
-                # Remove DynamoDB metadata
-                item.pop('pk', None)
-                item.pop('ttl', None)
-                return item
-            return None
-        except Exception:
-            return None
-
-    async def set(self, key: str, data: Dict[str, Any], ttl: Optional[int] = None) -> None:
-        """Set data in DynamoDB."""
-        dynamodb = await self._get_dynamodb()
-        table = dynamodb.Table(self.table_name)
-        
-        item = {'pk': key, **data}
-        if ttl:
-            item['ttl'] = int(time.time()) + ttl
-        
-        table.put_item(Item=item)
-
-    async def increment(self, key: str, amount: int = 1, ttl: Optional[int] = None) -> int:
-        """Atomically increment counter in DynamoDB."""
-        dynamodb = await self._get_dynamodb()
-        table = dynamodb.Table(self.table_name)
-        
-        update_expression = "ADD #count :amount"
-        expression_attribute_names = {"#count": "count"}
-        expression_attribute_values = {":amount": amount}
-        
-        if ttl:
-            update_expression += ", #ttl :ttl"
-            expression_attribute_names["#ttl"] = "ttl"
-            expression_attribute_values[":ttl"] = int(time.time()) + ttl
-        
-        response = table.update_item(
-            Key={'pk': key},
-            UpdateExpression=update_expression,
-            ExpressionAttributeNames=expression_attribute_names,
-            ExpressionAttributeValues=expression_attribute_values,
-            ReturnValues="NEW"
-        )
-        
-        return response['Attributes']['count']
-
-    async def get_multiple(self, keys: List[str]) -> Dict[str, Optional[Dict[str, Any]]]:
-        """Get multiple keys from DynamoDB."""
-        if not keys:
-            return {}
-        
-        dynamodb = await self._get_dynamodb()
-        
-        # DynamoDB batch_get_item
-        request_items = {
-            self.table_name: {
-                'Keys': [{'pk': key} for key in keys]
-            }
-        }
-        
-        response = dynamodb.batch_get_item(RequestItems=request_items)
-        items = response.get('Responses', {}).get(self.table_name, [])
-        
-        result = {key: None for key in keys}
-        for item in items:
-            key = item.pop('pk')
-            item.pop('ttl', None)  # Remove TTL metadata
-            result[key] = item
-        
+    async def get_multiple(self, keys: list[str]) -> dict[str, dict[str, Any] | None]:
+        """``BatchGetItem`` in groups of 100, retrying unprocessed keys; every key is returned."""
+        for key in keys:
+            check_key(key)
+        result: dict[str, dict[str, Any] | None] = {key: None for key in keys}
+        unique = list(dict.fromkeys(keys))
+        with provider_errors("dynamodb", "get_multiple"):
+            self._get_table()
+            for start in range(0, len(unique), 100):
+                request: dict[str, Any] = {
+                    self.table_name: {
+                        "Keys": [{_KEY: k} for k in unique[start : start + 100]],
+                        "ConsistentRead": True,
+                    }
+                }
+                while request:
+                    response = await asyncio.to_thread(
+                        self._resource.batch_get_item, RequestItems=request
+                    )
+                    for item in response.get("Responses", {}).get(self.table_name, []):
+                        result[item[_KEY]] = self._item_value(item)
+                    request = response.get("UnprocessedKeys") or {}
         return result
 
-    async def set_multiple(self, data: Dict[str, Dict[str, Any]], ttl: Optional[int] = None) -> None:
-        """Set multiple keys in DynamoDB."""
-        if not data:
-            return
-        
-        dynamodb = await self._get_dynamodb()
-        table = dynamodb.Table(self.table_name)
-        
-        # Use batch_writer for efficient bulk writes
-        with table.batch_writer() as batch:
-            for key, value in data.items():
-                item = {'pk': key, **value}
-                if ttl:
-                    item['ttl'] = int(time.time()) + ttl
+    async def set_multiple(self, data: dict[str, dict[str, Any]], ttl: int | None = None) -> None:
+        """Write every item with a batch writer; nothing is sent when one item is invalid."""
+        check_items(data)
+        check_ttl(ttl)
+        items = [self._item(key, value, ttl) for key, value in data.items()]
+
+        def write() -> None:
+            with self._get_table().batch_writer() as batch:
+                for item in items:
+                    batch.put_item(Item=item)
+
+        with provider_errors("dynamodb", "set_multiple"):
+            await asyncio.to_thread(write)
+
+    async def keys(self, prefix: str = "", limit: int | None = None) -> list[str]:
+        """A ``Scan`` of the keys that start with ``prefix`` (reads the whole table), sorted."""
+        check_limit(limit)
+
+        def scan() -> list[str]:
+            table = self._get_table()
+            kwargs: dict[str, Any] = {
+                "ProjectionExpression": "#k, #t",
+                "ExpressionAttributeNames": {"#k": _KEY, "#t": _TTL},
+            }
+            if prefix:
+                kwargs["FilterExpression"] = "begins_with(#k, :p)"
+                kwargs["ExpressionAttributeValues"] = {":p": prefix}
+            found = []
+            while True:
+                response = table.scan(**kwargs)
+                for item in response.get("Items", []):
+                    expiry = item.get(_TTL)
+                    if not is_expired(None if expiry is None else float(expiry), self._clock):
+                        found.append(item[_KEY])
+                last = response.get("LastEvaluatedKey")
+                if not last:
+                    return sorted(found)
+                kwargs["ExclusiveStartKey"] = last
+
+        with provider_errors("dynamodb", "keys"):
+            found = await asyncio.to_thread(scan)
+        return found if limit is None else found[:limit]
+
+
+__all__ = ["DynamoDBBackend"]

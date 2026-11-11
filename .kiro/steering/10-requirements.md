@@ -110,7 +110,7 @@ Written without the project name (it is being chosen); `<pkg>` is the import pac
 
 #### Acceptance Criteria
 
-1. EACH component SHALL have one codename matching `^[a-z]{3,7}$`; THE 15 codenames SHALL be unique and listed in `docs/glossary.md`.
+1. EACH component SHALL have one codename matching `^[a-z]{3,7}$`; THE 15 codenames SHALL be unique and listed in `docs/project/glossary.md`.
 2. A codename SHALL appear only in the front matter of the spec and docs section, one italic line under the section index title, the last line of the package docstring, and the glossary.
 3. IF a codename appears in an import, a folder or file name, an identifier, a configuration key, a log field or a spec folder name, THEN THE codename test SHALL fail naming the codename and the place; THE test SHALL also check pattern, uniqueness and the count of 15.
 4. THE documentation SHALL carry two more watermarks outside the 15, `vapor` (the `Runnable` Port) and the project umbrella watermark; each SHALL be unique against the 15, match `^[a-z]{3,7}$`, and never appear in code, imports, file or folder names, identifiers or configuration keys.
@@ -159,7 +159,7 @@ Written without the project name (it is being chosen); `<pkg>` is the import pac
 3. THE `auth` component SHALL start no background thread, SHALL NOT put a secret in a log, repr or error, and SHALL NOT run an interactive login; WHERE a mode needs an earlier vendor-tool login (AWS IAM Identity Center SSO, `az login`, `gcloud auth login`, application-default-credentials login), it SHALL read that tool's cache and, IF it is missing or expired, raise an error saying to log in again.
 4. THE only third-party library SHALL be `rsa` (extra `auth`), used only to mint tokens; THE `google` extra SHALL declare only the provider SDK; `google-auth` and `cryptography` SHALL NOT be used.
 5. WHERE user code needs another credential provider, THE `auth` component SHALL let it register one.
-6. THE library SHALL read provider credentials only from each provider's standard variables (through `auth`), SHALL NOT read them from a prefixed variable, and SHALL define exactly three prefixed variables: `<PREFIX>_LOG_LEVEL`, `<PREFIX>_CONFIG`, `<PREFIX>_ENABLE_TELEMETRY`.
+6. THE library SHALL read provider credentials only from each provider's standard variables (through `auth`), SHALL NOT read them from a prefixed variable, and SHALL define exactly two prefixed variables: `<PREFIX>_LOG_LEVEL` and `<PREFIX>_CONFIG` (`<PREFIX>_ENABLE_TELEMETRY` left with the key it set, decision D106).
 7. THE `auth` component SHALL support only documented, non-deprecated, non-interactive modes at a stated date.
 8. THE `auth` component SHALL treat on-premises Active Directory (Kerberos, NTLM, ADFS), SAML, hardware security modules (PKCS#11) and non-RSA signing as out of scope.
 9. THE design of `auth` SHALL verify against each provider's current documentation at least: the serverless execution role (environment variables, container-credentials endpoint, IMDSv2); AWS assume-role including cross-account through signed STS; web identity (OIDC token from a file); Bedrock API keys; Google service-account files (RS256 with `rsa`), impersonation, metadata server, authorized-user refresh token, Workload Identity Federation, and API key or access token from the environment; Microsoft Entra ID for Azure OpenAI (managed identity, client secret, certificate with `rsa`, federated token file, API key); and API key or bearer for OpenAI-compatible providers, Anthropic and Cohere.
@@ -170,9 +170,12 @@ Written without the project name (it is being chosen); `<pkg>` is the import pac
 
 #### Acceptance Criteria
 
-1. THE `store` component SHALL hold the in-memory, file, DynamoDB and Redis backends, each in its own module, reached only through the storage Port in `base`; no other component SHALL keep a copy of a backend.
-2. WHERE a durable backend is needed and none is declared, THE library SHALL default to DynamoDB, and WHERE a backend has a pure-Python and a compiled driver, to the pure-Python one.
+1. THE `store` component SHALL hold the in-memory, file, DynamoDB, Redis, PostgreSQL and Lambda durable function backends, each in its own module, reached only through the storage Ports in `base`; no other component SHALL keep a copy of a backend (decision D96).
+2. THE library SHALL default to the in-memory backend and SHALL NOT choose a durable backend by itself: the caller chooses the durable function, DynamoDB, PostgreSQL or another backend explicitly (decision D97). EACH backend that needs a third-party library SHALL have its own extra, named for the backend and not for a component (`valkey`, `redis`, `postgres`, `postgres-asyncpg`, `aws`), and WHERE a backend has a pure-Python and a compiled driver, the pure-Python one SHALL come first (decisions D99, D100, D102).
 3. IF a service needs a backend that has no Port in `base`, THEN THE Port SHALL be defined first.
+4. THE storage Port SHALL be split into capability Protocols: `KeyValueStore` (every backend), `CounterStore` (atomic increment) and `ScanStore` (keys by prefix); a component SHALL ask only for the capabilities it uses, and `StorageBackend` SHALL name key-value plus counter (decision D98).
+5. A time to live SHALL be `None` or a positive integer of seconds; any other value SHALL raise `ValidationError` before anything is written, and every backend SHALL treat an expired entry as absent on read (decision D95).
+6. THE `store` component SHALL create a backend by name with `backend(name, **config)`, SHALL let a backend from outside Skye be added with `register_backend(name, factory)`, and SHALL ship its conformance suite as public code so a new backend is checked with one test (decision D98).
 
 ### Requirement 13: Prompts
 
@@ -200,7 +203,7 @@ Written without the project name (it is being chosen); `<pkg>` is the import pac
 #### Acceptance Criteria
 
 1. THE requirements, the high-level design and the decisions SHALL live only in `10-requirements.md`, `11-design.md` and `12-decisions.md`.
-2. EACH component SHALL have exactly one spec, named `<n>-<layer>-<scope>` (`.kiro/specs/<n>-<layer>-<scope>/`, the layer from Requirement 2.1 and the component as the scope); the cross-cutting work SHALL live in two specs, both at layer 0 with `0-base-base` and `0-base-auth`: `.kiro/specs/0-base-structure/` (structure, base contracts, consolidation, documentation wiki) and `.kiro/specs/0-base-uxui/` (the public surface a user touches: import paths, names, Port contracts, examples and docstrings; decision D35). EACH spec has `requirements.md` (Kiro format: its user stories as `### Requirement N:` blocks, each criterion being a pointer `THE spec SHALL realize Requirement N.k of #[[file:.kiro/steering/10-requirements.md]]`, never a copied rule), `design.md` (detailed design, opening with a `Builds on:` line that cites the sections and components of `11-design.md`) and `tasks.md` (the only place for tasks, each citing the requirements it satisfies).
+2. EACH component SHALL have exactly one spec, named `<n>-<layer>-<scope>` (`.kiro/specs/<n>-<layer>-<scope>/`, the layer from Requirement 2.1 and the component as the scope); the cross-cutting work SHALL live in three specs, all at layer 0 with `0-base-base` and `0-base-auth`: `.kiro/specs/0-base-structure/` (structure, base contracts, consolidation, documentation wiki), `.kiro/specs/0-base-uxui/` (the public surface a user touches: import paths, names, Port contracts, examples and docstrings; decision D35) and `.kiro/specs/0-base-plugins/` (plugins, the registrar and the provider profile; Requirements 56 to 61, decision D108). EACH spec has `requirements.md` (Kiro format: its user stories as `### Requirement N:` blocks, each criterion being a pointer `THE spec SHALL realize Requirement N.k of #[[file:.kiro/steering/10-requirements.md]]`, never a copied rule), `design.md` (detailed design, opening with a `Builds on:` line that cites the sections and components of `11-design.md`) and `tasks.md` (the only place for tasks, each citing the requirements it satisfies).
 3. WHEN a new spec needs a requirement that no existing one covers, THE requirement SHALL be added here, in Kiro format with the next number, and the spec SHALL cite it; existing numbers SHALL NOT be renumbered.
 4. WHEN a requirement changes, THE change SHALL be made here with a decision-log line, and a milestone SHALL be added to each component that cites it.
 5. THE documentation SHALL be a wiki with one section per component, a glossary and `docs/index.md`; IF a page lacks front matter, has a broken link or is unreachable from the index, THEN THE docs test SHALL fail.
@@ -734,7 +737,7 @@ Written without the project name (it is being chosen); `<pkg>` is the import pac
 #### Acceptance Criteria
 
 1. THE `memory` component SHALL provide conversation and state memory through the memory Port in `base`, persisting through the storage Port (Requirement 12.1).
-2. THE `memory` extra SHALL declare exactly the libraries the component imports, `redis` and `asyncpg`, and no compiled driver (Requirement 7.1).
+2. THE `memory` extra SHALL declare no store driver: a user of `memory` installs the extra of the backend they store in (Requirement 12.2, decision D99).
 3. THE runtime components SHALL reach `memory` only through the memory Port, never by import (Requirement 4.1).
 
 ### Requirement 53: Observe
@@ -786,3 +789,94 @@ Written without the project name (it is being chosen); `<pkg>` is the import pac
 2. THE extension SHALL provide a TextMate grammar (blocks, references, comments `#`, `/* */` and `/** **/`, front matter, `{{ }}` and `output`), live diagnostics taken from `skye check --format json`, and "Format Document" through `skye fmt -`, and SHALL be only a client of the command line, so that the errors in the editor and in CI are the same (decision D72).
 3. THE extension SHALL read the settings `skye.command`, `skye.run` and `skye.registry`, so that it can run the command through `uv run --project <repo> skye` (decision D72).
 4. THE command `skye vscode` SHALL offer `install`, `uninstall`, `status`, `path` and `package`: WHEN an editor CLI is found (`code`, `code-insiders`, `codium`, `cursor`, or `--editor`), THE command SHALL build the `.vsix` with `zipfile` and install it with `--install-extension`; OTHERWISE it SHALL copy the folder to `~/.vscode/extensions/skyeai.skye-<version>/` with a manifest of hashes, as `skye skill` does (decision D72).
+
+### Requirement 56: Plugins and the registrar
+
+**User Story:** As a third-party author, I want to add an integration to Skye with one object, so that I change nothing inside Skye (decision D107; it carries out Requirement 16.3).
+
+#### Acceptance Criteria
+
+1. THE `base` component SHALL define the Port `PluginInterface` as a `Protocol` with a `name` attribute and one method `register(registrar)`, replacing the lifecycle methods `initialize`, `shutdown` and `get_metadata`, which nothing calls (decision D37).
+2. THE `base` component SHALL define the Port `RegistrarInterface` with one method per kind of integration: `model_provider`, `embedding_provider`, `store_backend`, `credential_source`, `routing_strategy`, `mcp_client`, `decision_model`, `tokenizer`, `capability`, `prompt_filter` and `agent_type`; each method takes a name and the object or factory to register.
+3. THE registrar SHALL keep its registrations in the memory of the process, with no file, no thread and no state that must survive between invocations (decision D27).
+4. IF a registration uses a name already registered for the same kind, THEN THE registrar SHALL raise a `ConfigurationError` naming the kind and the name, unless the call passes `replace=True`.
+5. WHERE a registration gives its class or factory as a `"module:attribute"` text, THE registrar SHALL import that module at the first use of the name and not at registration.
+6. THE built-in integrations SHALL register through `RegistrarInterface` with the same calls as a third-party plugin.
+7. THE existing registries (`ProviderRegistry`, `skye.store.register_backend`, `skye.auth.register_credential_source`, the capability registry, `TokenCounter.register_tokenizer`, `register_agent_type`) SHALL remain as views of the registrar, so that every call that works today keeps working.
+8. WHERE a kind is held per instance today (the prompt filters of a prompt builder), THE registrar SHALL hold the default set that every new instance starts with, and a registration on an instance SHALL stay local to that instance.
+
+### Requirement 57: Discovery and control of plugins
+
+**User Story:** As a user, I want installed plugins found without code, or added with one call, and I want to choose which ones load, so that I control what runs in my function (decision D107).
+
+#### Acceptance Criteria
+
+1. WHEN a lookup of any kind finds no registration under the requested name, THE library SHALL scan the entry-point group `skye.plugins` with the standard-library `importlib.metadata`, register what the scan finds and repeat the lookup once.
+2. THE library SHALL scan the group at most once per process.
+3. WHEN `import <pkg>` runs, THE library SHALL NOT scan the group and SHALL NOT load a plugin (Requirements 7.8 and 7.9).
+4. WHEN `<pkg>.use(plugin)` is called, THE library SHALL call `plugin.register(registrar)` at once; THE argument SHALL be an object with a `register` method or a function of one parameter.
+5. WHERE the configuration file has the key `plugins` (a list of entry-point names), THE scan SHALL load only those entry points; WHERE the key is absent, THE scan SHALL load every entry point of the group.
+6. IF an entry point fails to load or its `register` raises, THEN THE library SHALL log the failure once with structured `extra` (entry-point name, distribution, error) and SHALL continue with the other entry points (decision D105).
+7. IF the name is still unknown after the scan, THEN THE library SHALL raise a `ConfigurationError` that lists the names registered for that kind and the failures of the scan.
+8. IF a call to `<pkg>.use(plugin)` raises in `register`, THEN THE library SHALL raise a `ConfigurationError` naming the plugin and keeping the cause.
+9. THE command `skye plugins` SHALL list the built-in registrations and each entry point of the group (name, distribution, version, loaded or failed with the error) with the names each one registered per kind, and SHALL accept `--format json`.
+
+### Requirement 58: Open kinds and conformance suites
+
+**User Story:** As a plugin author, I want every kind of integration open to me and a test that tells me my plugin works, so that I know it is ready before I publish it (decision D107).
+
+#### Acceptance Criteria
+
+1. THE `router` SHALL select a routing strategy by name through the registrar, THE built-in strategies SHALL register as built-in plugins, and the `if`/`elif` chain over the `RoutingStrategy` enum SHALL be removed; every `RoutingStrategy` member SHALL keep working as the name of its strategy.
+2. THE `tools` component SHALL create an MCP client by the `impl` name through the registrar; the default SHALL stay `"builtin"` (decision D16) and `"fastmcp"` SHALL register as a built-in plugin that imports `fastmcp` only when chosen (Requirement 10.7).
+3. THE `models` component SHALL create a decision model by name through the registrar, and Jev SHALL register as a built-in plugin.
+4. FOR each kind that has a method in `RegistrarInterface`, THE owner of the kind SHALL ship a public function `check_<kind>` (as `skye.store.check_backend` does, decision D98) that runs offline against fakes, returns the names of the checks it passed and raises an error naming the first check that fails.
+5. ONE test SHALL run every built-in registration of a kind through the `check_<kind>` function of that kind.
+6. WHEN a Port of a planned component (content reader, observer, safety filter, authorizer, memory) gets a registry, THE registrar SHALL gain its method in the same change.
+
+### Requirement 59: The provider profile
+
+**User Story:** As a provider author, I want to declare everything that is specific to my provider once, together with its class, so that cost, token counting, routing and authentication need no edit of mine (decision D107).
+
+#### Acceptance Criteria
+
+1. THE `base` component SHALL define `ProviderProfile` as a frozen dataclass of data and references to functions, with these fields: `name`; `api_key_variables` (the variables read, in order); `region` (a `RegionRule` or `None`); `default_api_base`; `client_settings` (a mapping that renames a generic setting to the name the provider uses, for example `api_base` to `azure_endpoint`) and `model_is_deployment` (a flag); `models` (a mapping from a model name to a `ModelProfile`); and `map_error` (a function, or a `"module:attribute"` text, that turns a failed response into a `ProviderError`).
+2. THE `base` component SHALL define `ModelProfile` as a frozen dataclass with these fields: `prompt_price` and `completion_price` (USD per 1M tokens, 0 or more, or `None` when unknown); `tokenizer` (`None`, or the name of a registered tokenizer); `message_overhead` (tokens added per message, 0 or more); and `info` (a mapping merged into the result of `get_model_info()`, for example `supports_structured_output`).
+3. THE `TokenCounter` SHALL read `tokenizer` and `message_overhead`, and THE `CostCalculator` SHALL read `prompt_price` and `completion_price`, from the `ModelProfile` found for the provider and the model; THE work on token counting in `1-adapters-models` SHALL use the field names of criteria 1 and 2.
+4. THE function that finds a `ModelProfile` SHALL be one function in `base`: the exact model name first, then the longest registered name followed by a date or a version suffix.
+5. THE `RegionRule` SHALL name the environment variables that hold the region and whether the region is required, and ONE function `resolve_region` in `base` SHALL apply it in this order: the region passed, the region of the authenticator, then the variables in order.
+6. IF no region is found for a provider whose profile requires one, THEN THE library SHALL raise a `ConfigurationError` naming the variables, and SHALL NOT use a default region.
+7. THE registrar methods `model_provider` and `embedding_provider` SHALL accept `profile=`; a provider name SHALL have one profile whether it is registered with a model class, an embedding class or both.
+8. IF two registrations give different profiles for the same provider name, THEN THE registrar SHALL raise a `ConfigurationError` naming the provider, unless the call passes `replace=True`.
+9. WHERE a provider speaks the OpenAI chat-completions format, THE plugin author SHALL be able to register it with `OpenAICompatibleProvider` and a `ProviderProfile`, and no new class.
+10. IF a provider has no profile or its profile lacks the model, THEN THE `CostCalculator` SHALL report the cost as unknown, THE `TokenCounter` SHALL use the standard-library estimate, and `get_model_info()` SHALL return the keys the adapter itself knows.
+
+### Requirement 60: Provider and storage knowledge in one place
+
+**User Story:** As a maintainer, I want the knowledge that belongs to one provider, and the knowledge that belongs to the store, each in exactly one place, so that adding a component edits one class and the other components call that logic (decision D107).
+
+#### Acceptance Criteria
+
+1. THE `CostCalculator` SHALL hold no table of prices; the prices of a built-in provider SHALL live in its profile, `add_custom_pricing` SHALL write a user layer that wins over the profiles, and `get_pricing`, `pricing_for` and `list_models` SHALL keep working.
+2. THE `TokenCounter` SHALL hold no table of model prefixes, tokenizers or message overheads.
+3. THE variable that holds the API key of a provider SHALL be written once, in its profile; `STANDARD_ENV_VARS` of `auth`, `API_KEY_VARIABLES` of `router` and the variable names written in the adapters SHALL be removed and read the profile, and the variable names SHALL stay the provider-standard ones (Requirement 11.6).
+4. THE `router` SHALL apply `client_settings` and `model_is_deployment` of the profile of a target, and SHALL contain no provider name.
+5. EACH adapter module SHALL hold the error handler of its provider and its schema conversion (the Gemini `responseSchema` in the Google adapter); `models/transport/error_mapping.py` SHALL keep only the mapping of an HTTP status (decision D104) and SHALL call `map_error` of the profile.
+6. THE AWS region SHALL be resolved only by `resolve_region` in `auth/aws.py`, `auth/sts.py`, the `models` adapters and the `store` backends that need one.
+7. THE Bedrock adapter SHALL take its native-JSON-output capability from `get_model_info()` and not from a function of its own.
+8. THE test `tests/budget/test_provider_knowledge.py` SHALL fail on a built-in provider name, a key variable or a price used as a literal outside the adapter and the profile of that provider, with an allowlist that only shrinks (as `tests/budget/test_provider_agnostic_core.py` does).
+9. THE `CounterStore` Port SHALL have a method `count(key)` that returns the count as an integer, and 0 when the key is absent or expired; THE `router` SHALL call it and SHALL NOT read the key `"count"` of a stored value.
+10. THE `store` SHALL expose, through a capability Protocol next to those of decision D98, whether a key is alive and its remaining lifetime in seconds; THE `router` SHALL keep a cooldown as a key with a `ttl`, SHALL read it through that Protocol and SHALL NOT compare a stored timestamp with `time.time()`, so that its time-dependent behaviour is testable with the `FakeClock` of the store.
+11. THE `router` SHALL create its default storage with `skye.store.backend("memory")` (decision D97) and SHALL NOT import a backend class.
+12. THE test `tests/budget/test_storage_knowledge.py` SHALL fail on the import of a concrete backend class outside `store` and its tests, and on the read of the key `"count"` of a stored value outside `store`.
+
+### Requirement 61: Plugin example, documentation and skill
+
+**User Story:** As a user who wants to extend Skye, I want one example, one page and an up-to-date skill, so that I write my first plugin in minutes.
+
+#### Acceptance Criteria
+
+1. THE example of how a user writes and registers a plugin SHALL be written in `examples/plugins/` before the design of any component changes, SHALL show a provider with its profile, a store backend, `<pkg>.use(plugin)` and the entry-point declaration in `pyproject.toml`, and SHALL be run offline by `tests/examples` (Requirement 24.11).
+2. THE documentation page that lists every kind of extension (Requirement 15.10) SHALL add the registrar method of each kind, and THE wiki SHALL hold a guide "Write a plugin" and a reference of `ProviderProfile`.
+3. WHEN a change touches `skye plugins`, `<pkg>.use`, the `plugins` configuration key, the registrar or the profile, THE Claude skill that ships with the package SHALL be updated in the same change, with an eval for the rule that a provider is declared once, in its profile.
+4. THE plugin machinery SHALL add no third-party dependency to the core and no extra to `pyproject.toml`; THE size, import time and cold start of `budgets.toml` SHALL NOT rise (Requirement 7.9).

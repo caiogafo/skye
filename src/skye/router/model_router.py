@@ -15,18 +15,21 @@ This module provides a complete routing solution with support for:
 """
 
 import asyncio
+import difflib
 import inspect
 import logging
 import os
 import time
-from collections.abc import Coroutine
+from collections.abc import Awaitable, Callable, Coroutine
 from dataclasses import dataclass, field
-from typing import Any, Optional, TypeVar, cast
+from typing import Any, TypeVar, cast
 
 from skye.base.completion import CompleteRequest, CompleteResponse
 from skye.base.exceptions import ConfigurationError, ProviderError
+from skye.base.interfaces import StorageBackend
 from skye.base.interfaces.model import ModelInterface
 from skye.base.interfaces.router import ModelRouterInterface, RoutingStrategy
+from skye.store.memory import InMemoryBackend
 
 from .config_models import (
     AllowedFailsPolicyConfig,
@@ -39,10 +42,8 @@ from .config_models import (
     UsageStats,
 )
 from .health_tracker import ModelHealth, RateLimitTracker
-from .skye_file import API_KEY_VARIABLES
 from .routing_strategies import RoutingStrategySelector
-from skye.base.interfaces import StorageBackend
-from skye.store.memory import InMemoryBackend
+from .skye_file import API_KEY_VARIABLES
 
 logger = logging.getLogger(__name__)
 
@@ -53,9 +54,9 @@ _T = TypeVar("_T")
 def _run_sync(coro: Coroutine[Any, Any, _T]) -> _T:
     """Run a coroutine to completion from synchronous code.
 
-    With no running loop, ``asyncio.run`` is used. Inside a running loop the coroutine runs in
-    a worker thread with its own loop. Errors raised by the coroutine propagate unchanged: they
-    are not mistaken for the "no running loop" case.
+    With no running loop, ``asyncio.run`` is used. Inside a running loop the coroutine runs in a
+    worker thread with its own loop. Errors raised by the coroutine propagate unchanged: they are
+    not mistaken for the "no running loop" case.
     """
     import asyncio
     import concurrent.futures
@@ -68,8 +69,6 @@ def _run_sync(coro: Coroutine[Any, Any, _T]) -> _T:
         return executor.submit(asyncio.run, coro).result()
 
 
-
-
 @dataclass
 class _Outcome:
     """What happened while one request walked the targets: the calls, the targets tried and the last error."""
@@ -80,17 +79,58 @@ class _Outcome:
     last_error: BaseException | None = None
 
 
-#: The retry policy and the cooldown policy a router starts with (a file or ``to_config`` lists only what differs).
+#: The retry policy and the cooldown policy a router starts with (a file or ``to_config`` lists only
+# what differs).
+#: The names are the error classes of ``skye.exceptions`` (decision D104); a name matches its class
+# and the subclasses.
 DEFAULT_RETRY_POLICY: dict[str, int] = {
     "RateLimitError": 3,
-    "TimeoutError": 2,
+    "ProviderTimeoutError": 2,
     "ServerError": 2,
     "AuthenticationError": 0,
 }
 DEFAULT_ALLOWED_FAILS_POLICY: dict[str, int] = {
     "RateLimitError": 100,
-    "ContentPolicyViolationError": 1000,
+    "ContentPolicyError": 1000,
 }
+
+#: The keyword arguments of ``from_file`` and ``from_config_dict`` that set or extend the router
+# (``routes`` comes
+#: from the configuration only).
+_ROUTER_KEYWORDS = (
+    "strategy",
+    "cooldown_seconds",
+    "enable_pre_call_checks",
+    "fallbacks",
+    "retry_policies",
+    "allowed_fails_policies",
+    "storage",
+    "sleep",
+)
+
+
+def _matching_policy(error: BaseException, policy: dict[str, Any]) -> str | None:
+    """The entry of a policy that applies to an error: its class name or the nearest base class name (MRO order)."""
+    for cls in type(error).__mro__:
+        if cls.__name__ in policy:
+            return cls.__name__
+    return None
+
+
+def _disable_client_retries(model: Any, *, always: bool) -> None:
+    """Turn the provider client's own retries off: the router's policy decides retries (decision D104).
+
+    A client exposes them as ``max_retries``. A client the router built is always given
+    ``max_retries = 0``; a model registered by the caller only when it already has the attribute.
+    """
+    if not always and not hasattr(model, "max_retries"):
+        return
+    try:
+        model.max_retries = 0
+    except (AttributeError, TypeError):  # a read-only or slotted client: leave it as it is
+        logger.debug(
+            "Router could not turn the client retries off", extra={"model": type(model).__name__}
+        )
 
 
 def _target_config(target: ModelTarget, include_secrets: bool) -> dict[str, Any]:
@@ -105,16 +145,21 @@ def _target_config(target: ModelTarget, include_secrets: bool) -> dict[str, Any]
     for key, original in target.env_refs.items():
         if key in config:
             config[key] = original  # as written: ${NAME}, not the value
+        elif key.startswith("options.") and key[len("options.") :] in config.get("options", {}):
+            config["options"] = {**config["options"], key[len("options.") :]: original}
     if "api_key" in config and "api_key" not in target.env_refs and not include_secrets:
         del config["api_key"]
     return config
 
 
-def expand_route_shorthand(shorthand: dict[str, list[str]]) -> tuple[list[RouteConfig], list[FallbackConfig]]:
+def expand_route_shorthand(
+    shorthand: dict[str, list[str]],
+) -> tuple[list[RouteConfig], list[FallbackConfig]]:
     """Expand ``{"alias": ["provider/model", ...]}`` into the full form.
 
-    The first entry is the primary target of the alias. Every other entry becomes a route named ``alias/fallback<N>`` and the
-    chain ``FallbackConfig(primary=alias, fallbacks=[...])`` lists them in order.
+    The first entry is the primary target of the alias. Every other entry becomes a route named
+    ``alias/fallback<N>`` and the chain ``FallbackConfig(primary=alias, fallbacks=[...])`` lists
+    them in order.
 
     Raises:
         ConfigurationError: If an entry is not ``provider/model`` or an alias has no entry.
@@ -130,8 +175,16 @@ def expand_route_shorthand(shorthand: dict[str, list[str]]) -> tuple[list[RouteC
         for entry in entries:
             provider, _, model = entry.partition("/")
             if not provider or not model:
-                raise ConfigurationError(f"Route '{alias}': '{entry}' is not of the form 'provider/model'")
-            targets.append(ModelTarget(model=model, provider=provider, api_key=os.environ.get(API_KEY_VARIABLES.get(provider, ""))))
+                raise ConfigurationError(
+                    f"Route '{alias}': '{entry}' is not of the form 'provider/model'"
+                )
+            targets.append(
+                ModelTarget(
+                    model=model,
+                    provider=provider,
+                    api_key=os.environ.get(API_KEY_VARIABLES.get(provider, "")),
+                )
+            )
         routes.append(RouteConfig(alias=alias, targets=[targets[0]]))
         names = []
         for number, target in enumerate(targets[1:], start=1):
@@ -214,22 +267,28 @@ class ModelRouter(ModelRouterInterface):
         fallbacks: list[FallbackConfig] | None = None,
         retry_policies: list[RetryPolicyConfig] | None = None,
         allowed_fails_policies: list[AllowedFailsPolicyConfig] | None = None,
-        storage: Optional[StorageBackend] = None,
+        storage: StorageBackend | None = None,
+        sleep: Callable[[float], Awaitable[None]] | None = None,
     ):
         """Initialize the router.
 
         Args:
-            routes: Optional list of route configurations with aliases, or the shorthand
-                ``{"alias": ["provider/model", ...]}``: the first entry is the primary, the rest are its fallbacks.
-                The shorthand builds the same ``RouteConfig``, ``ModelTarget`` and ``FallbackConfig`` as the full form; the API
-                key comes from the provider's standard environment variable. An explicit ``fallbacks`` argument wins over it.
-            strategy: Default routing strategy.
+            routes: Optional list of route configurations with aliases, or the shorthand ``{"alias":
+                ["provider/model", ...]}``: the first entry is the primary, the rest are its
+                fallbacks. The shorthand builds the same ``RouteConfig``, ``ModelTarget`` and
+                ``FallbackConfig`` as the full form; the API key comes from the provider's standard
+                environment variable. An explicit ``fallbacks`` argument wins over it.
+            strategy: Default routing strategy, used by every route that sets none.
             cooldown_seconds: Default cooldown duration for failed models.
             enable_pre_call_checks: Whether to check rate limits before calls.
             fallbacks: Optional list of fallback configurations.
-            retry_policies: Optional list of retry policy configurations.
-            allowed_fails_policies: Optional list of allowed fails policy configurations.
+            retry_policies: Optional list of retry policy configurations (added to the defaults, see
+                ``DEFAULT_RETRY_POLICY``).
+            allowed_fails_policies: Optional list of allowed fails policy configurations (added to
+                the defaults, see ``DEFAULT_ALLOWED_FAILS_POLICY``).
             storage: Optional external storage backend. If None, uses in-memory storage.
+            sleep: The coroutine that waits between retries, ``asyncio.sleep`` by default; tests
+                pass one that only records the waits.
 
         Example:
             >>> router = ModelRouter(
@@ -262,11 +321,15 @@ class ModelRouter(ModelRouterInterface):
         self.rate_limits: dict[str, RateLimitTracker] = {}
         self.fallbacks: dict[str, list[str]] = {}
         self.retry_policy: dict[str, int] = dict(DEFAULT_RETRY_POLICY)
+        #: The wait of each retry policy entry: (``retry_after_seconds``, ``exponential_backoff``).
+        self.retry_waits: dict[str, tuple[float | None, bool]] = {}
         self.allowed_fails_policy: dict[str, int] = dict(DEFAULT_ALLOWED_FAILS_POLICY)
+        self._sleep: Callable[[float], Awaitable[None]] = sleep or asyncio.sleep
 
         self._round_robin_index: dict[str, int] = {}  # Per-alias round-robin index
         self._last_serving: dict[str, Any] | None = None
-        # The storage backend is connected lazily, at the first call that uses it (see _ensure_storage).
+        # The storage backend is connected lazily, at the first call that uses it (see
+        # _ensure_storage).
         self._storage_connected = False
         self._storage_connecting: tuple[asyncio.AbstractEventLoop, asyncio.Task[None]] | None = None
 
@@ -278,7 +341,8 @@ class ModelRouter(ModelRouterInterface):
             round_robin_index=self._round_robin_index,
         )
 
-        # The shorthand expands to the full form; explicit fallbacks are applied after it, so they win.
+        # The shorthand expands to the full form; explicit fallbacks are applied after it, so they
+        # win.
         if isinstance(routes, dict):
             routes, shorthand_fallbacks = expand_route_shorthand(routes)
             fallbacks = [*shorthand_fallbacks, *(fallbacks or [])]
@@ -303,8 +367,9 @@ class ModelRouter(ModelRouterInterface):
     async def _ensure_storage(self) -> None:
         """Connect the storage backend once, at the first call that needs it.
 
-        Nothing is started in ``__init__``, so a router can be built inside or outside a running loop. Concurrent first
-        calls on one loop share the same connection attempt; a failed attempt is retried by the next call.
+        Nothing is started in ``__init__``, so a router can be built inside or outside a running
+        loop. Concurrent first calls on one loop share the same connection attempt; a failed attempt
+        is retried by the next call.
         """
         if self._storage_connected:
             return
@@ -325,45 +390,57 @@ class ModelRouter(ModelRouterInterface):
     def from_file(cls, path: str | Any, name: str | None = None, **kwargs: Any) -> "ModelRouter":
         """Create a ModelRouter from a ``.skye`` or JSON configuration file.
 
-        A ``.skye`` file holds a ``router`` block (decisions D59, D62); a JSON file holds the configuration object. The
-        library reads no YAML: a ``.yaml`` or ``.yml`` file raises a ``ConfigurationError`` that names the supported formats.
-        ``env.NAME`` (in ``.skye``) and ``${NAME}`` (in JSON) are replaced by the environment variable.
+        A ``.skye`` file holds a ``router`` block (decisions D59, D62); a JSON file holds the
+        configuration object. The library reads no YAML: a ``.yaml`` or ``.yml`` file raises a
+        ``ConfigurationError`` that names the supported formats. ``env.NAME`` (in ``.skye``) and
+        ``${NAME}`` (in JSON) are replaced by the environment variable.
 
         Args:
             path: Path to the ``.skye`` or ``.json`` file.
             name: The label of the router block when a ``.skye`` file holds several.
-            **kwargs: Router settings that override the file (``strategy``, ``cooldown_seconds``, ...).
+            **kwargs: Keyword arguments of ``ModelRouter`` other than ``routes``, as in
+                :meth:`from_config_dict` (``storage``, ``strategy``, ``cooldown_seconds``, ...).
 
         Returns:
             ModelRouter instance configured from the file.
 
         Raises:
-            ConfigurationError: If the file is missing, is YAML, does not parse, or names an unset variable.
+            ConfigurationError: If the file is missing, is YAML, does not parse, names an unset
+                variable, or a keyword argument is not one of ``ModelRouter``.
 
         Example:
             >>> router = ModelRouter.from_file("router.skye")  # doctest: +SKIP
             >>> router = ModelRouter.from_file("router.skye", name="main", cooldown_seconds=120.0)  # doctest: +SKIP
+            >>> router = ModelRouter.from_file("router.skye", storage=store)  # doctest: +SKIP
         """
         from .skye_file import load_router_config
 
-        return cls.from_config_dict(load_router_config(path, name, keep_target_references=True), **kwargs)
+        cls._check_keywords("from_file", kwargs)
+        return cls.from_config_dict(
+            load_router_config(path, name, keep_target_references=True), **kwargs
+        )
 
     @classmethod
     def from_config_dict(cls, config: dict[str, Any], **kwargs: Any) -> "ModelRouter":
         """Create a ModelRouter from a configuration dictionary.
 
-        This class method creates a ModelRouter instance from a configuration
-        dictionary. The dictionary should follow the RouterConfig schema.
+        This class method creates a ModelRouter instance from a configuration dictionary. The
+        dictionary should follow the RouterConfig schema.
 
         Args:
             config: Configuration dictionary with router settings.
-            **kwargs: Additional keyword arguments to override config values.
+            **kwargs: Keyword arguments of ``ModelRouter`` other than ``routes``. ``strategy`` (a
+                name or a ``RoutingStrategy``), ``cooldown_seconds`` and ``enable_pre_call_checks``
+                replace the values of the configuration; ``fallbacks``, ``retry_policies`` and
+                ``allowed_fails_policies`` are added after the configuration's (so they win for the
+                same primary or error type); ``storage`` and ``sleep`` are passed on.
 
         Returns:
             ModelRouter instance configured from the dictionary.
 
         Raises:
-            ConfigurationError: If the configuration is invalid.
+            ConfigurationError: If the configuration is invalid or a keyword argument is not one of
+                ``ModelRouter``.
 
         Example:
             >>> config = {
@@ -387,11 +464,13 @@ class ModelRouter(ModelRouterInterface):
             ... }
             >>> router = ModelRouter.from_config_dict(config)
         """
+        cls._check_keywords("from_config_dict", kwargs)
         # Extract router-level settings
-        strategy_str = kwargs.get("strategy", config.get("strategy", "round_robin"))
-        cooldown_seconds = kwargs.get(
-            "cooldown_seconds", config.get("cooldown_seconds", 60.0)
+        strategy_value = kwargs.get("strategy", config.get("strategy", "round_robin"))
+        strategy_str = (
+            strategy_value.value if isinstance(strategy_value, RoutingStrategy) else strategy_value
         )
+        cooldown_seconds = kwargs.get("cooldown_seconds", config.get("cooldown_seconds", 60.0))
         enable_pre_call_checks = kwargs.get(
             "enable_pre_call_checks", config.get("enable_pre_call_checks", True)
         )
@@ -415,10 +494,14 @@ class ModelRouter(ModelRouterInterface):
                 # Parse targets
                 targets = [ModelTarget(**target) for target in route_dict.get("targets", [])]
 
-                # Parse strategy for this route
-                route_strategy_str = route_dict.get("strategy", strategy_str)
+                # Parse strategy for this route (none: the router's)
+                route_strategy_str = route_dict.get("strategy")
                 try:
-                    route_strategy = RoutingStrategy(route_strategy_str)
+                    route_strategy = (
+                        RoutingStrategy(route_strategy_str)
+                        if route_strategy_str is not None
+                        else None
+                    )
                 except ValueError:
                     raise ConfigurationError(
                         f"Invalid routing strategy for route '{route_dict.get('alias')}': {route_strategy_str}",
@@ -483,6 +566,12 @@ class ModelRouter(ModelRouterInterface):
                     details={"policy": policy_dict, "error": str(e)},
                 ) from e
 
+        # Keyword lists come after the configuration's, so they win for the same primary or error
+        # type.
+        fallbacks.extend(kwargs.get("fallbacks") or [])
+        retry_policies.extend(kwargs.get("retry_policies") or [])
+        allowed_fails_policies.extend(kwargs.get("allowed_fails_policies") or [])
+
         # Create router instance
         return cls(
             routes=routes if routes else None,
@@ -492,17 +581,37 @@ class ModelRouter(ModelRouterInterface):
             fallbacks=fallbacks if fallbacks else None,
             retry_policies=retry_policies if retry_policies else None,
             allowed_fails_policies=allowed_fails_policies if allowed_fails_policies else None,
+            storage=kwargs.get("storage"),
+            sleep=kwargs.get("sleep"),
+        )
+
+    @staticmethod
+    def _check_keywords(method: str, kwargs: dict[str, Any]) -> None:
+        """Reject a keyword argument that ``from_file`` / ``from_config_dict`` would otherwise ignore."""
+        unknown = sorted(set(kwargs) - set(_ROUTER_KEYWORDS))
+        if not unknown:
+            return
+        hints = {name: difflib.get_close_matches(name, _ROUTER_KEYWORDS, n=1) for name in unknown}
+        suggestion = "; ".join(
+            f"'{name}': did you mean '{match[0]}'?" for name, match in hints.items() if match
+        )
+        raise ConfigurationError(
+            f"ModelRouter.{method}() got unknown keyword argument(s): {', '.join(repr(n) for n in unknown)}. "
+            f"Accepted: {', '.join(_ROUTER_KEYWORDS)}." + (f" {suggestion}" if suggestion else ""),
+            details={"unknown": unknown, "accepted": list(_ROUTER_KEYWORDS)},
         )
 
     def to_config(self, *, include_secrets: bool = False) -> dict[str, Any]:
         """The configuration dictionary of this router: ``ModelRouter.from_config_dict(router.to_config())`` rebuilds it.
 
-        Routes, targets, the fallback chains, the strategy, the cooldown, the pre-call checks, and the retry and cooldown
-        policies that differ from the defaults are listed. **Secrets are not exported by default:** a value that was written
-        as ``${NAME}`` (an API key, a base URL) is exported as ``${NAME}``, and an API key that was written in clear is left
-        out (the target then reads its provider's standard environment variable). Pass ``include_secrets=True`` to export the
-        keys as they are, for example to a private file. State that is not configuration (health, usage, the storage backend,
-        provider instances) and extra fields a target was given are not exported.
+        Routes, targets, the fallback chains, the strategy, the cooldown, the pre-call checks, and
+        the retry and cooldown policies that differ from the defaults are listed. **Secrets are not
+        exported by default:** a value that was written as ``${NAME}`` (an API key, a base URL) is
+        exported as ``${NAME}``, and an API key that was written in clear is left out (the target
+        then reads its provider's standard environment variable). Pass ``include_secrets=True`` to
+        export the keys as they are, for example to a private file. State that is not configuration
+        (health, usage, the storage backend, provider instances) and extra fields a target was given
+        are not exported.
 
         Args:
             include_secrets: Export API keys written in clear.
@@ -512,24 +621,29 @@ class ModelRouter(ModelRouterInterface):
         """
         routes: list[dict[str, Any]] = []
         for alias, route in self.aliases.items():
-            routes.append(
-                {
-                    "alias": alias,
-                    "targets": [_target_config(target, include_secrets) for target in route.targets],
-                    "strategy": route.strategy.value,
-                    "fallback_on_error": route.fallback_on_error,
-                }
-            )
+            entry: dict[str, Any] = {
+                "alias": alias,
+                "targets": [_target_config(target, include_secrets) for target in route.targets],
+            }
+            if (
+                route.strategy is not None and route.strategy != self.strategy
+            ):  # left out: the router's
+                entry["strategy"] = route.strategy.value
+            entry["fallback_on_error"] = route.fallback_on_error
+            routes.append(entry)
         return {
             "strategy": self.strategy.value,
             "cooldown_seconds": self.cooldown_seconds,
             "enable_pre_call_checks": self.pre_call_checks_enabled,
             "routes": routes,
-            "fallbacks": [{"primary": primary, "fallbacks": list(names)} for primary, names in self.fallbacks.items()],
+            "fallbacks": [
+                {"primary": primary, "fallbacks": list(names)}
+                for primary, names in self.fallbacks.items()
+            ],
             "retry_policies": [
-                {"error_type": name, "max_retries": count}
+                self._retry_policy_config(name, count)
                 for name, count in self.retry_policy.items()
-                if DEFAULT_RETRY_POLICY.get(name) != count
+                if DEFAULT_RETRY_POLICY.get(name) != count or name in self.retry_waits
             ],
             "allowed_fails_policies": [
                 {"error_type": name, "allowed_fails_per_minute": count}
@@ -538,12 +652,23 @@ class ModelRouter(ModelRouterInterface):
             ],
         }
 
+    def _retry_policy_config(self, name: str, count: int) -> dict[str, Any]:
+        """One retry policy entry of :meth:`to_config`, with its wait when it has one."""
+        entry: dict[str, Any] = {"error_type": name, "max_retries": count}
+        retry_after, backoff = self.retry_waits.get(name, (None, False))
+        if retry_after is not None:
+            entry["retry_after_seconds"] = retry_after
+        if backoff:
+            entry["exponential_backoff"] = True
+        return entry
+
     def to_skye(self, name: str | None = None, *, include_secrets: bool = False) -> str:
         """The ``router`` block of a ``.skye`` file that rebuilds this router (``ModelRouter.from_file`` reads it back).
 
-        The text is in the full form (one ``route`` block per alias, ``fallback = [...]`` inside the route), keys are written as
-        ``env.NAME`` where the router had ``${NAME}`` and are left out otherwise (see :meth:`to_config`), and it has no comments.
-        A route's strategy is written only when it differs from the router's.
+        The text is in the full form (one ``route`` block per alias, ``fallback = [...]`` inside the
+        route), keys are written as ``env.NAME`` where the router had ``${NAME}`` and are left out
+        otherwise (see :meth:`to_config`), and it has no comments. A route's strategy is written
+        only when it differs from the router's.
 
         Args:
             name: The label of the block (``router "name" { ... }``); none by default.
@@ -556,7 +681,9 @@ class ModelRouter(ModelRouterInterface):
 
         from .skye_file import config_to_router_spec
 
-        return str(to_text(config_to_router_spec(self.to_config(include_secrets=include_secrets), name)))
+        return str(
+            to_text(config_to_router_spec(self.to_config(include_secrets=include_secrets), name))
+        )
 
     def _register_route(self, route: RouteConfig) -> None:
         """Register a route configuration with alias and targets."""
@@ -591,24 +718,36 @@ class ModelRouter(ModelRouterInterface):
                 provider_config["timeout"] = target.timeout
 
             if target.provider == "azure":
-                # Azure names its endpoint differently, and the model of a target is the name of the deployment.
+                # Azure names its endpoint differently, and the model of a target is the name of the
+                # deployment.
                 if "api_base" in provider_config:
                     provider_config["azure_endpoint"] = provider_config.pop("api_base")
                 provider_config.setdefault("deployment_name", target.model)
+            # What the provider needs and the target has no field for (Google's project_id and
+            # location, ...).
+            provider_config.update(target.options)
 
             model = ProviderRegistry.get_model_provider(target.provider, **provider_config)
+            _disable_client_retries(model, always=True)
 
             # Register the model
             self.models[model_id] = model
             self.model_targets[model_id] = target
-            
+
             # Create health and rate limit trackers with shared storage backend
-            self.health[model_id] = ModelHealth(model_id=model_id, tags=target.tags, storage=self.storage_backend)
+            self.health[model_id] = ModelHealth(
+                model_id=model_id, tags=target.tags, storage=self.storage_backend
+            )
             self.rate_limits[model_id] = RateLimitTracker(
-                tpm_limit=target.tpm, rpm_limit=target.rpm, model_id=model_id, storage=self.storage_backend
+                tpm_limit=target.tpm,
+                rpm_limit=target.rpm,
+                model_id=model_id,
+                storage=self.storage_backend,
             )
 
-            logger.info("Router target registered", extra={"model_id": model_id, "alias": route.alias})
+            logger.info(
+                "Router target registered", extra={"model_id": model_id, "alias": route.alias}
+            )
 
     def register_model(
         self,
@@ -620,6 +759,9 @@ class ModelRouter(ModelRouterInterface):
     ) -> None:
         """Register a model directly with the router.
 
+        A model that has its own retries (a ``max_retries`` attribute, as the provider clients of
+        Skye) gets them turned off: the router's retry policy decides (decision D104).
+
         Args:
             model_id: Unique identifier for the model.
             model: The model instance implementing ModelInterface.
@@ -628,17 +770,22 @@ class ModelRouter(ModelRouterInterface):
             tags: Optional tags for tag-based routing.
         """
         self.models[model_id] = model
-        
+        _disable_client_retries(model, always=False)
+
         # Create health and rate limit trackers with shared storage backend
-        self.health[model_id] = ModelHealth(model_id=model_id, tags=tags or [], storage=self.storage_backend)
-        self.rate_limits[model_id] = RateLimitTracker(tpm_limit=tpm, rpm_limit=rpm, model_id=model_id, storage=self.storage_backend)
+        self.health[model_id] = ModelHealth(
+            model_id=model_id, tags=tags or [], storage=self.storage_backend
+        )
+        self.rate_limits[model_id] = RateLimitTracker(
+            tpm_limit=tpm, rpm_limit=rpm, model_id=model_id, storage=self.storage_backend
+        )
         logger.info("Router model registered", extra={"model_id": model_id})
 
     async def select_model(self, request: CompleteRequest) -> str:
         """Select a model based on routing strategy.
 
-        If the request specifies an alias, selects from targets for that alias.
-        Otherwise, selects from all available models.
+        If the request specifies an alias, selects from targets for that alias. Otherwise, selects
+        from all available models.
         """
         await self._ensure_storage()
         # Check if request model is an alias
@@ -660,13 +807,20 @@ class ModelRouter(ModelRouterInterface):
             available_models, None, self.strategy, token_estimate=self._token_estimate(request)
         )
 
-    async def _select_from_alias(self, alias: str, request: CompleteRequest) -> str:
-        """Select a target from an alias based on the route's strategy."""
+    async def _select_from_alias(
+        self, alias: str, request: CompleteRequest, exclude: set[str] | None = None
+    ) -> str:
+        """Select a target from an alias based on the route's strategy (the router's when the route sets none).
+
+        Targets in ``exclude`` (those that already failed for this request) are not selected.
+        """
         route = self.aliases[alias]
 
         # Get all model IDs for this alias
         alias_models = [
-            model_id for model_id in self.models.keys() if model_id.startswith(f"{alias}:")
+            model_id
+            for model_id in self.models.keys()
+            if model_id.startswith(f"{alias}:") and model_id not in (exclude or ())
         ]
 
         # Filter by availability
@@ -682,8 +836,8 @@ class ModelRouter(ModelRouterInterface):
                 details={"alias": alias, "total_targets": len(alias_models)},
             )
 
-        # Use route-specific strategy if different from default
-        strategy = route.strategy if route.strategy else self.strategy
+        # The route's own strategy, or the router's when the route sets none
+        strategy = route.strategy if route.strategy is not None else self.strategy
         await self._strategy_selector.prepare(available_models)
         return self._strategy_selector.apply_strategy(
             available_models, alias, strategy, token_estimate=self._token_estimate(request)
@@ -693,10 +847,12 @@ class ModelRouter(ModelRouterInterface):
     def _token_estimate(request: CompleteRequest) -> tuple[float, float] | None:
         """A rough (prompt, completion) token estimate for ``cost_based``, or ``None`` with nothing to go on.
 
-        The prompt side is about four characters per token over the message texts; the completion side is
-        ``max_tokens`` when the request sets it, else the prompt estimate.
+        The prompt side is about four characters per token over the message texts; the completion
+        side is ``max_tokens`` when the request sets it, else the prompt estimate.
         """
-        chars = sum(len(getattr(message, "content", "") or "") for message in (request.messages or []))
+        chars = sum(
+            len(getattr(message, "content", "") or "") for message in (request.messages or [])
+        )
         if not chars and not request.max_tokens:
             return None
         prompt_tokens = chars / 4
@@ -708,12 +864,12 @@ class ModelRouter(ModelRouterInterface):
         messages: list[Any],
         model: str | None = None,
         tags: list[str] | None = None,
-        **kwargs: Any
+        **kwargs: Any,
     ) -> CompleteResponse:
         """Complete a request using the router.
 
-        This method provides a unified interface for routing with flexible model
-        and tag-based selection. At least one of model or tags must be provided.
+        This method provides a unified interface for routing with flexible model and tag-based
+        selection. At least one of model or tags must be provided.
 
         Args:
             messages: List of messages for the completion.
@@ -725,8 +881,8 @@ class ModelRouter(ModelRouterInterface):
             The completion response from the selected model.
 
         Raises:
-            ValueError: If neither model nor tags are provided, or if no models
-                match the specified criteria.
+            ValueError: If neither model nor tags are provided, or if no models match the specified
+                criteria.
 
         Examples:
             >>> # Use specific model/alias
@@ -754,10 +910,9 @@ class ModelRouter(ModelRouterInterface):
 
         # Create internal CompleteRequest
         from skye.base.completion import CompleteRequest
+
         request = CompleteRequest(
-            messages=messages,
-            model=model or "",  # Will be selected by router if empty
-            **kwargs
+            messages=messages, model=model or "", **kwargs  # Will be selected by router if empty
         )
 
         # Handle tag-based filtering
@@ -771,7 +926,7 @@ class ModelRouter(ModelRouterInterface):
         messages: list[Any],
         model: str | None = None,
         tags: list[str] | None = None,
-        **kwargs: Any
+        **kwargs: Any,
     ) -> CompleteResponse:
         """Complete a request using the router asynchronously.
 
@@ -785,8 +940,8 @@ class ModelRouter(ModelRouterInterface):
             The completion response from the selected model.
 
         Raises:
-            ValueError: If neither model nor tags are provided, or if no models
-                match the specified criteria.
+            ValueError: If neither model nor tags are provided, or if no models match the specified
+                criteria.
         """
         # Validate input parameters
         if not model and not tags:
@@ -794,10 +949,9 @@ class ModelRouter(ModelRouterInterface):
 
         # Create internal CompleteRequest
         from skye.base.completion import CompleteRequest
+
         request = CompleteRequest(
-            messages=messages,
-            model=model or "",  # Will be selected by router if empty
-            **kwargs
+            messages=messages, model=model or "", **kwargs  # Will be selected by router if empty
         )
 
         # Handle tag-based filtering
@@ -813,60 +967,132 @@ class ModelRouter(ModelRouterInterface):
     async def _aroute_request_internal(self, request: CompleteRequest) -> CompleteResponse:
         """Route a request asynchronously (internal method).
 
-        The selected target is tried first (with the retries its error type allows, see :meth:`_retries_for`), then each
-        entry of the fallback chain in order. On success the serving record is put in ``response.metadata["router"]`` and
-        kept as :attr:`last_serving`. If every target fails, ``ProviderError`` names what was tried and chains the last error.
+        The requested model id, alias (or, with no model, any available model) is tried first, then
+        each entry of its fallback chain in order. For an alias the routing strategy selects a
+        target among the available ones (not in cooldown, within its limits); when the target fails
+        after the retries its error type allows (see :meth:`_retries_for`) and the route has
+        ``fallback_on_error``, the other available targets of the route are tried. An alias with no
+        available target goes straight to its fallback chain. On success the serving record is put
+        in ``response.metadata["router"]`` and kept as :attr:`last_serving`. If every target fails,
+        ``ProviderError`` names what was tried and chains the last error; when nothing could be
+        selected at all, the selection error itself is raised.
         """
         await self._ensure_storage()
-        # A registered model id is used as is; an alias (or no model) is resolved by the routing strategy.
-        model_id = request.model if request.model in self.models else await self.select_model(request)
-        fallback_chain = self.fallbacks.get(request.model, []) or self.fallbacks.get(model_id, [])
-
         outcome = _Outcome()
+        requested = request.model
+        fallback_chain = list(self.fallbacks.get(requested, []))
 
-        # Try primary model
-        response = await self._try_model(model_id, request, outcome)
-        if response is not None:
-            return self._record_serving(request, model_id, response, outcome, fallbacks_tried=[])
+        # The requested entry: a registered model id, an alias, or no model (any available model).
+        served = await self._try_entry(requested, request, outcome, first=True)
+        if served is not None:
+            return self._record_serving(request, served[0], served[1], outcome, fallbacks_tried=[])
+        if not fallback_chain and outcome.tried:
+            # No chain for the name asked for: the chain of the model id that was selected, if it
+            # has one.
+            fallback_chain = list(self.fallbacks.get(outcome.tried[0], []))
 
         # Try fallbacks (each entry is a registered model id or an alias)
         fallbacks_tried: list[str] = []
         for fallback in fallback_chain:
             logger.warning(
                 "Router target failed, trying the next fallback",
-                extra={"model_id": model_id, "fallback": fallback, "requested": request.model},
+                extra={"tried": list(outcome.tried), "fallback": fallback, "requested": requested},
             )
             fallbacks_tried.append(fallback)
-            try:
-                fallback_id = fallback if fallback in self.models else await self._select_from_alias(fallback, request)
-            except (ProviderError, KeyError) as error:
-                outcome.last_error = error
-                continue
-            response = await self._try_model(fallback_id, request, outcome)
-            if response is not None:
-                return self._record_serving(request, fallback_id, response, outcome, fallbacks_tried=fallbacks_tried)
+            served = await self._try_entry(fallback, request, outcome)
+            if served is not None:
+                return self._record_serving(
+                    request, served[0], served[1], outcome, fallbacks_tried=fallbacks_tried
+                )
 
+        if not outcome.tried and isinstance(outcome.last_error, ProviderError):
+            raise outcome.last_error  # nothing was available: the selection error says why
         raise ProviderError(
-            f"All models failed for request (tried: {model_id}, {fallback_chain})",
+            f"All models failed for request (tried: {outcome.tried}, fallbacks: {fallback_chain})",
             provider="router",
-            requested=request.model,
+            requested=requested,
             tried=list(outcome.tried),
             attempts=outcome.attempts,
-            last_error_type=type(outcome.last_error).__name__ if outcome.last_error is not None else None,
+            last_error_type=(
+                type(outcome.last_error).__name__ if outcome.last_error is not None else None
+            ),
         ) from outcome.last_error
 
-    def _retries_for(self, error: BaseException) -> int:
-        """The number of immediate retries the retry policy allows for this error.
+    async def _try_entry(
+        self, name: str, request: CompleteRequest, outcome: "_Outcome", *, first: bool = False
+    ) -> tuple[str, CompleteResponse] | None:
+        """Try one entry of the chain (a model id or an alias); the serving id and the response, or ``None``.
 
-        The error type matches a policy by class name along the MRO, the most specific class first (an error derived from
-        ``RateLimitError`` uses the ``RateLimitError`` policy unless its own class has one). No match means no retry.
+        The requested entry (``first``) that is neither a model id nor an alias (no model, for
+        instance) is resolved by the router's strategy over every available model; an unknown
+        fallback entry is skipped. A selection that finds nothing available is recorded as the last
+        error only when no call failed before it, so the final error chains the provider's failure
+        rather than a later "no available targets".
         """
-        for cls in type(error).__mro__:
-            if cls.__name__ in self.retry_policy:
-                return max(0, self.retry_policy[cls.__name__])
-        return 0
+        if name and name in self.models:
+            response = await self._try_model(name, request, outcome)
+            return (name, response) if response is not None else None
 
-    async def _call_model(self, model: ModelInterface, request: CompleteRequest) -> CompleteResponse:
+        failed: set[str] = set()
+        while True:
+            try:
+                if name in self.aliases:
+                    model_id = await self._select_from_alias(name, request, exclude=failed)
+                elif first:
+                    model_id = await self.select_model(request)
+                else:
+                    raise ProviderError(
+                        f"Unknown model or alias '{name}'", provider="router", name=name
+                    )
+            except ProviderError as error:
+                if outcome.last_error is None or not outcome.tried:
+                    outcome.last_error = error
+                return None
+            response = await self._try_model(model_id, request, outcome)
+            if response is not None:
+                return model_id, response
+            failed.add(model_id)
+            route = self.aliases.get(name)
+            if route is None or not route.fallback_on_error:
+                return None
+
+    def _retries_for(self, error: BaseException, model_id: str | None = None) -> int:
+        """The number of retries of the same target the retry policy allows for this error.
+
+        The error type matches a policy by class name along the MRO, the most specific class first
+        (an error derived from ``RateLimitError`` uses the ``RateLimitError`` policy unless its own
+        class has one). No match means no retry. When the policy retries the error and the target
+        sets ``max_retries``, the target's count is used instead.
+        """
+        name = _matching_policy(error, self.retry_policy)
+        if name is None or self.retry_policy[name] <= 0:
+            return 0
+        target = self.model_targets.get(model_id) if model_id is not None else None
+        if target is not None and target.max_retries is not None:
+            return max(0, target.max_retries)
+        return max(0, self.retry_policy[name])
+
+    def _retry_wait(self, error: BaseException, retry_number: int) -> float:
+        """Seconds to wait before retry number ``retry_number`` (1-based) of this error.
+
+        The policy's ``retry_after_seconds``, doubled after each retry with ``exponential_backoff``;
+        the error's own ``retry_after`` (the provider's ``Retry-After``) wins when it is longer.
+        """
+        name = _matching_policy(error, self.retry_policy)
+        base, backoff = (
+            self.retry_waits.get(name, (None, False)) if name is not None else (None, False)
+        )
+        wait = float(base or 0.0)
+        if backoff:
+            wait *= 2 ** (retry_number - 1)
+        server = getattr(error, "retry_after", None)
+        if isinstance(server, (int, float)) and server > wait:
+            wait = float(server)
+        return wait
+
+    async def _call_model(
+        self, model: ModelInterface, request: CompleteRequest
+    ) -> CompleteResponse:
         """Call the model without blocking the loop: its ``acomplete`` if it has one, else ``complete`` in a worker thread."""
         acomplete = getattr(model, "acomplete", None)
         if acomplete is not None and inspect.iscoroutinefunction(acomplete):
@@ -878,8 +1104,10 @@ class ModelRouter(ModelRouterInterface):
     ) -> CompleteResponse | None:
         """Try a request on one target, retrying it as the retry policy allows; ``None`` when the target did not answer.
 
-        The retries are immediate (``retry_after`` and ``exponential_backoff`` are not applied). Retrying stops early when
-        the target is put in cooldown. Every attempt and the last error are added to ``outcome``.
+        Before each retry the router waits :meth:`_retry_wait` seconds (with the injected
+        ``sleep``). Retrying stops early when the target is put in cooldown, or when the provider
+        asks to wait longer than the cooldown (``retry_after`` above ``cooldown_seconds``): the next
+        target is better than waiting. Every attempt and the last error are added to ``outcome``.
         """
         outcome = outcome if outcome is not None else _Outcome()
         if model_id not in self.models:
@@ -904,7 +1132,9 @@ class ModelRouter(ModelRouterInterface):
         outcome.target_attempts = 0
         model = self.models[model_id]
         retries_left: int | None = None  # set from the policy at the first failure
+        retries_total = 0
         while True:
+            wait = 0.0
             outcome.attempts += 1
             outcome.target_attempts += 1
             await rate_limit.increment_active_requests()
@@ -921,18 +1151,24 @@ class ModelRouter(ModelRouterInterface):
             except Exception as error:
                 outcome.last_error = error
                 error_type = type(error).__name__
-                await health.record_failure(error_type)
+                fails_policy = _matching_policy(error, self.allowed_fails_policy)
+                await health.record_failure(error_type, window_reason=fails_policy)
 
-                in_cooldown = await self._should_cooldown(model_id, error_type)
+                in_cooldown = await self._should_cooldown(model_id, fails_policy)
                 if in_cooldown:
                     await health.set_cooldown(self.cooldown_seconds)
                     logger.warning(
                         "Router target put in cooldown",
-                        extra={"model_id": model_id, "error_type": error_type, "cooldown_seconds": self.cooldown_seconds},
+                        extra={
+                            "model_id": model_id,
+                            "error_type": error_type,
+                            "cooldown_seconds": self.cooldown_seconds,
+                        },
                     )
 
                 if retries_left is None:
-                    retries_left = self._retries_for(error)
+                    retries_left = self._retries_for(error, model_id)
+                    retries_total = retries_left
                 logger.error(
                     "Router target failed",
                     extra={
@@ -944,10 +1180,20 @@ class ModelRouter(ModelRouterInterface):
                 )
                 if in_cooldown or retries_left <= 0:
                     return None
+                server_wait = getattr(error, "retry_after", None)
+                if isinstance(server_wait, (int, float)) and server_wait > self.cooldown_seconds:
+                    logger.warning(
+                        "Router target asked to wait longer than the cooldown, not retried",
+                        extra={"model_id": model_id, "retry_after": server_wait},
+                    )
+                    return None
                 retries_left -= 1
+                wait = self._retry_wait(error, retries_total - retries_left)
 
             finally:
                 await rate_limit.decrement_active_requests()
+            if wait > 0:  # outside the call: a waiting request is not an active one
+                await self._sleep(wait)
 
     def _record_serving(
         self,
@@ -959,7 +1205,8 @@ class ModelRouter(ModelRouterInterface):
     ) -> CompleteResponse:
         """Put the serving record in ``response.metadata["router"]`` and keep it as :attr:`last_serving`.
 
-        The record names the configuration that served the request and never holds a key or another secret.
+        The record names the configuration that served the request and never holds a key or another
+        secret.
         """
         target = self.model_targets.get(model_id)
         alias: str | None = None
@@ -968,7 +1215,9 @@ class ModelRouter(ModelRouterInterface):
             alias = model_id.split(":", 1)[0]
             route = self.aliases.get(alias)
             if route is not None:
-                target_index = next((i for i, item in enumerate(route.targets) if item is target), None)
+                target_index = next(
+                    (i for i, item in enumerate(route.targets) if item is target), None
+                )
         record: dict[str, Any] = {
             "requested": request.model or None,
             "alias": alias,
@@ -993,10 +1242,11 @@ class ModelRouter(ModelRouterInterface):
     def last_serving(self) -> dict[str, Any] | None:
         """The serving record of the last request this router answered (a copy), or ``None`` before the first one.
 
-        The same record is in ``response.metadata["router"]``: ``requested`` (the model or alias asked for), ``alias`` (the
-        route of the serving target, ``None`` for a model registered directly), ``model_id``, ``provider``, ``model``,
-        ``target_index`` (the position of the target in its route), ``attempts`` (calls to the serving target),
-        ``total_attempts`` (calls across the chain), ``tried`` (targets that failed first), ``fallbacks_tried`` and
+        The same record is in ``response.metadata["router"]``: ``requested`` (the model or alias
+        asked for), ``alias`` (the route of the serving target, ``None`` for a model registered
+        directly), ``model_id``, ``provider``, ``model``, ``target_index`` (the position of the
+        target in its route), ``attempts`` (calls to the serving target), ``total_attempts`` (calls
+        across the chain), ``tried`` (targets that failed first), ``fallbacks_tried`` and
         ``fallback``. It holds no key or other secret. It is process state, for observability only.
         """
         if self._last_serving is None:
@@ -1006,9 +1256,13 @@ class ModelRouter(ModelRouterInterface):
         record["fallbacks_tried"] = list(record["fallbacks_tried"])
         return record
 
-    async def _should_cooldown(self, model_id: str, error_type: str) -> bool:
-        """Whether the failures of this error type in the last minute reached the allowed-fails policy for it."""
-        if error_type not in self.allowed_fails_policy:
+    async def _should_cooldown(self, model_id: str, error_type: str | None) -> bool:
+        """Whether the failures of the last minute under this allowed-fails entry reached its allowed count.
+
+        ``error_type`` is the entry that matched the error (its class or the nearest base class with
+        an entry).
+        """
+        if error_type is None or error_type not in self.allowed_fails_policy:
             return False
 
         allowed_fails = self.allowed_fails_policy[error_type]
@@ -1072,18 +1326,23 @@ class ModelRouter(ModelRouterInterface):
         """
         return self.aliases.get(alias)
 
+    async def amark_model_failed(self, model_id: str) -> None:
+        """Put a model in cooldown for ``cooldown_seconds`` (async); an unknown model id is ignored."""
+        if model_id not in self.health:
+            return
+        await self._ensure_storage()
+        await self.health[model_id].set_cooldown(self.cooldown_seconds)
+        logger.warning("Router model marked as failed", extra={"model_id": model_id})
+
     def mark_model_failed(self, model_id: str) -> None:
-        """Mark a model as failed for cooldown."""
+        """Put a model in cooldown for ``cooldown_seconds``; the cooldown is stored when the call returns.
+
+        It runs :meth:`amark_model_failed` to the end (in a worker thread when a loop is running),
+        as the other synchronous methods do; no background task is left behind. In async code, await
+        :meth:`amark_model_failed`.
+        """
         if model_id in self.health:
-            import asyncio
-            try:
-                loop = asyncio.get_running_loop()
-                # We're in an async context, create a task
-                asyncio.create_task(self.health[model_id].set_cooldown(self.cooldown_seconds))
-            except RuntimeError:
-                # No running loop, use asyncio.run
-                asyncio.run(self.health[model_id].set_cooldown(self.cooldown_seconds))
-            logger.warning("Router model marked as failed", extra={"model_id": model_id})
+            _run_sync(self.amark_model_failed(model_id))
 
     async def aget_model_health(self, model_id: str) -> ModelHealthMetrics:
         """Get health status of a model asynchronously.
@@ -1100,25 +1359,25 @@ class ModelRouter(ModelRouterInterface):
         await self._ensure_storage()
         health = self.health[model_id]
         rate_limit = self.rate_limits[model_id]
-        
+
         health_metrics = await health.get_health_metrics()
         usage_stats = await rate_limit.get_current_usage()
 
         return ModelHealthMetrics(
             model_id=model_id,
-            success_count=health_metrics.get('success_count', 0),
-            failure_count=health_metrics.get('failure_count', 0),
-            total_requests=health_metrics.get('total_requests', 0),
-            success_rate=health_metrics.get('success_rate', 1.0),
-            average_latency_ms=health_metrics.get('average_latency_ms', 0.0),
-            min_latency_ms=health_metrics.get('min_latency_ms'),
-            max_latency_ms=health_metrics.get('max_latency_ms'),
-            last_success_time=health_metrics.get('last_success_time'),
-            last_failure_time=health_metrics.get('last_failure_time'),
-            is_in_cooldown=health_metrics.get('is_in_cooldown', False),
-            cooldown_until=health_metrics.get('cooldown_until'),
-            failure_reasons=health_metrics.get('failure_reasons', {}),
-            active_requests=usage_stats.get('active_requests', 0),
+            success_count=health_metrics.get("success_count", 0),
+            failure_count=health_metrics.get("failure_count", 0),
+            total_requests=health_metrics.get("total_requests", 0),
+            success_rate=health_metrics.get("success_rate", 1.0),
+            average_latency_ms=health_metrics.get("average_latency_ms", 0.0),
+            min_latency_ms=health_metrics.get("min_latency_ms"),
+            max_latency_ms=health_metrics.get("max_latency_ms"),
+            last_success_time=health_metrics.get("last_success_time"),
+            last_failure_time=health_metrics.get("last_failure_time"),
+            is_in_cooldown=health_metrics.get("is_in_cooldown", False),
+            cooldown_until=health_metrics.get("cooldown_until"),
+            failure_reasons=health_metrics.get("failure_reasons", {}),
+            active_requests=usage_stats.get("active_requests", 0),
             tags=health.tags,
         )
 
@@ -1161,7 +1420,10 @@ class ModelRouter(ModelRouterInterface):
         """
         for config in fallbacks:
             self.fallbacks[config.primary] = config.fallbacks
-            logger.info("Router fallbacks set", extra={"primary": config.primary, "fallbacks": list(config.fallbacks)})
+            logger.info(
+                "Router fallbacks set",
+                extra={"primary": config.primary, "fallbacks": list(config.fallbacks)},
+            )
 
     def set_retry_policy(self, retry_policies: list[RetryPolicyConfig]) -> None:
         """Set retry policy per error type.
@@ -1171,15 +1433,24 @@ class ModelRouter(ModelRouterInterface):
 
         Example:
             >>> router.set_retry_policy([
-            ...     RetryPolicyConfig(error_type="RateLimitError", max_retries=3),
-            ...     RetryPolicyConfig(error_type="TimeoutError", max_retries=2)
+            ...     RetryPolicyConfig(error_type="RateLimitError", max_retries=3, retry_after_seconds=1.0),
+            ...     RetryPolicyConfig(error_type="ProviderTimeoutError", max_retries=2)
             ... ])
         """
         for policy in retry_policies:
             self.retry_policy[policy.error_type] = policy.max_retries
+            if policy.retry_after_seconds is not None or policy.exponential_backoff:
+                self.retry_waits[policy.error_type] = (
+                    policy.retry_after_seconds,
+                    policy.exponential_backoff,
+                )
+            else:
+                self.retry_waits.pop(policy.error_type, None)
         logger.info("Router retry policy updated", extra={"retry_policy": dict(self.retry_policy)})
 
-    def set_allowed_fails_policy(self, allowed_fails_policies: list[AllowedFailsPolicyConfig]) -> None:
+    def set_allowed_fails_policy(
+        self, allowed_fails_policies: list[AllowedFailsPolicyConfig]
+    ) -> None:
         """Set allowed fails before cooldown per error type.
 
         Args:
@@ -1195,7 +1466,10 @@ class ModelRouter(ModelRouterInterface):
         """
         for policy in allowed_fails_policies:
             self.allowed_fails_policy[policy.error_type] = policy.allowed_fails_per_minute
-        logger.info("Router allowed-fails policy updated", extra={"allowed_fails_policy": dict(self.allowed_fails_policy)})
+        logger.info(
+            "Router allowed-fails policy updated",
+            extra={"allowed_fails_policy": dict(self.allowed_fails_policy)},
+        )
 
     def set_cooldown_time(self, cooldown_seconds: float) -> None:
         """Set cooldown duration for failed models."""
@@ -1210,9 +1484,11 @@ class ModelRouter(ModelRouterInterface):
     def set_rate_limits(
         self, model_id: str, tpm: int | None = None, rpm: int | None = None
     ) -> None:
-        """Set rate limits for a model deployment."""
+        """Set rate limits for a model deployment (a model id the router does not know gets a tracker on its store)."""
         if model_id not in self.rate_limits:
-            self.rate_limits[model_id] = RateLimitTracker()
+            self.rate_limits[model_id] = RateLimitTracker(
+                model_id=model_id, storage=self.storage_backend
+            )
 
         tracker = self.rate_limits[model_id]
         tracker.tpm_limit = tpm
@@ -1310,13 +1586,13 @@ class ModelRouter(ModelRouterInterface):
             if request.model in self.aliases:
                 # Get all model IDs for this alias
                 alias_models = [
-                    model_id for model_id in self.models.keys() 
+                    model_id
+                    for model_id in self.models.keys()
                     if model_id.startswith(f"{request.model}:")
                 ]
                 # Filter alias models by tags
                 matching_models = [
-                    model_id for model_id in alias_models 
-                    if model_id in matching_models
+                    model_id for model_id in alias_models if model_id in matching_models
                 ]
             else:
                 # Direct model ID - check if it has the required tags
@@ -1332,9 +1608,7 @@ class ModelRouter(ModelRouterInterface):
                     f"No models found matching model '{request.model}' with required tags: {required_tags}"
                 )
             else:
-                raise ValueError(
-                    f"No models found with required tags: {required_tags}"
-                )
+                raise ValueError(f"No models found with required tags: {required_tags}")
 
         # Temporarily override available models for selection
         original_models = self.models
@@ -1362,13 +1636,13 @@ class ModelRouter(ModelRouterInterface):
             if request.model in self.aliases:
                 # Get all model IDs for this alias
                 alias_models = [
-                    model_id for model_id in self.models.keys() 
+                    model_id
+                    for model_id in self.models.keys()
                     if model_id.startswith(f"{request.model}:")
                 ]
                 # Filter alias models by tags
                 matching_models = [
-                    model_id for model_id in alias_models 
-                    if model_id in matching_models
+                    model_id for model_id in alias_models if model_id in matching_models
                 ]
             else:
                 # Direct model ID - check if it has the required tags
@@ -1384,9 +1658,7 @@ class ModelRouter(ModelRouterInterface):
                     f"No models found matching model '{request.model}' with required tags: {required_tags}"
                 )
             else:
-                raise ValueError(
-                    f"No models found with required tags: {required_tags}"
-                )
+                raise ValueError(f"No models found with required tags: {required_tags}")
 
         # Temporarily override available models for selection
         original_models = self.models

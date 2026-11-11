@@ -1,6 +1,6 @@
 """Authentication for AWS requests: Bedrock API keys and SigV4 signing (Live).
 
-``skye.auth.aws`` carries the standard-library authenticators. ``BedrockApiKeyAuthenticator``
+``skye.auth`` carries the standard-library authenticators. ``BedrockApiKeyAuthenticator``
 adds a bearer token; ``SigV4Authenticator`` signs a request with SigV4. Both implement the
 ``AuthenticationInterface`` Port: ``apply(method, url, headers, body=b"")`` returns a new dict of
 headers with authentication added, without touching the network.
@@ -32,7 +32,7 @@ def main() -> None:
 
     # In production, hand a CredentialProvider instead of static keys and it resolves the source
     # for you (environment, named profile, container or EC2 metadata):
-    #   from skye.auth.aws import CredentialProvider
+    #   from skye.auth import CredentialProvider
     #   provider = CredentialProvider(profile_name="prod", region="us-east-1")
     #   auth = SigV4Authenticator(region="us-east-1", service="bedrock", credentials=provider)
 

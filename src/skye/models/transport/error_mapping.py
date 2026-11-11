@@ -1,299 +1,258 @@
-"""Provider-specific error handling and wrapping.
+"""Provider errors to the ``ProviderError`` subclass the failure calls for (decision D104).
 
-This module provides utilities for catching provider-specific errors and
-wrapping them in ProviderError with appropriate context information.
-
-Features:
-- Provider-specific error detection
-- Retry-after header extraction
-- Status code preservation
-- Error type classification
-- Structured error context
+An error that is not already a ``ProviderError`` (one from a vendor SDK, a socket, a custom
+adapter) is read for its HTTP status, its class name and its message, and becomes the same
+subclass the standard-library HTTP layer raises for that response: ``RateLimitError`` (429),
+``ServerError`` (5xx), ``ProviderTimeoutError`` (a timeout or a dropped connection),
+``AuthenticationError`` (401, 403), ``BadRequestError`` (other 4xx, ``ContentPolicyError`` when
+the body names a content policy). A known status code is decided by the rule of
+``skye.base.http``, so there is one mapping; the class name and the message decide only when no
+status is known. Every result keeps ``status_code``, ``provider``, ``retry_after`` and, in
+``details``, an ``error_type`` classification.
 """
 
 import logging
-from typing import Any, Callable, TypeVar
+from collections.abc import Callable
+from typing import Any, TypeVar
 
-from skye.base.exceptions import ProviderError
+from skye.base.exceptions import (
+    AuthenticationError,
+    ProviderError,
+    ProviderTimeoutError,
+    RateLimitError,
+    ServerError,
+)
+from skye.base.http import _is_timeout, _status_class
 
 logger = logging.getLogger(__name__)
 
 F = TypeVar("F", bound=Callable[..., Any])
 
+#: The subclass for a classification when no HTTP status is known.
+_CLASS_OF_KIND: dict[str, type[ProviderError]] = {
+    "rate_limit": RateLimitError,
+    "timeout": ProviderTimeoutError,
+    "connection_error": ProviderTimeoutError,
+    "authentication_error": AuthenticationError,
+    "permission_error": AuthenticationError,
+    "service_unavailable": ServerError,
+}
+
+
+def error_class(status_code: int | None, kind: str, message: str = "") -> type[ProviderError]:
+    """The ``ProviderError`` subclass for an HTTP status (the rule of ``skye.base.http``).
+
+    Without a status, the classification (``rate_limit``, ``timeout``, ...) decides.
+    """
+    if isinstance(status_code, int) and status_code >= 400:
+        return _status_class(status_code, message)
+    return _CLASS_OF_KIND.get(kind, ProviderError)
+
+
+def _classify(error_type: str, message: str) -> str:
+    """The classification the OpenAI, Anthropic and Azure clients share (class name and message)."""
+    name, text = error_type.lower(), message.lower()
+    if "ratelimit" in name or "rate_limit" in name or "rate_limit" in text:
+        return "rate_limit"
+    if "timeout" in name or "timeout" in text:
+        return "timeout"
+    if "connection" in name or "connection" in text:
+        return "connection_error"
+    if "auth" in name or "unauthorized" in text:
+        return "authentication_error"
+    if "api" in name:
+        return "api_error"
+    return "unknown_error"
+
+
+def _build(
+    label: str,
+    error: Exception,
+    provider: str,
+    kind: str,
+    status_code: int | None = None,
+    retry_after: float | None = None,
+    **extra: Any,
+) -> ProviderError:
+    message = str(error)
+    cls = error_class(status_code, kind, message)
+    if cls is ProviderError and _is_timeout(error):
+        cls = ProviderTimeoutError
+    return cls(
+        f"{label}: {message}",
+        provider=provider,
+        status_code=status_code,
+        retry_after=retry_after,
+        error_type=kind,
+        original_error_type=type(error).__name__,
+        **extra,
+    )
+
 
 class ErrorHandler:
-    """Handle provider-specific errors and wrap them in ProviderError."""
+    """Turn provider errors into the ``ProviderError`` subclass of D104."""
 
     @staticmethod
     def handle_openai_error(error: Exception, provider: str = "openai") -> ProviderError:
-        """Handle OpenAI-specific errors.
+        """Handle an OpenAI error.
 
         Args:
-            error: The OpenAI error to handle
+            error: The error to handle
             provider: Provider name for context
 
         Returns:
-            ProviderError with appropriate context
+            The ``ProviderError`` subclass for the failure
         """
-        error_type = type(error).__name__
-        error_message = str(error)
-
-        # Extract retry_after if available
-        retry_after = None
-        status_code = None
-
-        if hasattr(error, "retry_after"):
-            retry_after = error.retry_after
-
-        if hasattr(error, "status_code"):
-            status_code = error.status_code
-
-        # Classify error type - check both error type name and message
-        error_type_lower = error_type.lower()
-        error_message_lower = error_message.lower()
-        
-        if "ratelimit" in error_type_lower or "rate_limit" in error_type_lower or "rate_limit" in error_message_lower:
-            error_classification = "rate_limit"
-        elif "timeout" in error_type_lower or "timeout" in error_message_lower:
-            error_classification = "timeout"
-        elif "connection" in error_type_lower or "connection" in error_message_lower:
-            error_classification = "connection_error"
-        elif "auth" in error_type_lower or "unauthorized" in error_message_lower:
-            error_classification = "authentication_error"
-        elif "api" in error_type_lower:
-            error_classification = "api_error"
-        else:
-            error_classification = "unknown_error"
-
-        return ProviderError(
-            f"OpenAI API error: {error_message}",
-            provider=provider,
-            status_code=status_code,
-            error_type=error_classification,
-            retry_after=retry_after,
-            original_error_type=error_type,
+        kind = _classify(type(error).__name__, str(error))
+        return _build(
+            "OpenAI API error",
+            error,
+            provider,
+            kind,
+            getattr(error, "status_code", None),
+            getattr(error, "retry_after", None),
         )
 
     @staticmethod
     def handle_anthropic_error(error: Exception, provider: str = "anthropic") -> ProviderError:
-        """Handle Anthropic-specific errors.
+        """Handle an Anthropic error.
 
         Args:
-            error: The Anthropic error to handle
+            error: The error to handle
             provider: Provider name for context
 
         Returns:
-            ProviderError with appropriate context
+            The ``ProviderError`` subclass for the failure
         """
-        error_type = type(error).__name__
-        error_message = str(error)
-
-        # Extract status code if available
-        status_code = None
-        if hasattr(error, "status_code"):
-            status_code = error.status_code
-
-        # Classify error type - check both error type name and message
-        error_type_lower = error_type.lower()
-        error_message_lower = error_message.lower()
-        
-        if "ratelimit" in error_type_lower or "rate_limit" in error_type_lower or "rate_limit" in error_message_lower:
-            error_classification = "rate_limit"
-        elif "timeout" in error_type_lower or "timeout" in error_message_lower:
-            error_classification = "timeout"
-        elif "connection" in error_type_lower or "connection" in error_message_lower:
-            error_classification = "connection_error"
-        elif "auth" in error_type_lower or "unauthorized" in error_message_lower:
-            error_classification = "authentication_error"
-        elif "api" in error_type_lower:
-            error_classification = "api_error"
-        else:
-            error_classification = "unknown_error"
-
-        return ProviderError(
-            f"Anthropic API error: {error_message}",
-            provider=provider,
-            status_code=status_code,
-            error_type=error_classification,
-            original_error_type=error_type,
+        kind = _classify(type(error).__name__, str(error))
+        return _build(
+            "Anthropic API error",
+            error,
+            provider,
+            kind,
+            getattr(error, "status_code", None),
+            getattr(error, "retry_after", None),
         )
 
     @staticmethod
     def handle_bedrock_error(error: Exception, provider: str = "bedrock") -> ProviderError:
-        """Handle AWS Bedrock-specific errors.
+        """Handle an AWS Bedrock error (a botocore ``ClientError`` shape included).
 
         Args:
-            error: The Bedrock error to handle
+            error: The error to handle
             provider: Provider name for context
 
         Returns:
-            ProviderError with appropriate context
+            The ``ProviderError`` subclass for the failure
         """
-        error_type = type(error).__name__
-        error_message = str(error)
-
-        # Extract error code if available (boto3 ClientError)
         error_code = None
         status_code = None
-        if hasattr(error, "response"):
-            response = error.response
-            if isinstance(response, dict):
-                error_code = response.get("Error", {}).get("Code")
-                status_code = response.get("ResponseMetadata", {}).get("HTTPStatusCode")
+        response = getattr(error, "response", None)
+        if isinstance(response, dict):
+            error_code = response.get("Error", {}).get("Code")
+            status_code = response.get("ResponseMetadata", {}).get("HTTPStatusCode")
 
-        # Classify error type
-        error_code_lower = error_code.lower() if error_code else ""
-        error_type_lower = error_type.lower()
-        error_message_lower = error_message.lower()
-        
-        if "throttling" in error_code_lower:
-            error_classification = "rate_limit"
-        elif "ratelimit" in error_type_lower or "rate_limit" in error_type_lower or "rate_limit" in error_message_lower:
-            error_classification = "rate_limit"
-        elif "timeout" in error_type_lower or "timeout" in error_message_lower:
-            error_classification = "timeout"
-        elif "connection" in error_type_lower or "connection" in error_message_lower:
-            error_classification = "connection_error"
-        elif "accessdenied" in error_code_lower or "access_denied" in error_code_lower:
-            error_classification = "authentication_error"
-        elif "serviceunavailable" in error_code_lower or "service_unavailable" in error_code_lower:
-            error_classification = "service_unavailable"
+        code = error_code.lower() if error_code else ""
+        name, text = type(error).__name__.lower(), str(error).lower()
+        if "throttling" in code:
+            kind = "rate_limit"
+        elif "ratelimit" in name or "rate_limit" in name or "rate_limit" in text:
+            kind = "rate_limit"
+        elif "timeout" in name or "timeout" in text:
+            kind = "timeout"
+        elif "connection" in name or "connection" in text:
+            kind = "connection_error"
+        elif "accessdenied" in code or "access_denied" in code:
+            kind = "authentication_error"
+        elif "serviceunavailable" in code or "service_unavailable" in code:
+            kind = "service_unavailable"
         else:
-            error_classification = "unknown_error"
-
-        return ProviderError(
-            f"Bedrock API error: {error_message}",
-            provider=provider,
-            status_code=status_code,
-            error_type=error_classification,
-            error_code=error_code,
-            original_error_type=error_type,
+            kind = "unknown_error"
+        return _build(
+            "Bedrock API error", error, provider, kind, status_code, error_code=error_code
         )
 
     @staticmethod
     def handle_azure_error(error: Exception, provider: str = "azure") -> ProviderError:
-        """Handle Azure OpenAI-specific errors.
+        """Handle an Azure OpenAI error.
 
         Args:
-            error: The Azure error to handle
+            error: The error to handle
             provider: Provider name for context
 
         Returns:
-            ProviderError with appropriate context
+            The ``ProviderError`` subclass for the failure
         """
-        error_type = type(error).__name__
-        error_message = str(error)
-
-        # Extract status code if available
-        status_code = None
-        if hasattr(error, "status_code"):
-            status_code = error.status_code
-
-        # Classify error type - check both error type name and message
-        error_type_lower = error_type.lower()
-        error_message_lower = error_message.lower()
-        
-        if "ratelimit" in error_type_lower or "rate_limit" in error_type_lower or "rate_limit" in error_message_lower:
-            error_classification = "rate_limit"
-        elif "timeout" in error_type_lower or "timeout" in error_message_lower:
-            error_classification = "timeout"
-        elif "connection" in error_type_lower or "connection" in error_message_lower:
-            error_classification = "connection_error"
-        elif "auth" in error_type_lower or "unauthorized" in error_message_lower:
-            error_classification = "authentication_error"
-        elif "api" in error_type_lower:
-            error_classification = "api_error"
-        else:
-            error_classification = "unknown_error"
-
-        return ProviderError(
-            f"Azure OpenAI API error: {error_message}",
-            provider=provider,
-            status_code=status_code,
-            error_type=error_classification,
-            original_error_type=error_type,
+        kind = _classify(type(error).__name__, str(error))
+        return _build(
+            "Azure OpenAI API error",
+            error,
+            provider,
+            kind,
+            getattr(error, "status_code", None),
+            getattr(error, "retry_after", None),
         )
 
     @staticmethod
     def handle_google_error(error: Exception, provider: str = "google") -> ProviderError:
-        """Handle Google-specific errors.
+        """Handle a Google error.
 
         Args:
-            error: The Google error to handle
+            error: The error to handle
             provider: Provider name for context
 
         Returns:
-            ProviderError with appropriate context
+            The ``ProviderError`` subclass for the failure
         """
-        error_type = type(error).__name__
-        error_message = str(error)
-
-        # Extract status code if available
-        status_code = None
-        if hasattr(error, "code"):
-            status_code = error.code
-
-        # Classify error type - check both error type name and message
-        error_type_lower = error_type.lower()
-        error_message_lower = error_message.lower()
-        
-        if "resourceexhausted" in error_type_lower or "rate_limit" in error_message_lower:
-            error_classification = "rate_limit"
-        elif "deadlineexceeded" in error_type_lower or "timeout" in error_message_lower:
-            error_classification = "timeout"
-        elif "unavailable" in error_type_lower or "unavailable" in error_message_lower:
-            error_classification = "service_unavailable"
-        elif "unauthenticated" in error_type_lower or "auth" in error_message_lower:
-            error_classification = "authentication_error"
-        elif "permissiondenied" in error_type_lower:
-            error_classification = "permission_error"
+        code = getattr(error, "code", None)
+        status_code = code if isinstance(code, int) else None
+        name, text = type(error).__name__.lower(), str(error).lower()
+        if "resourceexhausted" in name or "rate_limit" in text:
+            kind = "rate_limit"
+        elif "deadlineexceeded" in name or "timeout" in text:
+            kind = "timeout"
+        elif "unavailable" in name or "unavailable" in text:
+            kind = "service_unavailable"
+        elif "unauthenticated" in name or "auth" in text:
+            kind = "authentication_error"
+        elif "permissiondenied" in name:
+            kind = "permission_error"
         else:
-            error_classification = "unknown_error"
-
-        return ProviderError(
-            f"Google API error: {error_message}",
-            provider=provider,
-            status_code=status_code,
-            error_type=error_classification,
-            original_error_type=error_type,
-        )
+            kind = "unknown_error"
+        return _build("Google API error", error, provider, kind, status_code)
 
     @staticmethod
     def wrap_provider_error(
         error: Exception,
         provider: str,
     ) -> ProviderError:
-        """Wrap a provider error with appropriate context.
+        """Wrap a provider error in the ``ProviderError`` subclass it calls for.
 
-        Routes to provider-specific error handlers based on provider name.
+        Routes to the provider-specific handler by provider name; a ``ProviderError`` is returned
+        as it is.
 
         Args:
             error: The error to wrap
-            provider: Provider name (openai, anthropic, bedrock, azure, google)
+            provider: Provider name (openai, anthropic, bedrock, azure, google, or another)
 
         Returns:
-            ProviderError with appropriate context
+            The ``ProviderError`` subclass for the failure
         """
-        # If already a ProviderError, return as-is
         if isinstance(error, ProviderError):
             return error
 
-        # Route to provider-specific handler
-        if provider == "openai":
-            return ErrorHandler.handle_openai_error(error, provider)
-        elif provider == "anthropic":
-            return ErrorHandler.handle_anthropic_error(error, provider)
-        elif provider == "bedrock":
-            return ErrorHandler.handle_bedrock_error(error, provider)
-        elif provider == "azure":
-            return ErrorHandler.handle_azure_error(error, provider)
-        elif provider == "google":
-            return ErrorHandler.handle_google_error(error, provider)
-        else:
-            # Generic error handling for unknown providers
-            return ProviderError(
-                f"Provider error: {str(error)}",
-                provider=provider,
-                error_type="unknown_error",
-                original_error_type=type(error).__name__,
-            )
+        handlers: dict[str, Callable[[Exception, str], ProviderError]] = {
+            "openai": ErrorHandler.handle_openai_error,
+            "anthropic": ErrorHandler.handle_anthropic_error,
+            "bedrock": ErrorHandler.handle_bedrock_error,
+            "azure": ErrorHandler.handle_azure_error,
+            "google": ErrorHandler.handle_google_error,
+        }
+        handler = handlers.get(provider)
+        if handler is not None:
+            return handler(error, provider)
+        kind = "timeout" if _is_timeout(error) else "unknown_error"
+        return _build("Provider error", error, provider, kind, getattr(error, "status_code", None))
+
+
+__all__ = ["ErrorHandler", "error_class"]

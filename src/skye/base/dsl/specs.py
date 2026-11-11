@@ -109,6 +109,10 @@ class TargetSpec(Validated):
     )
     tags: list[str] = field(default_factory=list, description="Tags for routing")
     metadata: dict[str, Any] = field(default_factory=dict, description="Additional metadata")
+    options: dict[str, Any] = field(
+        default_factory=dict,
+        description="Keyword arguments for the provider client (project_id, location, endpoint)",
+    )
 
 
 @validated

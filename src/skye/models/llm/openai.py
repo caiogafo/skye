@@ -5,7 +5,7 @@ module holds only what is specific to OpenAI.
 
 Example:
     >>> from skye.models.llm.openai import OpenAIProvider
-    >>> provider = OpenAIProvider(api_key="sk-...")
+    >>> provider = OpenAIProvider(api_key="sk-...")  # or set OPENAI_API_KEY and pass nothing
     >>> response = provider.complete(request)  # doctest: +SKIP
 """
 
@@ -18,7 +18,7 @@ class OpenAIProvider(OpenAICompatibleProvider):
     """OpenAI: default endpoint, ``OpenAI-Organization`` header and ``system_fingerprint``.
 
     Args:
-        api_key: OpenAI API key
+        api_key: OpenAI API key; ``OPENAI_API_KEY`` when omitted
         api_base: Optional custom API base URL
         organization: Optional organization ID
         **kwargs: Additional configuration parameters
@@ -27,11 +27,13 @@ class OpenAIProvider(OpenAICompatibleProvider):
     provider_name = "openai"
     metadata_prefix = "openai_"
     reports_fingerprint = True
+    streams_usage = True
     default_api_base = "https://api.openai.com/v1"
+    api_key_env_var = "OPENAI_API_KEY"  # the standard variable (D18)
 
     def __init__(
         self,
-        api_key: str,
+        api_key: str | None = None,
         api_base: str | None = None,
         organization: str | None = None,
         **kwargs: Any,

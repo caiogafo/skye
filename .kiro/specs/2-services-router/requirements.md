@@ -27,6 +27,7 @@ The requirements themselves live in `.kiro/steering/10-requirements.md`; each re
 6. THE spec SHALL realize Requirement 17.6 of #[[file:.kiro/steering/10-requirements.md]].
 7. THE spec SHALL realize Requirement 17.7 of #[[file:.kiro/steering/10-requirements.md]].
 8. THE spec SHALL honor decision D68 of #[[file:.kiro/steering/12-decisions.md]].
+9. THE spec SHALL honor decision D104 of #[[file:.kiro/steering/12-decisions.md]].
 
 ### Requirement 2: Tests
 

@@ -125,8 +125,8 @@ class TestProviderRegistry:
 
         error_msg = str(exc_info.value)
         assert "Model provider 'nonexistent' not found" in error_msg
-        assert "Available providers: none" in error_msg
-        assert "pip install skyeai[nonexistent]" in error_msg
+        assert "Available model providers: none" in error_msg
+        assert "skyeai[" not in error_msg  # no extra to suggest: the name is not a provider
 
     def test_get_model_provider_not_found_with_available(self):
         """Test error message includes available providers."""
@@ -168,8 +168,8 @@ class TestProviderRegistry:
 
         error_msg = str(exc_info.value)
         assert "Embedding provider 'nonexistent' not found" in error_msg
-        assert "Available providers: none" in error_msg
-        assert "pip install skyeai[nonexistent]" in error_msg
+        assert "Available embedding providers: none" in error_msg
+        assert "skyeai[" not in error_msg  # no extra to suggest: the name is not a provider
 
     def test_get_embedding_provider_not_found_with_available(self):
         """Test error message includes available embedding providers."""

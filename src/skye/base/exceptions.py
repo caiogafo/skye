@@ -2,13 +2,12 @@
 
 This module defines the exception hierarchy for the Skye GenAI platform.
 All Skye-specific exceptions inherit from SkyeError.
+
+An error never logs itself (decision D105): creating one emits no log record; the code that
+handles an error logs it once, with structured ``extra``.
 """
 
-import logging
 from typing import Any
-
-# Set up module logger
-logger = logging.getLogger(__name__)
 
 
 class SkyeError(Exception):
@@ -37,9 +36,6 @@ class SkyeError(Exception):
         self.details = details or {}
         super().__init__(self.message)
 
-        # Log the exception when it's created
-        logger.error(f"{self.__class__.__name__}: {message}", extra={"details": self.details})
-
     def __str__(self) -> str:
         """Return string representation of the error."""
         if self.details:
@@ -55,21 +51,120 @@ class ProviderError(SkyeError):
     """Error from an LLM provider.
 
     Raised when an error occurs during communication with an LLM provider
-    (e.g., OpenAI, Anthropic, AWS Bedrock).
+    (e.g., OpenAI, Anthropic, AWS Bedrock). The HTTP layer raises the subclass that the response
+    calls for (decision D104): :class:`RateLimitError`, :class:`ServerError`,
+    :class:`ProviderTimeoutError`, :class:`AuthenticationError`, :class:`BadRequestError` (and
+    its :class:`ContentPolicyError`); a failure that fits none of them is a plain
+    ``ProviderError``, so ``except ProviderError`` catches every one.
 
     Args:
         message: Human-readable error message
         provider: Name of the provider that raised the error
         status_code: Optional HTTP status code from the provider
+        retry_after: Seconds the provider asked to wait before retrying (its ``Retry-After``
+            header), or ``None`` when it did not say
         **kwargs: Additional context to include in details
+
+    Attributes:
+        provider: Name of the provider that raised the error.
+        status_code: The HTTP status code, or ``None`` (no response).
+        retry_after: Seconds to wait before retrying, or ``None``.
     """
 
     def __init__(
-        self, message: str, provider: str, status_code: int | None = None, **kwargs: Any
+        self,
+        message: str,
+        provider: str,
+        status_code: int | None = None,
+        *,
+        retry_after: float | None = None,
+        **kwargs: Any,
     ) -> None:
         """Initialize ProviderError with provider context."""
         details = {"provider": provider, "status_code": status_code, **kwargs}
+        if retry_after is not None:
+            details["retry_after"] = retry_after
         super().__init__(message, details)
+        self.provider = provider
+        self.status_code = status_code
+        self.retry_after = retry_after
+
+
+class RateLimitError(ProviderError):
+    """The provider refused the request because of a rate limit or quota (HTTP 429).
+
+    Retryable: wait ``retry_after`` seconds when the provider gave it.
+    """
+
+
+class ServerError(ProviderError):
+    """The provider failed on its side (HTTP 5xx). Retryable."""
+
+
+class ProviderTimeoutError(ProviderError):
+    """The request timed out or the connection dropped before a response (no ``status_code``).
+
+    Retryable.
+    """
+
+
+class AuthenticationError(ProviderError):
+    """The provider refused the credential (HTTP 401) or the permission (HTTP 403).
+
+    Not retryable.
+    """
+
+
+class BadRequestError(ProviderError):
+    """The provider refused the request itself (any other HTTP 4xx). Not retryable."""
+
+
+class ContentPolicyError(BadRequestError):
+    """The provider refused the request under its content policy (a 4xx whose body says so).
+
+    Detected by the HTTP layer when the error body contains ``content_policy``,
+    ``content_filter``, ``content policy`` or ``content management policy`` (case-insensitive):
+    the markers OpenAI and Azure OpenAI send. Not retryable on the same model.
+    """
+
+
+class UnsupportedModalityError(ProviderError):
+    """The input has a form the provider does not accept (Requirement 26.3).
+
+    Raised by the adapter before anything is sent, so there is no ``status_code``; the input is
+    left unchanged. Not retryable: sending it again fails the same way.
+
+    Args:
+        message: Human-readable message that names the modality.
+        provider: Name of the provider that does not support it.
+        modality: The modality or form refused, for example ``"image"``.
+        **kwargs: Additional context to include in details.
+
+    Attributes:
+        modality: The modality or form refused.
+    """
+
+    def __init__(self, message: str, provider: str, modality: str, **kwargs: Any) -> None:
+        """Initialize with the provider and the refused modality."""
+        super().__init__(message, provider, modality=modality, **kwargs)
+        self.modality = modality
+
+
+class CapabilityChoiceError(ProviderError):
+    """The model answered without the capability call the request forced (decision D108).
+
+    Raised only for a model that refuses a forced ``capability_choice``: Skye asked for the call in
+    an instruction, tried twice, and got an answer without it. There is no ``status_code`` (both
+    calls succeeded). Not retried by the client; a router may fall back to another model.
+
+    Attributes:
+        capability_choice: ``"required"`` or the capability name that was asked for.
+    """
+
+    def __init__(self, message: str, provider: str, capability_choice: str, **kwargs: Any) -> None:
+        """Initialize with the provider and the choice asked for."""
+        super().__init__(message, provider, capability_choice=capability_choice, **kwargs)
+        self.capability_choice = capability_choice
 
 
 class ConfigurationError(SkyeError):
@@ -159,7 +254,5 @@ class MissingExtraError(SkyeError, ImportError):
             f"Install it with: pip install {pkg}\n"
             f"Or install the skye extra: pip install skyeai[{extra}]"
         )
-        SkyeError.__init__(
-            self, message, {"extra": extra, "missing": missing, "package": pkg}
-        )
+        SkyeError.__init__(self, message, {"extra": extra, "missing": missing, "package": pkg})
         self.name = missing

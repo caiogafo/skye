@@ -25,9 +25,9 @@ def main() -> None:
     )
     print(response.content)
 
-    # The same call for another provider (credentials come from the provider's standard variables):
-    #   client = skye.provider("anthropic", api_key=os.environ["ANTHROPIC_API_KEY"])
-    #   client = skye.provider("bedrock", region="us-east-1")
+    # The same call for another provider; with no api_key the key comes from the provider's standard variable:
+    #   client = skye.provider("anthropic")                 # ANTHROPIC_API_KEY
+    #   client = skye.provider("bedrock", region="us-east-1")  # AWS credentials; AWS_REGION when region is omitted
 
 
 if __name__ == "__main__":

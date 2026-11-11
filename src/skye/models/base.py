@@ -33,21 +33,98 @@ To add a new provider, you only need to:
 2. Implement all required transformation methods
 3. No changes to core library code required
 
-See docs/models/provider-transformation-architecture.md for detailed documentation.
+See docs/guides/extend/custom-provider.md for how provider adapters are built.
 """
 
+import asyncio
+import concurrent.futures
+import dataclasses
+import logging
+import threading
 import time
 from abc import ABC, abstractmethod
-from collections.abc import Iterator
-from typing import Any, AsyncIterator
+from collections.abc import AsyncIterator, Callable, Coroutine, Iterator
+from typing import Any, TypeVar
 
-from skye.base.completion import CompleteRequest, CompleteResponse, StreamChunk
-from skye.base.exceptions import ProviderError, ValidationError
+from skye.base.completion import CompleteRequest, CompleteResponse, StreamChunk, TokenUsage
+from skye.base.exceptions import ProviderError, ProviderTimeoutError, ValidationError
+from skye.base.health import HealthMetrics
+from skye.base.http import _is_timeout
 from skye.base.interfaces.model import ModelInterface
 from skye.base.interfaces.vector_encoder import VectorEncoderInterface
-from skye.base.health import HealthMetrics
-from skye.models.transport.retry import with_retry
+from skye.base.log_event import (
+    ModelInvocationEvent,
+    model_invocation_end,
+    model_invocation_error,
+    model_invocation_start,
+    model_invocation_summary,
+    new_correlation_id,
+)
+from skye.base.prompt_parts import PromptParts
+from skye.models.transport.capability_choice import complete_emulated, emulated_request, forced_choice
+from skye.models.transport.cost import CostCalculator, check_pricing
+from skye.models.transport.prompt_parts import request_from_parts
+from skye.models.transport.retry import (
+    DEFAULT_MAX_RETRIES,
+    call_with_retry,
+    is_retryable,
+    retry_wait,
+)
 from skye.models.transport.structured import parse_structured
+from skye.models.transport.token_counter import TokenCounter
+
+logger = logging.getLogger(__name__)
+
+_T = TypeVar("_T")
+
+
+def _run_coroutine(coroutine: Coroutine[Any, Any, _T]) -> _T:
+    """Run a coroutine to completion from synchronous code, inside or outside a running event loop.
+
+    Inside a running loop the coroutine runs on its own loop in one worker thread, which is joined before returning.
+    """
+    try:
+        asyncio.get_running_loop()
+    except RuntimeError:
+        return asyncio.run(coroutine)
+    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+        return executor.submit(asyncio.run, coroutine).result()
+
+
+class _SchemaCapability:
+    """A capability known only by its schema (from a ``ToolProvider``): enough to offer it to a model."""
+
+    __slots__ = ("_schema",)
+
+    def __init__(self, schema: Any) -> None:
+        self._schema = schema
+
+    def get_schema(self) -> Any:
+        return self._schema
+
+    def __repr__(self) -> str:
+        return f"_SchemaCapability({getattr(self._schema, 'name', '?')!r})"
+
+
+def capability_list(source: Any) -> list[Any]:
+    """The capabilities to offer the model, from what ``CompleteRequest.capabilities`` holds.
+
+    A list (or tuple) of capabilities or tool dicts is kept; a ``CapabilityRegistry`` or any ``ToolProvider`` (anything with
+    ``list_schemas``) gives its schemas.
+
+    Raises:
+        ValidationError: ``source`` is none of these.
+    """
+    if isinstance(source, (list, tuple)):
+        return list(source)
+    if hasattr(source, "list_schemas"):
+        schemas = _run_coroutine(source.list_schemas())
+        return [_SchemaCapability(schema) for schema in schemas]
+    raise ValidationError(
+        "capabilities must be a list of capabilities, a CapabilityRegistry or a ToolProvider",
+        field="capabilities",
+        value=type(source).__name__,
+    )
 
 
 class BaseModelProvider(ModelInterface, ABC):
@@ -108,19 +185,43 @@ class BaseModelProvider(ModelInterface, ABC):
         ...         return [CapabilityCall(...) for tc in response.capability_calls]
         ...
         ...     # ... implement other abstract methods
+
+    Retries (decision D104): a client retries a ``RateLimitError``, a ``ServerError`` or a ``ProviderTimeoutError`` up to
+    ``max_retries`` times (3 by default, Requirement 9.2), waiting with exponential backoff or the server's ``Retry-After``; any other error
+    is raised at once. A stream is retried only before its first chunk. ``max_retries=0`` turns retries off (the router
+    does this for its targets, so its own policy decides).
+
+    Cost (Requirement 19): every response carries ``metadata["cost"]`` (``prompt``, ``completion``, ``total``, ``currency``,
+    ``exact``), priced with the provider's own token count; the tokens are estimated, with ``exact`` false, only when the
+    provider reports none. A model with no price has ``cost`` ``None``. ``pricing={"prompt": p, "completion": c}`` (USD per 1M
+    tokens) prices this client's calls with your own numbers. A stream carries the running tokens and cost on its chunks.
     """
-    
+
+    #: The first backoff wait in seconds; it doubles with each retry.
+    retry_base_wait: float = 1.0
+    #: The longest backoff wait in seconds (a ``Retry-After`` may ask for more, up to 60).
+    retry_max_wait: float = 20.0
+
     def __init__(self, model: str | None = None, router: Any | None = None, **config: Any) -> None:
         """Initialize base provider with configuration.
         
         Args:
             model: Model identifier (optional, can be provided in request)
             router: Model router for load balancing (optional)
-            **config: Provider-specific configuration parameters
+            **config: Provider-specific configuration parameters. Three are read here and not kept in ``config``:
+                ``max_retries`` (retries of a transient failure, default 3; ``0`` turns them off), ``retry_sleep``
+                (the function that waits between attempts, ``time.sleep`` by default; tests pass one that records) and
+                ``pricing`` (``{"prompt": p, "completion": c}`` in USD per 1M tokens, for the cost of this client's calls).
         """
         if model is not None and router is not None:
             raise ValueError("Cannot provide both 'model' and 'router'")
-        
+        max_retries = config.pop("max_retries", DEFAULT_MAX_RETRIES)
+        if not isinstance(max_retries, int) or isinstance(max_retries, bool) or max_retries < 0:
+            raise ValueError(f"max_retries must be an integer >= 0, got {max_retries!r}")
+        self.max_retries: int = max_retries
+        self.retry_sleep: Callable[[float], Any] = config.pop("retry_sleep", None) or time.sleep
+        self.pricing: dict[str, float] | None = check_pricing(config.pop("pricing", None))
+
         self.model = model
         self.router = router
         self.config = config
@@ -426,7 +527,8 @@ class BaseModelProvider(ModelInterface, ABC):
         """
         # If it's a CompleteResponse and already has capability_calls, return them
         if hasattr(response, 'capability_calls') and response.capability_calls is not None:
-            return response.capability_calls
+            calls: list[Any] = response.capability_calls
+            return calls
         
         # Handle both CompleteResponse and raw provider response
         if hasattr(response, 'metadata') and 'raw_response' in response.metadata:
@@ -492,26 +594,64 @@ class BaseModelProvider(ModelInterface, ABC):
         ``select_model`` of the router Port is ``async`` and takes a request, so the messages are wrapped in one
         and the coroutine is run to completion from this synchronous code.
         """
-        import asyncio
-        import concurrent.futures
-
         from skye.base.messages import UserMessage
 
         if isinstance(messages, str):
             messages = [UserMessage(content=messages)]
         selection = router.select_model(CompleteRequest(messages=messages, model=self.default_model or ""))
         if not asyncio.iscoroutine(selection):
-            return selection
+            return selection  # type: ignore[no-any-return]
+        return _run_coroutine(selection)  # type: ignore[no-any-return]
+
+    @staticmethod
+    def _resolved(request: CompleteRequest) -> CompleteRequest:
+        """The request with its capabilities as a list: a registry or a ``ToolProvider`` gives its schemas (finding 17)."""
+        capabilities = request.capabilities
+        if capabilities is None or isinstance(capabilities, list):
+            return request
+        return dataclasses.replace(request, capabilities=capability_list(capabilities))
+
+    def _provider_label(self) -> str:
         try:
-            asyncio.get_running_loop()
-        except RuntimeError:
-            return asyncio.run(selection)
-        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
-            return executor.submit(asyncio.run, selection).result()
+            return str(self.get_model_info().get("provider", "unknown"))
+        except Exception:
+            return "unknown"
+
+    def _wrap_failure(self, error: Exception, label: str) -> ProviderError:
+        """A failure that is not a ``ProviderError`` (a bug in a transform, a socket error) as one; a timeout stays a timeout."""
+        cls = ProviderTimeoutError if _is_timeout(error) else ProviderError
+        return cls(
+            f"{label}: {error}",
+            provider=self._provider_label(),
+            original_error=str(error),
+            error_type=type(error).__name__,
+        )
+
+    def request_from_parts(self, parts: PromptParts, model: str | None = None, **options: Any) -> CompleteRequest:
+        """The completion request for rendered prompt parts on this provider (Requirement 33.9, decisions D81, D101).
+
+        The capabilities this adapter reports in ``get_model_info()`` decide whether the system text and the output schema travel
+        in native fields or as text. ``complete(parts, model=...)`` calls it for you.
+
+        Args:
+            parts: The rendered prompt (``PromptParts`` from ``base``).
+            model: The model identifier; the provider's default model when omitted.
+            **options: Other request fields (``temperature``, ``max_tokens``, ``capabilities``, ...).
+
+        Returns:
+            The ``CompleteRequest`` to send.
+
+        Raises:
+            ValueError: If no model is given and the provider has no default model.
+        """
+        effective_model = model or self.default_model
+        if effective_model is None:
+            raise ValueError("Either 'model' or a default model is required for prompt parts")
+        return request_from_parts(parts, model=effective_model, info=self.get_model_info(), **options)
 
     def complete(
         self,
-        messages: list[Any] | str | CompleteRequest | None = None,
+        messages: list[Any] | str | CompleteRequest | PromptParts | None = None,
         model: str | None = None,
         router: Any | None = None,
         temperature: float | None = None,
@@ -540,7 +680,7 @@ class BaseModelProvider(ModelInterface, ABC):
             >>> response = provider.complete(request)
         
         Args:
-            messages: List of SkyeMessage objects, string, or CompleteRequest
+            messages: List of SkyeMessage objects, string, CompleteRequest, or rendered PromptParts
             model: Model identifier (mutually exclusive with router)
             router: Router instance for load balancing (mutually exclusive with model)
             temperature: Sampling temperature
@@ -555,6 +695,12 @@ class BaseModelProvider(ModelInterface, ABC):
             ValueError: If required parameters are missing or both model and router provided
         """
         # Handle polymorphic input
+        if isinstance(messages, PromptParts):
+            # Rendered prompt parts (D101): this model's capabilities choose native fields or text
+            if router is not None:
+                raise ValueError("Prompt parts need a 'model'; route first, then pass the chosen model")
+            sampling: dict[str, Any] = {k: v for k, v in {"temperature": temperature, "max_tokens": max_tokens}.items() if v is not None}
+            messages = self.request_from_parts(messages, model=model or self.default_model, **sampling, **kwargs)
         if isinstance(messages, CompleteRequest):
             request = messages
         else:
@@ -591,23 +737,34 @@ class BaseModelProvider(ModelInterface, ABC):
                 **kwargs,
             )
         
+        offered = request.capabilities
         start_time = time.time()
+        correlation_id = new_correlation_id()
         try:
+            request = self._resolved(request)
+            self._emit(lambda: model_invocation_start(request, provider=self._log_provider(), correlation_id=correlation_id))
             response = self._complete_with_retry(request)
             self._parse_structured_output(request, response)
-            
-            # Attach capabilities to response for direct execution
-            if request.capabilities:
-                response._capabilities = request.capabilities
+            self._account(request, response)
+
+            # Attach capabilities to response for direct execution (the registry itself when one was given)
+            if offered:
+                response._capabilities = offered
             
             # Record success with latency (only on final success)
             latency_ms = (time.time() - start_time) * 1000
             self.health_metrics.record_success(latency_ms)
-            
+            self._emit(lambda: model_invocation_end(response, correlation_id=correlation_id, latency_ms=latency_ms))
+
             return response
         except Exception as e:
             # Record failure (only on final failure after all retries)
             self.health_metrics.record_failure()
+            self._emit(
+                lambda: model_invocation_error(
+                    e, model=request.model, provider=self._log_provider(), correlation_id=correlation_id
+                )
+            )
             raise
     
     @staticmethod
@@ -621,44 +778,158 @@ class BaseModelProvider(ModelInterface, ABC):
         schema = getattr(request, "response_schema", None)
         if schema is None or response.structured_output is not None or not response.content:
             return
+        if response.capability_calls:
+            return  # the model asked for a capability: the structured answer comes in a later turn
         response.structured_output = parse_structured(schema, response.content)
 
-    @with_retry(max_retries=3, min_wait=4, max_wait=10, multiplier=1)
-    def _complete_with_retry(self, request: CompleteRequest) -> CompleteResponse:
-        """Internal method with retry logic.
-        
-        This method is wrapped with retry decorator and does not track health metrics
-        to avoid counting retries as separate failures.
+    def _log_provider(self) -> str:
+        """The provider name for the log: ``provider_name`` when the class has one, else the class name (``BedrockProvider``: ``bedrock``)."""
+        return getattr(self, "provider_name", None) or type(self).__name__.removesuffix("Provider").lower()
+
+    @staticmethod
+    def _emit(build: Callable[[], ModelInvocationEvent]) -> None:
+        """Log a model invocation event (Requirement 18.3) with structured ``extra``, never an f-string.
+
+        A start is DEBUG, an end INFO and a failure WARNING (a fallback may still serve the request). The event holds no
+        message content. One correlation id ties the start, the end and the error of one call. Logging never breaks a call:
+        if the event cannot be built or logged, that is noted at DEBUG and the call goes on.
         """
+        try:
+            event = build()
+            level = {"start": logging.DEBUG, "end": logging.INFO, "error": logging.WARNING}[event.phase]
+            logger.log(level, "model invocation", extra=event.log_extra())
+        except Exception:
+            logger.debug("model invocation event not logged", exc_info=True)
+
+    def _emit_stream_end(
+        self,
+        request: CompleteRequest,
+        correlation_id: str,
+        finish_reason: str | None,
+        last: StreamChunk | None,
+        latency_ms: float,
+    ) -> None:
+        """The end event of a stream, with the last running count its chunks carried."""
+        self._emit(
+            lambda: model_invocation_summary(
+                model=request.model,
+                provider=self._log_provider(),
+                correlation_id=correlation_id,
+                finish_reason=finish_reason,
+                usage=None if last is None else last.usage,
+                cost=None if last is None else last.cost,
+                latency_ms=latency_ms,
+            )
+        )
+
+    def _price(self, model: str, usage: TokenUsage, exact: bool) -> dict[str, Any] | None:
+        """The cost of ``usage`` (``pricing=`` of this client first, then the price table); ``None`` without a price."""
+        return CostCalculator.breakdown(model, usage, self.pricing, exact=exact)
+
+    @staticmethod
+    def _estimated_prompt_tokens(request: CompleteRequest) -> int:
+        """The tokens of the request messages by the counter of the model (a registered tokenizer, ``tiktoken`` or the estimate)."""
+        return TokenCounter.count_message_tokens(list(request.messages or []), request.model)
+
+    def _account(self, request: CompleteRequest, response: CompleteResponse) -> None:
+        """Put the cost in ``response.metadata["cost"]`` (Requirement 19.1).
+
+        The provider's token count is used as it is. When it reported none (all zero), the tokens are estimated from the
+        messages and the answer, ``response.usage`` takes the estimate, ``metadata["usage_estimated"]`` is true and the cost
+        says ``exact`` false.
+        """
+        usage = response.usage
+        exact = usage is not None and (usage.prompt_tokens > 0 or usage.completion_tokens > 0)
+        if not exact:
+            prompt = self._estimated_prompt_tokens(request)
+            completion = TokenCounter.count_tokens(response.content or "", request.model)
+            usage = TokenUsage(prompt_tokens=prompt, completion_tokens=completion, total_tokens=prompt + completion)
+            response.usage = usage
+            response.metadata["usage_estimated"] = True
+        cost = self._price(request.model, usage, exact)
+        if cost is None and response.model and response.model != request.model:
+            cost = self._price(response.model, usage, exact)  # the provider may name the model differently
+        response.metadata["cost"] = cost
+
+    def _with_running_cost(self, request: CompleteRequest, chunks: Iterator[StreamChunk]) -> Iterator[StreamChunk]:
+        """Give every chunk the running tokens and cost of the call (``chunk.usage`` and ``chunk.cost``).
+
+        The prompt is counted once, from the messages. The completion is counted from the text received so far. As soon as
+        the provider reports a count (OpenAI with ``include_usage``, Anthropic, Bedrock and Gemini all do), that count
+        replaces the estimate and the cost says ``exact`` true once both counts are the provider's. Only a chunk that costs
+        tokens (it has text, or it brings the provider's count) changes the counter; any other chunk repeats the value of
+        the one before it.
+        """
+        model = request.model
+        text = ""
+        prompt_estimate: int | None = None
+        reported_prompt = reported_completion = 0
+        usage: TokenUsage | None = None
+        cost: dict[str, Any] | None = None
+        for chunk in chunks:
+            if not isinstance(chunk, StreamChunk):
+                yield chunk  # a provider that yields something else keeps its own chunks, with no counter
+                continue
+            brings_count = chunk.usage is not None
+            if chunk.usage is not None:
+                reported_prompt = chunk.usage.prompt_tokens or reported_prompt
+                reported_completion = chunk.usage.completion_tokens or reported_completion
+            if usage is None or chunk.delta or brings_count:
+                text += chunk.delta
+                if not reported_prompt and prompt_estimate is None:
+                    prompt_estimate = self._estimated_prompt_tokens(request)
+                prompt = reported_prompt or prompt_estimate or 0
+                completion = reported_completion or TokenCounter.count_tokens(text, model)
+                usage = TokenUsage(prompt_tokens=prompt, completion_tokens=completion, total_tokens=prompt + completion)
+                cost = self._price(model, usage, bool(reported_prompt and reported_completion))
+            chunk.usage = None if usage is None else dataclasses.replace(usage)
+            chunk.cost = None if cost is None else dict(cost)
+            yield chunk
+
+    def refuses_forced_choice(self, model: str) -> bool:
+        """Whether ``model`` refuses a forced ``capability_choice`` (``"required"`` or a name).
+
+        ``False`` here; an adapter whose provider has such models overrides it. For those models
+        the client emulates the forced choice (decision D108, ``skye.models.transport.capability_choice``).
+        """
+        return False
+
+    def _complete_with_retry(self, request: CompleteRequest) -> CompleteResponse:
+        """One completion, retried on a transient failure (D104); health metrics are not tracked here.
+
+        A forced capability choice that the model refuses is emulated (D108). A retry is not counted
+        as a separate failure: ``complete`` records the outcome once.
+        """
+        if forced_choice(request) and self.refuses_forced_choice(request.model):
+            return complete_emulated(request, self._complete_with_transport_retry, self._provider_label())
+        return self._complete_with_transport_retry(request)
+
+    def _complete_with_transport_retry(self, request: CompleteRequest) -> CompleteResponse:
+        """One completion, retried on a transient failure (D104)."""
+        return call_with_retry(
+            lambda: self._complete_once(request),
+            max_retries=getattr(self, "max_retries", DEFAULT_MAX_RETRIES),
+            sleep=getattr(self, "retry_sleep", time.sleep),
+            base_wait=self.retry_base_wait,
+            max_wait=self.retry_max_wait,
+            name=f"{type(self).__name__}.complete",
+        )
+
+    def _complete_once(self, request: CompleteRequest) -> CompleteResponse:
+        """One attempt: transform, call, transform back. A ``ProviderError`` keeps its class (429, 5xx, 401, ...)."""
         try:
             provider_request = self._transform_request(request)
             provider_response = self._call_provider(provider_request)
             return self._transform_response(provider_response)
-        except ValidationError:
-            # The caller's input is wrong: retrying cannot fix it, so it is not wrapped as a provider failure.
+        except (ValidationError, ProviderError):
+            # The caller's input is wrong, or the transport already said what failed: raise it as it is.
             raise
         except Exception as e:
-            # Get provider name from model info if available
-            provider_name = "unknown"
-            try:
-                provider_name = self.get_model_info().get("provider", "unknown")
-            except Exception:
-                pass
-            
-            # Keep the HTTP status the transport saw: callers (router, health) tell an
-            # authentication failure from a rate limit by it.
-            status_code = e.details.get("status_code") if isinstance(e, ProviderError) else None
-            raise ProviderError(
-                f"Provider call failed: {str(e)}",
-                provider=provider_name,
-                status_code=status_code,
-                original_error=str(e),
-                error_type=type(e).__name__
-            ) from e
-    
+            raise self._wrap_failure(e, "Provider call failed") from e
+
     def stream(
         self,
-        messages: list[Any] | str | CompleteRequest | None = None,
+        messages: list[Any] | str | CompleteRequest | PromptParts | None = None,
         model: str | None = None,
         router: Any | None = None,
         temperature: float | None = None,
@@ -690,7 +961,7 @@ class BaseModelProvider(ModelInterface, ABC):
             ...     print(chunk.delta, end="")
         
         Args:
-            messages: List of SkyeMessage objects, string, or CompleteRequest
+            messages: List of SkyeMessage objects, string, CompleteRequest, or rendered PromptParts
             model: Model identifier (mutually exclusive with router)
             router: Router instance for load balancing (mutually exclusive with model)
             temperature: Sampling temperature
@@ -705,6 +976,12 @@ class BaseModelProvider(ModelInterface, ABC):
             ValueError: If required parameters are missing or both model and router provided
         """
         # Handle polymorphic input
+        if isinstance(messages, PromptParts):
+            # Rendered prompt parts (D101): this model's capabilities choose native fields or text
+            if router is not None:
+                raise ValueError("Prompt parts need a 'model'; route first, then pass the chosen model")
+            sampling: dict[str, Any] = {k: v for k, v in {"temperature": temperature, "max_tokens": max_tokens}.items() if v is not None}
+            messages = self.request_from_parts(messages, model=model or self.default_model, **sampling, **kwargs)
         if isinstance(messages, CompleteRequest):
             request = messages
         else:
@@ -742,45 +1019,81 @@ class BaseModelProvider(ModelInterface, ABC):
             )
         
         start_time = time.time()
+        correlation_id = new_correlation_id()
+        last: StreamChunk | None = None
+        finish_reason: str | None = None
+        ended = False
         try:
-            yield from self._stream_with_retry(request)
-            
+            request = self._resolved(request)
+            self._emit(lambda: model_invocation_start(request, provider=self._log_provider(), correlation_id=correlation_id))
+            for chunk in self._with_running_cost(request, self._stream_with_retry(request)):
+                if isinstance(chunk, StreamChunk):
+                    last = chunk
+                    finish_reason = chunk.finish_reason or finish_reason
+                yield chunk
+
             # Record success with latency after all chunks are yielded
             latency_ms = (time.time() - start_time) * 1000
             self.health_metrics.record_success(latency_ms)
+            ended = True
+            self._emit_stream_end(request, correlation_id, finish_reason, last, latency_ms)
         except Exception as e:
             # Record failure (only on final failure after all retries)
             self.health_metrics.record_failure()
+            ended = True
+            self._emit(
+                lambda: model_invocation_error(
+                    e, model=request.model, provider=self._log_provider(), correlation_id=correlation_id
+                )
+            )
             raise
+        finally:
+            if not ended:
+                # The caller stopped reading: the tokens used so far are still worth a record.
+                self._emit_stream_end(
+                    request, correlation_id, finish_reason or "interrupted", last, (time.time() - start_time) * 1000
+                )
     
-    @with_retry(max_retries=3, min_wait=4, max_wait=10, multiplier=1)
     def _stream_with_retry(self, request: CompleteRequest) -> Iterator[StreamChunk]:
-        """Internal method with retry logic for streaming.
-        
-        This method is wrapped with retry decorator and does not track health metrics
-        to avoid counting retries as separate failures.
+        """The stream, retried on a transient failure only before its first chunk (D104).
+
+        Once a chunk has reached the caller a failure is raised: the text cannot be taken back. A
+        forced capability choice that the model refuses is sent emulated, with no check (D108).
         """
+        if forced_choice(request) and self.refuses_forced_choice(request.model):
+            request, _ = emulated_request(request)
+        attempt = 1
+        while True:
+            chunks = self._stream_once(request)
+            try:
+                first = next(chunks)
+            except StopIteration:
+                return
+            except ProviderError as error:
+                if not is_retryable(error) or attempt > getattr(self, "max_retries", DEFAULT_MAX_RETRIES):
+                    raise
+                getattr(self, "retry_sleep", time.sleep)(
+                    retry_wait(error, attempt, base_wait=self.retry_base_wait, max_wait=self.retry_max_wait)
+                )
+                attempt += 1
+                continue
+            yield first
+            yield from chunks
+            return
+
+    def _stream_once(self, request: CompleteRequest) -> Iterator[StreamChunk]:
+        """One streaming attempt; a ``ProviderError`` keeps its class, another failure is wrapped."""
         try:
             provider_request = self._transform_request(request)
             provider_request["stream"] = True
-            
+
             for chunk in self._call_provider_stream(provider_request):
                 yield self._transform_stream_chunk(chunk)
+        except (ValidationError, ProviderError):
+            raise
         except Exception as e:
-            # Get provider name from model info if available
-            provider_name = "unknown"
-            try:
-                provider_name = self.get_model_info().get("provider", "unknown")
-            except Exception:
-                pass
-            
-            raise ProviderError(
-                f"Provider streaming failed: {str(e)}",
-                provider=provider_name,
-                original_error=str(e),
-                error_type=type(e).__name__
-            ) from e
-    
+            raise self._wrap_failure(e, "Provider streaming failed") from e
+
     async def invoke(self, input: CompleteRequest) -> CompleteResponse:
         """Runnable Port entry point: one request in, one response out.
 
@@ -794,7 +1107,7 @@ class BaseModelProvider(ModelInterface, ABC):
 
     async def acomplete(
         self,
-        messages: list[Any] | str | CompleteRequest | None = None,
+        messages: list[Any] | str | CompleteRequest | PromptParts | None = None,
         model: str | None = None,
         router: Any | None = None,
         temperature: float | None = None,
@@ -802,13 +1115,12 @@ class BaseModelProvider(ModelInterface, ABC):
         **kwargs: Any,
     ) -> CompleteResponse:
         """Execute asynchronous completion.
-        
-        Default implementation uses synchronous version. Override this method
-        in subclasses to provide true async support using the provider's
-        async client.
+
+        The synchronous call runs in a worker thread of the event loop's executor, so the loop is never blocked; the
+        call is over when this returns. Override this method to use a native asynchronous transport.
         
         Args:
-            messages: List of SkyeMessage objects, string, or CompleteRequest
+            messages: List of SkyeMessage objects, string, CompleteRequest, or rendered PromptParts
             model: Model identifier (mutually exclusive with router)
             router: Router instance for load balancing (mutually exclusive with model)
             temperature: Sampling temperature
@@ -821,25 +1133,29 @@ class BaseModelProvider(ModelInterface, ABC):
         Raises:
             ProviderError: If the provider API call fails
         """
-        return self.complete(messages, model, router, temperature, max_tokens, **kwargs)
-    
+        loop = asyncio.get_running_loop()
+        return await loop.run_in_executor(
+            None, lambda: self.complete(messages, model, router, temperature, max_tokens, **kwargs)
+        )
+
     async def astream(
         self,
-        messages: list[Any] | str | CompleteRequest | None = None,
+        messages: list[Any] | str | CompleteRequest | PromptParts | None = None,
         model: str | None = None,
         router: Any | None = None,
         temperature: float | None = None,
         max_tokens: int | None = None,
         **kwargs: Any,
     ) -> AsyncIterator[StreamChunk]:
-        """Execute asynchronous streaming completion.
-        
-        Default implementation uses synchronous version. Override this method
-        in subclasses to provide true async support using the provider's
-        async client. Takes the same arguments as :meth:`stream`.
+        """Execute asynchronous streaming completion without blocking the event loop.
+
+        The synchronous :meth:`stream` runs in a worker thread of the event loop's executor and hands each chunk to this
+        generator through a queue, so other tasks run while the provider is sending. Nothing outlives the call: when the
+        caller stops early the worker stops at the next chunk, and this generator waits for it before closing.
+        Takes the same arguments as :meth:`stream`.
         
         Args:
-            messages: List of SkyeMessage objects, string, or CompleteRequest
+            messages: List of SkyeMessage objects, string, CompleteRequest, or rendered PromptParts
             model: Model identifier (mutually exclusive with router)
             router: Router instance for load balancing (mutually exclusive with model)
             temperature: Sampling temperature
@@ -852,8 +1168,38 @@ class BaseModelProvider(ModelInterface, ABC):
         Raises:
             ProviderError: If the provider API call fails
         """
-        for chunk in self.stream(messages, model, router, temperature, max_tokens, **kwargs):
-            yield chunk
+        loop = asyncio.get_running_loop()
+        queue: asyncio.Queue[tuple[bool, Any]] = asyncio.Queue()
+        stop = threading.Event()
+
+        def produce() -> None:
+            chunks = self.stream(messages, model, router, temperature, max_tokens, **kwargs)
+            try:
+                for chunk in chunks:
+                    if stop.is_set():
+                        break
+                    loop.call_soon_threadsafe(queue.put_nowait, (False, chunk))
+            except BaseException as error:  # handed to the caller, raised there
+                loop.call_soon_threadsafe(queue.put_nowait, (True, error))
+                return
+            finally:
+                close = getattr(chunks, "close", None)
+                if close is not None:
+                    close()
+            loop.call_soon_threadsafe(queue.put_nowait, (True, None))
+
+        producer = loop.run_in_executor(None, produce)
+        try:
+            while True:
+                done, item = await queue.get()
+                if done:
+                    if item is not None:
+                        raise item
+                    return
+                yield item
+        finally:
+            stop.set()
+            await producer
     
     def get_health_metrics(self) -> dict[str, Any]:
         """Get health metrics for this provider.

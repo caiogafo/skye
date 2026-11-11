@@ -134,6 +134,8 @@ def _target_lines(target: TargetSpec) -> list[str]:
         lines.append(f"tags = {value(list(target.tags))}")
     if target.metadata:
         lines.append(f"metadata = {value(dict(target.metadata), env=True)}")
+    if target.options:
+        lines.append(f"options = {value(dict(target.options), env=True)}")
     return lines
 
 
@@ -446,16 +448,14 @@ def to_text(*specs: RouterSpec | FlowSpec | PromptSpec | Document) -> str:
     """The ``.skye`` text of one or more blocks, separated by a blank line.
 
     Args:
-        *specs: Routers, flows and prompts, as :func:`skye.base.dsl.build` returns them (or built by
-        hand), or a whole
-            :class:`~skye.base.dsl.Document` (its routers, then its flows, then its prompts). A flow
-            that runs ``flow.x``,
-            ``router.x`` or ``prompt.x`` needs that block in the same text: pass them together.
+        *specs: Routers, flows and prompts, as :func:`skye.base.dsl.build` returns them (or built
+            by hand), or a whole :class:`~skye.base.dsl.Document` (its routers, then its flows,
+            then its prompts). A flow that runs ``flow.x``, ``router.x`` or ``prompt.x`` needs
+            that block in the same text: pass them together.
 
     Returns:
         Text that passes :func:`~skye.base.dsl.check_text` (given the same registry names) and
-        builds an equal spec. Comments
-        are not kept.
+        builds an equal spec. Comments are not kept.
 
     Raises:
         TypeError: If an argument is not a router, flow or prompt spec or a document.

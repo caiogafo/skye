@@ -7,13 +7,15 @@ functions as capabilities that can be invoked by LLMs.
 import asyncio
 import inspect
 import logging
+import re
+import types
+import typing
 from collections.abc import Callable
 from functools import partial
-from typing import Any
+from typing import Any, Literal, Union
 
+from skye.base.interfaces.capability import CapabilityInterface, CapabilitySchema
 from skye.tools.exceptions import CapabilityValidationError
-from skye.tools.interface import CapabilityInterface
-from skye.tools.schema import CapabilitySchema
 
 logger = logging.getLogger(__name__)
 
@@ -24,6 +26,13 @@ class LocalFunctionCapability(CapabilityInterface):
     Automatically extracts schema from function signature and type hints.
     Supports both synchronous and asynchronous functions. Validates arguments
     against the schema before execution.
+
+    Type hints map to JSON Schema: ``list[X]``, ``set[X]`` and ``tuple[X, ...]`` are arrays of
+    ``X``, ``tuple[X, Y]`` is an array with ``prefixItems``, ``dict[str, X]`` is an object whose
+    values are ``X``, ``X | None`` (``Optional[X]``) is ``X`` and not required, any other union is
+    ``anyOf`` and ``Literal[...]`` is ``enum``. The description of each parameter comes from the
+    Google-style ``Args:`` section of the docstring. Logs carry the capability name and the
+    outcome, never the call arguments (they may hold personal data).
 
     Attributes:
         func: The wrapped Python function
@@ -74,7 +83,8 @@ class LocalFunctionCapability(CapabilityInterface):
             )
 
         self.func = func
-        self._name = name or func.__name__
+        # With a schema override the capability is known by the overridden name, errors included
+        self._name = schema_override.name if schema_override else (name or func.__name__)
         self._description = description or self._extract_docstring(func)
         self._schema_override = schema_override
         self._is_async = inspect.iscoroutinefunction(func)
@@ -97,8 +107,9 @@ class LocalFunctionCapability(CapabilityInterface):
 
         try:
             sig = inspect.signature(self.func)
-            parameters = self._extract_parameters(sig)
-            returns = self._extract_return_type(sig)
+            hints = _type_hints(self.func)
+            parameters = self._extract_parameters(sig, hints, _docstring_args(self.func.__doc__))
+            returns = self._extract_return_type(sig, hints)
 
             return CapabilitySchema(
                 name=self._name,
@@ -142,12 +153,10 @@ class LocalFunctionCapability(CapabilityInterface):
 
         try:
             result = self.func(**kwargs)
+            # The arguments are never logged: they may hold personal data
             logger.debug(
                 "Local function executed successfully",
-                extra={
-                    "capability_name": self._name,
-                    "arguments": kwargs,
-                },
+                extra={"capability_name": self._name, "outcome": "ok"},
             )
             return result
         except Exception as e:
@@ -155,8 +164,8 @@ class LocalFunctionCapability(CapabilityInterface):
                 "Local function execution failed",
                 extra={
                     "capability_name": self._name,
-                    "arguments": kwargs,
-                    "error": str(e),
+                    "outcome": "error",
+                    "error_type": type(e).__name__,
                 },
             )
             raise
@@ -192,10 +201,7 @@ class LocalFunctionCapability(CapabilityInterface):
 
             logger.debug(
                 "Local function executed successfully (async)",
-                extra={
-                    "capability_name": self._name,
-                    "arguments": kwargs,
-                },
+                extra={"capability_name": self._name, "outcome": "ok"},
             )
             return result
         except Exception as e:
@@ -203,8 +209,8 @@ class LocalFunctionCapability(CapabilityInterface):
                 "Local function execution failed (async)",
                 extra={
                     "capability_name": self._name,
-                    "arguments": kwargs,
-                    "error": str(e),
+                    "outcome": "error",
+                    "error_type": type(e).__name__,
                 },
             )
             raise
@@ -255,18 +261,27 @@ class LocalFunctionCapability(CapabilityInterface):
         return ""
 
     @staticmethod
-    def _extract_parameters(sig: inspect.Signature) -> dict[str, Any]:
+    def _extract_parameters(
+        sig: inspect.Signature,
+        hints: dict[str, Any] | None = None,
+        descriptions: dict[str, str] | None = None,
+    ) -> dict[str, Any]:
         """Extract parameters from function signature.
 
-        Converts function parameters to JSON Schema format, handling type hints
-        and default values.
+        Converts function parameters to JSON Schema format, handling type hints,
+        default values and the descriptions of the docstring's ``Args:`` section.
+        A parameter with a default, or typed ``X | None``, is not required.
 
         Args:
             sig: The function signature
+            hints: Resolved type hints by parameter name (string annotations resolved)
+            descriptions: Parameter descriptions by name, from the ``Args:`` section
 
         Returns:
             JSON Schema for parameters
         """
+        hints = hints or {}
+        descriptions = descriptions or {}
         properties: dict[str, Any] = {}
         required: list[str] = []
 
@@ -275,18 +290,20 @@ class LocalFunctionCapability(CapabilityInterface):
             if param_name in ("self", "cls"):
                 continue
 
-            prop: dict[str, Any] = {}
-
-            # Extract type hint
-            if param.annotation != inspect.Parameter.empty:
-                prop = _type_to_json_schema(param.annotation)
+            annotation = hints.get(param_name, param.annotation)
+            optional = False
+            if annotation is inspect.Parameter.empty:
+                prop: dict[str, Any] = {"type": "string"}
             else:
-                prop = {"type": "string"}
+                annotation, optional = _strip_optional(annotation)
+                prop = _type_to_json_schema(annotation)
 
+            if param_name in descriptions:
+                prop = {**prop, "description": descriptions[param_name]}
             properties[param_name] = prop
 
-            # Track required parameters (those without defaults)
-            if param.default == inspect.Parameter.empty:
+            # Required: no default and not Optional
+            if param.default is inspect.Parameter.empty and not optional:
                 required.append(param_name)
 
         return {
@@ -296,28 +313,101 @@ class LocalFunctionCapability(CapabilityInterface):
         }
 
     @staticmethod
-    def _extract_return_type(sig: inspect.Signature) -> dict[str, Any]:
+    def _extract_return_type(
+        sig: inspect.Signature, hints: dict[str, Any] | None = None
+    ) -> dict[str, Any]:
         """Extract return type from function signature.
 
         Converts return type annotation to JSON Schema format.
 
         Args:
             sig: The function signature
+            hints: Resolved type hints (the ``return`` key holds the return type)
 
         Returns:
             JSON Schema for return type
         """
-        if sig.return_annotation == inspect.Signature.empty:
+        annotation = (hints or {}).get("return", sig.return_annotation)
+        if annotation is inspect.Signature.empty:
             return {"type": "string"}
 
-        return _type_to_json_schema(sig.return_annotation)
+        return _type_to_json_schema(annotation)
+
+
+_PRIMITIVES: dict[Any, str] = {str: "string", int: "integer", float: "number", bool: "boolean"}
+_ARG_LINE = re.compile(r"^(\*{0,2}\w+)\s*(?:\([^)]*\))?\s*:\s*(.*)$")
+
+
+def _type_hints(func: Callable[..., Any]) -> dict[str, Any]:
+    """The resolved type hints of ``func``, or an empty dict when they cannot be resolved."""
+    try:
+        return typing.get_type_hints(func)
+    except Exception:
+        return {}
+
+
+def _is_union(python_type: Any) -> bool:
+    return typing.get_origin(python_type) in (Union, types.UnionType)
+
+
+def _strip_optional(python_type: Any) -> tuple[Any, bool]:
+    """Remove ``None`` from a union: ``(X, True)`` for ``X | None``, ``(T, False)`` otherwise."""
+    if not _is_union(python_type):
+        return python_type, False
+    args = [arg for arg in typing.get_args(python_type) if arg is not type(None)]
+    if len(args) == len(typing.get_args(python_type)):
+        return python_type, False
+    if len(args) == 1:
+        return args[0], True
+    return Union[tuple(args)], True  # noqa: UP007 - built at run time from a tuple
+
+
+def _docstring_args(doc: str | None) -> dict[str, str]:
+    """Parameter descriptions from the Google-style ``Args:`` section of a docstring.
+
+    A description may continue on more indented lines; it ends at the next parameter or at the next
+    section (``Returns:``, ``Raises:``), which is not indented.
+
+    Args:
+        doc: The docstring, or ``None``.
+
+    Returns:
+        The description of each documented parameter, by name (``*args`` is ``args``).
+    """
+    if not doc:
+        return {}
+    lines = inspect.cleandoc(doc).splitlines()
+    try:
+        start = next(i for i, line in enumerate(lines) if line.strip() in ("Args:", "Arguments:"))
+    except StopIteration:
+        return {}
+
+    descriptions: dict[str, str] = {}
+    current: str | None = None
+    entry_indent: int | None = None
+    for line in lines[start + 1 :]:
+        if not line.strip():
+            continue
+        indent = len(line) - len(line.lstrip())
+        if entry_indent is None:
+            entry_indent = indent
+        if indent == 0 or indent < entry_indent:
+            break
+        match = _ARG_LINE.match(line.strip()) if indent == entry_indent else None
+        if match:
+            current = match.group(1).lstrip("*")
+            descriptions[current] = match.group(2).strip()
+        elif current is not None:
+            descriptions[current] = f"{descriptions[current]} {line.strip()}".strip()
+    return {name: text for name, text in descriptions.items() if text}
 
 
 def _type_to_json_schema(python_type: Any) -> dict[str, Any]:
     """Convert Python type to JSON Schema.
 
-    Handles basic types, generic types, and Union types. Falls back to
-    string type for unknown types.
+    Handles basic types, nested generic types (``list[X]``, ``set[X]``, ``tuple``,
+    ``dict[str, X]``), unions (``X | None`` is ``X``; others are ``anyOf``) and
+    ``Literal`` (``enum``). Falls back to string type for unknown types.
 
     Args:
         python_type: The Python type to convert
@@ -326,29 +416,58 @@ def _type_to_json_schema(python_type: Any) -> dict[str, Any]:
         JSON Schema representation of the type
     """
     # Handle None/NoneType
-    if python_type is type(None):
+    if python_type is None or python_type is type(None):
         return {"type": "null"}
 
-    # Handle basic types
-    if python_type is str:
-        return {"type": "string"}
-    if python_type is int:
-        return {"type": "integer"}
-    if python_type is float:
-        return {"type": "number"}
-    if python_type is bool:
-        return {"type": "boolean"}
+    if python_type is Any:
+        return {}
 
-    # Handle list
-    if python_type is list or (
-        hasattr(python_type, "__origin__") and python_type.__origin__ is list
-    ):
-        return {"type": "array", "items": {"type": "string"}}
+    # Handle basic types
+    if python_type in _PRIMITIVES:
+        return {"type": _PRIMITIVES[python_type]}
+
+    origin = typing.get_origin(python_type)
+    args = typing.get_args(python_type)
+
+    if _is_union(python_type):
+        inner, _ = _strip_optional(python_type)
+        if not _is_union(inner):
+            return _type_to_json_schema(inner)
+        return {"anyOf": [_type_to_json_schema(arg) for arg in typing.get_args(inner)]}
+
+    if origin is Literal:
+        values = list(args)
+        kinds = {_PRIMITIVES.get(type(value)) for value in values}
+        schema: dict[str, Any] = {"enum": values}
+        if len(kinds) == 1 and None not in kinds:
+            schema = {"type": kinds.pop(), "enum": values}
+        return schema
+
+    # Handle list, set and frozenset
+    if python_type in (list, set, frozenset) or origin in (list, set, frozenset):
+        items = _type_to_json_schema(args[0]) if args else {"type": "string"}
+        schema = {"type": "array", "items": items}
+        if origin in (set, frozenset) or python_type in (set, frozenset):
+            schema["uniqueItems"] = True
+        return schema
+
+    # Handle tuple: tuple[X, ...] is a list of X, tuple[X, Y] has one schema per position
+    if python_type is tuple or origin is tuple:
+        if not args:
+            return {"type": "array"}
+        if len(args) == 2 and args[1] is Ellipsis:
+            return {"type": "array", "items": _type_to_json_schema(args[0])}
+        return {
+            "type": "array",
+            "prefixItems": [_type_to_json_schema(arg) for arg in args],
+            "minItems": len(args),
+            "maxItems": len(args),
+        }
 
     # Handle dict
-    if python_type is dict or (
-        hasattr(python_type, "__origin__") and python_type.__origin__ is dict
-    ):
+    if python_type is dict or origin is dict:
+        if len(args) == 2 and args[1] is not Any:
+            return {"type": "object", "additionalProperties": _type_to_json_schema(args[1])}
         return {"type": "object"}
 
     # Default to string for unknown types

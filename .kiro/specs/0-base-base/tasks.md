@@ -139,7 +139,7 @@ satisfies (`Requirement N.k` of `10-requirements.md`) or the decision it honors.
     - Evidence (2026-11-09): `examples/basic/configuration.py` uses `skye.load_config`; `docs/base/configuration.md` (load_config and the text loader); skill `references/python-api.md`; `docs/base/extending.md` needed no change (it names the Port only).
     - _Requirements: 24.3, 15.5, 54.14; D91_
 
-- [x] 12. Final verification (to be run with Kiro)
+- [x] 12. Final verification
   - [x] 12.1 Run `uv run pytest tests -q` and `uv run pytest tests/budget -q`; confirm that `src/skye/base` imports only the standard library and does no file I/O except `http.py` (the parser takes text); fix what fails, one failure at a time.
     - Evidence (2026-11-09): `uv run pytest tests -q`: 3486 passed, 3 skipped, 0 failed; `uv run pytest tests/budget -q`: 293 passed, 0 failed. An AST scan of the 53 modules of `src/skye/base` against `sys.stdlib_module_names` finds one import outside the standard library, `typing_extensions` in `src/skye/base/validated.py`, under `TYPE_CHECKING` only. File I/O: `tests/budget/test_base_no_file_io.py` 2 passed, and `grep` for `open(`, `read_text`, `write_text`, `read_bytes`, `write_bytes` and `.exists()` in `src/skye/base` outside `http.py` finds nothing. The open point of 12.2 is closed: `src/skye/base/config.py` opens no file (`ConfigLoader.from_text`, `from_dict`), the file is read by `src/skye/utils/config_files.py` (`skye.load_config`, milestone 14, D91). Nothing had to be fixed.
     - _Requirements: 54.2, 54.11; Requirement 3_
@@ -176,6 +176,26 @@ satisfies (`Requirement N.k` of `10-requirements.md`) or the decision it honors.
     - Evidence (2026-11-09): on `src/skye/base/dsl/metadata.py`, `fmt.py`, `shapes.py`, `info.py`, `mermaid.py`, `src/skye/base/interfaces/resource.py` and `src/skye/base/config.py`: no import outside the standard library (AST scan of `src/skye/base`, see 12.1), `tests/budget/test_base_no_file_io.py` 2 passed, the `grep` for file calls outside `http.py` finds nothing, `uv run mypy src/skye/base`: no issues in 53 source files.
     - _Requirements: 3.2, 54.2, 54.11_
 
+- [x] 15. Fixes found by the documentation review (2026-11-11)
+  - [x] 15.1 Provider errors chosen by the response: `RateLimitError`, `ServerError`, `ProviderTimeoutError`, `AuthenticationError`, `BadRequestError` and `ContentPolicyError` under `ProviderError`, raised by `base/http.py` with `retry_after` from `Retry-After`
+    - Evidence (2026-11-11): `src/skye/base/exceptions.py` (the six subclasses; `ProviderError` gains the attributes `provider`, `status_code`, `retry_after`); `src/skye/base/http.py` (`_status_class`, `_is_timeout`, `retry_after_seconds`, `CONTENT_POLICY_MARKERS`); exported by `src/skye/exceptions.py` and lazily by `src/skye/__init__.py`; `tests/unit/test_provider_errors.py`, `tests/unit/test_exports.py`. The retries of `models` and the policies of `router` are not changed here: they move to these names in their own specs.
+    - _Requirements: 3.5; D104_
+  - [x] 15.2 An error never logs itself: `SkyeError.__init__` logs nothing
+    - Evidence (2026-11-11): `src/skye/base/exceptions.py` (no logger); no caller in `src/skye/base` or `src/skye/utils/cli.py` relied on the record (the command line already prints every error it handles); `tests/unit/test_provider_errors.py::test_creating_an_error_logs_nothing`.
+    - _Requirements: 3.6; D105_
+  - [x] 15.3 Configuration keys that nothing reads are removed; an unknown key is a `ConfigurationError` naming it; `skye.load_config` applies the log levels
+    - Evidence (2026-11-11): `src/skye/base/config.py` (`SkyeConfig` keeps `log_level`, `correlation_id_header`, `component_log_levels`; `ConfigLoader._reject_unknown_keys` for the file and the overrides; the variable that set `enable_telemetry` left with it, so `ALL_ENV_VARS` is `SKYE_LOG_LEVEL` and `SKYE_CONFIG`; the `substitute_env_vars` docstring no longer speaks of a cache, D66); `src/skye/utils/config_files.py` (`apply_log_levels()`); `tests/unit/config/test_config_keys_d106.py`, `tests/unit/config/test_config_loader.py`, `tests/unit/config/test_config_models.py`, `tests/unit/config/test_env_var_substitution.py`, `tests/unit/config/conftest.py`, `tests/budget/test_env_vars.py`, `tests/unit/auth/test_no_leak_and_env_surface.py`, `tests/fixtures/sample_config*.json`; `examples/basic/configuration.py`, `docs/guides/configuration.md`, `docs/reference/configuration-keys.md`, the skill reference `python-api.md`.
+    - _Requirements: 5.5; D106_
+  - [x] 15.4 The `.skye` names without a public path join `skye.dsl`: `SkyeSyntaxError`, `build`, `to_text`, `build_cached`, `clear_cache`, `load_document`
+    - Evidence (2026-11-11): `src/skye/dsl.py` (re-exports only; `load_document` from `skye.utils.skye_files`); `tests/unit/dsl/test_dsl_facade.py`, `tests/budget/test_facade_purity.py`; `docs/reference/skye-language.md`, `docs/reference/api/dsl.md`, the skill reference `python-api.md`.
+    - _Requirements: 7.7; D78_
+  - [x] 15.5 Stale texts and the `all` bundle: the package docstring of `skye`, the `ScanStore` docstring (five backends, all but the durable function), `all` gains `valkey` and `asyncpg` (not `boto3`, preinstalled in AWS Lambda)
+    - Evidence (2026-11-11): `src/skye/__init__.py`, `src/skye/base/interfaces/storage.py`, `pyproject.toml`; `tests/unit/test_base_doc_fixes.py`; `tests/budget` passes.
+    - _Requirements: 1.1; D98_
+  - [x] 15.6 Record these fixes in the spec
+    - Evidence (2026-11-11): this milestone; the pointers to D104, D105 and D106 in `requirements.md` (Requirement 3, criteria 5 and 6; Requirement 5, criterion 5).
+    - _Requirements: 3.5, 3.6, 5.5; D104, D105, D106_
+
 ## Notes
 
 - Tasks marked with `*` are optional (tests) and can be skipped for a faster path.
@@ -186,7 +206,7 @@ satisfies (`Requirement N.k` of `10-requirements.md`) or the decision it honors.
   gate. 3.2 and 6.2 add the log-event shape, the per-component log levels and decision D32; 7.2 moves the base contracts to
   validated dataclasses. The project-wide pydantic removal (O4, taken as D49): `tools`, `memory`, `utils` and `router` still
   import it, tracked in `0-base-structure` tasks 14.1 to 14.4. Tasks 10 (the `.skye` parser), 11 (the cache, D63) and 12 (final
-  verification, run with Kiro) were added after D50 to D61.
+  verification, run as a final check) were added after D50 to D61.
 
 ## Task Dependency Graph
 

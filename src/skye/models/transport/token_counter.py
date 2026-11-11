@@ -17,11 +17,12 @@ Example:
     >>> messages = [UserMessage(content="Hello")]
     >>> count = TokenCounter.count_message_tokens(messages, "gpt-4")
     >>> print(count)
-    6
+    4
 """
 
 from typing import Any
 
+from skye.base.exceptions import ValidationError
 from skye.base.interfaces.token_counter import TokenCounterInterface
 from skye.base.messages import SkyeMessage
 from skye.models.lazy_import import LazyImporter
@@ -45,6 +46,54 @@ class TokenCounter(TokenCounterInterface):
     # Model-specific tokenizers (lazy loaded)
     _tokenizers: dict[str, Any] = {}
 
+    # Tokenizers registered by the caller, by model name or name prefix (they win over the built-in ones)
+    _custom: dict[str, Any] = {}
+
+    @classmethod
+    def register_tokenizer(cls, model: str, tokenizer: Any) -> None:
+        """Use ``tokenizer`` to count the tokens of ``model``, for a more exact count than the estimate.
+
+        ``model`` is a model name or the start of one: ``"claude-"`` covers every Claude model, and the longest
+        match wins, so ``"claude-3-opus"`` can have its own. A registered tokenizer wins over ``tiktoken``
+        and over the estimate. Nothing is installed by this call: the tokenizer is whatever the caller already has.
+
+        Args:
+            model: A model name or a name prefix.
+            tokenizer: Any object with ``encode(text)`` returning a sized sequence (a ``tiktoken`` encoding, a
+                ``tokenizers`` or ``transformers`` tokenizer through a small wrapper, a function of your own).
+
+        Raises:
+            ValidationError: ``model`` is empty, or ``tokenizer`` has no callable ``encode``.
+
+        Example:
+            >>> class Words:
+            ...     def encode(self, text):
+            ...         return text.split()
+            >>> TokenCounter.register_tokenizer("my-model", Words())
+            >>> TokenCounter.count_tokens("one two three", "my-model-v2")
+            3
+            >>> TokenCounter.unregister_tokenizer("my-model")
+            True
+        """
+        if not isinstance(model, str) or not model:
+            raise ValidationError("model must be a non-empty model name or prefix", "model", model)
+        if not callable(getattr(tokenizer, "encode", None)):
+            raise ValidationError("tokenizer must have an encode(text) method", "tokenizer", tokenizer)
+        cls._custom[model] = tokenizer
+
+    @classmethod
+    def unregister_tokenizer(cls, model: str) -> bool:
+        """Remove the tokenizer registered under exactly ``model``; ``True`` when there was one."""
+        return cls._custom.pop(model, None) is not None
+
+    @classmethod
+    def _registered_tokenizer(cls, model: str) -> Any | None:
+        """The tokenizer registered for ``model``: the exact name, else the longest registered prefix."""
+        if model in cls._custom:
+            return cls._custom[model]
+        prefixes = [name for name in cls._custom if model.startswith(name)]
+        return cls._custom[max(prefixes, key=len)] if prefixes else None
+
     @classmethod
     def count_tokens(cls, text: str, model: str) -> int:
         """Count tokens for a given text and model.
@@ -61,6 +110,8 @@ class TokenCounter(TokenCounterInterface):
             >>> count > 0
             True
         """
+        if not text:
+            return 0
         tokenizer = cls._get_tokenizer(model)
         return len(tokenizer.encode(text))
 
@@ -89,7 +140,7 @@ class TokenCounter(TokenCounterInterface):
         for msg in messages:
             # Add message overhead (varies by model)
             total += cls._get_message_overhead(model)
-            total += cls.count_tokens(msg.content, model)
+            total += cls.count_tokens(msg.content or "", model)
         return total
 
     @classmethod
@@ -107,6 +158,9 @@ class TokenCounter(TokenCounterInterface):
             >>> hasattr(tokenizer, 'encode')
             True
         """
+        registered = cls._registered_tokenizer(model)
+        if registered is not None:
+            return registered
         if model not in cls._tokenizers:
             if model.startswith("gpt-") or model.startswith("o1-") or model.startswith("o3-"):
                 try:

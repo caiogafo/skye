@@ -159,10 +159,11 @@ def test_a_fallback_is_recorded_with_what_was_tried() -> None:
         "claude",
         0,
     )
-    assert record["tried"] == ["chat:openai:gpt-4o"]
+    # fallback_on_error (the default): the other target of "chat" is tried before the fallback chain
+    assert record["tried"] == ["chat:openai:gpt-4o", "chat:openai:gpt-4o-mini"]
     assert record["fallbacks_tried"] == ["backup"]
     assert record["fallback"] is True
-    assert (record["attempts"], record["total_attempts"]) == (1, 2)
+    assert (record["attempts"], record["total_attempts"]) == (1, 3)
 
 
 def test_retries_are_counted_in_the_attempts() -> None:
