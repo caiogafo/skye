@@ -51,7 +51,7 @@ def _spec_dirs() -> list:
 
 
 # The cross-cutting specs: the structure and the public surface (decision D35, Requirement 15.2).
-CROSS_CUTTING_SPECS = ("0-base-structure", "0-base-uxui")
+CROSS_CUTTING_SPECS = ("0-base-structure", "0-base-uxui", "0-base-plugins")  # plugins: D108
 
 
 def _layers() -> dict[str, tuple[int, str]]:
