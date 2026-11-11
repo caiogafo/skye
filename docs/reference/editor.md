@@ -1,17 +1,19 @@
 ---
 title: "Editor support"
 status: current
-last_updated: 2026-11-08
 ---
 
 # Editor support
 
+This page shows you how to get highlighting, live diagnostics and formatting for `.skye` files in your editor.
+
 The package ships a VS Code extension for `.skye` files: syntax highlighting, comments and brackets, live diagnostics from
-`skye check`, and "Format Document" through `skye fmt -` (comments kept; a file with mistakes is left alone). It needs no marketplace and no Node.js: the `skye` command builds and installs it.
+`skye check`, and "Format Document" through `skye fmt -` (comments kept; a file with mistakes is left alone). It needs no
+marketplace and no Node.js: the `skye` command builds and installs it.
 
 ## Install
 
-```text
+```bash
 skye vscode install                     # with code, code-insiders, codium or cursor (the first found)
 skye vscode install --editor cursor     # with a given editor command
 skye vscode install --dir DIR [--force] # copy the unpacked extension to DIR/skyeai.skye-<version>/
@@ -37,7 +39,7 @@ passes `--registry` names.
 
 ## `skye check` for editors
 
-```text
+```bash
 skye check --format json --stdin-filename app.skye -
 ```
 
@@ -50,4 +52,10 @@ skye check --format json --stdin-filename app.skye -
 
 Lines and columns count from 1; `message` is the reason followed by the fix. The exit code is 0 with no diagnostic, 1 with some,
 and 2 for a usage or read error (the message goes to standard error and nothing is printed on standard output). Any other
-editor can use the same command. See [the .skye language](skye-language.md) for the language itself.
+editor can use the same command.
+
+## See also
+
+- [.skye language](skye-language.md): the language itself.
+- [CLI reference](cli.md#skye-vscode): every option of `skye vscode` and `skye check`.
+- [The .skye language](../concepts/skye-language.md): the overview.

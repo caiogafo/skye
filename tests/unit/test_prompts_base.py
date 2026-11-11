@@ -293,17 +293,26 @@ class TestBasePromptBuilder:
         assert "Unmatched opening brace" in result["errors"][0]
 
     def test_default_templates_work(self):
-        """Test that loaded templates can be rendered."""
+        """Conditions and loops are written in .skye prompts (D76); they render with real roles."""
         builder = BasePromptBuilder()
+        assert len(builder._templates) > 0, "No templates loaded"
 
-        # Get available templates
-        available_templates = list(builder._templates.keys())
-        assert len(available_templates) > 0, "No templates loaded"
-
-        # Test memory agent template
         builder.register_template(
             "memory_agent_test",
-            "You are an AI with memory.\n\n{% if episodic_memory %}## Past conversations:\n{% for memory in episodic_memory %}{{ memory.content }}{% endfor %}{% endif %}\n\nUser: {{ input }}",
+            """prompt "memory_agent_test" {
+  variables = {
+    input = string
+    episodic_memory = list({ content = string }, [])
+  }
+  message "user" {
+    text = "You are an AI with memory."
+    when episodic_memory {
+      text = "## Past conversations:"
+      each memory in episodic_memory { text = "{{ memory.content }}" }
+    }
+    text = "User: {{ input }}"
+  }
+}""",
         )
         messages = builder.render(
             "memory_agent_test",
@@ -316,42 +325,21 @@ class TestBasePromptBuilder:
         assert "remember me" in messages[0].content
         assert "hello yesterday" in messages[0].content
 
-        # Test tool agent template
-        builder.register_template(
-            "tool_agent_test",
-            "You can use tools.\n\nAvailable tools:\n{% for tool in tools %}- {{ tool.name }}: {{ tool.description }}\n{% endfor %}\n\nUser: {{ input }}",
-        )
-        messages = builder.render(
-            "tool_agent_test",
-            {
-                "input": "What tools do you have?",
-                "tools": [{"name": "calculator", "description": "Performs calculations"}],
-            },
-        )
-        assert "calculator" in messages[0].content
-        assert "calculations" in messages[0].content
-
-        # Test enhanced NER template
-        builder.register_template(
-            "enhanced_ner",
-            "Extract entities from: {{ text }}\n\n{% if domain %}Domain: {{ domain }}{% endif %}\n\n{% if labels %}Entity types: {% for label in labels %}{{ label.name }}{% endfor %}{% endif %}",
-        )
-        messages = builder.render(
-            "enhanced_ner",
-            {
-                "text": "Apple Inc. was founded by Steve Jobs.",
-                "domain": "business",
-                "labels": [{"name": "ORG"}, {"name": "PERSON"}],
-            },
-        )
-        assert "Apple Inc." in messages[0].content
-        assert "business" in messages[0].content
-        assert "ORG" in messages[0].content
-
-        # Test code agent template
         builder.register_template(
             "code_agent_test",
-            "You are a code assistant.\n\n{% if programming_language %}Language: {{ programming_language }}{% endif %}\n\n{% if task_type %}Task: {{ task_type }}{% endif %}\n\n[USER]\n{{ input }}",
+            """prompt "code_agent_test" {
+  variables = {
+    input = string
+    programming_language = string("")
+    task_type = string("")
+  }
+  message "system" {
+    text = "You are a code assistant."
+    when programming_language { text = "Language: {{ programming_language }}" }
+    when task_type { text = "Task: {{ task_type }}" }
+  }
+  message "user" { text = "{{ input }}" }
+}""",
         )
         messages = builder.render(
             "code_agent_test",
@@ -361,19 +349,9 @@ class TestBasePromptBuilder:
                 "task_type": "code_generation",
             },
         )
+        assert [m.role for m in messages] == ["system", "user"]
         assert "Python" in messages[0].content
         assert "code_generation" in messages[0].content
-
-        # Test multimodal agent template
-        builder.register_template(
-            "multimodal_test",
-            "Analyze content.\n\n{% if images %}Images: {% for img in images %}{{ img.description }}{% endfor %}{% endif %}\n\n[USER]\n{{ input }}",
-        )
-        messages = builder.render(
-            "multimodal_test",
-            {"input": "What do you see?", "images": [{"description": "A photo of a cat"}]},
-        )
-        assert "photo of a cat" in messages[0].content
 
     def test_role_based_messages(self):
         """Test role-based message creation."""
@@ -438,164 +416,61 @@ class TestBasePromptBuilder:
         assert len(selected) == 3
 
     def test_agent_templates(self):
-        """Test agent-specific templates."""
+        """An agent prompt with memories and tools, written in .skye."""
         builder = BasePromptBuilder()
-
-        # Test memory agent template structure
         builder.register_template(
             "memory_agent",
-            """[SYSTEM]
-You are an AI with memory capabilities.
-
-{% if episodic_memory %}
-## Past conversations:
-{% for memory in episodic_memory %}
-- {{ memory.content }}{% if memory.timestamp %} ({{ memory.timestamp }}){% endif %}
-{% endfor %}
-{% endif %}
-
-[USER]
-{{ input }}""",
+            """prompt "memory_agent" {
+  variables = {
+    input = string
+    episodic_memory = list({ content = string, timestamp = string("") }, [])
+    tools = list({ name = string, description = string }, [])
+  }
+  message "system" {
+    text = "You are an AI with memory capabilities."
+    when episodic_memory {
+      text = "## Past conversations:"
+      each memory in episodic_memory {
+        when memory.timestamp { text = "- {{ memory.content }} ({{ memory.timestamp }})" }
+        when not memory.timestamp { text = "- {{ memory.content }}" }
+      }
+    }
+    when tools {
+      text = "You can use these tools:"
+      each tool in tools { text = "- \\"{{ tool.name }}\\": {{ tool.description }}" }
+    }
+  }
+  message "user" { text = "{{ input }}" }
+}""",
         )
-
         messages = builder.render(
             "memory_agent",
             {
                 "input": "What did we discuss before?",
                 "episodic_memory": [
                     {"content": "User asked about weather", "timestamp": "2 hours ago"},
-                    {"content": "User mentioned vacation plans", "timestamp": "1 day ago"},
+                    {"content": "User mentioned vacation plans"},
                 ],
-            },
-        )
-
-        content = messages[0].content
-        assert "Past conversations:" in content
-        assert "weather" in content
-        assert "vacation plans" in content
-        assert "2 hours ago" in content
-
-        # Test tool agent template structure
-        builder.register_template(
-            "tool_agent",
-            """
-You can use these tools:
-{% for tool in tools -%}
-- "{{ tool.name }}": {{ tool.description }}
-{% endfor %}
-
-Respond with JSON: {"action": "tool_name", "action_input": "input"}
-
-[USER]
-{{ input }}
-""",
-        )
-
-        messages = builder.render(
-            "tool_agent",
-            {
-                "input": "Calculate 2 + 2",
                 "tools": [
                     {"name": "calculator", "description": "Performs mathematical calculations"},
                     {"name": "search", "description": "Searches for information"},
                 ],
             },
         )
+        system = messages[0].content
+        assert "Past conversations:" in system
+        assert "- User asked about weather (2 hours ago)" in system
+        assert "- User mentioned vacation plans" in system
+        assert '- "calculator": Performs mathematical calculations' in system
+        assert messages[1].content == "What did we discuss before?"
 
-        content = messages[0].content
-        assert "calculator" in content
-        assert "mathematical calculations" in content
-        assert "search" in content
-        assert "JSON" in content
-
-    def test_enhanced_ner_template(self):
-        """Test enhanced NER template with domain and labels."""
+    def test_text_template_with_a_control_tag_points_to_skye(self):
+        """A text template keeps interpolation only (D76)."""
         builder = BasePromptBuilder()
-
-        builder.register_template(
-            "enhanced_ner",
-            """
-{% if domain %}
-Domain: {{ domain }}
-{% endif %}
-
-Entity types:
-{% for label in labels %}
-- {{ label.name }}: {{ label.description }}
-{% endfor %}
-
-Text: {{ text }}
-
-Extract entities in JSON format.
-""",
-        )
-
-        messages = builder.render(
-            "enhanced_ner",
-            {
-                "text": "Dr. Smith works at Google in California.",
-                "domain": "business",
-                "labels": [
-                    {"name": "PERSON", "description": "Names of people"},
-                    {"name": "ORG", "description": "Organizations"},
-                    {"name": "LOC", "description": "Locations"},
-                ],
-            },
-        )
-
-        content = messages[0].content
-        assert "Domain: business" in content
-        assert "PERSON: Names of people" in content
-        assert "ORG: Organizations" in content
-        assert "Dr. Smith works at Google" in content
-
-    def test_multimodal_template(self):
-        """Test multimodal template with different content types."""
-        builder = BasePromptBuilder()
-
-        # Allow missing optional fields
-        builder.set_allowed_missing_variables(["image.url"])
-
-        builder.register_template(
-            "multimodal",
-            """
-{% if task_type %}
-Task: {{ task_type }}
-{% endif %}
-
-{% if images %}
-Images provided:
-{% for image in images %}
-- {{ image.description }}{% if image.url %} ({{ image.url }}){% endif %}
-{% endfor %}
-{% endif %}
-
-{% if documents %}
-Documents:
-{% for doc in documents %}
-- {{ doc.title }}: {{ doc.content }}
-{% endfor %}
-{% endif %}
-
-User: {{ input }}
-""",
-        )
-
-        messages = builder.render(
-            "multimodal",
-            {
-                "input": "Analyze the provided content",
-                "task_type": "image_analysis",
-                "images": [
-                    {"description": "Photo of a sunset", "url": "http://example.com/sunset.jpg"},
-                    {"description": "Chart showing sales data"},
-                ],
-                "documents": [{"title": "Report", "content": "Sales increased by 20%"}],
-            },
-        )
-
-        content = messages[0].content
-        assert "Task: image_analysis" in content
-        assert "Photo of a sunset" in content
-        assert "Chart showing sales data" in content
-        assert "Report: Sales increased by 20%" in content
+        with pytest.raises(ValidationError, match=r"line 2.*when.*each"):
+            builder.register_template(
+                "t", "Text: {{ text }}\n{% if domain %}{{ domain }}{% endif %}"
+            )  # noqa: E501
+        builder.register_template("t", "Labels: {{ labels | map('name') | join(', ') }}")
+        content = builder.render("t", {"labels": [{"name": "PERSON"}, {"name": "ORG"}]})[0].content
+        assert content == "Labels: PERSON, ORG"

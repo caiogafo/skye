@@ -20,7 +20,7 @@ from datetime import datetime, timezone
 from typing import Any, Literal
 from uuid import uuid4
 
-from skye.base.completion import CompleteRequest, CompleteResponse
+from skye.base.completion import CompleteRequest, CompleteResponse, TokenUsage
 from skye.base.interfaces.observer import EventType
 from skye.base.validated import Validated, field, validated
 
@@ -47,7 +47,7 @@ class ModelInvocationEvent(Validated):
         correlation_id: Ties the events of one invocation together (and to the HTTP header named by
             ``SkyeConfig.correlation_id_header``).
         request: Request details: number of messages, temperature, max tokens, stream.
-        response: Response details: finish reason, token usage, latency in milliseconds.
+        response: Response details: finish reason, token usage, cost, latency in milliseconds.
         error: The error message, for the ``error`` phase.
         timestamp: When the event was created.
     """
@@ -101,6 +101,43 @@ def model_invocation_start(
     )
 
 
+def model_invocation_summary(
+    *,
+    model: str,
+    provider: str,
+    correlation_id: str,
+    finish_reason: str | None,
+    usage: TokenUsage | None,
+    cost: dict[str, Any] | None = None,
+    latency_ms: float | None = None,
+) -> ModelInvocationEvent:
+    """The ``end`` event from its parts, for a call that has no ``CompleteResponse`` (a stream).
+
+    Args:
+        model: The model identifier.
+        provider: The provider name.
+        correlation_id: The id of the start event.
+        finish_reason: Why the generation stopped, or ``None``.
+        usage: The tokens of the call, or ``None`` when none were counted.
+        cost: The cost of the call (``response.metadata["cost"]``), or ``None``.
+        latency_ms: How long the invocation took, in milliseconds.
+    """
+    return ModelInvocationEvent(
+        phase="end",
+        model=model,
+        provider=provider,
+        correlation_id=correlation_id,
+        response={
+            "finish_reason": finish_reason,
+            "prompt_tokens": None if usage is None else usage.prompt_tokens,
+            "completion_tokens": None if usage is None else usage.completion_tokens,
+            "total_tokens": None if usage is None else usage.total_tokens,
+            "cost": cost,
+            "latency_ms": latency_ms,
+        },
+    )
+
+
 def model_invocation_end(
     response: CompleteResponse, *, correlation_id: str, latency_ms: float | None = None
 ) -> ModelInvocationEvent:
@@ -111,18 +148,14 @@ def model_invocation_end(
         correlation_id: The id of the start event.
         latency_ms: How long the invocation took, in milliseconds.
     """
-    return ModelInvocationEvent(
-        phase="end",
+    return model_invocation_summary(
         model=response.model,
         provider=response.provider,
         correlation_id=correlation_id,
-        response={
-            "finish_reason": response.finish_reason,
-            "prompt_tokens": response.usage.prompt_tokens,
-            "completion_tokens": response.usage.completion_tokens,
-            "total_tokens": response.usage.total_tokens,
-            "latency_ms": latency_ms,
-        },
+        finish_reason=response.finish_reason,
+        usage=response.usage,
+        cost=response.metadata.get("cost"),
+        latency_ms=latency_ms,
     )
 
 

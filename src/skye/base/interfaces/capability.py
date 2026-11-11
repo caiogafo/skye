@@ -20,18 +20,22 @@ Missing: not applicable (a capability returns its own result; absence of a capab
 Concurrency: ``execute`` is called from the calling thread, ``aexecute`` from the event loop; an implementation must not assume it is called once at a time.
 """
 
+import dataclasses
 from abc import ABC, abstractmethod
 from typing import Any
 
+from skye.base.exceptions import ValidationError
 from skye.base.validated import Validated, field, validated
 
 
-@validated
+@validated(frozen=True)
 class CapabilitySchema(Validated):
     """Schema defining a capability's signature.
 
     This model describes the capability's interface for LLM function calling,
-    including its name, description, parameters, and return type.
+    including its name, description, parameters, and return type. It is frozen; the name and
+    the description are stripped and must not be blank. This is the only ``CapabilitySchema``:
+    ``skye.tools`` re-exports it.
 
     Attributes:
         name: Unique name of the capability.
@@ -62,6 +66,24 @@ class CapabilitySchema(Validated):
     description: str = field(min_length=1)
     parameters: dict[str, Any] = field(default_factory=dict)
     returns: dict[str, Any] = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        """Validate the fields, then strip the name and the description, which must not be blank."""
+        try:
+            super().__post_init__()
+        except dataclasses.FrozenInstanceError as error:
+            raise ValidationError(
+                "parameters and returns must be dicts with string keys",
+                field="parameters",
+                value=None,
+            ) from error
+        for field_name in ("name", "description"):
+            value = getattr(self, field_name)
+            if not value.strip():
+                raise ValidationError(
+                    f"{field_name} cannot be empty or whitespace", field=field_name, value=value
+                )
+            object.__setattr__(self, field_name, value.strip())
 
 
 class CapabilityInterface(ABC):

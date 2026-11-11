@@ -1,17 +1,19 @@
 ---
-title: "The .skye language"
-codename: "stratus"
+title: ".skye language"
 status: current
-last_updated: 2026-11-07
 ---
 
-# The .skye language
+# .skye language
 
-One small, readable language for routers, flows and prompts, in files with the extension `.skye` (decisions D50 to D61, Requirement 54).
-The parser is in `skye.base.dsl`, written in the standard library; it takes text, not a path, and never uses `eval`. A file may hold several
-blocks, in any order; each file is self-sufficient in version 1 (no `include`).
+This page is the complete reference of the `.skye` language: grammar, blocks, fields, references, expressions, limits and errors.
+For an overview with one example of each block, read [The .skye language](../concepts/skye-language.md) first.
 
-Check a file with `skye check app.skye`; start a new one with `skye new flow my_flow` (see [Tools](#tools)).
+`.skye` is one small, readable language for routers, flows and prompts, in files with the extension `.skye`. The parser is written in
+the standard library; it takes text, not a path, and never uses `eval`. A file may hold several blocks, in any order; each file is
+self-sufficient in version 1 (no `include`).
+
+Check a file with `skye check app.skye`; start a new one with `skye new flow my_flow` (see [Tools](#tools) and the
+[CLI reference](cli.md)).
 
 ## Grammar
 
@@ -72,9 +74,9 @@ it:
 
 ### Front matter
 
-A file may start with metadata between two `---` lines. It is TOML (`key = value`, the same form as an attribute), not YAML (D62): a
+A file may start with metadata between two `---` lines. It is TOML (`key = value`, the same form as an attribute), not YAML: a
 `key: value` line is an error with the fix. The keys are free; the bundled files use `title`, `description`, `version` and `tags`.
-`build(text).metadata` holds it as a dict, `to_text(document)` writes it back, and the line numbers of the rest of the file do not change.
+`skye.load(path).metadata` holds it as a dict, `skye fmt` writes it back unchanged, and the line numbers of the rest of the file do not change.
 The prompt loader takes the template version from `version`.
 
 ```skye
@@ -124,6 +126,7 @@ router "main" {
       timeout  = "30s"
       tags     = ["premium"]
       metadata = { region = "us-east-1" }
+      options  = { deployment_name = "gpt4-prod" }   # keyword arguments for the provider client
     }
   }
   route "claude" = ["anthropic/claude-haiku", "openai/gpt-4o-mini"]   # shorthand
@@ -233,7 +236,7 @@ missing optional field gets its default in a copy (the caller's data is never ch
 #### The output block: the shape of the answer
 
 An `output` block says what the model must answer and in which format; the renderer writes the instructions, so the structure is
-never written by hand in the text (D70).
+never written by hand in the text.
 
 ```skye
 prompt "extract_invoice" {
@@ -270,18 +273,21 @@ prompt "extract" {
 - Conditional outputs: an `output` block may sit inside a `when` block at the top of the prompt (or a `when` nested in one; never inside a
   `message` or an `each`, an error), so a variable chooses the shape of the answer:
 
-  ```
-  when schema     { output format { schema = schema } }
-  when not schema { output format { name = string "What the extracted item is", value = string "Its value, as written in the input" } }
+  ```skye
+  prompt "extract_any" {
+    variables = { document = string, schema = map({}), format = string("json") }
+    when schema     { output format { schema = schema } }
+    when not schema { output format { name = string "What the extracted item is", value = string "Its value, as written in the input" } }
+    message "user" { text = "{{ document }}" }
+  }
   ```
 
   At render time the active output is the one whose conditions (its `when` and the ones around it) hold, a missing variable taking its
   default; none active means no instructions (free text), and more than one active raises `ValidationError` naming their conditions, so
   write conditions that exclude each other. A prompt with an unconditional `output` and a conditional one is an error naming both lines.
-  Every check of the block applies to each conditional one. `skye.prompts.active_output(spec, variables)` returns the active `OutputSpec`
-  (or `None`); in the model each one is a `PromptPartSpec(kind="output", output=OutputSpec)` among the parts of its `when`
-  (`PromptSpec.output_variants()` lists them with their conditions), while `PromptSpec.output` keeps the unconditional block. `skye prompt
-  info` shows each one under its condition (`Output (when not schema): json`).
+  Every check of the block applies to each conditional one. `skye.prompts.active_output(spec, variables)` returns the active output
+  block (or `None`); the prompt model's `output_variants()` lists the conditional ones with their conditions, while its `output` keeps
+  the unconditional block. `skye prompt info` shows each one under its condition (`Output (when not schema): json`).
 - The label may also be a declared `string` variable (`output style { ... }`, no quotes): the format is its value at render time (or its
   default). An undeclared name is an error with "Did you mean ...?", a variable of another type is an error, and so is a default that is
   not `json`, `table` or `xml`; at render time a value that is not one of the three raises `ValidationError` listing them, and with
@@ -322,7 +328,7 @@ prompt "extract" {
 
 ## References and prefixes
 
-A reference always has a prefix (decision D66), except inside a prompt:
+A reference always has a prefix, except inside a prompt:
 
 | Reference | Meaning |
 |---|---|
@@ -388,8 +394,11 @@ app.skye:11:15 route "gpt" has no route "claud" in fallback. Did you mean "claud
 ```
 
 A syntax error (an unclosed block, an unterminated string, a value that is missing) is reported alone: the checks that follow need a tree that
-parses. In Python, `skye.base.dsl.check_text(text, filename, registry_names)` returns the same errors as `Diagnostic` objects
-(`file`, `line`, `column`, `reason`, `fix`), and `build(...).raise_for_errors()` raises them together as one `SkyeSyntaxError`.
+parses. In Python, `skye.dsl.check_text(text, filename, registry_names)` returns the same errors as `Diagnostic` objects
+(`file`, `line`, `column`, `reason`, `fix`, and `format()` for the printed line), and `skye.load(path)` raises them together as one
+`ConfigurationError`. `skye.dsl.build(text, filename=..., registry_names=...)` returns the `Document` (its blocks and its
+`diagnostics`) without raising; `document.raise_for_errors()` raises `skye.dsl.SkyeSyntaxError`, whose `.diagnostics` holds every
+mistake.
 
 ## Version 1 and version 2
 
@@ -397,13 +406,13 @@ parses. In Python, `skye.base.dsl.check_text(text, filename, registry_names)` re
 |---|---|---|
 | Blocks | `router`, `flow`, `prompt` | `include "other.skye"` |
 | Flows | sequence, `choice`, `parallel`, bounded loops, `retry`, `timeout`, `on_error`, `foreach`, `set`, `emit` | `wait`, `on_event` (waiting for events with persistence and resume) |
-| Prompts | `variables`, `message`, `placeholder`, `text`, `when`, `each`, `allow_missing`, `output` (D70) | `examples`, multimodal `content`, `from`/`bind`, `parts`, type `image` |
+| Prompts | `variables`, `message`, `placeholder`, `text`, `when`, `each`, `allow_missing`, `output` | `examples`, multimodal `content`, `from`/`bind`, `parts`, type `image` |
 
 A version 2 word in a version 1 file is rejected with "is not available in this version".
 
 ## Tools
 
-```text
+```bash
 skye check app.skye                  # errors as file:line:col message; exit code 1 if there are errors
 skye check --registry planner,web_search app.skye
 skye check --schema                  # the JSON Schema of the router, flow and prompt blocks
@@ -414,7 +423,7 @@ skye new --list
 skye render app.skye --name triage --stdout --fence   # the flow as a Mermaid diagram, ready for Markdown
 ```
 
-`skye render FILE` draws a flow or a router as a Mermaid `flowchart` (decision D88) and writes `FILE.mmd`; `--stdout` prints it,
+`skye render FILE` draws a flow or a router as a Mermaid `flowchart` and writes `FILE.mmd`; `--stdout` prints it,
 `--fence` wraps each diagram in a `mermaid` code fence (and writes `FILE.mmd.md`), `-o` chooses the file, `--direction TD|LR` the
 orientation, and `--name` picks one block when the file has several. A step is a box with what it runs, a `choice` a diamond whose edges
 carry the `when` text, a `parallel` block a subgraph with its `join` rule, `on_error` and `on_timeout` dotted arrows; a router shows each
@@ -427,7 +436,7 @@ route with its strategy and targets and each fallback, in order. From Python: `f
 
 The package ships a skill for Claude Code that teaches a model the `skye` command, the `.skye` language and the rules of the library.
 
-```text
+```bash
 skye skill install                    # copies it to ~/.claude/skills/skye/
 skye skill install --scope project    # ... or to ./.claude/skills/skye/
 skye skill install --dir DIR          # ... or to DIR/skye/
@@ -447,8 +456,9 @@ test fails when one names something that does not exist or shows an example that
 
 ## Writing `.skye` from objects
 
-The opposite of `build` is `to_text`: it writes a router, flow or prompt model (or a whole document) back as `.skye` text that passes
-`skye check` and builds an equal model again; defaults are left out and comments are not kept. To tidy a file you wrote, use `skye fmt`
+Skye can also write a model back as `.skye` text: `ModelRouter.to_skye(name)` for a router, `Flow.to_text()` for a flow, and
+`skye.dsl.to_text(spec_or_document)` for any spec or a whole document. The text
+passes `skye check` and builds an equal model again; defaults are left out and comments are not kept. To tidy a file you wrote, use `skye fmt`
 instead: it works on the text, so comments, `"""` strings and the front matter stay (two spaces per open bracket, no trailing spaces, at most
 one blank line in a row, exactly one after the front matter), and it refuses to write a result that would build differently. `skye fmt
 --check` lists the files that are not formatted (exit 1), for CI. With no path it formats every `.skye` file under the current folder (a folder argument is searched the same way; hidden
@@ -456,6 +466,10 @@ folders, `node_modules`, `venv`, `build` and `dist` are skipped); `--exclude GLO
 folder searched) leave paths out. A router built in Python or by an older program can be moved to a file:
 
 ```python
+from pathlib import Path
+
+from skye.router import ModelRouter
+
 router = ModelRouter({"fast": ["openai/gpt-4o-mini", "anthropic/claude-haiku"]})
 Path("router.skye").write_text(router.to_skye("main"), encoding="utf-8")     # the router block
 config = router.to_config()                                                    # or the dictionary that from_config_dict reads
@@ -480,16 +494,23 @@ flow.check()                                      # the mistakes now (empty when
 
 `skye.load(path, *, registry_names=None)` raises a `ConfigurationError` that lists every mistake as `file:line:column reason fix`. `name` is
 optional when the file holds one block of the kind. `Flow.from_text(text, name=None, registry=None, filename=None)` reads a text.
-**Running a flow is not built yet:** `flow.run(...)` raises `NotImplementedError` and points to the spec `3-runtime-flows`. There is no
-`skye.Router` (decision D39): use `ModelRouter`.
+**Running a flow is not built yet:** `flow.run(...)` raises `NotImplementedError` (see [Status and roadmap](../project/roadmap.md)).
+There is no `skye.Router`: use `ModelRouter`.
 
 ## Loading is cached
 
-Parsing and checking is the costly part of reading a `.skye` file, so it is done once per process. `skye.base.dsl.build_cached(text)` keeps the
-built document in a bounded in-memory cache keyed by the SHA-256 of the text; `skye.utils.skye_files.load_document(path)` also skips the read
-when the file's modification time and size did not change, and keeps the document when the time changed but the hash did not. The router
-loader uses it. A cached document is **read-only**; `clear_cache()` and `clear_files_cache()` forget everything, and `use_cache=False` reads
-and parses every time. Nothing depends on the cache for correctness: a new process parses once. Keeping the result on disk is not decided
-(open decision O37).
+Parsing and checking is the costly part of reading a `.skye` file (2 to 6 ms for a real file), so it is done once per process. The
+built document is kept in a bounded in-memory cache keyed by the SHA-256 of the text; `skye.load(path)` and the router loader also skip
+the read when the file's modification time and size did not change, and keep the document when the time changed but the hash did not.
+A cached document is **read-only** and shared. Nothing depends on the cache for correctness: a new process parses once. From
+Python, `skye.dsl.build_cached(text)` is `build` through the same cache, `skye.dsl.load_document(path)` reads a file through it and
+returns the document with its diagnostics (where `skye.load` raises), and `skye.dsl.clear_cache()` forgets the cached documents. The result is
+not kept on disk: it would save about 5 ms per cold container and add a second file to keep consistent.
 
-See also: [Configuration](configuration.md) for how a router reads its file.
+## See also
+
+- [The .skye language](../concepts/skye-language.md): the overview, with one example per block.
+- [CLI reference](cli.md): `skye check`, `fmt`, `render`, `new`, `prompt`, `skill`.
+- [Editor support](editor.md): the VS Code extension.
+- [skye.dsl](api/dsl.md): `build`, `build_cached`, `clear_cache`, `load_document`, `check_text`, `format_text`, `to_text`,
+  `to_mermaid`, `Diagnostic`, `FormatError`, `SkyeSyntaxError`.

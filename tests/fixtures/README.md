@@ -54,13 +54,14 @@ def test_skye_loading():
 ```
 
 ### `sample_config.json`
-Example JSON configuration file for testing JSON configuration loading.
+Example JSON configuration file for testing JSON configuration loading (`sample_config_full.json` is the
+same with every key). An unknown key is an error (D106), so these files hold only the keys of `SkyeConfig`.
 
 **Usage:**
 ```python
-from skye.base.config import load_config
+import skye
 
-config = load_config("tests/fixtures/sample_config.json")
+config = skye.load_config("tests/fixtures/sample_config.json")
 ```
 
 ### `skye/`

@@ -107,6 +107,7 @@ _TARGET_FIELDS = (
     "cost_per_1k_completion_tokens",
     "tags",
     "metadata",
+    "options",
 )
 _TYPE_WORDS = {
     "string": "a string",

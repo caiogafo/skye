@@ -47,9 +47,10 @@ base/
   health.py               HealthMetrics shared by adapters and the router's health tracking
   validated.py            @validated keyword-only dataclasses: field checks, conversions, constraints (standard library)
   log_event.py            ModelInvocationEvent and the correlation id (the structured log event of a model call)
-  exceptions.py           SkyeError, ProviderError, ConfigurationError, ValidationError,
-                          CapabilityExecutionError, MissingExtraError
-  config.py               ConfigLoader, SkyeConfig, ModelConfig, substitute_env_vars, the 3 prefixed vars
+  exceptions.py           SkyeError, ProviderError (and its RateLimitError, ServerError, ProviderTimeoutError,
+                          AuthenticationError, BadRequestError, ContentPolicyError), ConfigurationError,
+                          ValidationError, CapabilityExecutionError, MissingExtraError
+  config.py               ConfigLoader, SkyeConfig, ModelConfig, substitute_env_vars, the 2 prefixed vars
   lazy_import.py          missing_extra(): first-use import, MissingExtraError on absence
   http.py                 the one network-I/O module (urllib + json); request_json, stream_lines, send_bytes, request
   interfaces/
@@ -94,8 +95,9 @@ runtime, and supports dynamic registration and discovery of plugins through the 
 `exceptions.py` defines `SkyeError` as the root and the specific types `ProviderError` (provider name, status code, original
 error as context), `ConfigurationError`, `ValidationError` (field and value), `CapabilityExecutionError` and
 `MissingExtraError` (names the extra, subclasses `ImportError`). A wrapped error keeps the original message and stack by being
-raised `from` the cause, and `SkyeError.__init__` logs the exception with structured `extra={...}` so every exception is
-logged at an appropriate level (Requirement 18.1, 18.2). `log_event.py` defines the shape of the structured log event of a model invocation
+raised `from` the cause. An error never logs itself (D105): `SkyeError.__init__` emits no record, and the code that
+handles an error logs it once with structured `extra={...}` (Requirement 18.1, 18.2). The HTTP layer raises the `ProviderError`
+subclass the response calls for, with `provider`, `status_code` and `retry_after` (D104). `log_event.py` defines the shape of the structured log event of a model invocation
 (`ModelInvocationEvent`: phase start, end or error; model; provider; correlation id; request and response details, never the
 message text; `log_extra()` gives the keys for `logging`'s `extra`) and the telemetry hook Ports (`observer`, `event_handler`)
 consumed by `observe`; `SkyeConfig` carries the `correlation_id_header` and `component_log_levels` (a level per component, with
@@ -118,8 +120,10 @@ precedence is code > environment > file (Requirement 20.1, 20.2). `substitute_en
 and raises `ConfigurationError` when the variable is missing (Requirement 20.4). A YAML file needs the extra `yaml`: `_yaml()`
 calls `missing_extra("yaml", extra="yaml")`, so a missing parser raises `MissingExtraError` naming the extra, while JSON needs
 nothing (Requirement 20.1; D29). An invalid value raises `ConfigurationError` with details (Requirement 20.3). The prefixed
-environment variables are exactly three — `SKYE_LOG_LEVEL`, `SKYE_CONFIG`, `SKYE_ENABLE_TELEMETRY` (`ALL_ENV_VARS`); provider
-credentials never come from a prefixed variable (D18).
+environment variables are `SKYE_LOG_LEVEL` and `SKYE_CONFIG` (`ALL_ENV_VARS`; the telemetry variable left with the
+`enable_telemetry` key, D106); provider credentials never come from a prefixed variable (D18). `SkyeConfig` holds only the keys
+that code reads (`log_level`, `correlation_id_header`, `component_log_levels`); an unknown key in the file or the overrides is a
+`ConfigurationError` naming it, and `skye.load_config` applies the log levels it reads (D106).
 
 ### The `.skye` language: text-level features (Requirement 54.16 to 54.20; D69 to D73)
 
@@ -170,8 +174,11 @@ the configuration models `SkyeConfig`, `ModelConfig`, `RateLimitConfig`, `RetryC
 `SkyeError` is the one root; `ProviderError` wraps a provider failure with its context and status, `ConfigurationError`
 reports a bad configuration value or file, `ValidationError` names the field and value, and `MissingExtraError` names the
 absent extra while subclassing `ImportError` so existing `except ImportError` sites keep working. Every error is raised `from`
-its cause to keep the original message and stack, and logged on construction with structured context (Requirement 18.1, 18.2).
-`http.py` maps a `urllib` HTTP error or transport failure to a `ProviderError` with the status code, keeping the cause.
+its cause to keep the original message and stack; it is logged once by the code that handles it, never on construction
+(Requirement 18.1, 18.2; D105). `http.py` maps a `urllib` HTTP error or transport failure to the `ProviderError` subclass of the
+status (429 `RateLimitError`, 5xx `ServerError`, 401/403 `AuthenticationError`, other 4xx `BadRequestError` or
+`ContentPolicyError`, a timeout or dropped connection `ProviderTimeoutError`), with `retry_after` from `Retry-After`, keeping
+the cause (D104).
 
 ## Testing Strategy
 

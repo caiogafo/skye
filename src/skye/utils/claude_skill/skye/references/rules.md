@@ -9,7 +9,12 @@ Read this when you write or review code in the library itself.
 - **Ports.** A Port that third parties implement as a plain class is a `Protocol`; a component never imports another runtime component, it
   receives it as a `Runnable`.
 - **Errors** come from `skye.exceptions` (`ValidationError`, `ConfigurationError`, ...). A value that cannot be read raises `ValidationError`
-  with the field and the value.
+  with the field and the value. A provider failure is a `ProviderError` subclass chosen by the response (D104): `RateLimitError` (429),
+  `ServerError` (5xx), `ProviderTimeoutError`, `AuthenticationError` (401/403), `BadRequestError` (other 4xx) and its
+  `ContentPolicyError`; each has `.provider`, `.status_code` and `.retry_after` (seconds or `None`). An input form the adapter does
+  not accept (Bedrock and an image URL) is an `UnsupportedModalityError` (a `ProviderError`, `.modality`, no `status_code`, never
+  retried; Requirement 26.3). An error never logs itself (D105):
+  the code that handles it logs it once.
 - **No file I/O in `base`:** the parser takes text; the code that reads a file lives in the component or in `skye.utils`.
 - **Examples** run with no key (a scripted model), stay small and print plain output.
 - **Configuration** is `.skye` (router, flow, prompt) or JSON (library configuration). The library reads no YAML.

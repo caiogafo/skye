@@ -1,6 +1,6 @@
 """The parser of the ``.skye`` language: text in, syntax tree out.
 
-Grammar (see ``docs/base/skye-language.md`` for the full page)::
+Grammar (see ``docs/reference/skye-language.md`` for the full page)::
 
     file      = block*
     block     = KIND [LABEL] "{" (attribute | block)* "}"

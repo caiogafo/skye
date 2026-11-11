@@ -4,7 +4,7 @@
 
 This plan executes the target module and folder structure defined in `design.md`, governed by the testable requirements in `requirements.md` (the source of truth; requirements are cited by number). It is a **structure-only migration**: it moves and renames packages and declares boundaries, with no behavior change beyond what the requirements state.
 
-The migration is done and was verified green on 2026-11-02. The only open work is group **13**, the final verification, to be run with Kiro. The rename of the project and the owner actions are not tasks of this spec: they are in `.kiro/steering/12-decisions.md` (decision D31 and the section on owner actions). Documentation-as-wiki is group 10.
+The migration is done and was verified green on 2026-11-02. The only open work is group **13**, the final verification. The rename of the project and the owner actions are not tasks of this spec: they are in `.kiro/steering/12-decisions.md` (decision D31 and the section on owner actions). Documentation-as-wiki is group 10.
 
 ### Ordering principle
 
@@ -210,7 +210,7 @@ The migration is done and was verified green on 2026-11-02. The only open work i
     - Evidence: `tests/budget/test_provider_agnostic_core.py` (the core has no host, wire key, adapter class or `models/llm` import of one provider; no adapter imports the adapter of another provider; the detector is tested); the three pages of `docs/models/` that cited the script now cite the test.
     - _Requirements: 9.10_
 
-- [x] 13. Final verification (to be run with Kiro)
+- [x] 13. Final verification
   - [x] 13.1 Run the whole verification: `uv run pytest tests`, `make budget`, `make differential`. Everything passes except the documented skips (live-credential differential tests, and the one `xfail` of the `auth` extra until `auth` is implemented).
     - _Requirements: 7.5, 23.1_
   - [x] 13.2 Check that every requirement of `10-requirements.md` is cited by at least one spec story, or note which ones have no owner yet; rewrite the "Requirement coverage" table below with the current numbers (it still uses the numbering of the former spec).
@@ -250,7 +250,7 @@ The migration is done and was verified green on 2026-11-02. The only open work i
     - Evidence: `src/skye/interfaces.py`, `data.py`, `messages.py`, `completion.py`, `exceptions.py`, `config.py` (re-exports of `base`), the lazy names in `src/skye/__init__.py`, `RoutingStrategy` in `skye.router`, lazy exports in `skye.auth`; every import in `examples/`, `docs/` and `README.md` now has at most two levels and none goes through `skye.base`; `tests/budget/test_public_imports.py` fails on a deeper or `skye.base` path, and `tests/budget/test_import_matrix.py` counts the facades as `base`.
     - _Requirements: 7.8, 7.14; D34_
 
-- [x] 16. Final verification of the dependency removal and of the `.skye` work (to be run with Kiro)
+- [x] 16. Final verification of the dependency removal and of the `.skye` work
   - [x] 16.1 Run the whole verification: `uv run pytest tests -q`, `uv run pytest tests/budget -q`, `make budget`, `make differential`. Install the package in a clean environment with no extra and confirm that `import skye` works and imports no third-party module.
     - Evidence (2026-11-09): `uv run pytest tests -q`: 3486 passed, 3 skipped, 0 failed; `uv run pytest tests/budget -q`: 293 passed; `make budget`: 9 passed (`tests/budget/test_footprint_budget.py`: core footprint, compiled distributions, core modules without extras, clean-environment load, the extras `auth`, `memory`, `postgres`, `tokens`, and the serverless profile); `make differential`: 23 passed, 0 skipped. Clean environment: `uv venv` (Python 3.11.11) and `uv pip install .` install one distribution, `skyeai 0.1.1`; `import skye` adds no module outside the standard library, and `skye.load_config` (a JSON file, returns `SkyeConfig`), `skye.load` (`tests/fixtures/skye/flows.skye`, returns `Document`) and `skye.dsl.to_mermaid` (flow `triage`, a `flowchart TD`) work there, still with no third-party module loaded; `skye render tests/fixtures/skye/flows.skye --name triage --stdout --fence` prints a fenced Mermaid diagram and exits 0. Allowlists: `KNOWN_MISMATCHES` (`tests/unit/test_port_signatures.py`), `known_import_failures` and `known_leaks` (`budgets.toml`) are empty; `KNOWN_DUPLICATES` (`tests/budget/test_unique_names.py`: `CapabilitySchema`, `CapabilityInterface`, the older `tools` copies of the base Port) and `KNOWN_LONG` (`tests/budget/test_example_size.py`: `advanced/custom_providers.py`, 90 lines, proposal S5.5) hold one named debt each. Nothing had to be fixed.
     - _Requirements: 7.5, 7.9; D49_

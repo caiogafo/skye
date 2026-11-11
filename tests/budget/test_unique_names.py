@@ -12,12 +12,8 @@ from pathlib import Path
 
 SRC = Path(__file__).resolve().parents[2] / "src" / "skye"
 
-# name -> modules that define it. The `tools` CapabilitySchema is a validated dataclass now; it still duplicates the base Port name until the tools interface is merged.
-KNOWN_DUPLICATES: dict[str, set[str]] = {
-    "CapabilitySchema": {"skye.base.interfaces.capability", "skye.tools.schema"},
-    # Found by this test, not named in the audit: the `tools` interface is the older copy of the base Port.
-    "CapabilityInterface": {"skye.base.interfaces.capability", "skye.tools.interface"},
-}
+# name -> modules that define it. Empty: the `tools` copies of CapabilitySchema/CapabilityInterface were merged into the base Port.
+KNOWN_DUPLICATES: dict[str, set[str]] = {}
 
 
 def _module(path: Path) -> str:

@@ -17,7 +17,9 @@ from skye.base.interfaces.model import ModelInterface
 from skye.base.interfaces.observer import EventType, ObserverInterface
 from skye.base.interfaces.plugin import PluginInterface
 from skye.base.interfaces.prompt import (
+    OutputSchema,
     PromptBuilderInterface,
+    PromptParts,
     PromptRegistryInterface,
     PromptRenderingInterface,
     PromptSchemaInterface,
@@ -35,7 +37,12 @@ from skye.base.interfaces.router import (
 )
 from skye.base.interfaces.runnable import Runnable
 from skye.base.interfaces.safety import SafetyFilterInterface, SafetyResult
-from skye.base.interfaces.storage import StorageBackend
+from skye.base.interfaces.storage import (
+    CounterStore,
+    KeyValueStore,
+    ScanStore,
+    StorageBackend,
+)
 from skye.base.interfaces.token_counter import TokenCounterInterface
 from skye.base.interfaces.tool_provider import CapabilityContext, ToolProvider
 from skye.base.interfaces.vector_encoder import VectorEncoderInterface
@@ -55,6 +62,8 @@ __all__ = [
     "PromptRenderingInterface",
     "PromptRegistryInterface",
     "PromptSchemaInterface",
+    "PromptParts",
+    "OutputSchema",
     # Composition and decision Ports
     "AuthorizerInterface",
     "Decision",
@@ -70,6 +79,9 @@ __all__ = [
     # Memory and storage interfaces
     "MemoryInterface",
     "StorageBackend",
+    "KeyValueStore",
+    "CounterStore",
+    "ScanStore",
     # Safety and filtering interfaces
     "SafetyFilterInterface",
     "SafetyResult",

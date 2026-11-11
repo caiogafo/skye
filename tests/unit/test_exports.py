@@ -34,9 +34,15 @@ def test_provider_is_exported_and_loads_the_registry_only_when_called():
 def test_exception_exports():
     """Test that all exceptions are importable from skye.base.exceptions."""
     from skye.base.exceptions import (
+        AuthenticationError,
+        BadRequestError,
         CapabilityExecutionError,
         ConfigurationError,
+        ContentPolicyError,
         ProviderError,
+        ProviderTimeoutError,
+        RateLimitError,
+        ServerError,
         SkyeError,
         ValidationError,
     )
@@ -47,6 +53,9 @@ def test_exception_exports():
     assert issubclass(ConfigurationError, SkyeError)
     assert issubclass(ValidationError, SkyeError)
     assert issubclass(CapabilityExecutionError, SkyeError)
+    for cls in (RateLimitError, ServerError, ProviderTimeoutError, AuthenticationError, BadRequestError):
+        assert issubclass(cls, ProviderError)
+    assert issubclass(ContentPolicyError, BadRequestError)
 
 
 def test_message_exports():
@@ -148,6 +157,8 @@ CURATED = ["messages", "completion", "exceptions", "config"]
 LAZY_NAMES = {
     "UserMessage", "SystemMessage", "AssistantMessage", "CapabilityMessage", "CompleteRequest", "CompleteResponse",
     "StreamChunk", "TokenUsage", "SkyeError", "ProviderError", "ConfigurationError", "ValidationError", "MissingExtraError",
+    # The provider errors chosen by the response (decision D104).
+    "RateLimitError", "ServerError", "ProviderTimeoutError", "AuthenticationError", "BadRequestError", "ContentPolicyError",
     # The `.skye` loading API (decision D61): `skye.load(path)` and `skye.Flow` (task 8.4 of the uxui spec).
     "load", "Flow",
     # The configuration file is read in `skye.utils` (decision D91): `skye.load_config(path)`.

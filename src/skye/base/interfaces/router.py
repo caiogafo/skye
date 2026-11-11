@@ -33,14 +33,17 @@ if TYPE_CHECKING:
 class RoutingStrategy(Enum):
     """Routing strategies for model selection.
 
-    Inspired by LiteLLM's routing strategies:
-    - SIMPLE_SHUFFLE: Random selection (default)
+    Inspired by LiteLLM's routing strategies. ``ModelRouter`` uses ``ROUND_ROBIN`` unless told otherwise, and a
+    route with no strategy of its own uses the router's.
+
+    - ROUND_ROBIN: Each target in turn
+    - SIMPLE_SHUFFLE: Random selection
     - LEAST_BUSY: Route to deployment with fewest active requests
     - RATE_LIMIT_AWARE: Route to deployment with lowest TPM/RPM usage (async rate-limit aware)
     - LATENCY_BASED: Route to deployment with lowest latency
-    - COST_BASED: Route to deployment with lowest cost
+    - COST_BASED: Route to deployment with lowest ``cost_per_1k_*_tokens``
     - WEIGHTED: Weighted random selection based on model weights
-    - PRIORITY_BASED: Route based on model priority levels
+    - PRIORITY_BASED: Route to the deployment with the highest success rate
     """
 
     SIMPLE_SHUFFLE = "simple_shuffle"
@@ -260,7 +263,7 @@ class RouterConfigurationInterface(ABC):
             >>> from skye.router import RetryPolicyConfig
             >>> router.set_retry_policy([
             ...     RetryPolicyConfig(error_type="RateLimitError", max_retries=3),
-            ...     RetryPolicyConfig(error_type="TimeoutError", max_retries=2)
+            ...     RetryPolicyConfig(error_type="ProviderTimeoutError", max_retries=2)
             ... ])
         """
         pass

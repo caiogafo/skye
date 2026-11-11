@@ -4,19 +4,35 @@ The code lives in `skye.base.exceptions`; import from here (or from `skye` for t
 """
 
 from skye.base.exceptions import (
+    AuthenticationError,
+    BadRequestError,
+    CapabilityChoiceError,
     CapabilityExecutionError,
     ConfigurationError,
+    ContentPolicyError,
     MissingExtraError,
     ProviderError,
+    ProviderTimeoutError,
+    RateLimitError,
+    ServerError,
     SkyeError,
+    UnsupportedModalityError,
     ValidationError,
 )
 
 __all__ = [
+    "AuthenticationError",
+    "BadRequestError",
+    "CapabilityChoiceError",
     "CapabilityExecutionError",
     "ConfigurationError",
+    "ContentPolicyError",
     "MissingExtraError",
     "ProviderError",
+    "ProviderTimeoutError",
+    "RateLimitError",
+    "ServerError",
     "SkyeError",
+    "UnsupportedModalityError",
     "ValidationError",
 ]

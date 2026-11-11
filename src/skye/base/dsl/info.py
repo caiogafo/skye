@@ -1,6 +1,8 @@
-"""Help for prompts: what a prompt takes (its inputs) and what it gives back (its output).
+"""Help for ``.skye`` blocks: what a prompt, a router or a flow takes and gives back.
 
-:func:`describe_prompt` reads a :class:`~skye.base.dsl.PromptSpec` (and, when given, the front
+:func:`describe` reads any block (a prompt, a router or a flow, decision D83) into an info
+object: :class:`PromptInfo`, :class:`RouterInfo` or :class:`FlowInfo`; ``skye.dsl`` is its public
+path. :func:`describe_prompt` reads a :class:`~skye.base.dsl.PromptSpec` (and, when given, the front
 matter of its file) into a :class:`PromptInfo`; :func:`prompt_help` prints it as aligned plain
 text. ``BasePromptBuilder.describe`` and ``BasePromptBuilder.help`` do the same for a registered
 template, and ``skye prompt info`` on the command line.
@@ -21,14 +23,29 @@ import json
 from collections.abc import Iterable, Mapping, Sequence
 from typing import Any
 
-from skye.base.dsl.specs import OutputFieldSpec, OutputSpec, PromptPartSpec, PromptSpec
+from skye.base.dsl.specs import (
+    ChoiceSpec,
+    FlowSpec,
+    OutputFieldSpec,
+    OutputSpec,
+    ParallelSpec,
+    PromptPartSpec,
+    PromptSpec,
+    RouterSpec,
+    TargetSpec,
+)
 from skye.base.validated import Validated, field, validated
 
 __all__ = [
+    "FlowInfo",
     "InputInfo",
+    "NodeInfo",
     "OutputFieldInfo",
     "OutputInfo",
     "PromptInfo",
+    "RouteInfo",
+    "RouterInfo",
+    "describe",
     "describe_prompt",
     "prompt_help",
 ]
@@ -120,6 +137,159 @@ class PromptInfo(Validated):
         default_factory=list,
         description="The conditional outputs (output inside a when), each with its condition; "
         "at most one is active at render time",
+    )
+
+
+@validated
+class RouteInfo(Validated):
+    """One route of a router: its alias, its targets and its fallback chain."""
+
+    alias: str = field(description="Alias name of the route")
+    targets: list[str] = field(
+        default_factory=list, description='The targets, as "provider/model", in order'
+    )
+    strategy: str | None = field(
+        default=None, description="The strategy of the route (None: the router's)"
+    )
+    fallback: list[str] = field(
+        default_factory=list, description="Routes to try, in order, when this route fails"
+    )
+    fallback_targets: list[str] = field(
+        default_factory=list,
+        description='The shorthand route "x" = [...]: the entries after the first',
+    )
+
+
+@validated
+class RouterInfo(Validated):
+    """What a router block holds, for help screens and tools."""
+
+    name: str | None = field(default=None, description="The label of the block, if any")
+    title: str | None = field(default=None, description="Front matter title")
+    description: str | None = field(default=None, description="Front matter description")
+    version: str | None = field(default=None, description="Front matter version")
+    tags: list[str] = field(default_factory=list, description="Front matter tags")
+    strategy: str | None = field(default=None, description="Default routing strategy")
+    cooldown: str | None = field(default=None, description='Cooldown after failures, "60s"')
+    routes: list[RouteInfo] = field(default_factory=list, description="The routes, in order")
+
+
+@validated
+class NodeInfo(Validated):
+    """One node of a flow: a step, a parallel block or a choice."""
+
+    name: str = field(description="Node name")
+    kind: str = field(description="step, parallel or choice")
+    run: str | None = field(default=None, description="A step: the Runnable it runs")
+    next: str | None = field(default=None, description='The next node, or "end"')
+    branches: list[str] = field(
+        default_factory=list,
+        description="A parallel block: its branch steps; a choice: the next node of each branch",
+    )
+
+
+@validated
+class FlowInfo(Validated):
+    """What a flow takes (its context) and the nodes it goes through."""
+
+    name: str = field(description="Flow name")
+    title: str | None = field(default=None, description="Front matter title")
+    description: str | None = field(default=None, description="Front matter description")
+    version: str | None = field(default=None, description="Front matter version")
+    tags: list[str] = field(default_factory=list, description="Front matter tags")
+    start: str | None = field(default=None, description="The first node, where the flow starts")
+    inputs: list[InputInfo] = field(
+        default_factory=list, description="The declared context fields, in order"
+    )
+    steps: list[NodeInfo] = field(default_factory=list, description="The nodes, in file order")
+
+
+def describe(
+    spec: PromptSpec | RouterSpec | FlowSpec, metadata: Mapping[str, Any] | None = None
+) -> PromptInfo | RouterInfo | FlowInfo:
+    """What a block of a ``.skye`` file takes and gives back, for every kind of block (D83).
+
+    Args:
+        spec: A prompt, router or flow, from a ``Document`` (``document.prompt(name)``,
+            ``document.routers[0]``, ``document.flows[0]``).
+        metadata: The front matter of its file (``Document.metadata``).
+
+    Returns:
+        A :class:`PromptInfo` (as :func:`describe_prompt`), a :class:`RouterInfo` (the routes
+        with their targets and fallbacks) or a :class:`FlowInfo` (the context fields and the
+        nodes).
+
+    Raises:
+        TypeError: If ``spec`` is not a prompt, router or flow spec.
+
+    Example:
+        >>> from skye.base.dsl import build
+        >>> document = build('router "r" {\n  route "a" = ["openai/gpt-4o-mini"]\n}\n')
+        >>> describe(document.routers[0]).routes[0].targets
+        ['openai/gpt-4o-mini']
+    """
+    if isinstance(spec, PromptSpec):
+        return describe_prompt(spec, metadata)
+    if isinstance(spec, RouterSpec):
+        return _describe_router(spec, metadata)
+    if isinstance(spec, FlowSpec):
+        return _describe_flow(spec, metadata)
+    raise TypeError(
+        f"describe() takes a PromptSpec, RouterSpec or FlowSpec, not {type(spec).__name__}"
+    )
+
+
+def _target(target: TargetSpec) -> str:
+    return f"{target.provider}/{target.model}"
+
+
+def _describe_router(spec: RouterSpec, metadata: Mapping[str, Any] | None) -> RouterInfo:
+    routes = [
+        RouteInfo(
+            alias=route.alias,
+            targets=[_target(t) for t in route.targets],
+            strategy=route.strategy,
+            fallback=list(route.fallback),
+            fallback_targets=[_target(t) for t in route.fallback_targets],
+        )
+        for route in spec.routes
+    ]
+    return RouterInfo(
+        name=spec.name,
+        strategy=spec.strategy,
+        cooldown=spec.cooldown,
+        routes=routes,
+        **header_fields(metadata),
+    )
+
+
+def _node_info(node: Any) -> NodeInfo:
+    if isinstance(node, ParallelSpec):
+        return NodeInfo(
+            name=node.name,
+            kind="parallel",
+            next=node.next,
+            branches=[step.name for step in node.steps],
+        )
+    if isinstance(node, ChoiceSpec):
+        branches = [b.next for b in node.branches if b.next is not None]
+        if node.otherwise is not None and node.otherwise.next is not None:
+            branches.append(node.otherwise.next)
+        return NodeInfo(name=node.name, kind="choice", branches=branches)
+    return NodeInfo(name=node.name, kind="step", run=node.run, next=node.next)
+
+
+def _describe_flow(spec: FlowSpec, metadata: Mapping[str, Any] | None) -> FlowInfo:
+    inputs = [
+        InputInfo(name=f.name, type=f.type, required=f.required, default=f.default)
+        for f in spec.context.fields
+    ]
+    return FlowInfo(
+        name=spec.name,
+        start=spec.start,
+        inputs=inputs,
+        steps=[_node_info(node) for node in spec.nodes],
+        **header_fields(metadata),
     )
 
 

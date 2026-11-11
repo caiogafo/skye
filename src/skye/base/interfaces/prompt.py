@@ -9,8 +9,8 @@ Inspired by:
   invoke pattern, multimodal support
 
 Comprehensive Features:
-- **Template Engine**: a standard-library engine (``{{ }}``, ``if``, ``for``, filters); no macros,
-  inheritance or include (D20)
+- **Template Engine**: a standard-library engine, interpolation only (``{{ }}`` and filters, D76);
+  conditions and loops are written in ``.skye`` prompts; no macros, inheritance or include (D20)
 - **Few-Shot Learning**: Dynamic example selection and formatting
 - **Multimodal Support**: Text, images, audio, video content in prompts
 - **Template Management**: Versioning, loading from files/strings, composition
@@ -38,6 +38,7 @@ from collections.abc import Callable, Mapping
 from typing import Any
 
 from skye.base.messages import SkyeMessage
+from skye.base.prompt_parts import OutputSchema, PromptParts
 
 
 class PromptRenderingInterface(ABC):
@@ -74,6 +75,32 @@ class PromptRenderingInterface(ABC):
             'Extract entities from: Alice works at Google'
         """
         pass
+
+    def render_parts(self, template_name: str, variables: dict[str, Any]) -> PromptParts:
+        """Render a template into provider-agnostic parts (Requirement 33.9, decisions D81, D101).
+
+        The default takes :meth:`render`: the system messages become ``system`` (their texts
+        joined with a blank line), the other messages stay in order, and there is no output
+        schema. An implementation that knows the output of its templates overrides it to fill
+        ``output`` and ``fallback_text``.
+
+        Args:
+            template_name: Name of the template to render.
+            variables: Dictionary of variables to inject.
+
+        Returns:
+            The parts, ready for ``client.complete(parts, model=...)``.
+
+        Raises:
+            KeyError: If the template name is not found.
+            ValueError: If required variables are missing.
+        """
+        messages = self.render(template_name, variables)
+        system = [m.content for m in messages if m.role == "system" and m.content]
+        return PromptParts(
+            messages=tuple(m for m in messages if m.role != "system"),
+            system="\n\n".join(system) if system else None,
+        )
 
     @abstractmethod
     def partial(self, **kwargs: str | Callable[[], str]) -> "PromptBuilderInterface":
@@ -151,17 +178,24 @@ class PromptRenderingInterface(ABC):
         template_name: str,
         examples: list[dict[str, Any]],
         example_template: str | None = None,
+        *,
+        as_messages: bool = False,
     ) -> None:
         """Add few-shot examples to a template.
 
         Inspired by Promptify and LangChain's few-shot prompting, this allows
-        adding examples that will be formatted and injected into the prompt.
+        adding examples that will be formatted and injected into the prompt (decision D79).
 
         Args:
             template_name: Name of the template to add examples to.
-            examples: List of example dictionaries with input/output pairs.
-            example_template: Optional template for formatting each example.
-                If None, uses a default format.
+            examples: List of example dictionaries.
+            example_template: Optional template for formatting each example. If None, each
+                example is written from its own keys, one ``Key: value`` line per key in order.
+            as_messages: Give each example as a user message and an assistant message
+                (``input``/``output`` when present, else the first and the last key).
+
+        Raises:
+            ValueError: If an example lacks a key that ``example_template`` reads.
 
         Example:
             >>> builder = MyPromptBuilder()
@@ -246,19 +280,20 @@ class PromptRenderingInterface(ABC):
         pass
 
     @abstractmethod
-    def register_jinja_filter(self, filter_name: str, filter_func: Callable[[Any], Any]) -> None:
-        """Register a custom filter for the stdlib template engine.
+    def register_filter(self, filter_name: str, filter_func: Callable[[Any], Any]) -> None:
+        """Register a filter for ``{{ value | name }}``, available in every rendering.
 
-        Allows extending templates (``{{ value | name }}``) with custom filters for
-        text processing, formatting, etc. Macros are not supported (D20).
+        The template engine is the standard-library one and does interpolation only (decisions
+        D76, D77): a filter is how a template transforms a value. Macros are not supported (D20).
 
         Args:
             filter_name: Name of the filter to use in templates.
-            filter_func: Function that implements the filter.
+            filter_func: Function that implements the filter; it gets the value, then the
+                arguments written in the template.
 
         Example:
             >>> builder = MyPromptBuilder()
-            >>> builder.register_jinja_filter("uppercase", lambda x: x.upper())
+            >>> builder.register_filter("uppercase", lambda x: x.upper())
             >>> # In template: "{{ name | uppercase }}"
         """
         pass
@@ -610,3 +645,12 @@ class PromptBuilderInterface(
         ...         self.allowed_missing.extend(variables)
     """
 
+
+__all__ = [
+    "OutputSchema",
+    "PromptBuilderInterface",
+    "PromptParts",
+    "PromptRegistryInterface",
+    "PromptRenderingInterface",
+    "PromptSchemaInterface",
+]

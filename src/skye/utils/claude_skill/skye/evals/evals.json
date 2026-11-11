@@ -181,6 +181,29 @@
         "Neither output block is inside a message or an each block",
         "The assistant ran skye check on the file and it reported ok"
       ]
+    },
+    {
+      "id": 16,
+      "prompt": "I have a Skye prompt in invoice.skye with an output \"json\" block. I want to call OpenAI with the schema sent natively, not as text in the user message. Show me the Python.",
+      "expected_output": "Python that loads the prompt and calls skye.prompts.render_parts, then client.complete(parts, model=...).",
+      "files": [],
+      "expectations": [
+        "The code uses render_parts (from skye.prompts) or builder.render_parts, not render_prompt plus a hand-written OutputSchema",
+        "The PromptParts goes to client.complete(parts, model=...) with an explicit model, not to a router",
+        "The answer does not also append the output instructions to the messages by hand"
+      ]
+    },
+    {
+      "id": 17,
+      "prompt": "In my Skye router file, retry timeouts twice with a 2 second wait that doubles, and put a target in cooldown after 20 server errors in a minute. The router runs in a Lambda without a warm process, and I load it with ModelRouter.from_file.",
+      "expected_output": "retry_policy \"ProviderTimeoutError\" { max_retries = 2, retry_after = \"2s\", exponential_backoff = true } and allowed_fails_policy \"ServerError\" { allowed_fails_per_minute = 20 } in the router block, plus from_file(..., storage=...) with an explicit shared store.",
+      "files": [],
+      "expectations": [
+        "The timeout policy is named ProviderTimeoutError, not TimeoutError",
+        "The wait is written as retry_after = \"2s\" with exponential_backoff = true (no retry_after_seconds in the .skye file)",
+        "The cooldown policy is allowed_fails_policy \"ServerError\" with allowed_fails_per_minute = 20",
+        "The Python code passes a shared store to ModelRouter.from_file with storage= (DynamoDB or another external backend), because the in-memory default does not survive between invocations"
+      ]
     }
   ]
 }

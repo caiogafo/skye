@@ -47,6 +47,8 @@ The requirements themselves live in `.kiro/steering/10-requirements.md`; each re
 2. THE spec SHALL realize Requirement 18.2 of #[[file:.kiro/steering/10-requirements.md]].
 3. THE spec SHALL realize Requirement 18.3 of #[[file:.kiro/steering/10-requirements.md]].
 4. THE spec SHALL realize Requirement 18.4 of #[[file:.kiro/steering/10-requirements.md]].
+5. THE spec SHALL honor decision D104 of #[[file:.kiro/steering/12-decisions.md]].
+6. THE spec SHALL honor decision D105 of #[[file:.kiro/steering/12-decisions.md]].
 
 ### Requirement 4: Token usage and cost
 
@@ -68,6 +70,7 @@ The requirements themselves live in `.kiro/steering/10-requirements.md`; each re
 2. THE spec SHALL realize Requirement 20.2 of #[[file:.kiro/steering/10-requirements.md]].
 3. THE spec SHALL realize Requirement 20.3 of #[[file:.kiro/steering/10-requirements.md]].
 4. THE spec SHALL realize Requirement 20.4 of #[[file:.kiro/steering/10-requirements.md]].
+5. THE spec SHALL honor decision D106 of #[[file:.kiro/steering/12-decisions.md]].
 
 ### Requirement 6: Type safety
 

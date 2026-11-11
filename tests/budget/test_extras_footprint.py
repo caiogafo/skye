@@ -58,20 +58,24 @@ EXTRA_PATHS: dict[str, list[str]] = {
         "tools/capability_models.py",
         "tools/decorator.py",
         "tools/exceptions.py",
-        "tools/interface.py",
         "tools/local_function.py",
         "tools/mcp_boundary.py",
         "tools/mcp_client.py",
         "tools/mcp_resource.py",
         "tools/registry.py",
         "tools/remote_api.py",
-        "tools/schema.py",
     ],
     "mcp": [
         "tools/mcp_fastmcp.py",
     ],
-    "memory": ["memory", "store/redis.py"],
-    "postgres": ["store/postgres.py"],
+    # Store backends: one extra per backend (D99). The drivers are imported lazily through `missing_extra`, which names
+    # the extra, so `store/postgres.py` (three drivers) and `store/redis.py` (two) are attributed by those hints, not by its path.
+    "memory": ["memory"],
+    "redis": [],
+    "valkey": [],
+    "postgres": [],
+    "postgres-asyncpg": [],
+    "aws": [],
     "observe": ["observe"],
 }
 

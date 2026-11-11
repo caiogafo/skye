@@ -20,6 +20,7 @@ Example:
     'gpt-4'
 """
 
+import dataclasses
 import json
 import logging
 import os
@@ -32,7 +33,6 @@ from skye.base.validated import Validated, field, validated
 
 # Set up module logger
 logger = logging.getLogger(__name__)
-
 
 
 def reject_yaml(path: str | Path) -> None:
@@ -57,7 +57,8 @@ def substitute_env_vars(config: dict[str, Any] | list[Any] | str | Any) -> Any:
 
     Substitutes ${VAR_NAME} patterns with environment variable values throughout
     the configuration structure. Supports nested dictionaries, lists, and strings.
-    Uses caching to avoid repeated os.getenv() calls for the same variable.
+    Each reference reads the environment when it is substituted (decision D66), so a variable
+    changed between two loads is seen by the second.
 
     Args:
         config: Configuration data (dict, list, str, or other type).
@@ -89,7 +90,6 @@ def substitute_env_vars(config: dict[str, Any] | list[Any] | str | Any) -> Any:
 
         def replace_var(match: re.Match[str]) -> str:
             var_name = match.group(1)
-
 
             # Get from environment
             value = os.getenv(var_name)
@@ -268,48 +268,26 @@ class ModelConfig(Validated):
 class SkyeConfig(Validated):
     """Global Skye configuration.
 
-    Top-level configuration for the entire Skye platform including logging,
-    telemetry, model configurations, plugin settings, and router configuration.
+    The settings of the library itself: the log levels and the correlation header. A key that
+    nothing reads is not a field, and an unknown key in a configuration file is a
+    ``ConfigurationError`` (decision D106); a key comes back only with the code that reads it.
 
     Attributes:
         log_level: Logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL).
-        enable_telemetry: Whether to enable telemetry collection.
         correlation_id_header: HTTP header name for correlation IDs.
         component_log_levels: Log level per component, keyed by the component name (for example
-            ``{"router": "DEBUG", "models": "WARNING"}``); a component not listed uses ``log_level``.
-        models: Dictionary of model configurations keyed by model name.
-        plugins: Dictionary of plugin configurations keyed by plugin name.
-        default_routing_strategy: Default strategy for model routing.
-        enable_fallbacks: Whether to enable fallback models.
-        enable_rate_limiting: Whether to enable rate limiting.
+            ``{"router": "DEBUG", "models": "WARNING"}``); a component not listed uses
+            ``log_level``.
 
     Example:
-        >>> config = SkyeConfig(
-        ...     log_level="INFO",
-        ...     enable_telemetry=True,
-        ...     models={
-        ...         "gpt-4": ModelConfig(
-        ...             model_id="gpt-4",
-        ...             provider="openai"
-        ...         )
-        ...     },
-        ...     default_routing_strategy="round_robin"
-        ... )
-        >>> config.log_level
-        'INFO'
+        >>> config = SkyeConfig(log_level="INFO", component_log_levels={"router": "DEBUG"})
+        >>> config.level_for("router")
+        'DEBUG'
     """
 
     log_level: str = "INFO"
-    enable_telemetry: bool = True
     correlation_id_header: str = "X-Correlation-ID"
     component_log_levels: dict[str, str] = field(default_factory=dict)
-    models: dict[str, ModelConfig] = field(default_factory=dict)
-    plugins: dict[str, dict[str, Any]] = field(default_factory=dict)
-
-    # Router configuration
-    default_routing_strategy: str = "round_robin"
-    enable_fallbacks: bool = True
-    enable_rate_limiting: bool = True
 
     def __post_init__(self) -> None:
         """Validate the fields, then that every component log level is a standard level name."""
@@ -392,9 +370,7 @@ class RouterConfig(Validated):
     )
     strategy: str = field("round_robin", description="Default routing strategy")
     cooldown_seconds: float = field(60.0, ge=0.0, description="Cooldown duration in seconds")
-    enable_pre_call_checks: bool = field(
-        True, description="Enable pre-call rate limit checks"
-    )
+    enable_pre_call_checks: bool = field(True, description="Enable pre-call rate limit checks")
 
 
 def _validation_errors(error: ValidationError) -> list[dict[str, Any]]:
@@ -412,8 +388,8 @@ def _validation_errors(error: ValidationError) -> list[dict[str, Any]]:
 
 
 #: The Skye-prefixed variables that set configuration values (SKYE_CONFIG selects the file).
-ENV_CONFIG_VARS = frozenset({"SKYE_LOG_LEVEL", "SKYE_ENABLE_TELEMETRY"})
-#: All Skye-prefixed environment variables: exactly three.
+ENV_CONFIG_VARS = frozenset({"SKYE_LOG_LEVEL"})
+#: All Skye-prefixed environment variables: two (the telemetry variable left with its key, D106).
 ALL_ENV_VARS = ENV_CONFIG_VARS | {"SKYE_CONFIG"}
 
 
@@ -451,8 +427,8 @@ class ConfigLoader:
                 or if the merged values do not validate.
 
         Example:
-            >>> ConfigLoader.load('{"enable_telemetry": false}').enable_telemetry
-            False
+            >>> ConfigLoader.load('{"log_level": "WARNING"}').log_level
+            'WARNING'
         """
         if text is None:
             named = ConfigLoader.config_path_from_env()
@@ -497,8 +473,12 @@ class ConfigLoader:
             SkyeConfig: The validated configuration.
 
         Raises:
-            ConfigurationError: If the merged values do not validate.
+            ConfigurationError: If a key of ``data`` or ``overrides`` is not a configuration key
+                (the message names it), or the merged values do not validate.
         """
+        ConfigLoader._reject_unknown_keys(data, "configuration file")
+        if overrides:
+            ConfigLoader._reject_unknown_keys(overrides, "overrides")
         config_data: dict[str, Any] = dict(substitute_env_vars(dict(data)))
         # The environment wins over the file, and code overrides win over both.
         config_data.update(ConfigLoader._load_from_env())
@@ -512,6 +492,18 @@ class ConfigLoader:
                 "Configuration validation failed",
                 details={"validation_errors": _validation_errors(e)},
             ) from e
+
+    @staticmethod
+    def _reject_unknown_keys(values: dict[str, Any], where: str) -> None:
+        """Raise ``ConfigurationError`` naming each key of ``values`` that is not a field (D106)."""
+        known = {f.name for f in dataclasses.fields(SkyeConfig)}
+        unknown = sorted(key for key in values if key not in known)
+        if unknown:
+            raise ConfigurationError(
+                f"Unknown configuration key{'s' if len(unknown) > 1 else ''} in {where}: "
+                f"{', '.join(unknown)}. Known keys: {', '.join(sorted(known))}.",
+                details={"unknown_keys": unknown, "known_keys": sorted(known)},
+            )
 
     @staticmethod
     def parse_text(text: str, *, source: str = "<text>") -> dict[str, Any]:
@@ -562,13 +554,13 @@ class ConfigLoader:
 
         Reads the Skye-prefixed variables that set configuration values and converts them
         to configuration keys. The prefix is removed and the key is lowercased. There are
-        exactly three Skye-prefixed variables (Requirement 23): SKYE_LOG_LEVEL and
-        SKYE_ENABLE_TELEMETRY (read here) and SKYE_CONFIG (names the config file, which
-        ``skye.load_config`` opens). Provider credentials never come from a Skye-prefixed variable.
+        two Skye-prefixed variables: SKYE_LOG_LEVEL (read here) and SKYE_CONFIG (names the
+        config file, which ``skye.load_config`` opens); the telemetry variable left with the
+        ``enable_telemetry`` key (D106). Provider credentials never come from a Skye-prefixed
+        variable.
 
         For example:
             SKYE_LOG_LEVEL=DEBUG -> log_level: "DEBUG"
-            SKYE_ENABLE_TELEMETRY=false -> enable_telemetry: False
 
         Returns:
             Dictionary containing configuration data from environment variables.
@@ -578,7 +570,7 @@ class ConfigLoader:
         for key, value in os.environ.items():
             if key in ENV_CONFIG_VARS:
                 # Remove SKYE_ prefix and convert to lowercase
-                config_key = key[len("SKYE_"):].lower()
+                config_key = key[len("SKYE_") :].lower()
 
                 # Try to parse boolean values
                 if value.lower() in ["true", "false"]:

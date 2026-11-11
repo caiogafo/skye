@@ -1,7 +1,6 @@
 ---
 title: "Size and load budgets"
 status: current
-last_updated: 2026-11-07
 ---
 
 # Size and load budgets

@@ -48,7 +48,7 @@ _ROUTER_SHORTHAND = """\
 router "__NAME__" {
   /** CHANGE ME: the alias, then "provider/model" first (primary) and its fallbacks in order.
       The key comes from the provider's variable (OPENAI_API_KEY, ANTHROPIC_API_KEY). **/
-  route "fast" = ["openai/gpt-4o-mini", "anthropic/claude-haiku"]
+  route "fast" = ["openai/gpt-4o-mini", "anthropic/claude-haiku-5-5"]
 }
 """
 
@@ -75,7 +75,7 @@ router "__NAME__" {
 
   route "backup" {
     target {
-      model    = "claude-3-5-haiku-latest"       # CHANGE ME
+      model    = "claude-haiku-5-5"              # CHANGE ME
       provider = "anthropic"                     # CHANGE ME
       api_key  = env.ANTHROPIC_API_KEY           # CHANGE ME
     }

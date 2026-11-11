@@ -113,8 +113,9 @@ def test_credentials_come_only_from_provider_standard_variables():
     assert not odd, f"variables that are not provider-standard: {odd}"
 
 
-def test_auth_adds_no_prefixed_variable_beyond_the_three_of_base():
-    assert sorted(ALL_ENV_VARS) == ["SKYE_CONFIG", "SKYE_ENABLE_TELEMETRY", "SKYE_LOG_LEVEL"]
+def test_auth_adds_no_prefixed_variable_beyond_the_ones_of_base():
+    # Two since D106 removed `enable_telemetry` and its variable.
+    assert sorted(ALL_ENV_VARS) == ["SKYE_CONFIG", "SKYE_LOG_LEVEL"]
     for path in MODULES:
         assert "SKYE_" not in path.read_text(
             encoding="utf-8"

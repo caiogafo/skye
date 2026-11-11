@@ -1,16 +1,18 @@
-"""Skye - Modular GenAI library with optional extras.
+"""Skye - a serverless-first Python library for GenAI applications.
 
-Skye provides a foundational layer for building AI agents and intelligent applications
-with a Clean Architecture approach. The base package includes only interfaces and models,
-while all implementations are available as optional extras. The top level re-exports only
-the commonest names (messages, completion, errors) and ``provider``; the modules ``skye.messages``, ``skye.completion``, ``skye.exceptions``, ``skye.config``, ``skye.data`` and ``skye.interfaces`` are the public paths of ``base``; import everything else
-from its Component path (skye.models, skye.router, skye.tools, ...).
+The core is the standard library: every model provider is a built-in REST adapter, and an optional
+extra adds only a third-party library that one feature needs (exact token counts, a store driver,
+the MCP SDK). The top level re-exports only the commonest names (messages, completion, errors) and
+``provider``; the modules ``skye.messages``, ``skye.completion``, ``skye.exceptions``,
+``skye.config``, ``skye.data``, ``skye.interfaces`` and ``skye.dsl`` are the public paths of
+``base``; import everything else from its component path (``skye.models``, ``skye.router``,
+``skye.tools``, ...).
 
 Installation:
     pip install skyeai                    # every provider (built-in REST adapters)
     pip install skyeai[tokens]            # + exact token counts
-    pip install skyeai[memory]            # + Redis store
-    pip install skyeai[all]               # every optional library
+    pip install skyeai[redis]             # + Redis store backend
+    pip install skyeai[all]               # every optional library but boto3 (in Lambda already)
 
 Example:
     >>> import skye
@@ -31,9 +33,15 @@ from typing import TYPE_CHECKING, Any, Literal, overload
 if TYPE_CHECKING:
     from skye.base.completion import CompleteRequest, CompleteResponse, StreamChunk, TokenUsage
     from skye.base.exceptions import (
+        AuthenticationError,
+        BadRequestError,
         ConfigurationError,
+        ContentPolicyError,
         MissingExtraError,
         ProviderError,
+        ProviderTimeoutError,
+        RateLimitError,
+        ServerError,
         SkyeError,
         ValidationError,
     )
@@ -56,6 +64,12 @@ _LAZY = {
     "TokenUsage": "skye.base.completion",
     "SkyeError": "skye.base.exceptions",
     "ProviderError": "skye.base.exceptions",
+    "RateLimitError": "skye.base.exceptions",
+    "ServerError": "skye.base.exceptions",
+    "ProviderTimeoutError": "skye.base.exceptions",
+    "AuthenticationError": "skye.base.exceptions",
+    "BadRequestError": "skye.base.exceptions",
+    "ContentPolicyError": "skye.base.exceptions",
     "ConfigurationError": "skye.base.exceptions",
     "ValidationError": "skye.base.exceptions",
     "MissingExtraError": "skye.base.exceptions",
@@ -80,11 +94,15 @@ def __getattr__(name: str) -> Any:
 
 
 @overload
-def provider(name: str, *, provider_type: Literal["embedding"], **config: Any) -> "VectorEncoderInterface": ...
+def provider(
+    name: str, *, provider_type: Literal["embedding"], **config: Any
+) -> "VectorEncoderInterface": ...
 
 
 @overload
-def provider(name: str, *, provider_type: Literal["model"] = ..., **config: Any) -> "ModelInterface": ...
+def provider(
+    name: str, *, provider_type: Literal["model"] = ..., **config: Any
+) -> "ModelInterface": ...
 
 
 def provider(name: str, **config: Any) -> "ModelInterface | VectorEncoderInterface":

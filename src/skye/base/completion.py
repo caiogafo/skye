@@ -27,6 +27,7 @@ from skye.base.capability_execution import (
     run_capability_call,
 )
 from skye.base.messages import CapabilityMessage, SkyeMessage
+from skye.base.prompt_parts import OutputSchema
 from skye.base.validated import Validated, field, validated
 
 if TYPE_CHECKING:
@@ -134,14 +135,15 @@ class CompleteRequest(Validated):
         top_p: Nucleus sampling parameter (0.0-1.0).
         stop: List of sequences that will stop generation.
         stream: Whether to stream the response.
-        capabilities: List of capabilities available to the model
-            (requires skyeai[capabilities]).
+        capabilities: The capabilities available to the model: a list of capabilities, or a
+            ``CapabilityRegistry`` or any ``ToolProvider`` (the adapter offers its schemas).
         capability_choice: How the model should choose capabilities ('auto', 'required', or specific capability name).
-        mcp_servers: List of MCP server configurations to load capabilities from
-            (requires skyeai[mcp]). Each config should contain server connection details.
+        force_choice: For a model that refuses a forced choice, send only the capability named in
+            ``capability_choice`` (allowed before the model's first answer only; decision D108).
         response_format: Format specification for structured outputs.
         response_schema: Class that describes the structured output (for example a pydantic model
-            or a dataclass); the adapter validates the reply with it.
+            or a dataclass), or an ``OutputSchema`` from rendered prompt parts (its reply is a ``dict``);
+            the adapter validates the reply with it.
         metadata: Additional metadata for the request.
 
     Example (Base Skye):
@@ -186,21 +188,6 @@ class CompleteRequest(Validated):
         >>> len(request.capabilities)
         1
 
-    Example (With skyeai[mcp]):
-        >>> # Using MCP servers (requires skyeai[mcp])
-        >>> request = CompleteRequest(
-        ...     messages=[UserMessage(content="What's the weather in NYC?")],
-        ...     model="gpt-4",
-        ...     mcp_servers=[
-        ...         {
-        ...             "name": "weather_server",
-        ...             "command": "mcp-server-weather",
-        ...             "args": ["--port", "8080"]
-        ...         }
-        ...     ]
-        ... )
-        >>> len(request.mcp_servers)
-        1
     """
 
     # Polymorphic input: either messages OR prompt
@@ -216,13 +203,12 @@ class CompleteRequest(Validated):
     stream: bool = False
     # Capabilities can be provided as:
     # 1. List of CapabilityInterface objects (direct, no registry needed)
-    # 2. CapabilityRegistry instance (enables search/discovery)
-    capabilities: Any | None = None  # list of CapabilityInterface, or a CapabilityRegistry
+    # 2. A CapabilityRegistry or any ToolProvider (its schemas are offered)
+    capabilities: Any | None = None  # list of CapabilityInterface, a CapabilityRegistry or a ToolProvider
     capability_choice: str | None = None  # "auto", "required", or specific capability name
-    # MCP server configurations (requires skyeai[mcp])
-    mcp_servers: list[dict[str, Any]] | None = None
+    force_choice: bool = False  # D108: when the model refuses a forced choice, send only the named capability
     response_format: dict[str, Any] | None = None
-    response_schema: type | None = None  # a dataclass (the standard); a user's pydantic model also works; base imports neither
+    response_schema: type | OutputSchema | None = None  # a dataclass (the standard), a user's pydantic model, or an OutputSchema of prompt parts (D101)
     metadata: dict[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
@@ -265,6 +251,8 @@ class CompleteResponse(Validated):
         usage: Token usage statistics.
         capability_calls: List of capability calls requested by the model (requires skyeai[capabilities]).
         created_at: Timestamp when the response was created.
+        added_messages: Messages Skye appended to the request (the instruction of an emulated
+            forced choice, decision D108); add them to the history to keep it append-only.
         metadata: Additional metadata about the response.
 
     Example (Basic Response):
@@ -316,6 +304,7 @@ class CompleteResponse(Validated):
     finish_reason: str
     usage: TokenUsage
     capability_calls: list[CapabilityCall] | None = None
+    added_messages: list[Any] = field(default_factory=list)  # D108: messages Skye appended; keep them in the history
     created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     metadata: dict[str, Any] = field(default_factory=dict)
     
@@ -528,6 +517,13 @@ class StreamChunk(Validated):
         delta: The incremental content in this chunk.
         finish_reason: Reason the generation stopped (only set in final chunk).
         index: Index of this chunk in the stream sequence.
+        usage: A running counter of the tokens of the call so far, or ``None`` when it is not
+            counted. Chunks a model client yields carry it; a chunk that costs no token repeats
+            the value of the chunk before it. It is an estimate until the provider reports its own
+            numbers, then it is the provider's count.
+        cost: The running cost of the call, in the shape of ``response.metadata["cost"]``
+            (``prompt``, ``completion``, ``total``, ``currency``, ``exact``), or ``None`` when the
+            model has no price.
 
     Example:
         >>> chunk = StreamChunk(
@@ -553,3 +549,5 @@ class StreamChunk(Validated):
     delta: str
     finish_reason: str | None = None
     index: int = 0
+    usage: TokenUsage | None = None
+    cost: dict[str, Any] | None = None

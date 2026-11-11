@@ -304,9 +304,16 @@ class SigV4Authenticator:
 
 
 class BedrockApiKeyAuthenticator:
-    """Bearer-token authentication with a Bedrock API key (``AWS_BEARER_TOKEN_BEDROCK``)."""
+    """Bearer-token authentication with a Bedrock API key (``AWS_BEARER_TOKEN_BEDROCK``).
 
-    def __init__(self, api_key: str | None = None) -> None:
+    Args:
+        api_key: The key; ``AWS_BEARER_TOKEN_BEDROCK`` when omitted.
+        region: The region the key is used in, kept as ``region`` so a client built with this
+            authenticator calls the same region (``None`` when not known).
+    """
+
+    def __init__(self, api_key: str | None = None, region: str | None = None) -> None:
+        self.region = region
         self._key = api_key or os.environ.get("AWS_BEARER_TOKEN_BEDROCK")
         if not self._key:
             raise ConfigurationError(
@@ -328,9 +335,12 @@ def bedrock_authenticator(
     secret_key: str | None = None,
     session_token: str | None = None,
 ) -> SigV4Authenticator | BedrockApiKeyAuthenticator:
-    """API key when given or in the environment (and no explicit keys), else SigV4 (``bedrock``)."""
+    """API key when given or in the environment (and no explicit keys), else SigV4 (``bedrock``).
+
+    Either authenticator keeps ``region``, so ``BedrockProvider(authenticator=...)`` calls that region.
+    """
     if api_key or (not access_key and os.environ.get("AWS_BEARER_TOKEN_BEDROCK")):
-        return BedrockApiKeyAuthenticator(api_key)
+        return BedrockApiKeyAuthenticator(api_key, region=region)
     provider = CredentialProvider(
         access_key=access_key,
         secret_key=secret_key,

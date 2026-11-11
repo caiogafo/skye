@@ -1,7 +1,6 @@
 ---
 title: "Codename glossary"
 status: current
-last_updated: 2026-11-02
 ---
 
 # Codename glossary

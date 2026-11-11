@@ -48,7 +48,10 @@ prompt "chat" {
   `{key, value}`: `each entry in data { text = "{{ entry.key }}: {{ entry.value }}" }`. There is no `each key, value in ...` and no `.items()`.
 - A list on one line (each `text` is its own line): `{{ tools | map('name') | join(', ') }}`.
 - **Convert a Jinja template**: `{% if x %}` becomes `when x { text = "..." }`, `{% for x in xs %}` `each x in xs { ... }` (`.items()`: `each entry in d`),
-  `[SYSTEM]` / `[USER]` `message "system"` / `message "user"`. Do not leave `{% %}` tags in the text.
+  `[SYSTEM]` / `[USER]` `message "system"` / `message "user"`. Do not leave `{% %}` tags in the text. A plain-text template on
+  `BasePromptBuilder` is interpolation only too: `register_template` rejects a `{% %}` tag (`ValidationError` with the line).
+- Tool parameters in an agent prompt are shown as JSON Schema: `text = "Parameters: {{ tool.parameters | tojson }}"`, never one line
+  per parameter.
 
 ## The answer format: `output`
 
@@ -69,9 +72,14 @@ raises `ValueError` naming every missing one. A `placeholder "name"` takes `hist
 wraps a prompt as a `Runnable` (`invoke(variables)` returns the messages). `BasePromptBuilder().render("chat", {...})` renders the bundled
 `.skye` templates the same way. `output_instructions(spec, variables)` (from `skye.prompts`) returns the text of the `output` block alone;
 `builder.set_output_schema(name, MyDataclass, output_format="table")` does the same for a dataclass or a JSON-schema dict (`"json"` by
-default).
+default). For a native provider call use `render_parts(spec, variables)` (or `builder.render_parts(name, variables)`): it returns a
+`PromptParts` (system text apart, messages, the `json` output as an `OutputSchema`, the instructions as `fallback_text`, not appended
+to the messages) for `client.complete(parts, model=...)`. `output_json_schema(spec, variables)` is the JSON Schema of the `output` block.
+`builder.register_filter("money", fn)` adds a filter for every template of the builder.
 
 ## Not available yet (version 2)
 
-Few-shot `examples`, multimodal `content`, and `from` / `bind` / `parts` / `separator` (partial and composed prompts) are rejected with
-"not available in this version". Say so and keep that part in Python.
+A native `examples { ... }` block, multimodal `content`, and `from` / `bind` / `parts` / `separator` (partial and composed prompts) are rejected with
+"not available in this version". Say so and keep that part in Python: `builder.add_examples(name, examples)` writes each example
+from its own keys (`Question: ...` / `Answer: ...`), `example_template=` chooses the layout (a missing key is a `ValidationError`), and
+`as_messages=True` gives user/assistant message pairs (`input`/`output`, else the first and the last key).

@@ -40,9 +40,10 @@ SDK_OWNERS: dict[str, tuple[str, ...]] = {
     "vertexai": (),
     "google": (),
     "cohere": (),
-    # boto3 is the DynamoDB store backend's driver (a store, not a model provider).
-    "boto3": ("store/dynamodb.py",),
-    "botocore": ("store/dynamodb.py",),
+    # boto3 drives two store backends (a store, not a model provider): DynamoDB and the RDS Data API driver of
+    # PostgreSQL (decision D100).
+    "boto3": ("store/dynamodb.py", "store/postgres.py"),
+    "botocore": ("store/dynamodb.py", "store/postgres.py"),
     "fastmcp": ("tools/mcp_fastmcp.py",),
     "mcp": ("tools/mcp_fastmcp.py",),
 }

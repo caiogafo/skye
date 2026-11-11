@@ -73,7 +73,7 @@ def _known_block_kinds() -> set[str]:
     ``.skye`` files of ``examples/``, plus the top-level kinds of the guide's table.
     """
     texts = [skeleton(kind, template=t) for kind, names in TEMPLATES.items() for t in names]
-    guide = (REPO / "docs" / "base" / "skye-language.md").read_text(encoding="utf-8")
+    guide = (REPO / "docs" / "reference" / "skye-language.md").read_text(encoding="utf-8")
     texts += re.findall(r"```skye\n(.*?)```", guide, flags=re.DOTALL)
     texts += [p.read_text(encoding="utf-8") for p in (REPO / "examples").rglob("*.skye")]
     kinds: set[str] = set()
