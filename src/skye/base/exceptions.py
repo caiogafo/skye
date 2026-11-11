@@ -151,7 +151,7 @@ class UnsupportedModalityError(ProviderError):
 
 
 class CapabilityChoiceError(ProviderError):
-    """The model answered without the capability call the request forced (decision D108).
+    """The model answered without the capability call the request forced (decision D109).
 
     Raised only for a model that refuses a forced ``capability_choice``: Skye asked for the call in
     an instruction, tried twice, and got an answer without it. There is no ``status_code`` (both

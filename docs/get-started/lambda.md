@@ -16,14 +16,16 @@ cold start short, and how to keep the state of a router between invocations in D
 
 ## What to package
 
-The base install is enough for every provider. Skye has no third-party dependency: the package is one pure-Python wheel of about
-1 MB, and each provider is called over HTTPS with the standard library. Bedrock requests are signed with SigV4 by Skye itself, so
-neither `boto3` nor a vendor SDK is needed for a model call.
+The base install is enough for every provider. Skye has no third-party dependency: the package is one pure-Python wheel, and
+each provider is called over HTTPS with the standard library. Bedrock requests are signed with SigV4 by Skye itself, so neither
+`boto3` nor a vendor SDK is needed for a model call.
+
+A complete function is in [`examples/serverless/lambda_zip`](https://github.com/ggiallo28/skye/tree/main/examples/serverless/lambda_zip):
+`handler.py` and `build.sh`, which writes `function.zip` with Skye and the handler, nothing else. The zip is **0.56 MB** (1.76 MB
+unzipped; AWS allows 50 MB and 250 MB), and the CI fails above `[lambda] max_zip_mb` of `budgets.toml` (1 MB).
 
 ```bash
-pip install --target build skyeai
-cp handler.py build/
-cd build && zip -r ../function.zip .
+sh examples/serverless/lambda_zip/build.sh   # pip install --target build skyeai, add handler.py, zip -r9
 ```
 
 The wheel has no compiled file, so you build the package on any machine, for `x86_64` or `arm64`, without a container.

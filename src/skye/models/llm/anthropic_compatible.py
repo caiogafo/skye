@@ -53,7 +53,7 @@ ANTHROPIC_VERSION = "2023-06-01"
 
 #: The Claude models that refuse a forced ``tool_choice`` (``any`` or ``tool``) with a 400, matched
 #: anywhere in the model id so that Bedrock ids (``us.anthropic.claude-opus-5-5-...``) match too.
-#: For them the client emulates the forced choice (decision D108).
+#: For them the client emulates the forced choice (decision D109).
 CLAUDE_REFUSING_FORCED_CHOICE = ("opus-5-5", "sonnet-5-5", "fable-5-1", "mythos-5-1")
 
 
@@ -530,7 +530,7 @@ class AnthropicCompatibleProvider(BaseModelProvider):
         return formatted
     
     def refuses_forced_choice(self, model: str) -> bool:
-        """Claude Opus 5.5, Sonnet 5.5, Fable 5.1 and Mythos 5.1 refuse a forced ``tool_choice`` (D108)."""
+        """Claude Opus 5.5, Sonnet 5.5, Fable 5.1 and Mythos 5.1 refuse a forced ``tool_choice`` (D109)."""
         return claude_refuses_forced_choice(model)
 
     def get_model_info(self) -> dict[str, Any]:

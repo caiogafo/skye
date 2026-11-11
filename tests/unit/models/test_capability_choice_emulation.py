@@ -1,4 +1,4 @@
-"""A forced capability choice, emulated for the models that refuse one (decision D108).
+"""A forced capability choice, emulated for the models that refuse one (decision D109).
 
 Claude Opus 5.5, Sonnet 5.5, Fable 5.1 and Mythos 5.1 answer a forced ``tool_choice`` (``any`` or
 ``tool``) with a 400. For them Skye sends ``auto`` plus an instruction appended at the end, checks

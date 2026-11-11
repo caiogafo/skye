@@ -24,7 +24,7 @@
 # Measured 2026-11-07 (task 14.4 of 0-base-structure): wheel built with `uv build --wheel`, installed with `uv pip install --no-deps` in a
 # fresh venv (Python 3.13, macOS arm64; the wheel is pure Python, py3-none-any): 1 distribution, 1.13 MB (the whole package, no compiled file).
 max_distributions = 1               # now 1 (skyeai); was 12, 10 with pydantic and tenacity
-max_installed_mb = 2                # now 1.1; was 11, 9.0 with pydantic-core (compiled)
+max_installed_mb = 2                # now 1.8 (2026-11-11); was 11, 9.0 with pydantic-core (compiled)
 allowed_dependencies = []
 # Modules that fail to import on a core-only install. Each entry must be fixed
 # (move the import behind LazyImporter, or declare the dependency) and removed.
@@ -78,7 +78,10 @@ forbidden_at_import = [
 preinstalled = ["boto3", "botocore", "s3transfer", "jmespath", "python-dateutil", "six", "urllib3"]
 unzipped_limit_mb = 250             # hard AWS limit for code plus layers
 profile_extra = "bedrock"           # the serverless profile: core + this extra
-max_profile_mb = 3                  # core + bedrock without the preinstalled libraries, now 1.1 (bedrock has no library of its own)
+max_profile_mb = 3                  # core + bedrock without the preinstalled libraries, now 1.8 (bedrock has no library of its own)
+# The deployment zip of examples/serverless/lambda_zip (the library and handler.py, nothing else), deflate level 9.
+zipped_limit_mb = 50                # hard AWS limit for a zip uploaded directly
+max_zip_mb = 1                      # now 0.56 (1.76 unzipped), measured 2026-11-11
 
 # Megabytes added over the core install, preinstalled libraries excluded, and the number of
 # compiled distributions added over the core install (target 0 for every extra).

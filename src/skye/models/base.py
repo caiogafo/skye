@@ -890,14 +890,14 @@ class BaseModelProvider(ModelInterface, ABC):
         """Whether ``model`` refuses a forced ``capability_choice`` (``"required"`` or a name).
 
         ``False`` here; an adapter whose provider has such models overrides it. For those models
-        the client emulates the forced choice (decision D108, ``skye.models.transport.capability_choice``).
+        the client emulates the forced choice (decision D109, ``skye.models.transport.capability_choice``).
         """
         return False
 
     def _complete_with_retry(self, request: CompleteRequest) -> CompleteResponse:
         """One completion, retried on a transient failure (D104); health metrics are not tracked here.
 
-        A forced capability choice that the model refuses is emulated (D108). A retry is not counted
+        A forced capability choice that the model refuses is emulated (D109). A retry is not counted
         as a separate failure: ``complete`` records the outcome once.
         """
         if forced_choice(request) and self.refuses_forced_choice(request.model):
@@ -1058,7 +1058,7 @@ class BaseModelProvider(ModelInterface, ABC):
         """The stream, retried on a transient failure only before its first chunk (D104).
 
         Once a chunk has reached the caller a failure is raised: the text cannot be taken back. A
-        forced capability choice that the model refuses is sent emulated, with no check (D108).
+        forced capability choice that the model refuses is sent emulated, with no check (D109).
         """
         if forced_choice(request) and self.refuses_forced_choice(request.model):
             request, _ = emulated_request(request)

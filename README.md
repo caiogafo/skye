@@ -1,56 +1,65 @@
 # Skye AI
 
-**Modular GenAI library with optional extras**
-
-Skye AI provides a foundational layer for building AI agents and intelligent applications with a Clean Architecture approach. The base package includes only interfaces and models, while all implementations are available as optional extras.
+**A GenAI library for AWS Lambda that deploys as a 0.56 MB zip.** Standard library only: no container, no layer, no
+dependency to vendor. The size limits are in [`budgets.toml`](https://github.com/ggiallo28/skye/blob/main/budgets.toml) and the CI fails any change that exceeds them.
 
 [![PyPI](https://img.shields.io/pypi/v/skyeai?label=PyPI)](https://pypi.org/project/skyeai/)
 [![Python 3.11+](https://img.shields.io/badge/Python-3.11%2B-3776AB)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow)](https://opensource.org/licenses/MIT)
 [![Documentation](https://img.shields.io/readthedocs/skye?label=Docs)](https://skye.readthedocs.io/)
-[![Install size: 1.1 MB](https://img.shields.io/badge/Install%20size-1.1%20MB-2EA44F)](https://skye.readthedocs.io/en/latest/budgets/)
+[![Lambda zip: 0.56 MB](https://img.shields.io/badge/Lambda%20zip-0.56%20MB-2EA44F)](https://skye.readthedocs.io/en/latest/project/budgets/)
 [![Built with Kiro](https://img.shields.io/badge/Built%20with-Kiro-790ECB)](https://kiro.dev)
 
-## Features
+| Measured on skyeai 0.1.1 (2026-11-11) | Value | Limit the CI enforces |
+|---|---|---|
+| Lambda zip, library and handler ([`examples/serverless/lambda_zip`](https://github.com/ggiallo28/skye/tree/main/examples/serverless/lambda_zip)) | 0.56 MB | 1 MB (AWS: 50 MB) |
+| Installed size of the core | 1.8 MB | 2 MB |
+| Third-party dependencies of the core | 0 | 0 |
+| `import skye` in a fresh interpreter | about 60 ms | 100 ms |
 
-- 🎯 **Provider-agnostic** - Unified interface for OpenAI, Anthropic, AWS Bedrock, Azure, and more
-- 🧩 **Modular architecture** - Install only what you need via optional extras
-- 🔒 **Type-safe** - Complete type hints, with validated dataclasses
-- ⚡ **Async-first** - Both sync and async APIs throughout
-- 🔄 **Load balancing** - Multiple routing strategies with automatic fallbacks
-- 📊 **Observability** - Built-in telemetry, logging, and tracing
-- 🛡️ **Safety filters** - Input/output validation and moderation
-- 💾 **Memory systems** - Episodic and semantic memory support
+Provider calls go over REST with the standard library, and AWS requests are signed with SigV4 in the standard library, so Bedrock
+needs nothing beyond the Lambda Python runtime. Every extra is optional and loaded only when used.
 
-
-## Install
+## Quick start (60 seconds)
 
 ```bash
-pip install skyeai            # the base: messages, completion, errors, config, Ports (standard library only)
-pip install skyeai[redis]     # add only what you need: tokens, auth, redis, postgres, aws, mcp, ...
+pip install skyeai
+export OPENAI_API_KEY=sk-...
 ```
-
-Every extra is optional and loaded lazily. All extras and install options: [getting started](https://skye.readthedocs.io/en/latest/getting-started/).
-
-## Quick start
-
-One call creates the client of a provider, in the style of `boto3.client`:
 
 ```python
 import skye
 from skye import UserMessage
 
-# AWS credentials come from the usual sources: environment variables, ~/.aws or the instance role
-client = skye.provider("bedrock", region="us-east-1")
-response = client.complete(
-    messages=[UserMessage(content="Hello!")],
-    model="us.anthropic.claude-sonnet-4-5-20250929-v1:0",
-)
+client = skye.provider("openai")  # the key from OPENAI_API_KEY
+response = client.complete(messages=[UserMessage(content="Hello!")], model="gpt-4o-mini")
 print(response.content)
 ```
 
-The same line works for every provider (`"openai"`, `"anthropic"`, `"bedrock"`, `"azure"`, `"google"`, `"cohere"`); for embeddings add `provider_type="embedding"`.
-To balance several models with fallbacks, use the router: [router overview](https://skye.readthedocs.io/en/latest/router/overview/).
+The same line works for `"anthropic"`, `"bedrock"`, `"azure"` and `"google"`, each with its standard key variable.
+
+## On AWS Lambda
+
+[`examples/serverless/lambda_zip`](https://github.com/ggiallo28/skye/tree/main/examples/serverless/lambda_zip) is a complete function: `handler.py` calls Bedrock with the
+function's role, and `build.sh` packs it with Skye into `function.zip`, 0.56 MB. Deploy it with `aws lambda create-function
+--runtime python3.12 --handler handler.handler --zip-file fileb://function.zip`; the steps are in its README.
+
+## Works today
+
+| Component | What you can use |
+|---|---|
+| `models` | OpenAI, Anthropic, Bedrock, Azure OpenAI, Google; streaming and async; structured output into dataclasses; embeddings; images in messages; token count and cost |
+| `router` | aliases over several models, routing strategies, fallbacks, retries, cooldown; its state in any store |
+| `store` | memory, file, DynamoDB, Valkey/Redis, PostgreSQL, Lambda durable functions; one extra per driver |
+| `tools` | function calling with local functions and remote APIs; a built-in MCP client |
+| `prompts` | templates and few-shot examples; prompts and routers written in `.skye` files |
+| `auth` | API keys, SigV4, credential sources and secret managers |
+| CLI | `skye check`, `fmt`, `render`, `new` for `.skye` files |
+
+## Roadmap
+
+Agents, memory, safety filters (`guard`), policies, observability, a tool gateway, teams and flows are specified in
+[`.kiro/specs/`](https://github.com/ggiallo28/skye/tree/main/.kiro/specs) and have no released code yet. Their state: [Status and roadmap](https://skye.readthedocs.io/en/latest/project/roadmap/).
 
 ## Examples
 
