@@ -139,7 +139,7 @@ class CompleteRequest(Validated):
             ``CapabilityRegistry`` or any ``ToolProvider`` (the adapter offers its schemas).
         capability_choice: How the model should choose capabilities ('auto', 'required', or specific capability name).
         force_choice: For a model that refuses a forced choice, send only the capability named in
-            ``capability_choice`` (allowed before the model's first answer only; decision D108).
+            ``capability_choice`` (allowed before the model's first answer only; decision D109).
         response_format: Format specification for structured outputs.
         response_schema: Class that describes the structured output (for example a pydantic model
             or a dataclass), or an ``OutputSchema`` from rendered prompt parts (its reply is a ``dict``);
@@ -206,7 +206,7 @@ class CompleteRequest(Validated):
     # 2. A CapabilityRegistry or any ToolProvider (its schemas are offered)
     capabilities: Any | None = None  # list of CapabilityInterface, a CapabilityRegistry or a ToolProvider
     capability_choice: str | None = None  # "auto", "required", or specific capability name
-    force_choice: bool = False  # D108: when the model refuses a forced choice, send only the named capability
+    force_choice: bool = False  # D109: when the model refuses a forced choice, send only the named capability
     response_format: dict[str, Any] | None = None
     response_schema: type | OutputSchema | None = None  # a dataclass (the standard), a user's pydantic model, or an OutputSchema of prompt parts (D101)
     metadata: dict[str, Any] = field(default_factory=dict)
@@ -252,7 +252,7 @@ class CompleteResponse(Validated):
         capability_calls: List of capability calls requested by the model (requires skyeai[capabilities]).
         created_at: Timestamp when the response was created.
         added_messages: Messages Skye appended to the request (the instruction of an emulated
-            forced choice, decision D108); add them to the history to keep it append-only.
+            forced choice, decision D109); add them to the history to keep it append-only.
         metadata: Additional metadata about the response.
 
     Example (Basic Response):
@@ -304,7 +304,7 @@ class CompleteResponse(Validated):
     finish_reason: str
     usage: TokenUsage
     capability_calls: list[CapabilityCall] | None = None
-    added_messages: list[Any] = field(default_factory=list)  # D108: messages Skye appended; keep them in the history
+    added_messages: list[Any] = field(default_factory=list)  # D109: messages Skye appended; keep them in the history
     created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     metadata: dict[str, Any] = field(default_factory=dict)
     

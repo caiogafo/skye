@@ -1,4 +1,4 @@
-"""A forced capability choice, emulated for the models that refuse one (decision D108).
+"""A forced capability choice, emulated for the models that refuse one (decision D109).
 
 ``capability_choice="required"`` or a capability name forces the model to call a capability. Some
 models refuse the forced form with a 400 (Claude Opus 5.5, Sonnet 5.5, Fable 5.1, Mythos 5.1: the

@@ -50,7 +50,7 @@ from skye.models.transport.eventstream import post_eventstream_json
 
 
 #: The Claude models that refuse a forced ``toolChoice`` (``any`` or ``tool``); the same list as the
-#: Anthropic adapter's (an adapter imports no other adapter; a test keeps the two equal). D108.
+#: Anthropic adapter's (an adapter imports no other adapter; a test keeps the two equal). D109.
 CLAUDE_REFUSING_FORCED_CHOICE = ("opus-5-5", "sonnet-5-5", "fable-5-1", "mythos-5-1")
 
 
@@ -209,7 +209,7 @@ class BedrockProvider(BaseModelProvider):
                     ]
                 result.append({"role": msg.role, "content": content})
         # Converse wants the roles to alternate: consecutive user (or assistant) messages, such as
-        # several capability results or the instruction of an emulated choice (D108), become one.
+        # several capability results or the instruction of an emulated choice (D109), become one.
         merged: list[dict[str, Any]] = []
         for entry in result:
             if merged and entry["role"] != "system" and merged[-1]["role"] == entry["role"]:
@@ -605,7 +605,7 @@ class BedrockProvider(BaseModelProvider):
     
     def refuses_forced_choice(self, model: str) -> bool:
         """The Claude models that refuse a forced ``tool_choice`` refuse ``toolChoice`` ``any`` and
-        ``tool`` on Bedrock as well (D108)."""
+        ``tool`` on Bedrock as well (D109)."""
         return bool(model) and any(name in model for name in CLAUDE_REFUSING_FORCED_CHOICE)
 
     def get_model_info(self) -> dict[str, Any]:

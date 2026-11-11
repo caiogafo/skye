@@ -128,3 +128,34 @@ def test_serverless_profile_fits_lambda(wheel: Path, workdir: Path) -> None:
     report(f"| serverless profile (core + {lam['profile_extra']}) | | {size:.1f} MB (max {lam['max_profile_mb']}; Lambda limit {lam['unzipped_limit_mb']}) | |")
     assert size <= lam["max_profile_mb"], f"serverless profile is {size:.1f} MB, limit {lam['max_profile_mb']} MB"
     assert lam["max_profile_mb"] < lam["unzipped_limit_mb"]
+
+
+def test_lambda_zip_fits(wheel: Path, workdir: Path) -> None:
+    """The zip of examples/serverless/lambda_zip, built as its build.sh does.
+
+    The wheel and handler.py, nothing else.
+    """
+    import subprocess
+    import zipfile
+
+    lam = BUDGETS["lambda"]
+    target = workdir / "lambda-zip"
+    shutil.rmtree(target, ignore_errors=True)
+    subprocess.run(
+        ["uv", "pip", "install", "--quiet", "--target", str(target), str(wheel)],
+        check=True,
+        capture_output=True,
+    )
+    for junk in [*target.glob("*.dist-info"), *target.rglob("__pycache__")]:
+        shutil.rmtree(junk, ignore_errors=True)
+    example = measure.ROOT / "examples" / "serverless" / "lambda_zip"
+    shutil.copy(example / "handler.py", target / "handler.py")
+    archive = workdir / "function.zip"
+    with zipfile.ZipFile(archive, "w", zipfile.ZIP_DEFLATED, compresslevel=9) as zf:
+        for path in sorted(p for p in target.rglob("*") if p.is_file()):
+            zf.write(path, path.relative_to(target))
+    size = archive.stat().st_size / 1e6
+    limits = f"max {lam['max_zip_mb']}; AWS limit {lam['zipped_limit_mb']}"
+    report(f"| Lambda zip (lambda_zip example) | | {size:.2f} MB ({limits}) | |")
+    assert size <= lam["max_zip_mb"], f"the Lambda zip is {size:.2f} MB ({limits})"
+    assert lam["max_zip_mb"] < lam["zipped_limit_mb"]
