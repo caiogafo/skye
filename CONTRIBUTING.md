@@ -17,7 +17,7 @@ Everyone taking part in the project follows the [Code of Conduct](CODE_OF_CONDUC
 
 Skye is built for serverless architectures, where the size of the library and its cold start make a difference, so a user installs only what is needed and nothing forces a third-party library on them. For everything the library imports, in this order: the Python standard library, then libraries already in the serverless runtime (on AWS Lambda: boto3, botocore, urllib3, ...), then pure-Python packages, only when nothing earlier can do the job. Provider SDKs and other optional libraries are imported inside the function that uses them (`LazyImporter`), never at module level.
 
-The limits are in `budgets.toml` and are checked in every pull request (see `docs/budgets.md`):
+The limits are in `budgets.toml` and are checked in every pull request (see `docs/project/budgets.md`):
 
 ```bash
 make budget-fast    # policy and import checks, a second
@@ -32,7 +32,7 @@ Design work is spec driven, with Kiro. Requirements, design and tasks for each f
 
 ## Built-in vs external library
 
-When a Component offers a built-in standard-library implementation and one backed by an external library (a provider SDK, `fastmcp`), both sit behind the same Port and return the same Skye types. The external types are converted to Skye types at one boundary point inside the owning Component, and none is exposed in a Port return value, parameter or public API. Today this governs `models` (provider SDKs; only the SDK path exists, no REST adapter yet) and the `tools` MCP client (`mcp_client.py` built-in, `mcp_fastmcp.py` fastmcp, one conversion in `mcp_boundary.py`, which imports no third-party library). A future external backend for `observe`, `store`, `prompts` or `agents` follows the same rule, with no new Component and no new Port. Keep the library import inside a function in the owning file, convert at the boundary, and add the file to `SDK_OWNERS` in `tests/budget/test_boundary_rule.py` (`make budget-fast` enforces it; `tests/differential/test_boundary_leak.py` checks both MCP clients against the fake server). Details: `docs/budgets.md`, Requirement 16 in `.kiro/specs/0-base-structure/`.
+When a Component offers a built-in standard-library implementation and one backed by an external library (a provider SDK, `fastmcp`), both sit behind the same Port and return the same Skye types. The external types are converted to Skye types at one boundary point inside the owning Component, and none is exposed in a Port return value, parameter or public API. Today this governs `models` (provider SDKs; only the SDK path exists, no REST adapter yet) and the `tools` MCP client (`mcp_client.py` built-in, `mcp_fastmcp.py` fastmcp, one conversion in `mcp_boundary.py`, which imports no third-party library). A future external backend for `observe`, `store`, `prompts` or `agents` follows the same rule, with no new Component and no new Port. Keep the library import inside a function in the owning file, convert at the boundary, and add the file to `SDK_OWNERS` in `tests/budget/test_boundary_rule.py` (`make budget-fast` enforces it; `tests/differential/test_boundary_leak.py` checks both MCP clients against the fake server). Details: `docs/project/budgets.md`, Requirement 16 in `.kiro/specs/0-base-structure/`.
 
 ## Before you open a pull request
 
