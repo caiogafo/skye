@@ -11,72 +11,79 @@ library the serverless environment already provides. The layer, the allowed impo
 steering sections named above and are not restated here.
 
 ## Current state
-Seven files exist in `src/skye/store/`, moved from the old `routes/storage_backends.py`: `memory.py`, `file.py`, `dynamodb.py`,
-`redis.py`, `postgres.py`, `durable_function.py` and `__init__.py`. The Port in `base` has five methods, all asynchronous: `connect`,
-`get`, `set` (with a time to live), `increment` (atomic, with a time to live), `get_multiple` and `set_multiple`. The only user is the
-router (`ModelRouter` and the health tracker). No test exercises any backend directly: the only test that mentions them is
-`tests/unit/router/test_router_exports.py`. The example `examples/store/backends.py` and the page `docs/store/index.md` exist.
+Rebuilt on 2026-11-11 after decisions D95 to D100. `src/skye/store/` holds the six backends, `_common.py` (clock, expiry, error
+wrapping), `factory.py` (`backend`, `register_backend`, `available_backends`) and `conformance.py` (the public suite). The Ports are
+in `src/skye/base/interfaces/storage.py`. The router is still the only user; `memory` and the agents archive (D93) will use the scan
+capability.
 
 ## Architecture
 ```
+base/interfaces/storage.py  KeyValueStore, CounterStore, ScanStore (Protocols); StorageBackend (ABC: key-value + counter);
+                            check_ttl, check_key
 store/
-  memory.py            InMemoryBackend       core, standard library
-  file.py              FileSystemBackend     core, standard library
-  dynamodb.py          DynamoDBBackend       boto3, lazy; first-choice durable backend
-  redis.py             RedisBackend          extra `memory` (`redis.asyncio`), lazy
-  postgres.py          PostgreSQLBackend     extra `postgres` (`asyncpg`), lazy (D30)
-  durable_function.py  DurableFunctionBackend  takes a DurableContext from the caller, no import of the SDK
+  _common.py           clock, expiry_of / is_expired, provider_errors, check_data / check_items / check_limit
+  memory.py            InMemoryBackend         key-value, counter, scan   no extra (the default, D97)
+  file.py              FileSystemBackend       key-value, counter, scan   no extra
+  dynamodb.py          DynamoDBBackend         key-value, counter, scan   boto3 (extra `aws` outside Lambda)
+  redis.py             RedisBackend            key-value, counter, scan   valkey-py (`valkey`), else redis-py (`redis`); D102
+  postgres.py          PostgreSQLBackend       key-value, counter, scan   Data API (boto3), pg8000 (`postgres`), asyncpg (`postgres-asyncpg`)
+  durable_function.py  DurableFunctionBackend  key-value, counter         the caller's durable context
+  factory.py           backend(name, **config), register_backend, available_backends
+  conformance.py       check_backend and the three checks, FakeClock (public, D98)
 ```
-Each module is reached only through the Port. A new backend is one new module (extension-point table of `11-design.md`).
+Each module is reached only through the Ports. A new backend is one new module, or a backend outside Skye added with
+`register_backend` and checked with `check_backend` (D98).
 
-### Contract every backend meets (Requirement 12.1, Port footer)
-A value is a JSON-like dictionary. `get` of an absent or expired key returns `None` and never raises; an expired entry is absent.
-`increment` is atomic and stores the counter under the field `count`; `get_multiple` returns every requested key, with `None` for
-the absent ones; `set_multiple` writes the keys with one time to live. An unreachable backend raises `ProviderError`; invalid data
-raises `ValidationError`. One shared conformance suite runs the same cases against every backend that can run offline (memory, file)
-and against the others with a fake client, so the Port promises are tested once and not per module.
+### Contract every backend meets (Requirement 12, Port footer)
+A value is a JSON-like dictionary. `get` of an absent or expired key returns `None` and never raises; `delete` returns whether a live
+value was there. `increment` is atomic, stores `{"count": n}`, starts an absent or expired counter at 0, and sets (or with `None`
+removes) the expiry. `get_multiple` returns every requested key in the order asked; `set_multiple` validates every item before writing
+any. `keys(prefix, limit)` returns the live keys that start with the prefix, sorted, the prefix matched literally. An unreachable
+backend raises `ProviderError`; invalid input raises `ValidationError`. The public conformance suite checks all of this once, against
+every backend (offline, with fakes for the external stores).
 
-### Time to live
-A `ttl` of `None` means no expiry. Today the memory and file backends treat a `ttl` of `0` as no expiry (they test truthiness), while
-DynamoDB stores an expiry attribute that only takes effect when the table's TTL is enabled and is not checked on read. The shared
-suite fixes one meaning (assumption: `ttl=None` is no expiry, and a positive number of seconds is an expiry that every backend also
-checks on read, so an entry past its time is absent even before the service removes it); the zero case follows the owner's answer in
-the open points.
+### Time to live (D95)
+`ttl` is `None` (no expiry) or a positive `int` of seconds; anything else raises `ValidationError` before a write (`check_ttl`). Every
+backend computes the absolute expiry from its clock and checks it on read, so an expired value is absent even where the service deletes
+it later (DynamoDB TTL); Redis uses its own `EX`. Backends take a `clock` argument (Redis: its client), so the suite checks expiry with
+a fake clock and no sleep.
 
-### Lazy imports and missing extras
-`boto3`, `redis` and `asyncpg` are imported inside the method that first needs them, never at module import time (`00-rules`,
-"Dependencies"). A missing library raises `MissingExtraError` naming the extra, as the rest of the library does (invariant 8 of the
-correctness properties in `11-design.md`); today the three modules raise a plain `ImportError`, which is a gap.
+### Lazy imports and missing extras (D99)
+Drivers are imported with `missing_extra(module, extra=...)` inside the method that first needs them, so `import skye.store` loads none
+and a missing one raises `MissingExtraError` naming the extra of that backend. Extras belong to backends, never to components.
 
 ### Async and blocking
-`00-rules` says never to block in an async function. `DynamoDBBackend` calls the synchronous `boto3` resource inside `async def`
-methods, and `FileSystemBackend` does synchronous file I/O. Both move the blocking call to a worker thread with
-`asyncio.to_thread` (a thread inside one invocation, no background thread, no process). The worker thread does not outlive the call.
+`boto3`, pg8000 and file I/O run in `asyncio.to_thread` (a thread inside one call, nothing outliving it). The pg8000 and asyncpg drivers
+hold one connection per backend under a lock; the Data API has none.
 
-### Default durable backend (Requirement 12.2)
-Requirement 12.2 says that where a durable backend is needed and none is declared, the library defaults to DynamoDB, and to the
-pure-Python driver where a backend has two. Today the router defaults to `InMemoryBackend` when it gets no storage argument, and no
-function chooses a durable default. Where that default is applied (a factory in `store`, or the caller) and what "declared" means
-(an argument, a configuration key, an environment variable) is not stated in steering and is listed under "Open points".
+### PostgreSQL (D100)
+`choose_driver` picks the Data API when `cluster_arn` and `secret_arn` are given, else pg8000, else asyncpg, else `MissingExtraError`;
+`driver=` forces one. `statements(table)` writes each operation once with `:name` parameters and no `::` cast (pg8000 and the Data API
+read `:name`; asyncpg gets `$n` through `positional`, which skips quoted strings). The table name is checked as an identifier and every
+value is a parameter. The expiry is a `DOUBLE PRECISION` of seconds, computed in Python from the backend's clock.
+
+### No implicit durable backend (D97)
+The library defaults to `InMemoryBackend` and never chooses a durable backend; the router keeps that default. In pure serverless the
+caller passes the durable function backend or an external store, directly or with `backend(name, **config)`.
 
 ### Identity and credentials
-`DynamoDBBackend` uses the default `boto3` credential chain of the runtime, and the table name is a required argument. The hardcoded
-default region `us-east-1` is a gap: the region comes from the caller or from the runtime configuration, with no silent default.
+`DynamoDBBackend` and the Data API use the default `boto3` credential chain; there is no default region (D97 era fix, task 3.6).
 `RedisBackend` and `PostgreSQLBackend` take their URL or connection string from the caller (`${VAR}` substitution is the caller's
-configuration layer, Requirement 20.4). No backend logs a key's value, a URL with a password, or a credential.
+configuration layer, Requirement 20.4). No backend logs or puts in an error a stored value, a URL with a password, or a credential.
 
 ## Data Models
-No new model is needed. A stored value is a `dict[str, Any]`; the expiry is kept beside it by the backend (`_ttl` in a file, a tuple in
-memory, the `ttl` attribute in DynamoDB), and the backend strips its own metadata on read.
+No new model is needed. A stored value is a `dict[str, Any]`; the expiry is kept beside it by the backend (`_skye_expires_at` in a
+file, a tuple in memory, the `ttl` attribute in DynamoDB, `expires_at` in PostgreSQL and the durable context), and the backend strips
+its own metadata on read.
 
 ## Error Handling
 A backend wraps its client's exceptions in `ProviderError` with the backend name and the operation (`raise ... from e`) and lets a
 missing key be a normal `None`. Connection failures surface at `connect` or at the first call, not at construction.
 
 ## Testing Strategy
-Tests are in `tests/unit/store/`: the shared conformance suite for memory and file, the same suite with a fake DynamoDB resource, a
-fake Redis client and a fake asyncpg pool, the expiry on read, atomic `increment` under concurrent tasks (`asyncio.gather`), the
-missing-extra error for the three lazy libraries, and that importing `skye.store` imports none of them (the lazy-import budget).
+Tests are in `tests/unit/store/`: the public conformance suite against all six backends (fakes in `fakes.py` for DynamoDB, Redis
+and the SQL executor), the three PostgreSQL drivers with fake clients, the factory and registry, the missing-extra errors, wrapped
+errors without secrets, and the structure rules (no driver at import, no backend outside `store`).
 The example `examples/store/backends.py` keeps running under `tests/examples`. Property-based tests fit the set and get round-trip.
 
 ## Correctness Properties
@@ -90,10 +97,8 @@ The example `examples/store/backends.py` keeps running under `tests/examples`. P
 8. No component outside `store` defines a class that implements `StorageBackend` for production use (Requirement 12.1).
 
 ## Open points (not decided here)
-- Requirement 12.1 lists four backends (in-memory, file, DynamoDB, Redis). The code also has `PostgreSQLBackend` (extra `postgres`, D30)
-  and `DurableFunctionBackend`. The "Store layout" table of `11-design.md` says PostgreSQL is "used by `memory`" under the extra
-  `memory`, which D30 supersedes. The steering lists need a correction (Requirement 12.1 and the table) before the spec claims them;
-  the owner also decides whether `DurableFunctionBackend` stays.
-- Where the default durable backend of Requirement 12.2 is applied and what "declared" means.
-- Whether `ttl=0` means "no expiry" or "already expired".
-- Whether `memory` needs a delete or a prefix query on the Port (Requirement 12.3 requires the Port first); decided with the `memory` spec.
+- ~~The backends of Requirement 12.1 and the "Store layout" table~~: settled by D96.
+- ~~Where the default durable backend applies~~: settled by D97 (none is picked by the library; the caller chooses).
+- ~~What `ttl=0` means~~: settled by D95 (rejected).
+- Which further operations `memory` needs on the Ports (a vector store, D41): decided with the `memory` spec; `delete` and `keys` by
+  prefix exist (D98).

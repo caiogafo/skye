@@ -17,7 +17,7 @@ import base64
 from pathlib import Path
 from typing import Union, Dict, Any
 
-from skye.base.exceptions import ValidationError
+from skye.base.exceptions import UnsupportedModalityError, ValidationError
 from skye.base.messages import sniff_image_mime
 
 
@@ -214,6 +214,10 @@ class ImageHandler:
         
         Returns:
             Dict in Bedrock format
+
+        Raises:
+            UnsupportedModalityError: If the image is a URL, which Bedrock does not fetch.
+            ValidationError: If the image input is invalid.
         
         Example:
             >>> ImageHandler.to_bedrock_format(Path("image.png"))
@@ -232,10 +236,11 @@ class ImageHandler:
                         "source": {"bytes": base64.b64decode(data)}
                     }
                 }
-            raise ValidationError(
-                "Bedrock does not fetch image URLs: pass a file path, bytes or a data URI",
-                "image_input",
-                url,
+            raise UnsupportedModalityError(
+                "Bedrock does not support the image modality given as a URL (it does not fetch URLs): "
+                "pass a file path, bytes or a data URI",
+                provider="bedrock",
+                modality="image",
             )
         return processed
 

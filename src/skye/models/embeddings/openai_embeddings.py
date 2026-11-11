@@ -19,6 +19,7 @@ from typing import Any
 
 from skye.models.base import BaseEmbeddingProvider
 from skye.models.transport import rest
+from skye.models.transport.credentials import resolve_api_key
 
 DEFAULT_API_BASE = "https://api.openai.com/v1"
 
@@ -48,14 +49,18 @@ class OpenAIEmbeddingProvider(BaseEmbeddingProvider):
         "text-embedding-ada-002": 1536,
     }
     
-    def __init__(self, model: str, api_key: str, **config: Any) -> None:
+    def __init__(self, model: str, api_key: str | None = None, **config: Any) -> None:
         """Initialize OpenAI embedding provider.
         
         Args:
             model: Model identifier (e.g., 'text-embedding-3-small')
-            api_key: OpenAI API key
+            api_key: OpenAI API key; ``OPENAI_API_KEY`` when omitted
             **config: Additional configuration parameters
+
+        Raises:
+            ConfigurationError: No key is given and ``OPENAI_API_KEY`` is not set.
         """
+        api_key = resolve_api_key(api_key, "OPENAI_API_KEY")  # the standard variable (D18)
         super().__init__(model=model, api_key=api_key, **config)
         self.api_key = api_key
     

@@ -4,10 +4,10 @@ This example runs real library code end to end, with no network.
 
 ``TokenCounter`` counts tokens in plain text and in a list of messages, adding the
 per-message overhead each model uses for formatting. Exact counts for GPT models come
-from ``tiktoken``, which ships with the ``openai`` extra. That extra is absent in this
-offline harness, so ``TokenCounter`` falls back to its standard-library approximation
-(about four characters per token). The numbers printed here are that approximation; with
-``skyeai`` installed the same calls return exact counts for GPT models.
+from ``tiktoken``, which ships with the ``tokens`` extra (``pip install "skyeai[tokens]"``).
+Without it ``TokenCounter`` falls back to its standard-library approximation (about four
+characters per token); with the extra installed the same calls return exact counts for GPT
+models.
 """
 
 import skye  # noqa: F401  (imported so the example reads like user code)
@@ -20,7 +20,7 @@ def main() -> None:
 
     text = "Skye keeps the core to the Python standard library."
     text_tokens = TokenCounter.count_tokens(text, model)
-    print("count_tokens (approximate, stdlib fallback):")
+    print("count_tokens (exact with the tokens extra, otherwise the stdlib approximation):")
     print(f"  model : {model}")
     print(f"  text  : {text}")
     print(f"  tokens: {text_tokens}")
@@ -34,7 +34,7 @@ def main() -> None:
     print(f"  messages: {len(messages)}")
     print(f"  tokens  : {message_tokens}")
 
-    print("\nInstall skyeai (tiktoken) for exact GPT token counts.")
+    print('\nInstall "skyeai[tokens]" (tiktoken) for exact GPT token counts.')
 
 
 if __name__ == "__main__":

@@ -5,7 +5,7 @@ module holds only what is specific to Anthropic.
 
 Example:
     >>> from skye.models.llm.anthropic import AnthropicProvider
-    >>> provider = AnthropicProvider(api_key="sk-ant-...")
+    >>> provider = AnthropicProvider(api_key="sk-ant-...")  # or set ANTHROPIC_API_KEY
     >>> response = provider.complete(request)  # doctest: +SKIP
 """
 
@@ -16,13 +16,14 @@ class AnthropicProvider(AnthropicCompatibleProvider):
     """Anthropic: default endpoint ``api.anthropic.com`` and the label ``anthropic``.
 
     Args:
-        api_key: Anthropic API key
+        api_key: Anthropic API key; ``ANTHROPIC_API_KEY`` when omitted
         api_base: Optional custom API base URL
         timeout: Seconds before a call fails (default 60)
     """
 
     provider_name = "anthropic"
     default_api_base = "https://api.anthropic.com"
+    api_key_env_var = "ANTHROPIC_API_KEY"  # the standard variable (D18)
 
 
 __all__ = ["AnthropicProvider"]

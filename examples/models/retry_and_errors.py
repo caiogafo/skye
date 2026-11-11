@@ -1,36 +1,79 @@
-"""Handling provider errors; retry lives at the router (proposed-interface, guarded).
+"""Provider errors and the client's own retries (Live, no network).
 
-This example shows the real ``ProviderError`` type and how the ``SkyeError`` hierarchy
-lets you catch provider failures with one ``except``. It does not fake a retry switch:
-transient-error retry is a router-level concern, configured where a request is routed
-across providers (see ``examples/routing``), not a per-call flag on a model client.
-
-Every error line that is provoked on purpose contains the word ``Expected`` so the
-offline harness reads it as a deliberate demonstration rather than a real failure.
+A failed call raises the ``ProviderError`` subclass of the response (D104): ``RateLimitError`` (429),
+``ServerError`` (5xx), ``ProviderTimeoutError`` (timeout, dropped connection), ``AuthenticationError``
+(401, 403), ``BadRequestError`` (other 4xx). A client retries only the first three, ``max_retries``
+times (3 by default, ``0`` = off), with backoff or the server's ``Retry-After``; a stream only before
+its first chunk. The "service" is a local function that fails on purpose, and the waits are recorded
+(``retry_sleep``) instead of slept. Lines with errors provoked on purpose say ``Expected``.
 """
 
-from skye import ProviderError, SkyeError
+from typing import Any
+
+from skye import CompleteResponse, StreamChunk, TokenUsage, UserMessage
+from skye.exceptions import BadRequestError, ProviderError, RateLimitError, ServerError
+from skye.models import BaseModelProvider
+
+
+class FlakyService(BaseModelProvider):
+    """Fails with the errors it is given, one per call, then answers."""
+
+    def __init__(self, failures: list[ProviderError], **config: Any) -> None:
+        super().__init__(**config)
+        self.failures, self.calls = list(failures), 0
+
+    def _call_provider(self, request: dict[str, Any]) -> Any:
+        self.calls += 1
+        if self.failures:
+            raise self.failures.pop(0)
+        return {"text": f"ok after {self.calls} attempts", "model": request["model"]}
+
+    def _call_provider_stream(self, request: dict[str, Any]) -> Any:
+        yield self._call_provider(request)
+
+    def _transform_request(self, request: Any) -> dict[str, Any]:
+        return {"model": request.model}
+
+    def _transform_response(self, response: Any) -> CompleteResponse:
+        usage = TokenUsage(prompt_tokens=1, completion_tokens=1, total_tokens=2)
+        return CompleteResponse(model=response["model"], provider="flaky", content=response["text"], finish_reason="stop", usage=usage)
+
+    def _transform_stream_chunk(self, chunk: Any) -> StreamChunk:
+        return StreamChunk(id="s", delta=chunk["text"], finish_reason="stop", index=0)
+
+    _initialize_client = lambda self: None  # noqa: E731
+    _transform_messages = _transform_capabilities = format_capability_results = lambda self, items: []  # noqa: E731
+    _extract_capability_calls = lambda self, response: None  # noqa: E731
+
+    def get_model_info(self) -> dict[str, Any]:
+        return {"provider": "flaky"}
 
 
 def main() -> None:
-    # A ProviderError carries the provider name and, when known, an HTTP status code.
-    transient = ProviderError(
-        "upstream was briefly unavailable", provider="openai", status_code=503
-    )
+    hello, waits = [UserMessage(content="hello")], []
 
+    # 1. A rate limit with Retry-After, then a server error: retried, then answered
+    failures = [RateLimitError("slow down", provider="flaky", status_code=429, retry_after=3), ServerError("down", provider="flaky", status_code=503)]
+    client = FlakyService(failures, retry_sleep=waits.append)
+    print(client.complete(hello, model="m").content, f"(waited {waits} s: Retry-After, then the backoff)")
+
+    # 2. A bad request is raised at once
+    client = FlakyService([BadRequestError("bad field", provider="flaky", status_code=400)], retry_sleep=waits.append)
     try:
-        raise transient
-    except SkyeError as error:
-        print("Expected caught a provider failure through the SkyeError umbrella:")
-        print(f"  type    : {type(error).__name__}")
-        print(f"  message : {error.message}")
-        print(f"  provider: {error.details.get('provider')}")
-        print(f"  status  : {error.details.get('status_code')}")
+        client.complete(hello, model="m")
+    except BadRequestError as error:
+        print(f"Expected {type(error).__name__} after {client.calls} attempt (status {error.status_code})")
 
-    status = transient.details.get("status_code")
-    retryable = isinstance(status, int) and status in (429, 500, 502, 503, 504)
-    print(f"\nLooks retryable at the router level: {retryable}")
-    print("Configure retry where requests are routed, not per call; see examples/routing.")
+    # 3. max_retries=0 turns retries off (what a router does for its targets)
+    client = FlakyService([RateLimitError("slow down", provider="flaky", status_code=429)], max_retries=0)
+    try:
+        client.complete(hello, model="m")
+    except ProviderError as error:  # every provider failure is a ProviderError
+        print(f"Expected {type(error).__name__} with max_retries=0 after {client.calls} attempt")
+
+    # 4. A stream is retried before its first chunk
+    client = FlakyService([ServerError("down", provider="flaky", status_code=502)], retry_sleep=waits.append)
+    print("stream:", "".join(chunk.delta for chunk in client.stream(hello, model="m")))
 
 
 if __name__ == "__main__":

@@ -101,7 +101,7 @@ class TestAzureOpenAIProviderInitialization:
         """Azure deployment URL with api-version and api-key header."""
         provider = _provider()
         assert provider._endpoint_url() == URL
-        assert provider._auth_headers() == {"api-key": "test-key"}
+        assert provider._authenticator().apply("POST", URL, {}) == {"api-key": "test-key"}
 
     def test_module_imports_no_openai_sdk(self) -> None:
         """The adapter must not import the vendor SDK."""
@@ -492,7 +492,8 @@ class TestAzureOpenAIProviderCalls:
         payload = post.call_args.args[1]
         assert payload["model"] == "gpt-4"
         assert payload["messages"] == [{"role": "user", "content": "Hello"}]
-        assert post.call_args.kwargs["headers"] == {"api-key": "test-key"}
+        assert post.call_args.kwargs["headers"] == {}
+        assert post.call_args.kwargs["authenticator"].apply("POST", URL, {}) == {"api-key": "test-key"}
     
     def test_complete_error_handling(self) -> None:
         """Test error handling in complete."""

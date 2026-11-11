@@ -46,7 +46,8 @@ class JsonObject:
 
     def to_dict(self) -> dict[str, Any]:
         """The underlying plain dict."""
-        return self._d
+        data: dict[str, Any] = self._d
+        return data
 
     def __repr__(self) -> str:
         return f"JsonObject({self._d!r})"
@@ -85,7 +86,26 @@ def post_json(
     timeout: float = 60.0,
     provider: str = "http",
 ) -> JsonObject:
-    """POST a JSON body, return the decoded JSON response as a :class:`JsonObject`."""
+    """POST a JSON body and return the decoded JSON response as a :class:`JsonObject`.
+
+    Public as ``skye.models.post_json``: the transport of the built-in adapters, for a custom provider.
+
+    Args:
+        url: The endpoint.
+        payload: The body, encoded as JSON.
+        headers: Extra headers (``Content-Type: application/json`` is set).
+        authenticator: Signs or authenticates the request (an ``AuthenticationInterface``: a SigV4
+            signer, an Entra ID or Google bearer token); applied after the body is serialised.
+        timeout: Seconds before the call fails with ``ProviderTimeoutError``.
+        provider: The provider name the errors carry.
+
+    Returns:
+        The decoded response (attribute access: ``response.choices[0].message.content``).
+
+    Raises:
+        ProviderError: The subclass of the response (D104): ``RateLimitError``, ``ServerError``,
+            ``ProviderTimeoutError``, ``AuthenticationError``, ``BadRequestError``.
+    """
     body, hdrs = prepare("POST", url, payload, headers, authenticator)
     raw = http.send_bytes(url, body, headers=hdrs, method="POST", timeout=timeout, provider=provider)
     return JsonObject(json.loads(raw.decode("utf-8")) if raw else {})
@@ -101,7 +121,14 @@ def stream_sse_json(
     provider: str = "http",
     done_marker: str = "[DONE]",
 ) -> Iterator[JsonObject]:
-    """POST and yield each SSE ``data`` payload decoded as JSON (stops at ``done_marker``)."""
+    """POST a JSON body and yield each server-sent event's ``data`` decoded as JSON.
+
+    Public as ``skye.models.stream_sse_json``. Takes the arguments of :func:`post_json`; the stream
+    stops at an event whose data is ``done_marker`` (OpenAI's ``[DONE]``) or at the end of the body.
+
+    Raises:
+        ProviderError: The subclass of the response, before the first event (D104).
+    """
     body, hdrs = prepare("POST", url, payload, headers, authenticator)
     resp = http.open_stream(url, body, headers=hdrs, method="POST", timeout=timeout, provider=provider)
     with resp:

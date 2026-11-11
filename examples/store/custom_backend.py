@@ -1,17 +1,19 @@
 """Your own durable-state backend behind the StorageBackend Port (Live).
 
-``StorageBackend`` (``skye.base.interfaces.storage``) is the contract every store honours. Subclass
-it, implement the abstract async methods, and the rest of Skye can use your backend anywhere a core
-one would go. This example backs it with a plain dict to keep the focus on the shape of the Port.
+``StorageBackend`` is key-value plus counter (decision D98); ``ScanStore`` adds ``keys`` by prefix.
+Subclass, implement the abstract async methods, register the class with ``register_backend`` and
+check it with the public conformance suite (``check_backend``). This example backs it with a plain
+dict to keep the focus on the shape of the Ports; it ignores expiry, so it skips the full suite.
 """
 
 import asyncio
 from typing import Any
 
-from skye.interfaces import StorageBackend
+from skye.interfaces import ScanStore, StorageBackend
+from skye.store import backend, register_backend
 
 
-class DictBackend(StorageBackend):
+class DictBackend(StorageBackend, ScanStore):
     """A minimal StorageBackend kept entirely in a dictionary."""
 
     def __init__(self) -> None:
@@ -25,6 +27,13 @@ class DictBackend(StorageBackend):
 
     async def set(self, key: str, data: dict[str, Any], ttl: int | None = None) -> None:
         self._data[key] = dict(data)
+
+    async def delete(self, key: str) -> bool:
+        return self._data.pop(key, None) is not None
+
+    async def keys(self, prefix: str = "", limit: int | None = None) -> list[str]:
+        found = sorted(k for k in self._data if k.startswith(prefix))
+        return found if limit is None else found[:limit]
 
     async def increment(self, key: str, amount: int = 1, ttl: int | None = None) -> int:
         current = await self.get(key) or {}
@@ -41,13 +50,15 @@ class DictBackend(StorageBackend):
 
 
 async def main() -> None:
-    backend = DictBackend()
-    await backend.connect()
+    register_backend("dict", DictBackend, replace=True)
+    store = backend("dict")
+    await store.connect()
 
-    await backend.set_multiple({"user:1": {"name": "Ada"}, "user:2": {"name": "Grace"}})
-    print("get(user:1):", await backend.get("user:1"))
-    print("increment(hits):", await backend.increment("hits", amount=3))
-    print("get_multiple:", await backend.get_multiple(["user:1", "user:2", "missing"]))
+    await store.set_multiple({"user:1": {"name": "Ada"}, "user:2": {"name": "Grace"}})
+    print("get(user:1):", await store.get("user:1"))
+    print("increment(hits):", await store.increment("hits", amount=3))
+    print("get_multiple:", await store.get_multiple(["user:1", "user:2", "missing"]))
+    print("keys(user:):", await store.keys("user:"))
 
 
 if __name__ == "__main__":

@@ -38,10 +38,12 @@ from datetime import datetime, timezone
 from typing import Any
 
 from skye.auth.google import resolve_google_auth
+from skye.base.prompt_parts import PromptParts
+from skye.models.transport.cost import usage_of
 from skye.base.completion import CapabilityCall, CompleteRequest, CompleteResponse, StreamChunk, TokenUsage
 from skye.base.interfaces.authentication import AuthenticationInterface
 from skye.models.base import BaseModelProvider
-from skye.models.transport.structured import schema_instruction
+from skye.models.transport.structured import gemini_schema, schema_instruction, schema_of
 from skye.models.transport import rest
 from skye.models.transport.rest import JsonObject, wrap
 
@@ -283,9 +285,13 @@ class GoogleProvider(BaseModelProvider):
             "generationConfig": generation_config,
         }
         if request.response_schema:
-            # JSON mode plus the schema in the instructions (no schema dialect to translate)
+            # Native responseSchema when the schema fits Gemini's OpenAPI subset; else JSON mode plus the schema in the instructions
             generation_config["responseMimeType"] = "application/json"
-            system_parts = [*system_parts, {"text": schema_instruction(request.response_schema)}]
+            native = gemini_schema(schema_of(request.response_schema))
+            if native is not None:
+                generation_config["responseSchema"] = native
+            else:
+                system_parts = [*system_parts, {"text": schema_instruction(request.response_schema)}]
         if system_parts:
             google_request["systemInstruction"] = {"parts": system_parts}
 
@@ -401,7 +407,18 @@ class GoogleProvider(BaseModelProvider):
             finish_reason = self._finish_reason(candidate)
             parts = (candidate.get("content") or JsonObject({})).get("parts") or []
             content = "".join(p.get("text") for p in parts if p.get("text") is not None)
-        return StreamChunk(id="", delta=content, finish_reason=finish_reason, index=0)
+        # usageMetadata, when an event has it, is a running count of the whole call.
+        reported = chunk.get("usageMetadata")
+        usage = (
+            usage_of(
+                reported.get("promptTokenCount"),
+                reported.get("candidatesTokenCount"),
+                reported.get("totalTokenCount"),
+            )
+            if reported
+            else None
+        )
+        return StreamChunk(id="", delta=content, finish_reason=finish_reason, index=0, usage=usage)
 
     def _prepare_call(self, request: dict[str, Any], method: str) -> tuple[str, dict[str, Any]]:
         body = dict(request)
@@ -422,7 +439,7 @@ class GoogleProvider(BaseModelProvider):
 
     async def acomplete(
         self,
-        messages: list[Any] | str | CompleteRequest | None = None,
+        messages: list[Any] | str | CompleteRequest | PromptParts | None = None,
         model: str | None = None,
         router: Any | None = None,
         temperature: float | None = None,
@@ -486,6 +503,6 @@ class GoogleProvider(BaseModelProvider):
             "provider": "google",
             "supports_streaming": True,
             "supports_function_calling": True,
-            "supports_structured_output": False,
+            "supports_structured_output": True,  # responseSchema (D101)
             "supports_multimodal": True
         }

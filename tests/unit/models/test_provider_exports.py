@@ -118,6 +118,9 @@ class TestProviderExports:
             "CostCalculator",
             "ImageHandler",
             "LazyImporter",
+            "JsonObject",
+            "post_json",
+            "stream_sse_json",
         ]
 
         for utility in expected_utilities:
@@ -261,8 +264,9 @@ class TestProviderExports:
         # - 4 utilities
         # - 1 decision model (Jev)
         # - 2 base classes
-        # Total: 18
-        expected_count = 18
+        # - 3 HTTP transport names for custom providers (JsonObject, post_json, stream_sse_json)
+        # Total: 21
+        expected_count = 21
 
         assert len(__all__) == expected_count, f"Expected {expected_count} exports, got {len(__all__)}"
 

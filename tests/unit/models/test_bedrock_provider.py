@@ -20,11 +20,17 @@ from skye.models.llm.bedrock import BedrockProvider
 from skye.models.transport import rest
 
 
+@pytest.fixture(autouse=True)
+def _aws_region(monkeypatch):
+    """The region comes from AWS_REGION when none is passed (there is no silent default)."""
+    monkeypatch.setenv("AWS_REGION", "us-east-1")
+
+
 class TestBedrockProviderInitialization:
     """Test BedrockProvider initialization and client setup."""
     
     def test_init_with_defaults(self):
-        """Test initialization with default parameters."""
+        """Without region_name the region is AWS_REGION."""
         provider = BedrockProvider()
         assert provider.region_name == "us-east-1"
         assert provider.profile_name is None
@@ -90,10 +96,9 @@ class TestBedrockRequestTransformation:
         
         bedrock_request = provider._transform_request(request)
         
-        # System message should be in messages array for Bedrock
-        assert len(bedrock_request["messages"]) == 2
-        assert bedrock_request["messages"][0]["role"] == "system"
-        assert bedrock_request["messages"][0]["content"][0]["text"] == "You are a helpful assistant"
+        # Converse takes the system prompt as the top-level "system" field; messages are only user and assistant (D101)
+        assert bedrock_request["system"] == [{"text": "You are a helpful assistant"}]
+        assert [m["role"] for m in bedrock_request["messages"]] == ["user"]
     
     def test_transform_request_with_max_tokens(self):
         """Test transformation with max_tokens parameter."""

@@ -8,7 +8,7 @@ from unittest.mock import patch
 import pytest
 
 from skye.auth.sigv4 import sign_request
-from skye.base.exceptions import ProviderError
+from skye.base.exceptions import ProviderError, ServerError
 from skye.models.transport import http
 from skye.models.transport.retry import with_retry
 from skye.models.transport.streaming import SSEEvent, parse_sse
@@ -63,9 +63,9 @@ class TestRetry:
         @with_retry(max_retries=3, min_wait=0, max_wait=0)
         def f():
             calls.append(1)
-            raise ProviderError("boom", provider="x")
+            raise ServerError("boom", provider="x", status_code=503)
 
-        with pytest.raises(ProviderError):
+        with pytest.raises(ServerError):
             f()
         assert len(calls) == 3
 
@@ -76,7 +76,7 @@ class TestRetry:
         def f():
             calls.append(1)
             if len(calls) < 2:
-                raise ProviderError("boom", provider="x")
+                raise ServerError("boom", provider="x", status_code=502)
             return "ok"
 
         assert f() == "ok" and len(calls) == 2

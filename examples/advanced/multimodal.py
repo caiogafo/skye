@@ -39,7 +39,8 @@ def main() -> None:
         # The same sources, inside a message (needs OPENAI_API_KEY and a network)
         message = UserMessage(content="What is in this image?", images=[path])
         print("message carries", len(message.images), "image(s):", message.to_dict()["images"][0][:22])
-        # client = skye.provider("openai"); client.complete(messages=[message], model="gpt-4o")
+        # client = skye.provider("openai")  # the key from OPENAI_API_KEY
+        # client.complete(messages=[message], model="gpt-4o")
 
 
 if __name__ == "__main__":

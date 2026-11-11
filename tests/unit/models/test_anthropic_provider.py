@@ -482,7 +482,7 @@ class TestAnthropicModelInfo:
         assert info["provider"] == "anthropic"
         assert info["supports_streaming"] is True
         assert info["supports_function_calling"] is True
-        assert info["supports_structured_output"] is False
+        assert info["supports_structured_output"] is True  # output_config.format
         assert info["supports_multimodal"] is True
         assert info["supports_thinking"] is True
 

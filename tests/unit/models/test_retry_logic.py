@@ -14,7 +14,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from skye.base.completion import CompleteRequest, CompleteResponse, TokenUsage
-from skye.base.exceptions import ProviderError
+from skye.base.exceptions import BadRequestError, ProviderError, RateLimitError
 from skye.base.messages import UserMessage
 from skye.models.base import BaseModelProvider
 from skye.models.transport.retry import with_retry
@@ -24,7 +24,8 @@ class MockProvider(BaseModelProvider):
     """Mock provider for testing retry logic."""
 
     def __init__(self, **config):
-        super().__init__(**config)
+        self.waits: list[float] = []
+        super().__init__(retry_sleep=self.waits.append, **config)
         self.call_count = 0
         self.fail_count = 0
 
@@ -67,10 +68,10 @@ class MockProvider(BaseModelProvider):
         self.call_count += 1
         if self.fail_count > 0:
             self.fail_count -= 1
-            raise ProviderError(
+            raise RateLimitError(
                 "Transient error",
                 provider="mock",
-                error_type="rate_limit",
+                status_code=429,
             )
         return MagicMock()
 
@@ -97,7 +98,7 @@ class TestRetryDecorator:
         assert provider.call_count == 1
 
     def test_retry_decorator_retries_on_failure(self) -> None:
-        """Test that decorator retries on ProviderError."""
+        """A rate limit (a transient error, D104) is retried."""
         provider = MockProvider()
         provider.fail_count = 2  # Fail twice, succeed on third try
         request = CompleteRequest(
@@ -120,8 +121,21 @@ class TestRetryDecorator:
         with pytest.raises(ProviderError):
             provider.complete(request)
 
-        # Should have tried 3 times (initial + 2 retries)
-        assert provider.call_count == 3
+        # Should have tried 4 times (initial + 3 retries, Requirement 9.2)
+        assert provider.call_count == 4
+
+    def test_a_client_error_is_not_retried(self) -> None:
+        """A 4xx other than 429 is raised at once (D104)."""
+        provider = MockProvider()
+
+        def bad_request(request):
+            provider.call_count += 1
+            raise BadRequestError("bad", provider="mock", status_code=400)
+
+        provider._call_provider = bad_request  # type: ignore[method-assign]
+        with pytest.raises(BadRequestError):
+            provider.complete(CompleteRequest(messages=[UserMessage(content="test")], model="test-model"))
+        assert provider.call_count == 1 and provider.waits == []
 
     def test_retry_decorator_exponential_backoff(self) -> None:
         """Test that retry uses exponential backoff."""
@@ -131,14 +145,15 @@ class TestRetryDecorator:
             messages=[UserMessage(content="test")], model="test-model"
         )
 
-        start_time = time.time()
         response = provider.complete(request)
-        elapsed = time.time() - start_time
 
         assert response.content == "test response"
-        # Should have waited at least min_wait (4 seconds)
-        # Allow some tolerance for test execution
-        assert elapsed >= 3.5
+        # The first wait is the base wait (1 s); it doubles with each retry
+        assert provider.waits == [1.0]
+        provider.fail_count = 2
+        provider.waits.clear()
+        provider.complete(request)
+        assert provider.waits == [1.0, 2.0]
 
     def test_retry_decorator_with_custom_params(self) -> None:
         """Test retry decorator with custom parameters."""
@@ -189,7 +204,7 @@ class TestRetryDecorator:
             def _call_provider(self, request):
                 self.call_count += 1
                 if self.call_count < 2:
-                    raise ProviderError("test error", provider="mock")
+                    raise RateLimitError("test error", provider="mock", status_code=429)
                 return MagicMock()
 
             def _call_provider_stream(self, request):

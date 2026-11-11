@@ -18,6 +18,7 @@ from typing import Any
 
 from skye.models.base import BaseEmbeddingProvider
 from skye.models.transport import rest
+from skye.models.transport.credentials import resolve_api_key
 
 COHERE_EMBED_URL = "https://api.cohere.com/v2/embed"
 
@@ -46,14 +47,18 @@ class CohereEmbeddingProvider(BaseEmbeddingProvider):
         "embed-multilingual-v3.0": 1024,
     }
     
-    def __init__(self, model: str, api_key: str, **config: Any) -> None:
+    def __init__(self, model: str, api_key: str | None = None, **config: Any) -> None:
         """Initialize Cohere embedding provider.
         
         Args:
             model: Model identifier (e.g., 'embed-english-v3.0')
-            api_key: Cohere API key
+            api_key: Cohere API key; ``COHERE_API_KEY`` when omitted
             **config: Additional configuration parameters
+
+        Raises:
+            ConfigurationError: No key is given and ``COHERE_API_KEY`` is not set.
         """
+        api_key = resolve_api_key(api_key, "COHERE_API_KEY")  # the standard variable (D18)
         super().__init__(model=model, api_key=api_key, **config)
         self.api_key = api_key
     

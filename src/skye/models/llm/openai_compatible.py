@@ -31,11 +31,15 @@ from collections.abc import Iterator
 from datetime import datetime, timezone
 from typing import Any
 
+from skye.base.prompt_parts import PromptParts
+from skye.models.transport.cost import usage_of
 from skye.base.completion import CompleteRequest, CompleteResponse, StreamChunk, TokenUsage
 from skye.base.exceptions import ConfigurationError
+from skye.base.interfaces.authentication import AuthenticationInterface
 from skye.base.messages import AssistantMessage
 from skye.models.base import BaseModelProvider
-from skye.models.transport.structured import schema_of, strict_schema
+from skye.models.transport.credentials import resolve_api_key
+from skye.models.transport.structured import schema_name, schema_of, strict_schema, wants_strict
 from skye.models.transport import rest
 
 
@@ -60,17 +64,26 @@ class OpenAICompatibleProvider(BaseModelProvider):
     metadata_prefix = "openai_"
     #: Whether response metadata carries ``system_fingerprint``.
     reports_fingerprint = False
+    #: Ask the endpoint for the token usage of a stream (``stream_options.include_usage``). Off here because an
+    #: OpenAI-compatible endpoint may reject the field; ``OpenAIProvider`` turns it on.
+    streams_usage = False
+    #: The provider-standard variable read when no ``api_key`` is given (D18); ``None`` means the key must be passed.
+    api_key_env_var: str | None = None
 
-    def __init__(self, api_key: str, api_base: str | None = None, **kwargs: Any) -> None:
+    def __init__(self, api_key: str | None = None, api_base: str | None = None, **kwargs: Any) -> None:
         """Initialize the provider.
 
         Args:
-            api_key: Key sent as a bearer token
+            api_key: Key sent as a bearer token; the class's standard variable (``api_key_env_var``) when omitted
             api_base: Base URL of the endpoint (default: ``default_api_base``)
             **kwargs: Additional configuration parameters
+
+        Raises:
+            ConfigurationError: No key is given and the standard variable is not set (the error names it).
         """
+        api_key = resolve_api_key(api_key, self.api_key_env_var)
         super().__init__(api_key=api_key, api_base=api_base, **kwargs)
-        self.api_key = api_key
+        self.api_key: str | None = api_key
         self.api_base = api_base
 
     def _initialize_client(self) -> Any:
@@ -87,6 +100,10 @@ class OpenAICompatibleProvider(BaseModelProvider):
     def _auth_headers(self) -> dict[str, str]:
         """Authentication headers for the endpoint."""
         return {"Authorization": f"Bearer {self.api_key}"}
+
+    def _authenticator(self) -> AuthenticationInterface | None:
+        """An authenticator that signs each request (Azure Entra ID); ``None`` when the headers are enough."""
+        return None
 
     def _model_name(self, request: CompleteRequest) -> str:
         """Model identifier sent to the endpoint."""
@@ -239,11 +256,11 @@ class OpenAICompatibleProvider(BaseModelProvider):
         # Handle structured outputs
         if request.response_schema:
             schema = schema_of(request.response_schema)
-            strict = strict_schema(schema)
+            strict = strict_schema(schema) if wants_strict(request.response_schema) else None
             openai_request["response_format"] = {
                 "type": "json_schema",
                 "json_schema": {
-                    "name": request.response_schema.__name__,
+                    "name": schema_name(request.response_schema),
                     "schema": strict or schema,
                     "strict": strict is not None
                 }
@@ -349,8 +366,19 @@ class OpenAICompatibleProvider(BaseModelProvider):
         # The API omits keys it has nothing to say about: the last chunk has `"delta": {}`, and a usage-only chunk has no choices.
         chunk_id = getattr(chunk, "id", "")
         choices = getattr(chunk, "choices", None) or []
+        # With include_usage the last chunk has no choices and the usage of the whole request; the others carry null.
+        raw_usage = getattr(chunk, "usage", None)
+        usage = (
+            usage_of(
+                getattr(raw_usage, "prompt_tokens", None),
+                getattr(raw_usage, "completion_tokens", None),
+                getattr(raw_usage, "total_tokens", None),
+            )
+            if raw_usage is not None
+            else None
+        )
         if not choices:
-            return StreamChunk(id=chunk_id, delta="", finish_reason=None, index=0)
+            return StreamChunk(id=chunk_id, delta="", finish_reason=None, index=0, usage=usage)
         choice = choices[0]
         delta = getattr(choice, "delta", None)
 
@@ -359,26 +387,35 @@ class OpenAICompatibleProvider(BaseModelProvider):
             delta=(getattr(delta, "content", None) or "") if delta is not None else "",
             finish_reason=getattr(choice, "finish_reason", None),
             index=getattr(choice, "index", 0),
+            usage=usage,
         )
     
     def _call_provider(self, request: dict[str, Any]) -> Any:
         """POST to the chat-completions endpoint and return the decoded JSON view."""
         return rest.post_json(
-            self._endpoint_url(), request, headers=self._auth_headers(), provider=self.provider_name
+            self._endpoint_url(),
+            request,
+            headers=self._auth_headers(),
+            authenticator=self._authenticator(),
+            provider=self.provider_name,
         )
 
     def _call_provider_stream(self, request: dict[str, Any]) -> Iterator[Any]:
         """Stream the chat-completions endpoint (SSE), yielding decoded chunks."""
+        payload = {**request, "stream": True}
+        if self.streams_usage:
+            payload.setdefault("stream_options", {"include_usage": True})
         return rest.stream_sse_json(
             self._endpoint_url(),
-            {**request, "stream": True},
+            payload,
             headers=self._auth_headers(),
+            authenticator=self._authenticator(),
             provider=self.provider_name,
         )
 
     async def acomplete(
         self,
-        messages: list[Any] | str | CompleteRequest | None = None,
+        messages: list[Any] | str | CompleteRequest | PromptParts | None = None,
         model: str | None = None,
         router: Any | None = None,
         temperature: float | None = None,
