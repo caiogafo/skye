@@ -1,6 +1,6 @@
 [project]
 name = "skyeai"
-version = "0.1.1"
+version = "0.2.0"
 description = "Modular GenAI library with optional extras for building AI agents and intelligent applications"
 readme = "README.md"
 license = {text = "MIT"}
@@ -18,7 +18,7 @@ classifiers = [
     "Typing :: Typed",
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
 ]
-dependencies = []
+dependencies = []  # the core is the standard library only (decision D49; supersedes the pydantic and tenacity entries)
 
 [project.urls]
 Homepage = "https://github.com/ggiallo28/skye"
@@ -30,40 +30,82 @@ Issues = "https://github.com/ggiallo28/skye/issues"
 skye = "skye.utils.cli:main"
 
 [project.optional-dependencies]
+# Model providers: each has one built-in stdlib REST adapter (Requirement 20); vendor SDKs are
+# dev/test oracles only. The extras exist so `pip install skyeai[openai]` etc. keep working.
 openai = []
 anthropic = []
-bedrock = []
+bedrock = []  # SigV4 is in the stdlib (auth/sigv4.py); boto3 is not needed
 google = []
 cohere = []
+
+# Exact token counts for gpt-*/o1/o3 models (decision D33); the library falls back to a stdlib estimate when tiktoken is absent.
 tokens = ["tiktoken>=0.5"]
+
+# Individual components
+# auth: pure-Python RSA for RS256 (Google service-account JWT, Azure certificate assertion).
 auth = ["rsa>=4.9"]
 agents = []
-prompts = []
-tools = []
-mcp = ["fastmcp-slim[client]>=4.0"]
+prompts = []  # empty extra: the template engine is standard library
+tools = []  # empty extra: a module of the core, no third-party libraries
+# mcp: fastmcp, the optional full-capability substitute for the built-in stdlib MCP client,
+# chosen only by create_mcp_client(target, impl="fastmcp") (Requirement 21).
+mcp = ["fastmcp-slim[client]>=4.0"]  # client only: full fastmcp also pulls the server stack (pyyaml, watchfiles, websockets, jsonref)
+# memory: no store driver of its own; install the extra of the backend you store in (decision D99).
 memory = []
+# Store backends: one extra per backend, never per component (decisions D96, D99, D100). In-memory, file and the
+# durable function need none; the RDS Data API driver of PostgreSQL needs only boto3.
 redis = ["redis>=5.0"]
-valkey = ["valkey>=6.0"]
-postgres = ["pg8000>=1.30"]
-postgres-asyncpg = ["asyncpg>=0.29"]
-aws = ["boto3>=1.28"]
+valkey = ["valkey>=6.0"]  # valkey-py, same API as redis-py; preferred by RedisBackend when installed (D102)
+postgres = ["pg8000>=1.30"]  # pure Python, any PostgreSQL
+postgres-asyncpg = ["asyncpg>=0.29"]  # compiled, the fastest PostgreSQL driver
+aws = ["boto3>=1.28"]  # DynamoDB and the RDS Data API outside AWS Lambda (preinstalled in Lambda)
 guard = []
-teams = []
-flows = []
-observe = []
+teams = []  # empty extra: a module of the core, no third-party libraries
+flows = []  # empty extra: a module of the core, no third-party libraries
+observe = []  # nothing imports a telemetry library yet; declare it with the code that does
+
+# Convenience bundles
 llm-providers = ["tiktoken>=0.5"]
 embedding-providers = ["tiktoken>=0.5"]
 all-providers = ["tiktoken>=0.5"]
 providers = ["tiktoken>=0.5"]
-all = ["tiktoken>=0.5", "redis>=5.0", "valkey>=6.0", "pg8000>=1.30", "asyncpg>=0.29", "fastmcp-slim[client]>=4.0", "rsa>=4.9"]
+# boto3 is left out of `all`: it is the AWS SDK, preinstalled in AWS Lambda; install `skyeai[aws]` outside it.
+all = [
+    "tiktoken>=0.5",
+    "redis>=5.0",
+    "valkey>=6.0",
+    "pg8000>=1.30",
+    "asyncpg>=0.29",
+    "fastmcp-slim[client]>=4.0",
+    "rsa>=4.9",
+]
 
 [dependency-groups]
 dev = [
-    "pytest>=7.0", "pytest-asyncio>=0.21", "pytest-cov>=4.0", "black>=23.0", "ruff>=0.1", "mypy>=1.0",
-    "types-requests>=2.31", "responses>=0.23", "requests>=2.31", "httpx>=0.24",
-    "openai>=1.0", "anthropic>=0.25", "boto3>=1.28", "google-cloud-aiplatform>=1.38", "fastmcp>=2.0",
+    "pytest>=7.0",
+    "pytest-asyncio>=0.21",
+    "pytest-cov>=4.0",
+    "black>=23.0",
+    "ruff>=0.1",
+    "mypy>=1.0",
+    "types-requests>=2.31",
+    "responses>=0.23",
+    "requests>=2.31",
+    "httpx>=0.24",
+    # Official vendor SDKs + fastmcp: differential-test validation oracles only (Requirement 14).
+    # This dev group is the single validation home: never a runtime dependency (Requirement 20).
+    "openai>=1.0",
+    "anthropic>=0.25",
+    "boto3>=1.28",
+    "google-cloud-aiplatform>=1.38",
+    "fastmcp>=2.0",
 ]
-docs = ["mkdocs>=1.6,<2", "mkdocs-material>=9.5", "mkdocstrings[python]>=0.26", "mkdocs-git-revision-date-localized-plugin>=1.2"]
+docs = [
+    "mkdocs>=1.6,<2",
+    "mkdocs-material>=9.5",
+    "mkdocstrings[python]>=0.26",  # the Python API reference, from the docstrings (D103)
+    "mkdocs-git-revision-date-localized-plugin>=1.2",  # page dates from git (D103)
+]
 
 [build-system]
 requires = ["hatchling"]
@@ -93,7 +135,11 @@ python_classes = ["Test*"]
 python_functions = ["test_*"]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
-markers = ["stress: marks stress tests", "differential: marks differential tests", "budget: marks budget tests"]
+markers = [
+    "stress: marks tests as stress tests (deselect with '-m \"not stress\"')",
+    "differential: built-in vs official-SDK equivalence tests (dev env only; run with 'make differential')",
+    "budget: installs Skye in clean environments to check size budgets (needs uv and network; run with '-m budget')",
+]
 addopts = "-m 'not budget'"
 
 [tool.coverage.run]
@@ -101,7 +147,16 @@ source = ["src"]
 omit = ["*/tests/*"]
 
 [tool.coverage.report]
-exclude_lines = ["pragma: no cover", "def __repr__", "raise AssertionError", "raise NotImplementedError", "if __name__ == .__main__.", "if TYPE_CHECKING:", "@abstractmethod"]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+    "if TYPE_CHECKING:",
+    "@abstractmethod",
+]
 
 [tool.hatch.build.targets.wheel]
+# The distribution is `skyeai`; the import package is `skye`.
 packages = ["src/skye"]
