@@ -20,17 +20,14 @@ classifiers = [
 ]
 dependencies = []  # the core is the standard library only (decision D49; supersedes the pydantic and tenacity entries)
 
-
 [project.urls]
 Homepage = "https://github.com/ggiallo28/skye"
 Documentation = "https://skye.readthedocs.io"
 Repository = "https://github.com/ggiallo28/skye"
 Issues = "https://github.com/ggiallo28/skye/issues"
 
-
 [project.scripts]
 skye = "skye.utils.cli:main"
-
 
 [project.optional-dependencies]
 # Model providers: each has one built-in stdlib REST adapter (Requirement 20); vendor SDKs are
@@ -41,10 +38,8 @@ bedrock = []  # SigV4 is in the stdlib (auth/sigv4.py); boto3 is not needed
 google = []
 cohere = []
 
-
 # Exact token counts for gpt-*/o1/o3 models (decision D33); the library falls back to a stdlib estimate when tiktoken is absent.
 tokens = ["tiktoken>=0.5"]
-
 
 # Individual components
 # auth: pure-Python RSA for RS256 (Google service-account JWT, Azure certificate assertion).
@@ -65,3 +60,103 @@ postgres = ["pg8000>=1.30"]  # pure Python, any PostgreSQL
 postgres-asyncpg = ["asyncpg>=0.29"]  # compiled, the fastest PostgreSQL driver
 aws = ["boto3>=1.28"]  # DynamoDB and the RDS Data API outside AWS Lambda (preinstalled in Lambda)
 guard = []
+teams = []  # empty extra: a module of the core, no third-party libraries
+flows = []  # empty extra: a module of the core, no third-party libraries
+observe = []  # nothing imports a telemetry library yet; declare it with the code that does
+
+# Convenience bundles
+llm-providers = ["tiktoken>=0.5"]
+embedding-providers = ["tiktoken>=0.5"]
+all-providers = ["tiktoken>=0.5"]
+providers = ["tiktoken>=0.5"]
+# boto3 is left out of `all`: it is the AWS SDK, preinstalled in AWS Lambda; install `skyeai[aws]` outside it.
+all = [
+    "tiktoken>=0.5",
+    "redis>=5.0",
+    "valkey>=6.0",
+    "pg8000>=1.30",
+    "asyncpg>=0.29",
+    "fastmcp-slim[client]>=4.0",
+    "rsa>=4.9",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=7.0",
+    "pytest-asyncio>=0.21",
+    "pytest-cov>=4.0",
+    "black>=23.0",
+    "ruff>=0.1",
+    "mypy>=1.0",
+    "types-requests>=2.31",
+    "responses>=0.23",
+    "requests>=2.31",
+    "httpx>=0.24",
+    # Official vendor SDKs + fastmcp: differential-test validation oracles only (Requirement 14).
+    # This dev group is the single validation home: never a runtime dependency (Requirement 20).
+    "openai>=1.0",
+    "anthropic>=0.25",
+    "boto3>=1.28",
+    "google-cloud-aiplatform>=1.38",
+    "fastmcp>=2.0",
+]
+docs = [
+    "mkdocs>=1.6,<2",
+    "mkdocs-material>=9.5",
+    "mkdocstrings[python]>=0.26",  # the Python API reference, from the docstrings (D103)
+    "mkdocs-git-revision-date-localized-plugin>=1.2",  # page dates from git (D103)
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.black]
+line-length = 100
+target-version = ['py311']
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "W", "UP"]
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+warn_return_any = true
+warn_unused_configs = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+markers = [
+    "stress: marks tests as stress tests (deselect with '-m \"not stress\"')",
+    "differential: built-in vs official-SDK equivalence tests (dev env only; run with 'make differential')",
+    "budget: installs Skye in clean environments to check size budgets (needs uv and network; run with '-m budget')",
+]
+addopts = "-m 'not budget'"
+
+[tool.coverage.run]
+source = ["src"]
+omit = ["*/tests/*"]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+    "if TYPE_CHECKING:",
+    "@abstractmethod",
+]
+
+[tool.hatch.build.targets.wheel]
+# The distribution is `skyeai`; the import package is `skye`.
+packages = ["src/skye"]
